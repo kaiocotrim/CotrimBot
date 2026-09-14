@@ -1,11 +1,11 @@
 import express from "express";
 import { prisma } from "./lib/prisma.js";
 
-const app = express();
+export const app = express();
 
 app.use(express.json());
 
-// GET /contacts - Ele retorna todos os contatos
+// GET /contacts - Ele retorna todos os contatos ok
 app.get("/contacts", async (req, res) => {
   const contacts = await prisma.contact.findMany();
 
@@ -13,7 +13,7 @@ app.get("/contacts", async (req, res) => {
 });
 
 
-// POST /contacts - Ele cria um novo contato
+// POST /contacts - Ele cria um novo contato ok 
 app.post("/contacts", async (req, res) => {
   const { name, phone } = req.body;
 
@@ -42,7 +42,7 @@ app.get("/contacts/:id", async (req, res) => {
   res.json(contact);
 });
 
-// PUT /contacts/:id - Ele atualiza um contato específico pelo ID
+// PUT /contacts/:id - Ele atualiza um contato específico pelo ID ok 
 app.patch("/contacts/:id", async (req, res) => {
   const id = Number(req.params.id);
 
@@ -98,7 +98,7 @@ app.delete("/contacts/:id", async (req, res) => {
   res.status(204).send();
 });
 
-// POST /contacts/:id/messages - Ele cria uma nova mensagem para um contato específico
+// POST /contacts/:id/messages - Ele cria uma nova mensagem para um contato específico ok 
 
 app.post("/contacts/:id/messages", async (req, res) => {
   const contactId = Number(req.params.id);
@@ -128,7 +128,7 @@ app.post("/contacts/:id/messages", async (req, res) => {
   res.status(201).json(message);
 });
 
-// GET /contacts/:id/messages - Ele retorna todas as mensagens de um contato específico
+// GET /contacts/:id/messages - Ele retorna todas as mensagens de um contato específico ok
 
 app.get("/contacts/:id/messages", async (req, res) => {
   const contactId = Number(req.params.id);
