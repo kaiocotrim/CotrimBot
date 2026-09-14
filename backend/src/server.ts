@@ -1,10 +1,10 @@
 import express from "express";
 import { prisma } from "./lib/prisma.js";
-
+import webhookRoutes from "./routes/webhook.routes.js";
 export const app = express();
 
 app.use(express.json());
-
+app.use(webhookRoutes);
 // GET /contacts - Ele retorna todos os contatos ok
 app.get("/contacts", async (req, res) => {
   const contacts = await prisma.contact.findMany();
