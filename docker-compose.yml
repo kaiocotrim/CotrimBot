@@ -1,0 +1,20 @@
+services:
+  mysql:
+    image: mysql:8.4
+
+    container_name: cotrimbot-mysql
+
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: cotrimbot
+      MYSQL_USER: cotrimbot
+      MYSQL_PASSWORD: cotrimbot123
+
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:
