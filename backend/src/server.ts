@@ -98,6 +98,63 @@ app.delete("/contacts/:id", async (req, res) => {
   res.status(204).send();
 });
 
+// POST /contacts/:id/messages - Ele cria uma nova mensagem para um contato específico
+
+app.post("/contacts/:id/messages", async (req, res) => {
+  const contactId = Number(req.params.id);
+
+  const { content, direction } = req.body;
+
+  const contact = await prisma.contact.findUnique({
+    where: {
+      id: contactId,
+    },
+  });
+
+  if (!contact) {
+    return res.status(404).json({
+      message: "Contato não encontrado",
+    });
+  }
+
+  const message = await prisma.message.create({
+    data: {
+      content,
+      direction,
+      contactId,
+    },
+  });
+
+  res.status(201).json(message);
+});
+
+// GET /contacts/:id/messages - Ele retorna todas as mensagens de um contato específico
+
+app.get("/contacts/:id/messages", async (req, res) => {
+  const contactId = Number(req.params.id);
+
+  const contact = await prisma.contact.findUnique({
+    where: {
+      id: contactId,
+    },
+  });
+  if (!contact) {
+    return res.status(404).json({
+      message: "Contato não encontrado",
+    });
+  }
+
+  const messages = await prisma.message.findMany({
+    where: {
+      contactId,
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
+
+  res.json(messages);
+});
 
 // Porta de escuta do servidor
 app.listen(3333, () => {
