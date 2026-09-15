@@ -1,8 +1,6 @@
 import type { Request, Response } from "express";
 
 import { prisma } from "../lib/prisma.js";
-import { sendWhatsAppMessage } from "../services/evolution.service.js";
-import { getAutomaticReply } from "../services/bot.service.js";
 
 export async function whatsappWebhook(req: Request, res: Response) {
   const body = req.body;
@@ -123,60 +121,6 @@ export async function whatsappWebhook(req: Request, res: Response) {
     mensagem: incomingMessage.content,
     externalId: incomingMessage.externalId,
   });
-
-  try {
-    // Gera uma resposta automática baseada no conteúdo recebido.
-    const replyText = getAutomaticReply(content);
-
-    if (!replyText) {
-      console.log("Mensagem recebida, mas nenhuma resposta automática foi definida.");
-
-      return res.status(200).json({
-        received: true,
-      });
-    }
-
-    // Envia a resposta pelo WhatsApp através da Evolution API.
-    const evolutionResponse = await sendWhatsAppMessage(
-      contact.phone,
-      replyText
-    );
-
-    // Recupera o ID original da mensagem enviada.
-    const replyExternalId = evolutionResponse?.key?.id;
-
-    // Só salvamos a resposta no banco se a Evolution
-    // realmente tiver retornado um ID para a mensagem.
-    if (replyExternalId) {
-      // OUTGOING significa que a mensagem saiu do CotrimBot
-      // em direção ao usuário.
-      await prisma.message.create({
-        data: {
-          externalId: replyExternalId,
-          content: replyText,
-          direction: "OUTGOING",
-          contactId: contact.id,
-        },
-      });
-
-      console.log("Resposta automática enviada e salva:");
-      console.log({
-        contato: contact.name,
-        telefone: contact.phone,
-        mensagem: replyText,
-        externalId: replyExternalId,
-      });
-    } else {
-      console.log(
-        "Resposta enviada, mas a Evolution não retornou externalId."
-      );
-    }
-  } catch (error) {
-    console.error(
-      "Erro ao enviar resposta automática:",
-      error
-    );
-  }
 
   // Respondemos 200 para informar à Evolution
   // que o webhook foi recebido corretamente.
