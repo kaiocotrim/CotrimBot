@@ -2,6 +2,7 @@ import express from "express";
 import { prisma } from "./lib/prisma.js";
 import webhookRoutes from "./routes/webhook.routes.js";
 export const app = express();
+import { sendWhatsAppMessage } from "./services/evolution.service.js";
 
 app.use(express.json());
 app.use(webhookRoutes);
@@ -155,6 +156,63 @@ app.get("/contacts/:id/messages", async (req, res) => {
 
   res.json(messages);
 });
+
+
+// POST /contacts/:id/send - Ele envia uma mensagem para um contato específico via Evolution API
+
+app.post("/contacts/:id/send", async (req, res) => {
+  const contactId = Number(req.params.id);
+  const { text } = req.body;
+
+  const contact = await prisma.contact.findUnique({
+    where: {
+      id: contactId,
+    },
+  });
+
+  if (!contact) {
+    return res.status(404).json({
+      message: "Contato não encontrado",
+    });
+  }
+
+  if (!text) {
+    return res.status(400).json({
+      message: "Texto da mensagem é obrigatório",
+    });
+  }
+
+  try {
+    const evolutionResponse = await sendWhatsAppMessage(
+      contact.phone,
+      text
+    );
+
+    const externalId = evolutionResponse.key?.id;
+
+    const message = await prisma.message.create({
+      data: {
+        externalId,
+        content: text,
+        direction: "OUTGOING",
+        contactId: contact.id,
+      },
+    });
+
+    return res.status(201).json({
+      message,
+      evolution: evolutionResponse,
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      message: "Erro ao enviar mensagem",
+    });
+  }
+});
+
+
 
 // Porta de escuta do servidor
 app.listen(3333, () => {
