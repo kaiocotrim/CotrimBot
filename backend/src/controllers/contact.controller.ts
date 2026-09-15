@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
+import { getProfilePicture } from "../services/evolution.service.js";
 
 // GET /contacts - Retorna todos os contatos
 export async function getContacts(_req: Request, res: Response) {
@@ -21,6 +22,33 @@ export async function getContactById(req: Request, res: Response) {
   }
 
   res.json(contact);
+}
+
+// GET /contacts/:id/avatar - Busca a foto do contato na Evolution API
+export async function getContactAvatar(req: Request, res: Response) {
+  const id = Number(req.params.id);
+
+  const contact = await prisma.contact.findUnique({
+    where: { id },
+  });
+
+  if (!contact) {
+    return res.status(404).json({ message: "Contato não encontrado" });
+  }
+
+  try {
+    const profile = await getProfilePicture(contact.phone);
+
+    return res.json({
+      profilePictureUrl: profile.profilePictureUrl ?? null,
+    });
+  } catch (error) {
+    console.error("Erro ao buscar avatar:", error);
+
+    return res.status(500).json({
+      message: "Erro ao buscar foto do contato",
+    });
+  }
 }
 
 // POST /contacts - Cria um novo contato

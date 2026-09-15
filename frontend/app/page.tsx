@@ -6,6 +6,7 @@ type Contact = {
   id: number;
   name: string;
   phone: string;
+  profilePictureUrl?: string | null;
 };
 
 type Message = {
@@ -15,6 +16,10 @@ type Message = {
   direction: "INCOMING" | "OUTGOING";
   contactId: number;
   createdAt: string;
+};
+
+type ContactAvatar = {
+  profilePictureUrl: string | null;
 };
 
 const API_URL = "http://localhost:3333";
@@ -45,9 +50,36 @@ export default function Home() {
         throw new Error("Erro ao buscar contatos");
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as Contact[];
+      const contactsWithAvatars = await Promise.all(
+        data.map(async (contact) => {
+          try {
+            const avatarResponse = await fetch(
+              `${API_URL}/contacts/${contact.id}/avatar`
+            );
 
-      setContacts(data);
+            if (!avatarResponse.ok) {
+              return contact;
+            }
+
+            const avatar = (await avatarResponse.json()) as ContactAvatar;
+
+            return {
+              ...contact,
+              profilePictureUrl: avatar.profilePictureUrl,
+            };
+          } catch (error) {
+            console.error(
+              `Erro ao carregar avatar do contato ${contact.id}:`,
+              error
+            );
+
+            return contact;
+          }
+        })
+      );
+
+      setContacts(contactsWithAvatars);
     } catch (error) {
       console.error("Erro ao carregar contatos:", error);
     }
@@ -210,12 +242,26 @@ export default function Home() {
                 return (
                   <div
                     key={message.id}
-                    className={`flex ${
+                    className={`flex items-center gap-2 ${
                       outgoing
                         ? "justify-end"
                         : "justify-start"
                     }`}
                   >
+                    {!outgoing && (
+                      selectedContact.profilePictureUrl ? (
+                        <img
+                          src={selectedContact.profilePictureUrl}
+                          alt={selectedContact.name}
+                          className="h-10 w-10 shrink-0 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-700 font-semibold">
+                          {selectedContact.name.charAt(0).toUpperCase()}
+                        </div>
+                      )
+                    )}
+
                     <div
                       className={`max-w-[70%] rounded-[24px] px-4 py-2 ${
                         outgoing
@@ -231,6 +277,7 @@ export default function Home() {
                           : "INCOMING"}
                       </p>
                     </div>
+
                   </div>
                 );
               })}

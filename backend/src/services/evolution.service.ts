@@ -50,3 +50,40 @@ export async function sendWhatsAppMessage(
   // A resposta inclui key.id, identificador externo usado ao persistir a mensagem.
   return response.json();
 }
+
+type ProfilePictureResponse = {
+  profilePictureUrl?: string | null;
+};
+
+/** Busca a URL da foto de perfil de um contato na Evolution API. */
+export async function getProfilePicture(
+  number: string
+): Promise<ProfilePictureResponse> {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE;
+
+  if (!apiUrl || !apiKey || !instance) {
+    throw new Error("Configuração da Evolution API incompleta");
+  }
+
+  const response = await fetch(
+    `${apiUrl}/chat/fetchProfilePictureUrl/${instance}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: apiKey,
+      },
+      body: JSON.stringify({ number }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+
+    throw new Error(`Erro ao buscar foto de perfil: ${error}`);
+  }
+
+  return (await response.json()) as ProfilePictureResponse;
+}
