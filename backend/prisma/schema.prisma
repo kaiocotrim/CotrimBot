@@ -25,11 +25,11 @@ model Message {
   contactId Int
   contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
 }
 
 enum MessageDirection {
   INCOMING
   OUTGOING
 }
-

@@ -6,6 +6,7 @@ import { prisma } from "../lib/prisma.js";
 
 // Importa o service que concentra toda a comunicação HTTP com a Evolution API.
 import { sendWhatsAppMessage } from "../services/evolution.service.js";
+import { getSatisfactionSurvey } from "../services/bot.service.js";
 
 // GET /contacts/:id/messages - Retorna as mensagens de um contato
 export async function getMessages(req: Request, res: Response) {
@@ -25,30 +26,6 @@ export async function getMessages(req: Request, res: Response) {
   });
 
   res.json(messages);
-}
-
-// POST /contacts/:id/messages - Cria uma mensagem para um contato
-export async function createMessage(req: Request, res: Response) {
-  const contactId = Number(req.params.id);
-  const { content, direction } = req.body;
-
-  const contact = await prisma.contact.findUnique({
-    where: { id: contactId },
-  });
-
-  if (!contact) {
-    return res.status(404).json({ message: "Contato não encontrado" });
-  }
-
-  const message = await prisma.message.create({
-    data: {
-      content,
-      direction,
-      contactId,
-    },
-  });
-
-  res.status(201).json(message);
 }
 
 /**
@@ -121,4 +98,63 @@ export async function sendMessageToContact(req: Request, res: Response) {
       message: "Erro ao enviar mensagem",
     });
   }
+}
+
+// Envia a pesquisa de satisfação ao encerrar o atendimento com o bot.
+export async function closeConversationWithBot(req: Request, res: Response) {
+  const contactId = Number(req.params.id);
+  const contact = await prisma.contact.findUnique({ where: { id: contactId } });
+
+  if (!contact) {
+    return res.status(404).json({ message: "Contato não encontrado" });
+  }
+
+  try {
+    const survey = getSatisfactionSurvey();
+    const evolutionResponse = await sendWhatsAppMessage(contact.phone, survey);
+    const externalId = evolutionResponse?.key?.id;
+
+    if (!externalId) {
+      throw new Error("A Evolution API não retornou o ID da mensagem");
+    }
+
+    const message = await prisma.message.create({
+      data: {
+        externalId,
+        content: survey,
+        direction: "OUTGOING",
+        contactId,
+      },
+    });
+
+    return res.status(201).json({ message, evolution: evolutionResponse });
+  } catch (error) {
+    console.error("Erro ao encerrar chamado com o bot:", error);
+    return res.status(500).json({ message: "Erro ao enviar pesquisa de satisfação" });
+  }
+}
+
+// PATCH /contacts/:id/messages/read - Marca as mensagens recebidas como lidas
+
+export async function markMessagesAsRead(
+  req: Request,
+  res: Response
+) {
+  const contactId = Number(req.params.id);
+
+  await prisma.message.updateMany({
+    where: {
+      contactId,
+      direction: "INCOMING",
+      readAt: null,
+    },
+
+    data: {
+      readAt: new Date(),
+    },
+  });
+
+  return res.status(200).json({
+    message: "Mensagens marcadas como lidas",
+  });
 }

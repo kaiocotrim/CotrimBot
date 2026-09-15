@@ -1,23 +1,55 @@
 // Importa o Router do Express para agrupar as rotas relacionadas a mensagens.
 import { Router } from "express";
 
-// Os controllers recebem a requisição, executam o fluxo necessário e produzem
-// a resposta HTTP. A rota apenas escolhe qual controller será executado.
+// Importa os controllers responsáveis pelas regras executadas em cada rota.
+// A rota apenas recebe a URL e direciona a requisição para o controller correto.
 import {
-  createMessage,
+  closeConversationWithBot,
   getMessages,
   sendMessageToContact,
+  markMessagesAsRead,
 } from "../controllers/message.controller.js";
 
-// Cria o agrupador das rotas de mensagens registrado posteriormente no server.ts.
+// Cria o agrupador das rotas de mensagens.
+// Esse router será registrado posteriormente no server.ts.
 export const messageRouter = Router();
 
-// Lista, em ordem cronológica, as mensagens pertencentes a um contato.
-messageRouter.get("/contacts/:id/messages", getMessages);
+/**
+ * GET /contacts/:id/messages
+ *
+ * Retorna todas as mensagens relacionadas a um contato,
+ * normalmente em ordem cronológica.
+ */
+messageRouter.get(
+  "/contacts/:id/messages",
+  getMessages
+);
 
-// Registra manualmente uma mensagem para um contato existente.
-messageRouter.post("/contacts/:id/messages", createMessage);
+/**
+ * POST /contacts/:id/send
+ *
+ * Envia uma nova mensagem para o WhatsApp do contato
+ * através da Evolution API e salva a mensagem no banco
+ * como OUTGOING.
+ */
+messageRouter.post(
+  "/contacts/:id/send",
+  sendMessageToContact
+);
 
-// Envia uma mensagem ao WhatsApp do contato pela Evolution API e, após o envio,
-// registra essa mensagem no banco de dados.
-messageRouter.post("/contacts/:id/send", sendMessageToContact);
+// Encerra o atendimento enviando a pesquisa de satisfação do bot.
+messageRouter.post(
+  "/contacts/:id/close-with-bot",
+  closeConversationWithBot
+);
+
+/**
+ * PATCH /contacts/:id/messages/read
+ *
+ * Marca como lidas todas as mensagens INCOMING
+ * desse contato que ainda possuem readAt = null.
+ */
+messageRouter.patch(
+  "/contacts/:id/messages/read",
+  markMessagesAsRead
+);

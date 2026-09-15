@@ -4,9 +4,39 @@ import { getProfilePicture } from "../services/evolution.service.js";
 
 // GET /contacts - Retorna todos os contatos
 export async function getContacts(_req: Request, res: Response) {
-  const contacts = await prisma.contact.findMany();
+  const contacts = await prisma.contact.findMany({
+    include: {
+      // Traz somente a mensagem mais recente de cada contato
+      messages: {
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: 1,
+      },
 
-  res.json(contacts);
+      // Conta quantas mensagens recebidas ainda não foram lidas
+      _count: {
+        select: {
+          messages: {
+            where: {
+              direction: "INCOMING",
+              readAt: null,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  // Transforma _count.messages em unreadCount
+  const result = contacts.map(({ _count, ...contact }) => {
+    return {
+      ...contact,
+      unreadCount: _count.messages,
+    };
+  });
+
+  return res.json(result);
 }
 
 // GET /contacts/:id - Retorna um contato especifico pelo ID
