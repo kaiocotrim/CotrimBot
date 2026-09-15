@@ -1,8 +1,9 @@
 services:
+  # Banco principal do CotrimBot
   mysql:
     image: mysql:8.4
-
     container_name: cotrimbot-mysql
+    restart: unless-stopped
 
     environment:
       MYSQL_ROOT_PASSWORD: root123
@@ -16,5 +17,68 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
 
+  # Banco interno da Evolution API
+  postgres:
+    image: postgres:16
+    container_name: cotrimbot-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: evolution123
+      POSTGRES_DB: evolution
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Cache da Evolution
+  redis:
+    image: redis:7
+    container_name: cotrimbot-redis
+    restart: unless-stopped
+
+    ports:
+      - "6379:6379"
+
+    volumes:
+      - redis_data:/data
+
+  # WhatsApp / Evolution API
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    container_name: cotrimbot-evolution
+    restart: unless-stopped
+
+    depends_on:
+      - postgres
+      - redis
+
+    ports:
+      - "8090:8080"
+
+    environment:
+      SERVER_URL: http://localhost:8090
+      SERVER_DISABLE_MANAGER: "false"
+
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:evolution123@postgres:5432/evolution
+      DATABASE_CONNECTION_CLIENT_NAME: evolution
+
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379/6
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_REDIS_SAVE_INSTANCES: "true"
+
+      AUTHENTICATION_API_KEY: cotrimbot-dev-key
+
+    volumes:
+      - evolution_instances:/evolution/instances
+
 volumes:
   mysql_data:
+  postgres_data:
+  redis_data:
+  evolution_instances:
