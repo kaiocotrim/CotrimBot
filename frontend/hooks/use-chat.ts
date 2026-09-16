@@ -49,6 +49,8 @@ export function useChat() {
       const isOpenConversation =
         selectedContact?.id === data.contact.id;
 
+      const isIncoming =
+        data.message.direction === "INCOMING";
       // =====================================================
       // ATUALIZA A CONVERSA ABERTA
       // =====================================================
@@ -77,9 +79,12 @@ export function useChat() {
 
         // Como o usuário já está olhando essa conversa,
         // marcamos as mensagens recebidas como lidas.
-        await markMessagesAsRead(
-          data.contact.id
-        );
+        if (isIncoming) {
+          await markMessagesAsRead(
+            data.contact.id
+          );
+        }
+
       }
 
       // =====================================================
@@ -118,7 +123,9 @@ export function useChat() {
           // aumentamos o contador.
           unreadCount: isOpenConversation
             ? 0
-            : (existingContact?.unreadCount ?? 0) + 1,
+            : isIncoming
+              ? (existingContact?.unreadCount ?? 0) + 1
+              : (existingContact?.unreadCount ?? 0),
         };
 
         // Remove a versão antiga desse contato.
@@ -287,8 +294,7 @@ export function useChat() {
   // =========================================================
 
   async function sendMessage() {
-    const content =
-      text.trim();
+    const content = text.trim();
 
     if (
       !selectedContact ||
@@ -307,28 +313,10 @@ export function useChat() {
         content
       );
 
-      // Limpa o campo de texto.
+      // O WebSocket será responsável por
+      // adicionar a mensagem na conversa
+      // e atualizar a sidebar.
       setText("");
-
-      // Atualiza as mensagens da conversa.
-      const updatedMessages =
-        await getMessages(
-          selectedContact.id
-        );
-
-      setMessages(
-        updatedMessages
-      );
-
-      // Atualiza a sidebar para mostrar
-      // a mensagem enviada como a mais recente
-      // e mover o contato para o topo.
-      const updatedContacts =
-        await getContacts();
-
-      setContacts(
-        updatedContacts
-      );
     } catch (error) {
       console.error(
         "Erro ao enviar mensagem:",
@@ -358,23 +346,6 @@ export function useChat() {
         selectedContact.id
       );
 
-      // Atualiza a conversa.
-      const updatedMessages =
-        await getMessages(
-          selectedContact.id
-        );
-
-      setMessages(
-        updatedMessages
-      );
-
-      // Atualiza a sidebar.
-      const updatedContacts =
-        await getContacts();
-
-      setContacts(
-        updatedContacts
-      );
     } catch (error) {
       console.error(
         "Erro ao encerrar chamado com o bot:",

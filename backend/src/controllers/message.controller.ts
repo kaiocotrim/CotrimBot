@@ -1,3 +1,6 @@
+// Importa o servidor de socket para enviar notificações em tempo real.
+import { getSocketServer } from "../lib/socket.js";
+
 // Importa somente os tipos HTTP do Express usados nas assinaturas dos controllers.
 import type { Request, Response } from "express";
 
@@ -73,6 +76,12 @@ export async function sendMessageToContact(req: Request, res: Response) {
     // mensagem. Ele permite relacionar o registro local ao envio externo.
     const externalId = evolutionResponse.key?.id;
 
+    if (!externalId) {
+      throw new Error(
+        "A Evolution API não retornou o ID da mensagem"
+      );
+    }
+
     // Salvamos como OUTGOING porque a mensagem saiu do CotrimBot em direção ao
     // WhatsApp do contato, em vez de ter sido recebida pelo webhook.
     const message = await prisma.message.create({
@@ -82,6 +91,15 @@ export async function sendMessageToContact(req: Request, res: Response) {
         direction: "OUTGOING",
         contactId: contact.id,
       },
+    });
+
+    // Avisa os frontends conectados que uma nova
+    // mensagem OUTGOING foi salva.
+    const io = getSocketServer();
+
+    io.emit("new_message", {
+      message,
+      contact,
     });
 
     // Mantém a resposta atual: registro local e resposta original da Evolution.
@@ -125,6 +143,15 @@ export async function closeConversationWithBot(req: Request, res: Response) {
         direction: "OUTGOING",
         contactId,
       },
+    });
+
+    // Avisa os frontends conectados que uma nova
+    // mensagem OUTGOING foi salva.
+    const io = getSocketServer();
+
+    io.emit("new_message", {
+      message,
+      contact,
     });
 
     return res.status(201).json({ message, evolution: evolutionResponse });
