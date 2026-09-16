@@ -1,6 +1,8 @@
 "use client";
 
+import { socket } from "@/lib/socket";
 import { useEffect, useState } from "react";
+
 import {
   closeConversationWithBot,
   getContacts,
@@ -8,28 +10,132 @@ import {
   markMessagesAsRead,
   postMessage,
 } from "@/lib/chat-api";
+
 import type { Contact, Message } from "@/types/chat";
 
-const MESSAGE_REFRESH_INTERVAL = 2000;
-const CONTACT_REFRESH_INTERVAL = 3000;
-
-// Concentra o estado e as ações da conversa fora dos componentes visuais.
+// Concentra o estado e as ações da conversa
+// fora dos componentes visuais.
 export function useChat() {
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [selectedContact, setSelectedContact] =
+    useState<Contact | null>(null);
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
+
   const [sending, setSending] = useState(false);
   const [closing, setClosing] = useState(false);
 
-  // Carrega a lista inicial de contatos e seus avatares.
+  // Escuta novas mensagens enviadas pelo backend.
+  useEffect(() => {
+    async function handleNewMessage(data: {
+      message: Message;
+      contact: Contact;
+    }) {
+      console.log(
+        "📩 Nova mensagem recebida pelo WebSocket:",
+        data
+      );
+
+      // Se a mensagem pertence à conversa aberta,
+      // adiciona imediatamente na tela.
+      if (selectedContact?.id === data.contact.id) {
+        setMessages((currentMessages) => {
+          const alreadyExists = currentMessages.some(
+            (message) =>
+              message.externalId ===
+              data.message.externalId
+          );
+
+          if (alreadyExists) {
+            return currentMessages;
+          }
+
+          return [
+            ...currentMessages,
+            data.message,
+          ];
+        });
+
+        // Como a conversa já está aberta,
+        // marca as mensagens como lidas.
+        await markMessagesAsRead(
+          data.contact.id
+        );
+      }
+
+      // Atualiza a sidebar:
+      // última mensagem e unreadCount.
+      const updatedContacts =
+        await getContacts();
+
+      setContacts(updatedContacts);
+    }
+
+    socket.on(
+      "new_message",
+      handleNewMessage
+    );
+
+    return () => {
+      socket.off(
+        "new_message",
+        handleNewMessage
+      );
+    };
+  }, [selectedContact]);
+
+  // Mantém a conexão com o backend via Socket.IO.
+  useEffect(() => {
+    function handleConnect() {
+      console.log(
+        "🟢 Conectado ao WebSocket:",
+        socket.id
+      );
+    }
+
+    function handleDisconnect() {
+      console.log(
+        "🔴 Desconectado do WebSocket"
+      );
+    }
+
+    socket.on(
+      "connect",
+      handleConnect
+    );
+
+    socket.on(
+      "disconnect",
+      handleDisconnect
+    );
+
+    socket.connect();
+
+    return () => {
+      socket.off(
+        "connect",
+        handleConnect
+      );
+
+      socket.off(
+        "disconnect",
+        handleDisconnect
+      );
+
+      socket.disconnect();
+    };
+  }, []);
+
+  // Carrega a lista de contatos
+  // apenas quando a página abre.
   useEffect(() => {
     let active = true;
 
-    // Função responsável por buscar a lista atualizada de contatos.
     async function loadContacts() {
       try {
-        const data = await getContacts();
+        const data =
+          await getContacts();
 
         if (active) {
           setContacts(data);
@@ -42,114 +148,124 @@ export function useChat() {
       }
     }
 
-    // Busca imediatamente quando a página abre.
     loadContacts();
 
-    // Depois busca novamente a cada 3 segundos.
-    const interval = window.setInterval(() => {
-      loadContacts();
-    }, CONTACT_REFRESH_INTERVAL);
-
-    // Quando o componente for desmontado,
-    // interrompe o polling.
     return () => {
       active = false;
-      window.clearInterval(interval);
     };
   }, []);
 
-  // Abre a conversa, marca as mensagens como lidas e atualiza a sidebar.
+  // Quando seleciona um contato:
+  // carrega o histórico e marca como lido.
   useEffect(() => {
-    if (!selectedContact) return;
+    if (!selectedContact) {
+      return;
+    }
 
     let active = true;
 
     getMessages(selectedContact.id)
       .then((data) => {
-        if (active) setMessages(data);
-        return markMessagesAsRead(selectedContact.id);
+        if (active) {
+          setMessages(data);
+        }
+
+        return markMessagesAsRead(
+          selectedContact.id
+        );
       })
       .then(() => getContacts())
       .then((data) => {
-        if (active) setContacts(data);
+        if (active) {
+          setContacts(data);
+        }
       })
-      .catch((error) => console.error("Erro ao abrir conversa:", error));
+      .catch((error) => {
+        console.error(
+          "Erro ao abrir conversa:",
+          error
+        );
+      });
 
     return () => {
       active = false;
     };
   }, [selectedContact]);
 
-  // Mantém a conversa sincronizada com novas mensagens do WhatsApp.
-  useEffect(() => {
-    if (!selectedContact) return;
-
-    const interval = window.setInterval(async () => {
-      try {
-        // Busca as mensagens mais recentes da conversa aberta.
-        const data = await getMessages(selectedContact.id);
-
-        // Atualiza as mensagens exibidas no chat.
-        setMessages(data);
-
-        // Verifica se existe pelo menos uma mensagem recebida
-        // que ainda não foi marcada como lida.
-        const hasUnreadMessages = data.some(
-          (message) =>
-            message.direction === "INCOMING" &&
-            message.readAt === null
-        );
-
-        // Se a conversa já está aberta, consideramos
-        // essas novas mensagens como lidas.
-        if (hasUnreadMessages) {
-          await markMessagesAsRead(selectedContact.id);
-
-          // Atualiza a lista de contatos para remover
-          // o contador de mensagens não lidas da sidebar.
-          const updatedContacts = await getContacts();
-
-          setContacts(updatedContacts);
-        }
-      } catch (error) {
-        console.error(
-          "Erro ao atualizar mensagens:",
-          error
-        );
-      }
-    }, MESSAGE_REFRESH_INTERVAL);
-
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [selectedContact]);
-
+  // Envia uma mensagem pelo painel.
   async function sendMessage() {
     const content = text.trim();
-    if (!selectedContact || !content || sending) return;
+
+    if (
+      !selectedContact ||
+      !content ||
+      sending
+    ) {
+      return;
+    }
 
     try {
       setSending(true);
-      await postMessage(selectedContact.id, content);
+
+      await postMessage(
+        selectedContact.id,
+        content
+      );
+
       setText("");
-      setMessages(await getMessages(selectedContact.id));
+
+      // Atualiza a conversa.
+      setMessages(
+        await getMessages(
+          selectedContact.id
+        )
+      );
+
+      // Atualiza a sidebar.
+      setContacts(
+        await getContacts()
+      );
     } catch (error) {
-      console.error("Erro ao enviar mensagem:", error);
+      console.error(
+        "Erro ao enviar mensagem:",
+        error
+      );
     } finally {
       setSending(false);
     }
   }
 
-  // Envia a pesquisa configurada no bot e atualiza a conversa na tela.
+  // Envia a pesquisa configurada no bot.
   async function closeWithBot() {
-    if (!selectedContact || closing) return;
+    if (
+      !selectedContact ||
+      closing
+    ) {
+      return;
+    }
 
     try {
       setClosing(true);
-      await closeConversationWithBot(selectedContact.id);
-      setMessages(await getMessages(selectedContact.id));
+
+      await closeConversationWithBot(
+        selectedContact.id
+      );
+
+      setMessages(
+        await getMessages(
+          selectedContact.id
+        )
+      );
+
+      // Também atualiza a sidebar.
+      setContacts(
+        await getContacts()
+      );
     } catch (error) {
-      console.error("Erro ao encerrar chamado com o bot:", error);
+      console.error(
+        "Erro ao encerrar chamado com o bot:",
+        error
+      );
     } finally {
       setClosing(false);
     }
@@ -162,8 +278,11 @@ export function useChat() {
     text,
     sending,
     closing,
+
     setText,
+
     selectContact: setSelectedContact,
+
     sendMessage,
     closeWithBot,
   };
