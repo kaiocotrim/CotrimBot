@@ -21,6 +21,7 @@ model Message {
   externalId String           @unique
   content    String           @db.Text
   direction  MessageDirection
+  type       MessageType      @default(TEXT)
 
   contactId Int
   contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
@@ -32,4 +33,12 @@ model Message {
 enum MessageDirection {
   INCOMING
   OUTGOING
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
 }
