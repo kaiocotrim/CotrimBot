@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 
 import { prisma } from "../lib/prisma.js";
+import { getSocketServer } from "../lib/socket.js";
 
 export async function whatsappWebhook(req: Request, res: Response) {
   const body = req.body;
@@ -113,6 +114,16 @@ export async function whatsappWebhook(req: Request, res: Response) {
       contactId: contact.id,
     },
   });
+
+  const io = getSocketServer();
+
+  // Dispara um evento para os navegadores conectados.
+  io.emit("new_message", {
+    message: incomingMessage,
+    contact,
+  });
+
+  console.log("Evento new_message enviado pelo WebSocket.");
 
   console.log("Mensagem recebida salva no banco:");
   console.log({

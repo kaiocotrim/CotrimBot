@@ -28,13 +28,23 @@ export async function getContacts(_req: Request, res: Response) {
     },
   });
 
-  // Transforma _count.messages em unreadCount
-  const result = contacts.map(({ _count, ...contact }) => {
-    return {
+  // Adiciona a contagem de mensagens não lidas e ordena os contatos pela data da última mensagem
+  const result = contacts
+    .map(({ _count, ...contact }) => ({
       ...contact,
       unreadCount: _count.messages,
-    };
-  });
+    }))
+    .sort((a, b) => {
+      const dateA = a.messages[0]?.createdAt
+        ? new Date(a.messages[0].createdAt).getTime()
+        : 0;
+
+      const dateB = b.messages[0]?.createdAt
+        ? new Date(b.messages[0].createdAt).getTime()
+        : 0;
+
+      return dateB - dateA;
+    });
 
   return res.json(result);
 }
