@@ -8,8 +8,10 @@ type ChatPanelProps = {
   messages: Message[];
   text: string;
   sending: boolean;
+  closing: boolean;
   onTextChange: (text: string) => void;
   onSend: () => void;
+  onCloseWithBot: () => void;
 };
 
 // Agrupa todas as partes visuais da conversa selecionada.
@@ -18,8 +20,10 @@ export function ChatPanel({
   messages,
   text,
   sending,
+  closing,
   onTextChange,
   onSend,
+  onCloseWithBot,
 }: ChatPanelProps) {
   if (!contact) {
     return (
@@ -36,8 +40,10 @@ export function ChatPanel({
       <MessageComposer
         text={text}
         sending={sending}
+        closing={closing}
         onTextChange={onTextChange}
         onSend={onSend}
+        onCloseWithBot={onCloseWithBot}
       />
     </section>
   );

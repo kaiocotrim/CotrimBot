@@ -10,7 +10,7 @@ export default function Home() {
 
   return (
     <main className="flex h-screen bg-zinc-950 text-white">
-      <ContactSidebar
+      <ContactSidebar 
         contacts={chat.contacts}
         selectedContactId={chat.selectedContact?.id}
         onSelectContact={chat.selectContact}
@@ -21,8 +21,10 @@ export default function Home() {
         messages={chat.messages}
         text={chat.text}
         sending={chat.sending}
+        closing={chat.closing}
         onTextChange={chat.setText}
         onSend={chat.sendMessage}
+        onCloseWithBot={chat.closeWithBot}
       />
     </main>
   );

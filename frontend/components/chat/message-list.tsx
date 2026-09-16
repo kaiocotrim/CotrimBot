@@ -27,7 +27,8 @@ export function MessageList({ contact, messages }: MessageListProps) {
                 outgoing ? "bg-green-600" : "bg-zinc-800"
               }`}
             >
-              <p>{message.content}</p>
+              {/* Preserva as quebras de linha enviadas pelo backend. */}
+              <p className="whitespace-pre-wrap">{message.content}</p>
             </div>
           </div>
         );

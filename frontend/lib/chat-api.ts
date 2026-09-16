@@ -36,6 +36,18 @@ export async function getMessages(contactId: number): Promise<Message[]> {
   return parseResponse<Message[]>(response, "Erro ao buscar mensagens");
 }
 
+// Marca como lidas todas as mensagens recebidas do contato.
+export async function markMessagesAsRead(contactId: number): Promise<void> {
+  const response = await fetch(
+    `${API_URL}/contacts/${contactId}/messages/read`,
+    { method: "PATCH" }
+  );
+
+  if (!response.ok) {
+    throw new Error("Erro ao marcar mensagens como lidas");
+  }
+}
+
 export async function postMessage(contactId: number, text: string) {
   const response = await fetch(`${API_URL}/contacts/${contactId}/send`, {
     method: "POST",
@@ -44,4 +56,14 @@ export async function postMessage(contactId: number, text: string) {
   });
 
   return parseResponse(response, "Erro ao enviar mensagem");
+}
+
+// Solicita ao backend o encerramento com a pesquisa de satisfação do bot.
+export async function closeConversationWithBot(contactId: number) {
+  const response = await fetch(
+    `${API_URL}/contacts/${contactId}/close-with-bot`,
+    { method: "POST" }
+  );
+
+  return parseResponse(response, "Erro ao encerrar chamado com o bot");
 }
