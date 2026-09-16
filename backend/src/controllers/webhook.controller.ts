@@ -25,9 +25,19 @@ export async function whatsappWebhook(req: Request, res: Response) {
   }
 
   const remoteJid = data.key?.remoteJid;
+  const remoteJidAlt = data.key?.remoteJidAlt;
 
-  // Por enquanto não vamos processar mensagens de grupos.
-  if (!remoteJid || remoteJid.endsWith("@g.us")) {
+  // Ignora mensagens sem identificação.
+  if (!remoteJid) {
+    console.log("Mensagem sem remoteJid.");
+
+    return res.status(200).json({
+      received: true,
+    });
+  }
+
+  // Por enquanto continuamos ignorando grupos.
+  if (remoteJid.endsWith("@g.us")) {
     console.log("Mensagem de grupo ignorada.");
 
     return res.status(200).json({
@@ -35,11 +45,39 @@ export async function whatsappWebhook(req: Request, res: Response) {
     });
   }
 
-  // Por enquanto processamos somente contatos no formato normal do WhatsApp.
-  if (!remoteJid.endsWith("@s.whatsapp.net")) {
+  // Esse será o JID que usaremos para descobrir
+  // o telefone real do contato.
+  let contactJid: string;
+
+  // Formato tradicional do WhatsApp.
+  if (remoteJid.endsWith("@s.whatsapp.net")) {
+    contactJid = remoteJid;
+  }
+
+  // Alguns contatos chegam usando o formato @lid.
+  // Quando isso acontecer, tentamos usar o JID alternativo
+  // que contém o número tradicional.
+  else if (
+    remoteJid.endsWith("@lid") &&
+    remoteJidAlt?.endsWith("@s.whatsapp.net")
+  ) {
+    contactJid = remoteJidAlt;
+
+    console.log("Contato @lid convertido para telefone:", {
+      lid: remoteJid,
+      jid: contactJid,
+    });
+  }
+
+  // Se ainda não conseguimos descobrir o telefone,
+  // não tentamos criar um contato errado no banco.
+  else {
     console.log(
       "Formato de contato ainda não suportado:",
-      remoteJid
+      {
+        remoteJid,
+        remoteJidAlt,
+      }
     );
 
     return res.status(200).json({
@@ -58,7 +96,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
   const content = data.message?.conversation;
 
   // Remove "@s.whatsapp.net" e mantém somente o número.
-  const phone = remoteJid.replace("@s.whatsapp.net", "");
+  const phone = contactJid.replace("@s.whatsapp.net", "");
 
   // Se não existir ID ou conteúdo de texto,
   // ignoramos a mensagem por enquanto.
