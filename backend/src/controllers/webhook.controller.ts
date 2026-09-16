@@ -92,16 +92,57 @@ export async function whatsappWebhook(req: Request, res: Response) {
   // Nome exibido pelo contato no WhatsApp.
   const name = data.pushName || "Contato";
 
-  // Conteúdo da mensagem de texto.
-  const content = data.message?.conversation;
+  // Tipo da mensagem que será salvo no banco.
+  let messageType: "TEXT" | "AUDIO" | "IMAGE" | "VIDEO" | "DOCUMENT";
+
+  // Conteúdo exibido no CotrimBot.
+  let content: string;
+
+  // Mensagem de texto normal.
+  if (data.message?.conversation) {
+    messageType = "TEXT";
+    content = data.message.conversation;
+  }
+  // Algumas mensagens de texto chegam neste formato.
+  else if (data.message?.extendedTextMessage?.text) {
+    messageType = "TEXT";
+    content = data.message.extendedTextMessage.text;
+  }
+  // Áudio.
+  else if (data.message?.audioMessage) {
+    messageType = "AUDIO";
+    content = "[Áudio]";
+  }
+  // Imagem: usa a legenda quando disponível.
+  else if (data.message?.imageMessage) {
+    messageType = "IMAGE";
+    content = data.message.imageMessage.caption || "[Imagem]";
+  }
+  // Vídeo: usa a legenda quando disponível.
+  else if (data.message?.videoMessage) {
+    messageType = "VIDEO";
+    content = data.message.videoMessage.caption || "[Vídeo]";
+  }
+  // Documento: usa o nome do arquivo quando disponível.
+  else if (data.message?.documentMessage) {
+    messageType = "DOCUMENT";
+    content = data.message.documentMessage.fileName || "[Documento]";
+  }
+  // Tipo que ainda não sabemos processar.
+  else {
+    console.log("Tipo de mensagem ainda não suportado:", data.message);
+
+    return res.status(200).json({
+      received: true,
+    });
+  }
 
   // Remove "@s.whatsapp.net" e mantém somente o número.
   const phone = contactJid.replace("@s.whatsapp.net", "");
 
-  // Se não existir ID ou conteúdo de texto,
-  // ignoramos a mensagem por enquanto.
-  if (!externalId || !content) {
-    console.log("Mensagem sem ID ou sem texto. Ignorando.");
+  // Ignora mensagens sem ID.
+  if (!externalId) {
+    console.log("Mensagem sem ID. Ignorando.");
 
     return res.status(200).json({
       received: true,
@@ -149,6 +190,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
       externalId,
       content,
       direction: "INCOMING",
+      type: messageType,
       contactId: contact.id,
     },
   });
