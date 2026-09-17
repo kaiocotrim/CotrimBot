@@ -87,3 +87,67 @@ export async function getProfilePicture(
 
   return (await response.json()) as ProfilePictureResponse;
 }
+
+
+
+export type EvolutionMediaResponse = {
+  mediaType: string;
+  fileName?: string;
+  mimetype: string;
+  base64: string;
+};
+
+// Busca a mídia original de uma mensagem
+// diretamente na Evolution API.
+export async function getMediaMessage(
+  externalId: string
+): Promise<EvolutionMediaResponse> {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE;
+
+  if (!apiUrl || !apiKey || !instance) {
+    throw new Error(
+      "Configurações da Evolution API não encontradas"
+    );
+  }
+
+  const response = await fetch(
+    `${apiUrl}/chat/getBase64FromMediaMessage/${instance}`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+        apikey: apiKey,
+      },
+
+      body: JSON.stringify({
+        message: {
+          key: {
+            id: externalId,
+          },
+        },
+
+        convertToMp4: false,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Erro ao buscar mídia na Evolution: ${response.status}`
+    );
+  }
+
+  const data =
+    (await response.json()) as EvolutionMediaResponse;
+
+  if (!data.base64) {
+    throw new Error(
+      "A Evolution não retornou o conteúdo da mídia"
+    );
+  }
+
+  return data;
+}

@@ -1,3 +1,9 @@
+import {
+  getMessageMedia,
+  // seus outros controllers...
+} from "../controllers/message.controller.js";
+
+
 // Importa o Router do Express para agrupar as rotas relacionadas a mensagens.
 import { Router } from "express";
 
@@ -52,4 +58,13 @@ messageRouter.post(
 messageRouter.patch(
   "/contacts/:id/messages/read",
   markMessagesAsRead
+);
+
+
+
+// GET /messages/:id/media - Retorna o conteúdo de mídia de uma mensagem
+
+messageRouter.get(
+  "/messages/:id/media",
+  getMessageMedia
 );

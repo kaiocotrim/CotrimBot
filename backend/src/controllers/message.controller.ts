@@ -1,3 +1,4 @@
+
 // Importa o servidor de socket para enviar notificações em tempo real.
 import { getSocketServer } from "../lib/socket.js";
 
@@ -8,7 +9,10 @@ import type { Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
 
 // Importa o service que concentra toda a comunicação HTTP com a Evolution API.
-import { sendWhatsAppMessage } from "../services/evolution.service.js";
+import {
+  getMediaMessage,
+  sendWhatsAppMessage,
+} from "../services/evolution.service.js";
 import { getSatisfactionSurvey } from "../services/bot.service.js";
 
 // GET /contacts/:id/messages - Retorna as mensagens de um contato
@@ -184,4 +188,78 @@ export async function markMessagesAsRead(
   return res.status(200).json({
     message: "Mensagens marcadas como lidas",
   });
+}
+
+
+// GET /messages/:id/media
+// Busca a mídia de uma mensagem na Evolution
+// e entrega os bytes reais para o navegador.
+export async function getMessageMedia(
+  req: Request,
+  res: Response
+) {
+  const messageId = Number(req.params.id);
+
+  // Procura a mensagem no banco do CotrimBot.
+  const message = await prisma.message.findUnique({
+    where: {
+      id: messageId,
+    },
+  });
+
+  // Não existe uma Message com esse ID.
+  if (!message) {
+    return res.status(404).json({
+      message: "Mensagem não encontrada",
+    });
+  }
+
+  // Mensagens TEXT não possuem arquivo de mídia.
+  if (message.type === "TEXT") {
+    return res.status(400).json({
+      message: "Essa mensagem não possui mídia",
+    });
+  }
+
+  try {
+    // Usa o externalId salvo no banco
+    // para pedir a mídia original à Evolution.
+    const media = await getMediaMessage(
+      message.externalId
+    );
+
+    // Converte o texto Base64 nos bytes
+    // originais do arquivo.
+    const buffer = Buffer.from(
+      media.base64,
+      "base64"
+    );
+
+    // Informa ao navegador qual tipo
+    // de arquivo estamos enviando.
+    res.setHeader(
+      "Content-Type",
+      media.mimetype
+    );
+
+    // Permite que o navegador tente exibir/tocar
+    // a mídia diretamente.
+    if (media.fileName) {
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="${media.fileName}"`
+      );
+    }
+
+    return res.send(buffer);
+  } catch (error) {
+    console.error(
+      "Erro ao buscar mídia da mensagem:",
+      error
+    );
+
+    return res.status(500).json({
+      message: "Erro ao buscar mídia da mensagem",
+    });
+  }
 }

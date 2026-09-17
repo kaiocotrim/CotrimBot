@@ -112,6 +112,15 @@ export async function whatsappWebhook(req: Request, res: Response) {
   else if (data.message?.audioMessage) {
     messageType = "AUDIO";
     content = "[Áudio]";
+
+    console.log(
+      "🎵 Payload do áudio recebido:",
+      JSON.stringify(
+        data.message.audioMessage,
+        null,
+        2
+      )
+    );
   }
   // Imagem: usa a legenda quando disponível.
   else if (data.message?.imageMessage) {
