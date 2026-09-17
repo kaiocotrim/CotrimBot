@@ -1,4 +1,5 @@
 import { Avatar } from "@/components/chat/avatar";
+import { MessageBubble } from "@/components/chat/message-bubble";
 import type { Contact, Message } from "@/types/chat";
 
 type MessageListProps = {
@@ -22,14 +23,8 @@ export function MessageList({ contact, messages }: MessageListProps) {
           >
             {!outgoing && <Avatar contact={contact} />}
 
-            <div
-              className={`max-w-[70%] rounded-[24px] px-4 py-2 text-white ${
-                outgoing ? "bg-green-600" : "bg-zinc-800"
-              }`}
-            >
-              {/* Preserva as quebras de linha enviadas pelo backend. */}
-              <p className="whitespace-pre-wrap">{message.content}</p>
-            </div>
+            {/* O balão escolhe entre player de áudio e conteúdo textual. */}
+            <MessageBubble message={message} />
           </div>
         );
       })}
