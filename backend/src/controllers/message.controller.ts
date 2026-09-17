@@ -1,18 +1,22 @@
-
-// Importa o servidor de socket para enviar notificações em tempo real.
-import { getSocketServer } from "../lib/socket.js";
-
 // Importa somente os tipos HTTP do Express usados nas assinaturas dos controllers.
 import type { Request, Response } from "express";
 
 // Importa a instância do Prisma usada para consultar contatos e salvar mensagens.
 import { prisma } from "../lib/prisma.js";
 
+// Importa o servidor de socket para enviar notificações em tempo real.
+import { getSocketServer } from "../lib/socket.js";
+
 // Importa o service que concentra toda a comunicação HTTP com a Evolution API.
 import {
   getMediaMessage,
   sendWhatsAppMessage,
 } from "../services/evolution.service.js";
+
+import {
+  transcribeAudio
+} from "../services/transcription.service.js";
+
 import { getSatisfactionSurvey } from "../services/bot.service.js";
 
 // GET /contacts/:id/messages - Retorna as mensagens de um contato
@@ -33,6 +37,63 @@ export async function getMessages(req: Request, res: Response) {
   });
 
   res.json(messages);
+}
+
+// POST /messages/:id/transcribe
+// Busca um áudio já salvo e solicita sua transcrição.
+export async function transcribeMessage(
+  req: Request,
+  res: Response
+) {
+  const messageId = Number(req.params.id);
+
+  // Busca a mensagem no banco.
+  const message = await prisma.message.findUnique({
+    where: {
+      id: messageId,
+    },
+  });
+
+  if (!message) {
+    return res.status(404).json({
+      message: "Mensagem não encontrada",
+    });
+  }
+
+  // Por enquanto, só permitimos transcrição de áudio.
+  if (message.type !== "AUDIO") {
+    return res.status(400).json({
+      message: "Essa mensagem não é um áudio",
+    });
+  }
+
+  try {
+    // Busca o áudio original através da Evolution.
+    const media = await getMediaMessage(
+      message.externalId
+    );
+
+    // Envia o áudio para o serviço Whisper.
+    const transcription = await transcribeAudio({
+      base64: media.base64,
+      mimetype: media.mimetype,
+      fileName: media.fileName,
+    });
+
+    return res.status(200).json({
+      messageId: message.id,
+      transcription,
+    });
+  } catch (error) {
+    console.error(
+      "Erro ao transcrever áudio:",
+      error
+    );
+
+    return res.status(500).json({
+      message: "Erro ao transcrever áudio",
+    });
+  }
 }
 
 /**

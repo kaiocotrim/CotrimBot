@@ -9,7 +9,7 @@ export default function Home() {
   const chat = useChat();
 
   return (
-    <main className="flex h-screen bg-zinc-950 text-white">
+    <main className="flex h-dvh overflow-hidden bg-zinc-950 text-white">
       <ContactSidebar 
         contacts={chat.contacts}
         selectedContactId={chat.selectedContact?.id}

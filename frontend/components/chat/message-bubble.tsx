@@ -24,7 +24,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       case "TEXT":
         return <TextMessage content={message.content} />;
       case "AUDIO":
-        return <AudioMessage mediaUrl={mediaUrl} />;
+        return <AudioMessage
+          mediaUrl={mediaUrl}
+          messageId={message.id}
+        />
       case "IMAGE":
         return <ImageMessage mediaUrl={mediaUrl} content={message.content} />;
       case "VIDEO":
@@ -38,9 +41,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
   return (
     <div
-      className={`min-w-0 max-w-[70%] rounded-[24px] px-4 py-2 text-white ${
-        outgoing ? "bg-green-600" : "bg-zinc-800"
-      }`}
+      className={`min-w-0 max-w-[70%] rounded-[24px] px-4 py-2 text-white ${outgoing ? "bg-green-600" : "bg-zinc-800"
+        }`}
     >
       {content}
     </div>

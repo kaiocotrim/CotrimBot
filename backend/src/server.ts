@@ -26,7 +26,7 @@ app.use(express.json());
 app.use(contactRouter);
 app.use(messageRouter);
 app.use(webhookRoutes);
-
+app.use(transcriptionRouter);
 // Cria o servidor HTTP que será compartilhado
 // pelo Express e pelo Socket.IO.
 const httpServer = createServer(app);
@@ -66,3 +66,9 @@ httpServer.listen(3333, () => {
     "Servidor rodando em http://localhost:3333"
   );
 });
+
+
+// Registra as rotas de transcrição.
+import {
+  transcriptionRouter,
+} from "./routes/transcription.routes.js";

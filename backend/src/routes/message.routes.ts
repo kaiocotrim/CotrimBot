@@ -68,3 +68,18 @@ messageRouter.get(
   "/messages/:id/media",
   getMessageMedia
 );
+
+
+
+//  POST /messages/transcribe - Transcreve uma mensagem de áudio para texto
+import {
+  transcribeMessage,
+  // seus outros controllers...
+} from "../controllers/message.controller.js";
+
+// POST /messages/:id/transcribe - Transcreve uma mensagem de áudio para texto
+
+messageRouter.post(
+  "/messages/:id/transcribe",
+  transcribeMessage
+);

@@ -1,22 +1,100 @@
+"use client";
+
+import { useState } from "react";
+import { transcribeMessage } from "@/lib/chat-api";
+import { TranscriptionSettings } from "@/components/chat/transcription-settings";
+
 type AudioMessageProps = {
-  // URL da rota do backend que entrega o arquivo de áudio.
   mediaUrl: string;
+  messageId: number;
 };
 
-// Responsável somente por renderizar mensagens do tipo AUDIO.
-// O MessageBubble decide quando usar este componente e fornece a URL.
-export function AudioMessage({ mediaUrl }: AudioMessageProps) {
+export function AudioMessage({
+  mediaUrl,
+  messageId,
+}: AudioMessageProps) {
+  const [transcription, setTranscription] =
+    useState<string | null>(null);
+
+  const [transcribing, setTranscribing] =
+    useState(false);
+
+  const [error, setError] =
+    useState<string | null>(null);
+
+  async function handleTranscribe() {
+    if (transcribing) return;
+
+    try {
+      setTranscribing(true);
+      setError(null);
+
+      const result =
+        await transcribeMessage(messageId);
+
+      setTranscription(
+        result.transcription
+      );
+    } catch (error) {
+      console.error(
+        "Erro ao transcrever:",
+        error
+      );
+
+      setError(
+        "Não foi possível transcrever o áudio."
+      );
+    } finally {
+      setTranscribing(false);
+    }
+  }
+
   return (
-    // Os controles são nativos do navegador. preload="none" evita
-    // baixar o áudio antecipadamente ao abrir a conversa.
-    <audio
-      controls
-      preload="none"
-      src={mediaUrl}
-      className="max-w-full"
-      aria-label="Áudio da mensagem"
-    >
-      Seu navegador não suporta a reprodução de áudio.
-    </audio>
+    <div className="space-y-2">
+      <div className="flex items-center gap-1">
+      <audio
+        controls
+        preload="none"
+        src={mediaUrl}
+        className="min-w-0 max-w-full flex-1"
+        aria-label="Áudio da mensagem"
+      >
+        Seu navegador não suporta a reprodução de áudio.
+      </audio>
+      <TranscriptionSettings disabled={transcribing} />
+      </div>
+
+      {!transcription && (
+        <button
+          type="button"
+          onClick={handleTranscribe}
+          disabled={transcribing}
+          aria-busy={transcribing}
+          className="text-sm font-medium underline disabled:opacity-50"
+        >
+          {transcribing
+            ? "Transcrevendo..."
+            : "Transcrever áudio"}
+        </button>
+      )}
+
+      {transcription && (
+        <div className="rounded-lg bg-black/20 p-3">
+          <p className="mb-1 text-xs font-medium opacity-70">
+            📝 Transcrição
+          </p>
+
+          <p className="cursor-text whitespace-pre-wrap text-sm">
+            {transcription}
+          </p>
+        </div>
+      )}
+
+      {error && (
+        <p className="text-sm text-red-300">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

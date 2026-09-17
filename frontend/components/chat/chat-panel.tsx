@@ -34,8 +34,14 @@ export function ChatPanel({
   }
 
   return (
-    <section className="flex flex-1 flex-col">
-      <ChatHeader contact={contact} />
+    <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 z-10 h-36 bg-gradient-to-b from-zinc-950 via-zinc-950/85 to-transparent"
+      />
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-3 sm:px-6">
+        <ChatHeader contact={contact} />
+      </div>
       <MessageList contact={contact} messages={messages} />
       <MessageComposer
         text={text}

@@ -1,4 +1,5 @@
 import { Avatar } from "@/components/chat/avatar";
+import Image from "next/image";
 import type { Contact } from "@/types/chat";
 
 type ContactSidebarProps = {
@@ -14,9 +15,18 @@ export function ContactSidebar({
   onSelectContact,
 }: ContactSidebarProps) {
   return (
-    <aside className="flex h-full w-80 flex-col border-r border-zinc-800">
-      <div className="border-b border-zinc-800 p-5">
-        <h1 className="text-xl font-bold">CotrimBot</h1>
+    <aside className="flex h-full w-80 flex-col">
+      <div className="p-5">
+        <h1>
+          <Image
+            src="/favicon.ico"
+            alt="CotrimBot"
+            width={40}
+            height={40}
+            unoptimized
+            className="mb-2 size-10 object-contain"
+          />
+        </h1>
 
         <p className="text-sm text-zinc-400">
           Conversas
@@ -32,7 +42,7 @@ export function ContactSidebar({
             <button
               key={contact.id}
               onClick={() => onSelectContact(contact)}
-              className={`w-full border-b border-zinc-900 p-4 text-left transition hover:bg-zinc-900 ${
+              className={`w-full p-4 text-left transition hover:bg-zinc-900 ${
                 selectedContactId === contact.id
                   ? "bg-zinc-900"
                   : ""

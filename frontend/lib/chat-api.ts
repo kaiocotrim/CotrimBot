@@ -36,6 +36,18 @@ export async function getMessages(contactId: number): Promise<Message[]> {
   return parseResponse<Message[]>(response, "Erro ao buscar mensagens");
 }
 
+export async function transcribeMessage(messageId: number) {
+  const response = await fetch(
+    `${API_URL}/messages/${messageId}/transcribe`,
+    { method: "POST" }
+  );
+
+  return parseResponse<{ messageId: number; transcription: string }>(
+    response,
+    "Erro ao transcrever áudio"
+  );
+}
+
 // Marca como lidas todas as mensagens recebidas do contato.
 export async function markMessagesAsRead(contactId: number): Promise<void> {
   const response = await fetch(
