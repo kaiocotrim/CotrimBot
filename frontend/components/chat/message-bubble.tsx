@@ -23,8 +23,8 @@ export function MessageBubble({
   return (
     <div
       className={`min-w-0 max-w-[70%] rounded-[24px] px-4 py-2 text-white ${outgoing
-          ? "bg-green-600"
-          : "bg-zinc-800"
+        ? "bg-green-600"
+        : "bg-zinc-800"
         }`}
     >
       {/* ÁUDIO */}
@@ -58,7 +58,36 @@ export function MessageBubble({
             <p className="whitespace-pre-wrap">
               {message.content}
             </p>
-    )}
+          )}
+        </div>
+      )}
+
+
+      {/* DOCUMENTO */}
+      {message.type === "DOCUMENT" && (
+        <div className="flex min-w-[240px] items-center gap-3 rounded-xl bg-black/20 p-3">
+          {/* Ícone simples do documento */}
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
+            📄
+          </div>
+
+          <div className="min-w-0 flex-1">
+            {/* O webhook já salva o nome do arquivo em content */}
+            <p className="truncate text-sm font-medium">
+              {message.content !== "[Documento]"
+                ? message.content
+                : "Documento"}
+            </p>
+
+            <a
+              href={mediaUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 inline-block text-xs underline underline-offset-2"
+            >
+              Abrir documento
+            </a>
+          </div>
         </div>
       )}
 
