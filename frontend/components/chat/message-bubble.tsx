@@ -22,11 +22,10 @@ export function MessageBubble({
 
   return (
     <div
-      className={`min-w-0 max-w-[70%] rounded-[24px] px-4 py-2 text-white ${
-        outgoing
+      className={`min-w-0 max-w-[70%] rounded-[24px] px-4 py-2 text-white ${outgoing
           ? "bg-green-600"
           : "bg-zinc-800"
-      }`}
+        }`}
     >
       {/* ÁUDIO */}
       {message.type === "AUDIO" && (
@@ -39,6 +38,28 @@ export function MessageBubble({
         >
           Seu navegador não suporta a reprodução de áudio.
         </audio>
+      )}
+
+
+      {/* VÍDEO */}
+      {message.type === "VIDEO" && (
+        <div className="space-y-2">
+          <video
+            controls
+            preload="metadata"
+            src={mediaUrl}
+            className="max-h-[420px] max-w-full rounded-xl"
+            aria-label="Vídeo da mensagem"
+          >
+            Seu navegador não suporta reprodução de vídeo.
+          </video>
+
+          {message.content !== "[Vídeo]" && (
+            <p className="whitespace-pre-wrap">
+              {message.content}
+            </p>
+    )}
+        </div>
       )}
 
       {/* IMAGEM */}
@@ -82,3 +103,5 @@ export function MessageBubble({
     </div>
   );
 }
+
+
