@@ -1,8 +1,11 @@
 ﻿"use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useAnimate, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { AttachmentMenu, type AttachmentKind } from "@/components/chat/attachment-menu";
+import { EmojiSelector } from "@/components/chat/emoji-selector";
+import { EmojiText } from "@/components/chat/emoji-text";
+import { insertEmojiAtSelection } from "@/lib/emoji-text";
 
 type MessageComposerProps = {
   text: string;
@@ -38,12 +41,19 @@ export function MessageComposer({ text, sending, closing, onTextChange, onSend, 
   const [isFocused, setIsFocused] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
+  const [emojisOpen, setEmojisOpen] = useState(false);
+  const [sendButtonRef, animateSendButton] = useAnimate<HTMLButtonElement>();
+  const emojiTriggerRef = useRef<HTMLButtonElement>(null);
+  const selectionRef = useRef({ start: text.length, end: text.length });
+  const pendingCaretRef = useRef<number | null>(null);
+  const emojiSelectorId = useId();
   const attachmentTriggerRef = useRef<HTMLButtonElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentKindRef = useRef<AttachmentKind>("document");
   const [measurements, setMeasurements] = useState({ compact: 24, stacked: 24 });
   const [availableHeight, setAvailableHeight] = useState(400);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textLayerRef = useRef<HTMLDivElement>(null);
   const compactMirrorRef = useRef<HTMLTextAreaElement>(null);
   const stackedMirrorRef = useRef<HTMLTextAreaElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
@@ -55,10 +65,46 @@ export function MessageComposer({ text, sending, closing, onTextChange, onSend, 
   const isStacked = measurements.compact > 24 || isFullscreen;
   const transition = { duration: reduceMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
 
+  // A camada de desenho acompanha a rolagem do textarea, que continua editável.
+  const syncTextScroll = useCallback(() => {
+    const textarea = textareaRef.current;
+    const layer = textLayerRef.current;
+    if (!textarea || !layer) return;
+    layer.scrollTop = textarea.scrollTop;
+    layer.scrollLeft = textarea.scrollLeft;
+  }, []);
+
+  useLayoutEffect(() => {
+    syncTextScroll();
+  }, [text, syncTextScroll]);
+
   const closeAttachments = useCallback((restoreFocus = false) => {
     setAttachmentsOpen(false);
     if (restoreFocus) attachmentTriggerRef.current?.focus();
   }, []);
+
+  const closeEmojis = useCallback((restoreFocus = false) => {
+    setEmojisOpen(false);
+    if (restoreFocus) emojiTriggerRef.current?.focus();
+  }, []);
+
+  function selectEmoji(emoji: string) {
+    if (sending) return;
+    const next = insertEmojiAtSelection(text, emoji, selectionRef.current.start, selectionRef.current.end);
+    pendingCaretRef.current = next.caret;
+    selectionRef.current = { start: next.caret, end: next.caret };
+    onTextChange(next.value);
+  }
+
+  // Restaura o cursor depois que o React aplicar o texto; mantém o seletor aberto.
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    const caret = pendingCaretRef.current;
+    if (!textarea || caret === null) return;
+    textarea.focus();
+    textarea.setSelectionRange(caret, caret);
+    pendingCaretRef.current = null;
+  }, [text]);
 
   function selectAttachment(kind: AttachmentKind) {
     const input = fileInputRef.current;
@@ -126,6 +172,7 @@ export function MessageComposer({ text, sending, closing, onTextChange, onSend, 
   const naturalHeight = Math.max(112, Math.min(measurements.stacked, 144) + 72);
   const fieldHeight = isFullscreen ? availableHeight : isStacked ? Math.min(naturalHeight, availableHeight) : 48;
   const textHeight = isStacked ? Math.max(24, fieldHeight - 72) : 24;
+  const textLayout = { height: textHeight, top: isStacked ? 16 : 11, left: isStacked ? 16 : isFocused ? 92 : 52, width: isStacked ? "calc(100% - 64px)" : `calc(100% - ${isFocused ? 144 : showControls ? 104 : 68}px)` };
 
   return (
     <div ref={composerRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent px-4 pt-8 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
@@ -138,12 +185,25 @@ export function MessageComposer({ text, sending, closing, onTextChange, onSend, 
             if (!event.currentTarget.contains(event.relatedTarget)) {
               setIsFocused(false);
               closeAttachments();
+              // O seletor controla o fechamento por clique externo; perder foco
+              // ao clicar em uma área vazia dele não deve fechar o painel.
             }
           }}
           onSubmit={(event) => {
             event.preventDefault();
             closeAttachments();
-            if (!sending && text.trim()) onSend();
+            closeEmojis();
+            if (!sending && text.trim()) {
+              // Feedback visual sem atrasar o envio para a API.
+              if (!reduceMotion && sendButtonRef.current) {
+                void animateSendButton(sendButtonRef.current, { scale: [1, 1.16, 1] }, {
+                  duration: 0.4,
+                  times: [0, 0.4, 1],
+                  ease: "easeInOut",
+                });
+              }
+              onSend();
+            }
           }}
         >
           {/* Mesmo texto e fonte do campo, sem interferir na altura que está sendo animada. */}
@@ -154,20 +214,41 @@ export function MessageComposer({ text, sending, closing, onTextChange, onSend, 
 
           <motion.div
             initial={false}
-            animate={{ height: fieldHeight, marginRight: isStacked ? 0 : 56 }}
+            animate={{ height: fieldHeight, marginRight: isStacked ? 0 : 56, borderTopLeftRadius: emojisOpen && !sending ? 0 : 24, borderTopRightRadius: emojisOpen && !sending ? 0 : 24 }}
+            style={emojisOpen && !sending ? { borderTopWidth: 0, boxShadow: "inset 0 -1px 1px rgba(0,0,0,0.12), 0 4px 20px rgba(0,0,0,0.16)" } : undefined}
             transition={transition}
-            className={`relative overflow-hidden rounded-[24px] border bg-gradient-to-br from-white/[0.06] via-white/[0.015] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),inset_0_-1px_1px_rgba(0,0,0,0.12),0_4px_20px_rgba(0,0,0,0.16)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow] duration-250 motion-reduce:transition-none ${isFocused ? "border-white/25 bg-zinc-800/85 ring-2 ring-white/5" : "border-white/10 bg-zinc-950/25"}`}
+            className={`relative overflow-hidden rounded-[24px] border bg-gradient-to-br from-white/[0.06] via-white/[0.015] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),inset_0_-1px_1px_rgba(0,0,0,0.12),0_4px_20px_rgba(0,0,0,0.16)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow] duration-250 motion-reduce:transition-none ${emojisOpen && !sending ? "border-[#2f2f33] bg-zinc-900/95" : isFocused ? "border-white/25 bg-zinc-800/85 ring-2 ring-white/5" : "border-white/10 bg-zinc-950/25"}`}
           >
+            {/* O textarea guarda o texto; esta camada mostra os mesmos emojis do seletor. */}
+            <motion.div
+              ref={textLayerRef}
+              aria-hidden="true"
+              initial={false}
+              animate={textLayout}
+              transition={transition}
+              onAnimationComplete={syncTextScroll}
+              className="pointer-events-none absolute overflow-hidden p-0 text-base leading-6 whitespace-pre-wrap text-white [overflow-wrap:anywhere]"
+            >
+              <EmojiText content={text ? `${text}\u200b` : ""} preserveMetrics />
+            </motion.div>
             <motion.textarea
               ref={textareaRef}
               id={textareaId}
               initial={false}
-              animate={{ height: textHeight, top: isStacked ? 16 : 11, left: isStacked ? 16 : isFocused ? 92 : 52, width: isStacked ? "calc(100% - 64px)" : `calc(100% - ${isFocused ? 144 : showControls ? 104 : 68}px)` }}
+              animate={textLayout}
               transition={transition}
+              onAnimationComplete={syncTextScroll}
               rows={1}
               aria-label="Mensagem"
               value={text}
               onChange={(event) => onTextChange(event.target.value)}
+              onScroll={syncTextScroll}
+              onSelect={(event) => {
+                selectionRef.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd };
+              }}
+              onBlur={(event) => {
+                selectionRef.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd };
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Escape" && isFullscreen) {
                   event.preventDefault();
@@ -185,8 +266,8 @@ export function MessageComposer({ text, sending, closing, onTextChange, onSend, 
                 }
               }}
               placeholder="Digite uma mensagem..."
-              className={`absolute ${textClassName}`}
-              style={{ overflowY: isStacked && measurements.stacked > textHeight ? "auto" : "hidden" }}
+              className={`absolute caret-white placeholder:[-webkit-text-fill-color:#71717a] ${textClassName}`}
+              style={{ color: "transparent", WebkitTextFillColor: "transparent", overflowY: isStacked && measurements.stacked > textHeight ? "auto" : "hidden" }}
             />
 
             <motion.span initial={false} animate={{ opacity: showControls ? 0 : 1, scale: showControls ? 0.9 : 1 }} transition={transition} className="pointer-events-none absolute bottom-[13px] left-[14px] text-zinc-300">
@@ -196,9 +277,9 @@ export function MessageComposer({ text, sending, closing, onTextChange, onSend, 
               ref={attachmentTriggerRef}
               type="button"
               initial={false}
-              animate={{ opacity: showControls ? 1 : 0, scale: showControls ? 1 : 0.9, bottom: isStacked ? 8 : 5, left: isStacked ? 8 : 6 }}
-              whileTap={reduceMotion || sending ? undefined : { scale: 0.86, y: 2, backgroundColor: "rgba(63,63,70,0.8)", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.3)" }}
-              transition={{ ...transition, scale: { type: "spring", stiffness: 500, damping: 22 }, y: { type: "spring", stiffness: 500, damping: 22 } }}
+              animate={{ opacity: showControls ? 1 : 0, scale: showControls ? attachmentsOpen ? 0.96 : 1 : 0.9, rotate: reduceMotion ? 0 : attachmentsOpen ? 45 : 0, y: 0, bottom: isStacked ? 8 : 5, left: isStacked ? 8 : 6 }}
+              whileTap={reduceMotion || sending ? undefined : { scale: 0.86, backgroundColor: "rgba(63,63,70,0.8)", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.3)" }}
+              transition={{ ...transition, scale: reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 22 } }}
               aria-label="Abrir anexos"
               title="Abrir anexos"
               aria-haspopup="menu"
@@ -206,24 +287,34 @@ export function MessageComposer({ text, sending, closing, onTextChange, onSend, 
               aria-hidden={!showControls}
               tabIndex={showControls ? 0 : -1}
               disabled={!showControls || sending}
-              onClick={() => setAttachmentsOpen((current) => !current)}
+              onClick={() => {
+                closeEmojis();
+                setAttachmentsOpen((current) => !current);
+              }}
               className={`absolute size-9 ${buttonClassName}`}
-              style={{ pointerEvents: showControls ? "auto" : "none" }}
+              style={{ pointerEvents: showControls ? "auto" : "none", transformOrigin: "center" }}
             >
               <ComposerIcon name="plus" />
             </motion.button>
             {/* Surge ao lado do +, reservando espaço no texto com a mesma transição. */}
             <motion.button
+              ref={emojiTriggerRef}
               type="button"
               initial={false}
               animate={{ opacity: isFocused ? 1 : 0, scale: isFocused ? 1 : 0.85, x: isFocused ? 0 : -8, bottom: isStacked ? 8 : 5, left: isStacked ? 48 : 46 }}
               transition={transition}
-              aria-label="Abrir figurinhas"
-              title="Abrir figurinhas"
+              aria-label="Abrir emojis"
+              title="Abrir emojis"
+              aria-haspopup="dialog"
+              aria-expanded={emojisOpen}
+              aria-controls={emojiSelectorId}
               aria-hidden={!isFocused}
               tabIndex={isFocused ? 0 : -1}
               disabled={!isFocused || sending}
-              onClick={() => console.log("Abrir figurinhas")}
+              onClick={() => {
+                closeAttachments();
+                setEmojisOpen((current) => !current);
+              }}
               className={`absolute size-9 ${buttonClassName}`}
               style={{ pointerEvents: isFocused ? "auto" : "none" }}
             >
@@ -270,6 +361,7 @@ export function MessageComposer({ text, sending, closing, onTextChange, onSend, 
 
           {/* O mesmo botão desliza para dentro quando o texto ocupar mais linhas. */}
           <motion.button
+            ref={sendButtonRef}
             type="submit"
             initial={false}
             animate={{ width: isStacked ? 36 : 48, height: isStacked ? 36 : 48, right: isStacked ? 8 : 0, bottom: isStacked ? 8 : 0 }}
@@ -284,7 +376,8 @@ export function MessageComposer({ text, sending, closing, onTextChange, onSend, 
               <svg className="size-5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" opacity=".25" /><path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
             ) : <ComposerIcon name="send" />}
           </motion.button>
-          <AttachmentMenu open={attachmentsOpen && !sending} triggerRef={attachmentTriggerRef} onClose={closeAttachments} onSelect={selectAttachment} />
+          <AttachmentMenu open={attachmentsOpen && !sending} triggerRef={attachmentTriggerRef} onClose={closeAttachments} onSelect={selectAttachment} closing={closing} onCloseWithBot={onCloseWithBot} stacked={isStacked} />
+          <EmojiSelector id={emojiSelectorId} open={emojisOpen && !sending} triggerRef={emojiTriggerRef} onClose={closeEmojis} onSelect={selectEmoji} fieldHeight={fieldHeight} rightInset={isStacked ? 0 : 56} />
           {/* Seleciona o arquivo localmente; a integração de envio de mídia é uma etapa separada. */}
           <input
             ref={fileInputRef}
@@ -297,11 +390,6 @@ export function MessageComposer({ text, sending, closing, onTextChange, onSend, 
             }}
           />
         </form>
-        <div className="mt-2 flex justify-end px-1">
-          <button type="button" onClick={onCloseWithBot} disabled={closing} aria-busy={closing} className="rounded-full px-3 py-1.5 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-red-300 focus-visible:outline-2 focus-visible:outline-zinc-400 disabled:opacity-50">
-            {closing ? "Encerrando..." : "Encerrar chamado com Bot"}
-          </button>
-        </div>
       </div>
     </div>
   );

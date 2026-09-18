@@ -1,3 +1,5 @@
+import { EmojiText } from "@/components/chat/emoji-text";
+
 type VideoMessageProps = {
   mediaUrl: string;
   content: string;
@@ -17,7 +19,7 @@ export function VideoMessage({ mediaUrl, content }: VideoMessageProps) {
       </video>
       {/* Exibe somente a legenda real, omitindo o marcador padrão. */}
       {content !== "[Vídeo]" && (
-        <p className="whitespace-pre-wrap">{content}</p>
+        <p className="whitespace-pre-wrap"><EmojiText content={content} /></p>
       )}
     </div>
   );

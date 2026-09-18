@@ -1,3 +1,5 @@
+import { EmojiText } from "@/components/chat/emoji-text";
+
 type ImageMessageProps = {
   mediaUrl: string;
   content: string;
@@ -15,7 +17,7 @@ export function ImageMessage({ mediaUrl, content }: ImageMessageProps) {
         loading="lazy"
         className="max-h-[420px] max-w-full rounded-xl object-contain"
       />
-      {hasCaption && <p className="whitespace-pre-wrap">{content}</p>}
+      {hasCaption && <p className="whitespace-pre-wrap"><EmojiText content={content} /></p>}
     </div>
   );
 }

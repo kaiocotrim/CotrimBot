@@ -1,4 +1,5 @@
 import { Avatar } from "@/components/chat/avatar";
+import { EmojiText } from "@/components/chat/emoji-text";
 import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
 import Image from "next/image";
 import type { Contact } from "@/types/chat";
@@ -76,13 +77,13 @@ export function ContactSidebar({
                   <div className="mt-1 flex items-center justify-between gap-3">
                     {/* Última mensagem */}
                     <p className="truncate text-sm text-zinc-500">
-                      {lastMessage
+                      <EmojiText content={lastMessage
                         ? `${
                             lastMessage.direction === "OUTGOING"
                               ? "Você: "
                               : ""
                           }${lastMessage.content}`
-                        : "Nenhuma mensagem"}
+                        : "Nenhuma mensagem"} />
                     </p>
 
                     {/* Quantidade de mensagens não lidas */}

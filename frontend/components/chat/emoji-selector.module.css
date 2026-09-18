@@ -1,0 +1,55 @@
+/* Mantém a navegação acima da busca sem substituir a lógica do seletor. */
+.selector :global(.epr-header) {
+  display: flex;
+  flex-direction: column;
+}
+
+.selector :global(.epr-category-nav) {
+  order: -1;
+  padding-top: 14px;
+  padding-bottom: 12px;
+}
+
+.selector :global(.epr-cat-btn) {
+  border-radius: 8px;
+  transition: color 200ms ease, background-color 200ms ease;
+}
+
+.selector :global(.epr-cat-btn):hover {
+  background-color: transparent;
+  color: #34d399;
+}
+
+/* Remove o círculo de foco padrão; teclado mantém um contorno discreto. */
+.selector :global(.epr-cat-btn):focus::before {
+  content: none;
+}
+
+.selector :global(.epr-cat-btn):focus-visible {
+  outline: 1px solid #71717a;
+  outline-offset: 3px;
+}
+
+.selector :global(.epr-cat-btn.epr-active)::after {
+  content: "";
+  position: absolute;
+  bottom: -7px;
+  left: 20%;
+  right: 20%;
+  height: 3px;
+  border-radius: 999px;
+  background: #34d399;
+}
+
+.selector :global(.epr-emoji-category-label) {
+  /* Evita recalcular blur sobre os emojis a cada quadro da rolagem. */
+  backdrop-filter: none;
+  color: #a1a1aa;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.selector :global(.epr-body) {
+  scrollbar-width: thin;
+  scrollbar-color: #3f3f46 transparent;
+}

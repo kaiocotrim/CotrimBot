@@ -1,6 +1,28 @@
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 import { LoadingCursor } from "@/components/ui/loading-cursor";
 import "./globals.css";
+
+// Mesmas famílias do UItopic, servidas pelo próprio aplicativo.
+const calUI = localFont({
+  src: [
+    { path: "./fonts/cal-ui-light.woff2", weight: "300", style: "normal" },
+    { path: "./fonts/cal-ui-regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/cal-ui-medium.woff2", weight: "500", style: "normal" },
+  ],
+  variable: "--font-cal-ui",
+  display: "swap",
+});
+
+const calGeo = localFont({
+  src: [
+    { path: "./fonts/cal-geo-light.woff2", weight: "300", style: "normal" },
+    { path: "./fonts/cal-geo-regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/cal-geo-medium.woff2", weight: "500", style: "normal" },
+  ],
+  variable: "--font-cal-geo",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -11,7 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className="h-full font-sans antialiased"
+      className={`${calUI.variable} ${calGeo.variable} h-full font-sans antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}<LoadingCursor /></body>
     </html>
