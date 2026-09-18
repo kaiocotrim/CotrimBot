@@ -1,4 +1,5 @@
 import { Avatar } from "@/components/chat/avatar";
+import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
 import Image from "next/image";
 import type { Contact } from "@/types/chat";
 
@@ -15,7 +16,7 @@ export function ContactSidebar({
   onSelectContact,
 }: ContactSidebarProps) {
   return (
-    <aside className="flex h-full w-80 flex-col">
+    <aside className="flex h-full min-h-0 w-80 flex-col">
       <div className="p-5">
         <h1>
           <Image
@@ -33,7 +34,7 @@ export function ContactSidebar({
         </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <CompactScrollArea className="flex-1" label="Lista de conversas">
         {contacts.map((contact) => {
           // O backend retorna somente a mensagem mais recente.
           const lastMessage = contact.messages?.[0];
@@ -96,7 +97,7 @@ export function ContactSidebar({
             </button>
           );
         })}
-      </div>
+      </CompactScrollArea>
     </aside>
   );
 }

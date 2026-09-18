@@ -16,24 +16,24 @@ html {
   cursor: var(--apple-cursor, url("/cursors/default-small.svg") 5 4, default) !important;
 }
 
-/* Barra fina e arredondada, inspirada no macOS. */
+/* Barra estreita com indicador arredondado e pequenas setas nas extremidades. */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   cursor: url("/cursors/default-small.svg") 5 4, default;
 }
 
 ::-webkit-scrollbar-track,
 ::-webkit-scrollbar-corner {
-  background: transparent;
+  background: #111113;
   cursor: url("/cursors/default-small.svg") 5 4, default;
 }
 
 ::-webkit-scrollbar-thumb {
-  min-height: 32px;
+  min-height: 16px;
   border: 2px solid transparent;
   border-radius: 999px;
-  background: rgb(142 142 147 / 55%);
+  background: rgb(142 142 147 / 40%);
   background-clip: padding-box;
   cursor: url("/cursors/default-small.svg") 5 4, default;
 }
@@ -47,6 +47,27 @@ html {
 }
 
 ::-webkit-scrollbar-button {
+  display: block;
+  width: 8px;
+  height: 8px;
+  background-color: #111113;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 6px 4px;
+}
+
+/* Mantém uma seta no início e outra no fim de cada trilho vertical. */
+::-webkit-scrollbar-button:vertical:decrement:start {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 4'%3E%3Cpath d='M3 0 6 4H0Z' fill='%23525256'/%3E%3C/svg%3E");
+}
+
+::-webkit-scrollbar-button:vertical:increment:end {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 4'%3E%3Cpath d='m0 0 3 4 3-4Z' fill='%23525256'/%3E%3C/svg%3E");
+}
+
+::-webkit-scrollbar-button:vertical:increment:start,
+::-webkit-scrollbar-button:vertical:decrement:end,
+::-webkit-scrollbar-button:horizontal {
   display: none;
   width: 0;
   height: 0;
@@ -55,8 +76,17 @@ html {
 @supports not selector(::-webkit-scrollbar) {
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgb(142 142 147 / 65%) transparent;
+    scrollbar-color: rgb(142 142 147 / 40%) transparent;
   }
+}
+
+/* A lista de contatos mantém a rolagem nativa e usa um indicador curto próprio. */
+.compact-scroll-viewport {
+  scrollbar-width: none;
+}
+
+.compact-scroll-viewport::-webkit-scrollbar {
+  display: none;
 }
 
 .cursor-pointer,
@@ -78,7 +108,7 @@ textarea,
 input:not([type]),
 input:is([type="text"], [type="search"], [type="email"], [type="password"], [type="url"], [type="tel"], [type="number"]),
 [contenteditable="true"] {
-  --apple-cursor: url("/cursors/text-small.svg") 15 15, text;
+  --apple-cursor: url("/cursors/text-small.svg") 9 9, text;
 }
 
 .cursor-grab,
@@ -108,7 +138,7 @@ select:disabled,
 textarea:disabled,
 [aria-disabled="true"],
 label:has(input:disabled) {
-  --apple-cursor: url("/cursors/not-allowed-small.svg") 15 15, not-allowed;
+  --apple-cursor: url("/cursors/not-allowed-small.svg") 9 9, not-allowed;
 }
 
 /* Mantém o alvo do cursor nos botões desabilitados. */
