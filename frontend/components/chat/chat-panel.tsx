@@ -9,8 +9,16 @@ type ChatPanelProps = {
   text: string;
   sending: boolean;
   closing: boolean;
+
   onTextChange: (text: string) => void;
   onSend: () => void;
+
+  // Envia arquivo + legenda opcional.
+  onSendMedia: (
+    file: File,
+    caption?: string
+  ) => Promise<void>;
+
   onCloseWithBot: () => void;
 };
 
@@ -23,6 +31,7 @@ export function ChatPanel({
   closing,
   onTextChange,
   onSend,
+  onSendMedia,
   onCloseWithBot,
 }: ChatPanelProps) {
   if (!contact) {
@@ -39,16 +48,23 @@ export function ChatPanel({
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 z-10 h-36 bg-gradient-to-b from-zinc-950 via-zinc-950/85 to-transparent"
       />
+
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-3 sm:px-6">
         <ChatHeader contact={contact} />
       </div>
-      <MessageList contact={contact} messages={messages} />
+
+      <MessageList
+        contact={contact}
+        messages={messages}
+      />
+
       <MessageComposer
         text={text}
         sending={sending}
         closing={closing}
         onTextChange={onTextChange}
         onSend={onSend}
+        onSendMedia={onSendMedia}
         onCloseWithBot={onCloseWithBot}
       />
     </section>

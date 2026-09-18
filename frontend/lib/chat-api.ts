@@ -79,3 +79,38 @@ export async function closeConversationWithBot(contactId: number) {
 
   return parseResponse(response, "Erro ao encerrar chamado com o bot");
 }
+
+
+// Envia mídia para o contato, com legenda opcional.
+export async function sendMedia(
+  contactId: number,
+  file: File,
+  caption?: string
+) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  if (caption?.trim()) {
+    formData.append(
+      "caption",
+      caption.trim()
+    );
+  }
+
+  const response = await fetch(
+    `${API_URL}/contacts/${contactId}/send-media`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Erro ao enviar mídia"
+    );
+  }
+
+  return response.json();
+}

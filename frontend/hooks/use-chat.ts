@@ -9,31 +9,45 @@ import {
   getMessages,
   markMessagesAsRead,
   postMessage,
+  sendMedia as sendMediaRequest,
 } from "@/lib/chat-api";
 
-import type { Contact, Message } from "@/types/chat";
+import type {
+  Contact,
+  Message,
+} from "@/types/chat";
+
+
+// =========================================================
+// HOOK PRINCIPAL DO CHAT
+// =========================================================
 
 // Concentra o estado e as ações da conversa
 // fora dos componentes visuais.
 export function useChat() {
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contacts, setContacts] =
+    useState<Contact[]>([]);
 
   const [selectedContact, setSelectedContact] =
     useState<Contact | null>(null);
 
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] =
+    useState<Message[]>([]);
 
-  const [text, setText] = useState("");
+  const [text, setText] =
+    useState("");
 
-  const [sending, setSending] = useState(false);
+  const [sending, setSending] =
+    useState(false);
 
-  const [closing, setClosing] = useState(false);
+  const [closing, setClosing] =
+    useState(false);
+
 
   // =========================================================
   // NOVAS MENSAGENS VIA WEBSOCKET
   // =========================================================
 
-  // Escuta novas mensagens enviadas pelo backend.
   useEffect(() => {
     async function handleNewMessage(data: {
       message: Message;
@@ -47,109 +61,147 @@ export function useChat() {
       // Verifica se a mensagem pertence
       // à conversa que está aberta.
       const isOpenConversation =
-        selectedContact?.id === data.contact.id;
+        selectedContact?.id ===
+        data.contact.id;
 
+      // INCOMING:
+      // WhatsApp -> CotrimBot
+      //
+      // OUTGOING:
+      // CotrimBot -> WhatsApp
       const isIncoming =
-        data.message.direction === "INCOMING";
+        data.message.direction ===
+        "INCOMING";
+
+
       // =====================================================
       // ATUALIZA A CONVERSA ABERTA
       // =====================================================
 
       if (isOpenConversation) {
-        setMessages((currentMessages) => {
-          // Verifica se essa mensagem já está
-          // sendo exibida na tela.
-          const alreadyExists = currentMessages.some(
-            (message) =>
-              message.externalId ===
-              data.message.externalId
-          );
+        setMessages(
+          (currentMessages) => {
+            // Verifica se essa mensagem
+            // já está aparecendo na tela.
+            const alreadyExists =
+              currentMessages.some(
+                (message) =>
+                  message.externalId ===
+                  data.message.externalId
+              );
 
-          // Evita mensagens duplicadas.
-          if (alreadyExists) {
-            return currentMessages;
+            // Evita mensagens duplicadas.
+            if (alreadyExists) {
+              return currentMessages;
+            }
+
+            // Adiciona a nova mensagem
+            // no final do chat.
+            return [
+              ...currentMessages,
+              data.message,
+            ];
           }
+        );
 
-          // Adiciona a nova mensagem no final do chat.
-          return [
-            ...currentMessages,
-            data.message,
-          ];
-        });
-
-        // Como o usuário já está olhando essa conversa,
-        // marcamos as mensagens recebidas como lidas.
+        // Se for uma mensagem recebida e
+        // o usuário já está vendo a conversa,
+        // marcamos como lida.
         if (isIncoming) {
           await markMessagesAsRead(
             data.contact.id
           );
         }
-
       }
+
 
       // =====================================================
       // ATUALIZA A SIDEBAR DIRETAMENTE NA MEMÓRIA
       // =====================================================
 
-      // Não precisamos fazer GET /contacts aqui,
-      // porque o WebSocket já trouxe o contato
-      // e a mensagem nova.
-      setContacts((currentContacts) => {
-        // Procura esse contato na sidebar.
-        const existingContact =
-          currentContacts.find(
-            (contact) =>
-              contact.id === data.contact.id
-          );
+      // Não precisamos fazer GET /contacts aqui.
+      // O próprio WebSocket já trouxe
+      // o contato e a mensagem.
+      setContacts(
+        (currentContacts) => {
+          // Procura esse contato
+          // na sidebar.
+          const existingContact =
+            currentContacts.find(
+              (contact) =>
+                contact.id ===
+                data.contact.id
+            );
 
-        // Cria a versão atualizada do contato.
-        const updatedContact: Contact = {
-          ...(existingContact ?? data.contact),
+          // Cria uma versão atualizada.
+          const updatedContact: Contact = {
+            ...(existingContact ??
+              data.contact),
 
-          // Atualiza os dados básicos.
-          name: data.contact.name,
-          phone: data.contact.phone,
+            name:
+              data.contact.name,
 
-          // A mensagem que acabou de chegar
-          // passa a ser a última mensagem.
-          messages: [
-            data.message,
-          ],
+            phone:
+              data.contact.phone,
 
-          // Se a conversa estiver aberta,
-          // não mostramos mensagens não lidas.
-          //
-          // Se estiver fechada,
-          // aumentamos o contador.
-          unreadCount: isOpenConversation
-            ? 0
-            : isIncoming
-              ? (existingContact?.unreadCount ?? 0) + 1
-              : (existingContact?.unreadCount ?? 0),
-        };
+            // A nova mensagem passa
+            // a ser a última mensagem.
+            messages: [
+              data.message,
+            ],
 
-        // Remove a versão antiga desse contato.
-        const otherContacts =
-          currentContacts.filter(
-            (contact) =>
-              contact.id !== data.contact.id
-          );
+            // Se a conversa estiver aberta,
+            // unread = 0.
+            //
+            // Se estiver fechada e for INCOMING,
+            // aumenta o contador.
+            //
+            // OUTGOING não aumenta unread.
+            unreadCount:
+              isOpenConversation
+                ? 0
+                : isIncoming
+                  ? (
+                      existingContact
+                        ?.unreadCount ??
+                      0
+                    ) + 1
+                  : (
+                      existingContact
+                        ?.unreadCount ??
+                      0
+                    ),
+          };
 
-        // Coloca o contato atualizado no topo.
-        return [
-          updatedContact,
-          ...otherContacts,
-        ];
-      });
+          // Remove a versão antiga.
+          const otherContacts =
+            currentContacts.filter(
+              (contact) =>
+                contact.id !==
+                data.contact.id
+            );
+
+          // Coloca o contato atualizado
+          // no topo da sidebar.
+          return [
+            updatedContact,
+            ...otherContacts,
+          ];
+        }
+      );
     }
 
-    // Começa a ouvir o evento enviado pelo backend.
+
+    // Começa a ouvir o evento
+    // enviado pelo backend.
     socket.on(
       "new_message",
       handleNewMessage
     );
 
-    // Remove o listener quando necessário.
+
+    // Remove o listener quando
+    // o effect for recriado/desmontado.
     return () => {
       socket.off(
         "new_message",
@@ -158,11 +210,11 @@ export function useChat() {
     };
   }, [selectedContact]);
 
+
   // =========================================================
   // CONEXÃO SOCKET.IO
   // =========================================================
 
-  // Mantém a conexão do frontend com o backend.
   useEffect(() => {
     function handleConnect() {
       console.log(
@@ -177,7 +229,9 @@ export function useChat() {
       );
     }
 
-    // Primeiro registra os eventos.
+
+    // Registra os eventos antes
+    // de abrir a conexão.
     socket.on(
       "connect",
       handleConnect
@@ -188,8 +242,10 @@ export function useChat() {
       handleDisconnect
     );
 
-    // Depois abre a conexão.
+
+    // Abre a conexão.
     socket.connect();
+
 
     return () => {
       socket.off(
@@ -206,12 +262,11 @@ export function useChat() {
     };
   }, []);
 
+
   // =========================================================
   // CARREGAMENTO INICIAL DOS CONTATOS
   // =========================================================
 
-  // Busca os contatos apenas uma vez
-  // quando o CotrimBot abre.
   useEffect(() => {
     let active = true;
 
@@ -238,6 +293,7 @@ export function useChat() {
     };
   }, []);
 
+
   // =========================================================
   // ABRIR UMA CONVERSA
   // =========================================================
@@ -245,7 +301,7 @@ export function useChat() {
   // Quando selecionamos um contato:
   //
   // 1. Busca o histórico.
-  // 2. Marca as mensagens como lidas.
+  // 2. Marca mensagens como lidas.
   // 3. Atualiza a sidebar.
   useEffect(() => {
     if (!selectedContact) {
@@ -284,17 +340,20 @@ export function useChat() {
         );
       });
 
+
     return () => {
       active = false;
     };
   }, [selectedContact]);
 
+
   // =========================================================
-  // ENVIAR MENSAGEM
+  // ENVIAR MENSAGEM DE TEXTO
   // =========================================================
 
   async function sendMessage() {
-    const content = text.trim();
+    const content =
+      text.trim();
 
     if (
       !selectedContact ||
@@ -307,25 +366,98 @@ export function useChat() {
     try {
       setSending(true);
 
-      // Envia a mensagem para o backend.
+      // Envia a mensagem
+      // para o backend.
       await postMessage(
         selectedContact.id,
         content
       );
 
-      // O WebSocket será responsável por
-      // adicionar a mensagem na conversa
-      // e atualizar a sidebar.
+      // O Socket.IO será responsável
+      // por adicionar a mensagem
+      // ao histórico.
       setText("");
+
     } catch (error) {
       console.error(
         "Erro ao enviar mensagem:",
         error
       );
+
     } finally {
       setSending(false);
     }
   }
+
+
+  // =========================================================
+  // ENVIAR MÍDIA
+  // =========================================================
+
+  // Recebe o File escolhido no MessageComposer.
+  //
+  // Exemplos:
+  //
+  // laudo.pdf
+  // foto.png
+  // video.mp4
+  // audio.ogg
+  //
+  // O useChat sabe qual contato está aberto,
+  // então consegue descobrir para quem enviar.
+  async function sendMediaMessage(
+    file: File,
+    caption?: string
+  ) {
+    if (
+      !selectedContact ||
+      sending
+    ) {
+      return;
+    }
+
+    try {
+      setSending(true);
+
+      // Envia:
+      //
+      // contactId
+      // +
+      // arquivo
+      // +
+      // legenda opcional
+      //
+      // para o chat-api.
+      await sendMediaRequest(
+        selectedContact.id,
+        file,
+        caption
+      );
+
+      // Não adicionamos a mensagem
+      // manualmente no estado.
+      //
+      // O backend salva no Prisma
+      // e emite "new_message".
+      //
+      // O Socket.IO atualiza
+      // o frontend automaticamente.
+
+    } catch (error) {
+      console.error(
+        "Erro ao enviar mídia:",
+        error
+      );
+
+      // Repassa o erro para o
+      // MessageComposer conseguir tratar.
+      throw error;
+
+    } finally {
+      setSending(false);
+    }
+  }
+
 
   // =========================================================
   // ENCERRAR CHAMADO COM O BOT
@@ -351,10 +483,12 @@ export function useChat() {
         "Erro ao encerrar chamado com o bot:",
         error
       );
+
     } finally {
       setClosing(false);
     }
   }
+
 
   // =========================================================
   // DADOS DISPONIBILIZADOS PARA OS COMPONENTES
@@ -364,7 +498,9 @@ export function useChat() {
     contacts,
     selectedContact,
     messages,
+
     text,
+
     sending,
     closing,
 
@@ -373,7 +509,15 @@ export function useChat() {
     selectContact:
       setSelectedContact,
 
+    // Envio de texto
     sendMessage,
+
+    // Envio de arquivo
+    sendMediaMessage,
+
+    // Encerramento
     closeWithBot,
   };
 }
+
+

@@ -7,15 +7,21 @@ import { EmojiSelector } from "@/components/chat/emoji-selector";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { insertEmojiAtSelection } from "@/lib/emoji-text";
 
+
 type MessageComposerProps = {
   text: string;
   sending: boolean;
   closing: boolean;
+
   onTextChange: (text: string) => void;
   onSend: () => void;
   onCloseWithBot: () => void;
-};
 
+  onSendMedia: (
+    file: File,
+    caption?: string
+  ) => Promise<void>;
+};
 type ComposerIconName = "message" | "plus" | "sticker" | "mic" | "send" | "expand" | "collapse";
 
 // Os controles compartilham tamanho e espessura de traço.
@@ -37,7 +43,15 @@ function ComposerIcon({ name }: { name: ComposerIconName }) {
 const textClassName = "resize-none bg-transparent p-0 text-base leading-6 text-white outline-none placeholder:text-zinc-500 [overflow-wrap:anywhere] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 const buttonClassName = "flex items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-700/70 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 disabled:text-zinc-500 motion-reduce:transition-none";
 
-export function MessageComposer({ text, sending, closing, onTextChange, onSend, onCloseWithBot }: MessageComposerProps) {
+export function MessageComposer({
+  text,
+  sending,
+  closing,
+  onTextChange,
+  onSend,
+  onCloseWithBot,
+  onSendMedia,
+}: MessageComposerProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
@@ -383,10 +397,28 @@ export function MessageComposer({ text, sending, closing, onTextChange, onSend, 
             ref={fileInputRef}
             type="file"
             className="hidden"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) console.log("Anexo selecionado", { tipo: attachmentKindRef.current, nome: file.name, tamanho: file.size });
-              textareaRef.current?.focus();
+            onChange={async (event) => {
+              const file =
+                event.target.files?.[0];
+
+              if (!file) return;
+
+              try {
+                await onSendMedia(
+                  file,
+                  text.trim() || undefined
+                );
+
+                onTextChange("");
+              } catch (error) {
+                console.error(
+                  "Erro ao enviar anexo:",
+                  error
+                );
+              } finally {
+                event.target.value = "";
+                textareaRef.current?.focus();
+              }
             }}
           />
         </form>
