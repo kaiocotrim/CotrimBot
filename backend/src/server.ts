@@ -7,6 +7,7 @@ import { setSocketServer } from "./lib/socket.js";
 
 import { contactRouter } from "./routes/contact.routes.js";
 import { messageRouter } from "./routes/message.routes.js";
+import { transcriptionRouter } from "./routes/transcription.routes.js";
 import webhookRoutes from "./routes/webhook.routes.js";
 
 // Cria a aplicação Express.
@@ -27,6 +28,7 @@ app.use(contactRouter);
 app.use(messageRouter);
 app.use(webhookRoutes);
 app.use(transcriptionRouter);
+
 // Cria o servidor HTTP que será compartilhado
 // pelo Express e pelo Socket.IO.
 const httpServer = createServer(app);
@@ -67,8 +69,3 @@ httpServer.listen(3333, () => {
   );
 });
 
-
-// Registra as rotas de transcrição.
-import {
-  transcriptionRouter,
-} from "./routes/transcription.routes.js";

@@ -143,6 +143,7 @@ export async function getMediaMessage(
   const data =
     (await response.json()) as EvolutionMediaResponse;
 
+
   if (!data.base64) {
     throw new Error(
       "A Evolution não retornou o conteúdo da mídia"
@@ -151,3 +152,66 @@ export async function getMediaMessage(
 
   return data;
 }
+
+
+
+// Envia uma mídia para um contato via WhatsApp, usando a Evolution API.
+
+type SendMediaInput = {
+  number: string;
+  mediatype: "image" | "video" | "document" | "audio";
+  mimetype: string;
+  media: string;
+  fileName: string;
+  caption?: string;
+};
+export async function sendWhatsAppMedia({
+  number,
+  mediatype,
+  mimetype,
+  media,
+  fileName,
+  caption = "",
+}: SendMediaInput) {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE;
+
+  if (!apiUrl || !apiKey || !instance) {
+    throw new Error(
+      "Configurações da Evolution API não encontradas"
+    );
+  }
+
+  const response = await fetch(
+    `${apiUrl}/message/sendMedia/${instance}`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+        apikey: apiKey,
+      },
+
+      body: JSON.stringify({
+        number,
+        mediatype,
+        mimetype,
+        media,
+        fileName,
+        caption,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+
+    throw new Error(
+      `Erro ao enviar mídia pela Evolution: ${response.status} - ${error}`
+    );
+  }
+
+  return response.json();
+}
+

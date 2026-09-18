@@ -1,85 +1,79 @@
-import {
-  getMessageMedia,
-  // seus outros controllers...
-} from "../controllers/message.controller.js";
-
-
-// Importa o Router do Express para agrupar as rotas relacionadas a mensagens.
+﻿// Router organiza os endpoints registrados por app.use(messageRouter) em server.ts.
 import { Router } from "express";
 
-// Importa os controllers responsáveis pelas regras executadas em cada rota.
-// A rota apenas recebe a URL e direciona a requisição para o controller correto.
+// Multer processa multipart/form-data e disponibiliza o arquivo em req.file.
+import { upload } from "../middlewares/upload.js";
+
+// Cada controller recebe req e res, executa a operação e responde ao frontend.
+// A extensão .js nos imports é necessária para os módulos ESM/NodeNext do projeto.
 import {
   closeConversationWithBot,
+  getMessageMedia,
   getMessages,
-  sendMessageToContact,
   markMessagesAsRead,
+  sendMediaToContact,
+  sendMessageToContact,
+  transcribeMessage,
 } from "../controllers/message.controller.js";
 
-// Cria o agrupador das rotas de mensagens.
-// Esse router será registrado posteriormente no server.ts.
 export const messageRouter = Router();
+
+// :id é um parâmetro da URL, recebido pelo controller em req.params.id.
+// Em /contacts ele identifica o contato; em /messages identifica a mensagem.
+// São IDs do banco do CotrimBot, não os IDs externos da Evolution API.
 
 /**
  * GET /contacts/:id/messages
- *
- * Retorna todas as mensagens relacionadas a um contato,
- * normalmente em ordem cronológica.
+ * Consulta as mensagens do contato, da mais antiga para a mais recente.
+ * Exemplo: /contacts/15/messages consulta o histórico do contato de ID 15.
  */
-messageRouter.get(
-  "/contacts/:id/messages",
-  getMessages
-);
+messageRouter.get("/contacts/:id/messages", getMessages);
 
 /**
  * POST /contacts/:id/send
- *
- * Envia uma nova mensagem para o WhatsApp do contato
- * através da Evolution API e salva a mensagem no banco
- * como OUTGOING.
+ * Recebe JSON: { "text": "Olá!" }.
+ * Envia o texto pela Evolution API, salva como OUTGOING e notifica o frontend.
  */
-messageRouter.post(
-  "/contacts/:id/send",
-  sendMessageToContact
-);
+messageRouter.post("/contacts/:id/send", sendMessageToContact);
 
-// Encerra o atendimento enviando a pesquisa de satisfação do bot.
-messageRouter.post(
-  "/contacts/:id/close-with-bot",
-  closeConversationWithBot
-);
+/**
+ * POST /contacts/:id/close-with-bot
+ * Envia a pesquisa de satisfação do bot para encerrar o atendimento do contato.
+ */
+messageRouter.post("/contacts/:id/close-with-bot", closeConversationWithBot);
 
 /**
  * PATCH /contacts/:id/messages/read
- *
- * Marca como lidas todas as mensagens INCOMING
- * desse contato que ainda possuem readAt = null.
+ * Marca as mensagens INCOMING ainda não lidas, preenchendo o campo readAt.
  */
-messageRouter.patch(
-  "/contacts/:id/messages/read",
-  markMessagesAsRead
-);
+messageRouter.patch("/contacts/:id/messages/read", markMessagesAsRead);
 
+/**
+ * GET /messages/:id/media
+ * Busca a mídia original na Evolution usando o externalId da mensagem salva.
+ * Devolve os bytes e o Content-Type para o navegador exibir ou tocar o arquivo.
+ * O controller rejeita mensagens de texto, pois não possuem arquivo de mídia.
+ */
+messageRouter.get("/messages/:id/media", getMessageMedia);
 
+/**
+ * POST /messages/:id/transcribe
+ * Busca o áudio de uma mensagem já salva e o envia ao microserviço Python.
+ * Retorna { messageId, transcription }. Esta rota não recebe upload.
+ */
+messageRouter.post("/messages/:id/transcribe", transcribeMessage);
 
-// GET /messages/:id/media - Retorna o conteúdo de mídia de uma mensagem
-
-messageRouter.get(
-  "/messages/:id/media",
-  getMessageMedia
-);
-
-
-
-//  POST /messages/transcribe - Transcreve uma mensagem de áudio para texto
-import {
-  transcribeMessage,
-  // seus outros controllers...
-} from "../controllers/message.controller.js";
-
-// POST /messages/:id/transcribe - Transcreve uma mensagem de áudio para texto
-
+/**
+ * POST /contacts/:id/send-media
+ * Recebe multipart/form-data: um arquivo no campo "file" e "caption" opcional.
+ * upload.single("file") executa antes do controller e preenche req.file.
+ * Os campos de texto ficam em req.body; os bytes ficam em req.file.buffer.
+ *
+ * Implementação atual: valida a presença do arquivo e a existência do contato,
+ * e retorna os dados do arquivo recebido. Ainda não envia à Evolution/WhatsApp.
+ */
 messageRouter.post(
-  "/messages/:id/transcribe",
-  transcribeMessage
+  "/contacts/:id/send-media",
+  upload.single("file"),
+  sendMediaToContact
 );

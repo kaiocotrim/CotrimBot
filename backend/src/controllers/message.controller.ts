@@ -11,6 +11,7 @@ import { getSocketServer } from "../lib/socket.js";
 import {
   getMediaMessage,
   sendWhatsAppMessage,
+  sendWhatsAppMedia
 } from "../services/evolution.service.js";
 
 import {
@@ -37,6 +38,147 @@ export async function getMessages(req: Request, res: Response) {
   });
 
   res.json(messages);
+}
+
+// POST /contacts/:id/send-media
+// Recebe uma mídia, envia pela Evolution
+// e salva a mensagem como OUTGOING.
+export async function sendMediaToContact(
+  req: Request,
+  res: Response
+) {
+  const contactId = Number(req.params.id);
+
+  // Arquivo recebido pelo Multer.
+  const file = req.file;
+
+  // Legenda opcional enviada no form-data.
+  const { caption } = req.body;
+
+  if (!file) {
+    return res.status(400).json({
+      message: "Nenhum arquivo foi enviado",
+    });
+  }
+
+  // Busca o contato para descobrir o telefone.
+  const contact = await prisma.contact.findUnique({
+    where: {
+      id: contactId,
+    },
+  });
+
+  if (!contact) {
+    return res.status(404).json({
+      message: "Contato não encontrado",
+    });
+  }
+
+  // Descobre qual tipo de mídia será enviado
+  // usando o MIME type do arquivo.
+  let mediatype:
+    | "image"
+    | "video"
+    | "document"
+    | "audio";
+
+  let messageType:
+    | "IMAGE"
+    | "VIDEO"
+    | "DOCUMENT"
+    | "AUDIO";
+
+  if (file.mimetype.startsWith("image/")) {
+    mediatype = "image";
+    messageType = "IMAGE";
+  } else if (file.mimetype.startsWith("video/")) {
+    mediatype = "video";
+    messageType = "VIDEO";
+  } else if (file.mimetype.startsWith("audio/")) {
+    mediatype = "audio";
+    messageType = "AUDIO";
+  } else {
+    // PDF, DOCX, XLSX etc.
+    mediatype = "document";
+    messageType = "DOCUMENT";
+  }
+
+  try {
+    // O arquivo está em bytes dentro da RAM.
+    // Convertemos esses bytes para Base64
+    // para enviar dentro do JSON da Evolution.
+    const base64 =
+      file.buffer.toString("base64");
+
+    const evolutionResponse =
+      await sendWhatsAppMedia({
+        number: contact.phone,
+        mediatype,
+        mimetype: file.mimetype,
+        media: base64,
+        fileName: file.originalname,
+        caption: caption ?? "",
+      });
+
+    // ID criado pelo WhatsApp/Evolution.
+    const externalId =
+      evolutionResponse.key?.id;
+
+    if (!externalId) {
+      throw new Error(
+        "A Evolution API não retornou o ID da mídia"
+      );
+    }
+
+    // Define o texto que aparecerá na sidebar/chat.
+    let content: string;
+
+    if (caption?.trim()) {
+      content = caption.trim();
+    } else if (messageType === "IMAGE") {
+      content = "[Imagem]";
+    } else if (messageType === "VIDEO") {
+      content = "[Vídeo]";
+    } else if (messageType === "AUDIO") {
+      content = "[Áudio]";
+    } else {
+      content = file.originalname;
+    }
+
+    // Salva a mídia no histórico local.
+    const message = await prisma.message.create({
+      data: {
+        externalId,
+        content,
+        direction: "OUTGOING",
+        type: messageType,
+        contactId: contact.id,
+      },
+    });
+
+    // Atualiza o frontend em tempo real.
+    const io = getSocketServer();
+
+    io.emit("new_message", {
+      message,
+      contact,
+    });
+
+    return res.status(201).json({
+      message,
+      evolution: evolutionResponse,
+    });
+
+  } catch (error) {
+    console.error(
+      "Erro ao enviar mídia:",
+      error
+    );
+
+    return res.status(500).json({
+      message: "Erro ao enviar mídia",
+    });
+  }
 }
 
 // POST /messages/:id/transcribe

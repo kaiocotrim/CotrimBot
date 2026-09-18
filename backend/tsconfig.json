@@ -1,46 +1,36 @@
-{
-  // Visit https://aka.ms/tsconfig to read more about this file
+﻿{
   "compilerOptions": {
-    // File Layout
+    // Mantém src/ e generated/ dentro de dist/, preservando os imports do Prisma.
     "rootDir": ".",
     "outDir": "./dist",
 
-    // Environment Settings
-    // See also https://aka.ms/tsconfig/module
+    // Usa módulos ESM do Node, compatíveis com "type": "module" no package.json.
+    // Nos arquivos .ts, os imports locais devem terminar em .js.
     "module": "nodenext",
     "target": "esnext",
     "types": ["node"],
-    // For nodejs:
-    // "lib": ["esnext"],
-    // "types": ["node"],
-    // and npm install -D @types/node
 
-    // Other Outputs
+    // Gera arquivos .js.map para depurar o JavaScript usando o TypeScript original.
     "sourceMap": true,
     "declaration": false,
     "declarationMap": false,
 
-    // Stricter Typechecking Options
+    // Verifica tipos, valores opcionais e acessos a posições que podem não existir.
+    "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
 
-    // Style Options
-    // "noImplicitReturns": true,
-    // "noImplicitOverride": true,
-    // "noUnusedLocals": true,
-    // "noUnusedParameters": true,
-    // "noFallthroughCasesInSwitch": true,
-    // "noPropertyAccessFromIndexSignature": true,
-
-    // Recommended Options
-    "strict": true,
-    "jsx": "react-jsx",
+    // Preserva imports ESM e verifica cada arquivo como módulo independente.
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
+
+    // Evita gerar uma nova compilação quando houver erros de TypeScript.
+    "noEmitOnError": true
   },
+  // O cliente Prisma também precisa ser compilado para funcionar em produção.
   "include": ["src/**/*.ts", "generated/**/*.ts"],
   "exclude": ["dist", "node_modules"]
 }
