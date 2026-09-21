@@ -44,12 +44,19 @@ export function ChatPanel({
 
   return (
     <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      {/* Papel de parede fornecido pelo usuário via Unsplash. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 z-10 h-36 bg-gradient-to-b from-zinc-950 via-zinc-950/85 to-transparent"
+        className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/banner.jpg')" }}
+      />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-zinc-950/72" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-[58px] z-10 h-12 bg-gradient-to-b from-zinc-950/35 to-transparent"
       />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-3 sm:px-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20">
         <ChatHeader contact={contact} />
       </div>
 

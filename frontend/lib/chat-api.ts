@@ -70,6 +70,17 @@ export async function postMessage(contactId: number, text: string) {
   return parseResponse(response, "Erro ao enviar mensagem");
 }
 
+export async function rewriteMessage(text: string): Promise<string> {
+  const response = await fetch(`${API_URL}/ai/rewrite`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+
+  const result = await parseResponse<{ text: string }>(response, "Erro ao reformular a mensagem");
+  return result.text;
+}
+
 // Solicita ao backend o encerramento com a pesquisa de satisfação do bot.
 export async function closeConversationWithBot(contactId: number) {
   const response = await fetch(

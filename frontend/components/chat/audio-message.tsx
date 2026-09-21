@@ -98,7 +98,7 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
   }
 
   return (
-    <div className="w-full max-w-[340px]">
+    <div className="w-full">
       {/* Áudio real, sem controles nativos */}
       <audio
         ref={audioRef}
@@ -124,8 +124,9 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
             onClick={handlePlayPause}
             aria-label={isPlaying ? "Pausar áudio" : "Reproduzir áudio"}
             className="
-              flex size-10 shrink-0 items-center justify-center
-              rounded-full bg-white text-zinc-950
+              flex size-11 shrink-0 items-center justify-center
+              rounded-full border border-white/20 bg-gradient-to-br from-white/20 to-white/[0.06] text-white
+              shadow-[inset_0_1px_2px_rgba(255,255,255,0.2),0_6px_18px_rgba(0,0,0,0.25)]
               transition duration-200 ease-out
               hover:bg-white/90 active:scale-95
               focus-visible:outline-none focus-visible:ring-2
@@ -135,11 +136,11 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
             "
           >
             {isPlaying ? (
-              <svg viewBox="0 0 24 24" fill="currentColor" className="size-[15px]" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="size-4" aria-hidden="true">
                 <path d="M7 5.75A1.25 1.25 0 0 1 8.25 4.5h1A1.25 1.25 0 0 1 10.5 5.75v12.5a1.25 1.25 0 0 1-1.25 1.25h-1A1.25 1.25 0 0 1 7 18.25V5.75Zm6.5 0a1.25 1.25 0 0 1 1.25-1.25h1A1.25 1.25 0 0 1 17 5.75v12.5a1.25 1.25 0 0 1-1.25 1.25h-1a1.25 1.25 0 0 1-1.25-1.25V5.75Z" />
               </svg>
             ) : (
-              <svg viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 size-[15px]" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 size-4" aria-hidden="true">
                 <path d="M8.5 5.8a1 1 0 0 1 1.53-.85l9.1 6.2a1 1 0 0 1 0 1.7l-9.1 6.2a1 1 0 0 1-1.53-.85V5.8Z" />
               </svg>
             )}
@@ -148,10 +149,10 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
           <div className="min-w-0 flex-1">
             {/* Barra de progresso */}
             <div className="group relative flex h-6 items-center">
-              <div className="pointer-events-none absolute inset-x-0 h-[3px] rounded-full bg-white/15" />
+              <div className="pointer-events-none absolute inset-x-0 h-1 rounded-full border border-white/15 bg-white/10 shadow-inner" />
 
               <div
-                className="pointer-events-none absolute left-0 h-[3px] rounded-full bg-white"
+                className="pointer-events-none absolute left-0 h-1 rounded-full bg-white/90"
                 style={{ width: `${progress}%` }}
               />
 
@@ -170,9 +171,9 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
 
               <div
                 className="
-                  pointer-events-none absolute size-3 -translate-x-1/2
+                  pointer-events-none absolute size-3.5 -translate-x-1/2
                   rounded-full bg-white shadow-md shadow-black/30
-                  opacity-0 scale-75
+                  opacity-100 scale-100
                   transition duration-150 ease-out
                   group-hover:opacity-100 group-hover:scale-100
                   peer-active:opacity-100 peer-active:scale-100
@@ -186,7 +187,7 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
             </div>
 
             {/* Tempo */}
-            <div className="mt-0.5 flex items-center justify-between text-[11px] tabular-nums text-white/45">
+            <div className="mt-0.5 flex items-center justify-between text-[11px] tabular-nums text-white/55">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(duration)}</span>
             </div>
@@ -194,7 +195,7 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
         </div>
 
         {/* Ações */}
-        <div className="mt-2.5 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3">
           {!transcription ? (
             <button
               type="button"
@@ -202,8 +203,8 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
               disabled={transcribing}
               aria-busy={transcribing}
               className="
-                -ml-2 flex items-center gap-1.5 rounded-full px-2.5 py-1.5
-                text-[13px] font-medium text-white/70
+                -ml-1.5 flex items-center gap-1.5 rounded-full px-2.5 py-1.5
+                text-[13px] font-medium text-white/80
                 transition duration-200 ease-out
                 hover:bg-white/[0.08] hover:text-white
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40
@@ -213,7 +214,7 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
             >
               {transcribing ? (
                 <>
-                  <svg className="size-3.5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <svg className="size-4 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" opacity="0.2" />
                     <path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
@@ -221,7 +222,7 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
                 </>
               ) : (
                 <>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="size-3.5" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="size-4" aria-hidden="true">
                     <path d="M12 3v18" />
                     <path d="M8 8v8" />
                     <path d="M4 10v4" />
@@ -238,8 +239,8 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
               onClick={() => setShowTranscription((v) => !v)}
               aria-expanded={showTranscription}
               className="
-                -ml-2 flex items-center gap-1 rounded-full px-2.5 py-1.5
-                text-[13px] font-medium text-white/60
+                -ml-1.5 flex items-center gap-1.5 rounded-full px-2.5 py-1.5
+                text-[13px] font-medium text-white/70
                 transition duration-200 ease-out
                 hover:bg-white/[0.08] hover:text-white
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40
@@ -270,8 +271,8 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
               onClick={handleChangeRate}
               aria-label={`Velocidade de reprodução: ${rate}x. Alterar`}
               className="
-                min-w-9 rounded-full px-2 py-1 text-xs font-medium tabular-nums
-                text-white/60 transition duration-200 ease-out
+                min-w-10 rounded-xl border border-white/10 bg-white/[0.06] px-2 py-1.5 text-xs font-medium tabular-nums
+                text-white/75 shadow-inner transition duration-200 ease-out
                 hover:bg-white/[0.08] hover:text-white
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40
                 motion-reduce:transition-none

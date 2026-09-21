@@ -1,11 +1,12 @@
 ﻿"use client";
 
-import { motion, useAnimate, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useAnimate, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { AttachmentMenu, type AttachmentKind } from "@/components/chat/attachment-menu";
 import { EmojiSelector } from "@/components/chat/emoji-selector";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { insertEmojiAtSelection } from "@/lib/emoji-text";
+import { rewriteMessage } from "@/lib/chat-api";
 
 
 type MessageComposerProps = {
@@ -22,7 +23,20 @@ type MessageComposerProps = {
     caption?: string
   ) => Promise<void>;
 };
-type ComposerIconName = "message" | "plus" | "sticker" | "mic" | "send" | "expand" | "collapse";
+type ComposerIconName = "message" | "plus" | "sticker" | "mic" | "send" | "expand" | "collapse" | "sparkles";
+
+const LONG_PASTE_CHARACTER_LIMIT = 1200;
+const LONG_PASTE_LINE_LIMIT = 18;
+
+function shouldCollapsePastedText(value: string) {
+  return value.length >= LONG_PASTE_CHARACTER_LIMIT || value.split(/\r?\n/).length >= LONG_PASTE_LINE_LIMIT;
+}
+
+function longTextPreview(value: string) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return "Texto colado";
+  return normalized.length > 42 ? `${normalized.slice(0, 42).trimEnd()}…` : normalized;
+}
 
 // Os controles compartilham tamanho e espessura de traço.
 function ComposerIcon({ name }: { name: ComposerIconName }) {
@@ -35,6 +49,7 @@ function ComposerIcon({ name }: { name: ComposerIconName }) {
       {name === "send" && <><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></>}
       {name === "expand" && <path d="M8 3H3v5m13 13h5v-5M3 3l6 6m12 12-6-6" />}
       {name === "collapse" && <path d="M3 8h5V3m13 13h-5v5M8 8 3 3m13 13 5 5" />}
+      {name === "sparkles" && <><path d="m12 3 1.35 3.65L17 8l-3.65 1.35L12 13l-1.35-3.65L7 8l3.65-1.35L12 3Z" /><path d="m18.5 13 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z" /><path d="m5 14 .65 1.35L7 16l-1.35.65L5 18l-.65-1.35L3 16l1.35-.65L5 14Z" /></>}
     </svg>
   );
 }
@@ -56,6 +71,11 @@ export function MessageComposer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [emojisOpen, setEmojisOpen] = useState(false);
+  const [rewriting, setRewriting] = useState(false);
+  const [rewriteError, setRewriteError] = useState<string | null>(null);
+  const [longTextCollapsed, setLongTextCollapsed] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [sendButtonRef, animateSendButton] = useAnimate<HTMLButtonElement>();
   const emojiTriggerRef = useRef<HTMLButtonElement>(null);
   const selectionRef = useRef({ start: text.length, end: text.length });
@@ -67,6 +87,7 @@ export function MessageComposer({
   const [measurements, setMeasurements] = useState({ compact: 24, stacked: 24 });
   const [availableHeight, setAvailableHeight] = useState(400);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const longTextTriggerRef = useRef<HTMLButtonElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
   const compactMirrorRef = useRef<HTMLTextAreaElement>(null);
   const stackedMirrorRef = useRef<HTMLTextAreaElement>(null);
@@ -75,8 +96,9 @@ export function MessageComposer({
   const previousText = useRef(text);
   const textareaId = useId();
   const reduceMotion = useReducedMotion();
+  const isLongTextCollapsed = longTextCollapsed && Boolean(text);
   const showControls = isFocused || text.length > 0 || isFullscreen;
-  const isStacked = measurements.compact > 24 || isFullscreen;
+  const isStacked = measurements.compact > 24 || isFullscreen || isLongTextCollapsed;
   const transition = { duration: reduceMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
 
   // A camada de desenho acompanha a rolagem do textarea, que continua editável.
@@ -108,6 +130,45 @@ export function MessageComposer({
     pendingCaretRef.current = next.caret;
     selectionRef.current = { start: next.caret, end: next.caret };
     onTextChange(next.value);
+  }
+
+  async function handleRewrite() {
+    const originalText = text.trim();
+    if (!originalText || rewriting || sending) return;
+
+    setRewriting(true);
+    setRewriteError(null);
+    try {
+      const rewritten = await rewriteMessage(originalText);
+      onTextChange(rewritten);
+      const caret = rewritten.length;
+      pendingCaretRef.current = caret;
+      selectionRef.current = { start: caret, end: caret };
+    } catch (error) {
+      console.error("Erro ao reformular mensagem:", error);
+      setRewriteError("Não foi possível reformular o texto.");
+    } finally {
+      setRewriting(false);
+    }
+  }
+
+  async function sendPendingAttachment() {
+    if (!pendingFile || sending) return;
+    setAttachmentError(null);
+    try {
+      await onSendMedia(pendingFile, text.trim() || undefined);
+      setPendingFile(null);
+      onTextChange("");
+    } catch (error) {
+      console.error("Erro ao enviar anexo:", error);
+      setAttachmentError("Não foi possível enviar o arquivo. Tente novamente.");
+    }
+  }
+
+  function formatFileSize(bytes: number) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   // Restaura o cursor depois que o React aplicar o texto; mantém o seletor aberto.
@@ -183,10 +244,10 @@ export function MessageComposer({
     };
   }, []);
 
-  const naturalHeight = Math.max(112, Math.min(measurements.stacked, 144) + 72);
+  const naturalHeight = isLongTextCollapsed ? 136 : Math.max(112, Math.min(measurements.stacked, 144) + 72);
   const fieldHeight = isFullscreen ? availableHeight : isStacked ? Math.min(naturalHeight, availableHeight) : 48;
   const textHeight = isStacked ? Math.max(24, fieldHeight - 72) : 24;
-  const textLayout = { height: textHeight, top: isStacked ? 16 : 11, left: isStacked ? 16 : isFocused ? 92 : 52, width: isStacked ? "calc(100% - 64px)" : `calc(100% - ${isFocused ? 144 : showControls ? 104 : 68}px)` };
+  const textLayout = { height: textHeight, top: isStacked ? 16 : 11, left: isStacked ? 16 : isFocused ? 92 : 52, width: isStacked ? "calc(100% - 64px)" : `calc(100% - ${isFocused ? 184 : showControls ? 144 : 68}px)` };
 
   return (
     <div ref={composerRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent px-4 pt-8 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
@@ -207,6 +268,10 @@ export function MessageComposer({
             event.preventDefault();
             closeAttachments();
             closeEmojis();
+            if (pendingFile) {
+              void sendPendingAttachment();
+              return;
+            }
             if (!sending && text.trim()) {
               // Feedback visual sem atrasar o envio para a API.
               if (!reduceMotion && sendButtonRef.current) {
@@ -220,9 +285,38 @@ export function MessageComposer({
             }
           }}
         >
+          <AnimatePresence>
+            {pendingFile && (
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                transition={transition}
+                className="absolute bottom-full left-0 mb-2 flex max-w-[min(360px,85vw)] items-center gap-3 rounded-2xl border border-white/15 bg-zinc-900/95 px-3 py-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl"
+              >
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-zinc-200">
+                  <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" /><path d="M14 2v6h6M8 13h8M8 17h6" /></svg>
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-zinc-100">{pendingFile.name}</span>
+                  <span className={`block text-[11px] ${attachmentError ? "text-red-300" : "text-zinc-400"}`}>{attachmentError ?? formatFileSize(pendingFile.size)}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => { setPendingFile(null); setAttachmentError(null); }}
+                  aria-label="Remover arquivo"
+                  title="Remover arquivo"
+                  className="flex size-7 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white/50"
+                >
+                  <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {attachmentError && <span role="alert" className="sr-only">{attachmentError}</span>}
           {/* Mesmo texto e fonte do campo, sem interferir na altura que está sendo animada. */}
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-0 overflow-hidden opacity-0">
-            <textarea ref={compactMirrorRef} value={text} readOnly tabIndex={-1} rows={1} className={textClassName} style={{ height: 0, width: `calc(100% - ${isFocused ? 202 : showControls ? 162 : 126}px)` }} />
+            <textarea ref={compactMirrorRef} value={text} readOnly tabIndex={-1} rows={1} className={textClassName} style={{ height: 0, width: `calc(100% - ${isFocused ? 242 : showControls ? 202 : 126}px)` }} />
             <textarea ref={stackedMirrorRef} value={text} readOnly tabIndex={-1} rows={1} className={textClassName} style={{ height: 0, width: "calc(100% - 66px)" }} />
           </div>
 
@@ -233,6 +327,36 @@ export function MessageComposer({
             transition={transition}
             className={`relative overflow-hidden rounded-[24px] border bg-gradient-to-br from-white/[0.06] via-white/[0.015] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),inset_0_-1px_1px_rgba(0,0,0,0.12),0_4px_20px_rgba(0,0,0,0.16)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow] duration-250 motion-reduce:transition-none ${emojisOpen && !sending ? "border-[#2f2f33] bg-zinc-900/95" : isFocused ? "border-white/25 bg-zinc-800/85 ring-2 ring-white/5" : "border-white/10 bg-zinc-950/25"}`}
           >
+            <AnimatePresence initial={false}>
+              {isLongTextCollapsed && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                  transition={transition}
+                  className="absolute top-2.5 right-2.5 left-2.5 z-10 flex h-[66px] items-center gap-3 rounded-[18px] border border-white/15 bg-zinc-900/95 px-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_5px_18px_rgba(0,0,0,0.2)]"
+                >
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-zinc-300 text-zinc-300" aria-hidden="true">
+                    <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3h6l4 4v14H8z" /><path d="M14 3v5h4" /></svg>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-zinc-100">{longTextPreview(text)}</span>
+                    <button
+                      ref={longTextTriggerRef}
+                      type="button"
+                      onClick={() => {
+                        setLongTextCollapsed(false);
+                        setIsFullscreen(true);
+                        requestAnimationFrame(() => textareaRef.current?.focus());
+                      }}
+                      className="mt-0.5 inline-flex items-center gap-1 text-xs text-zinc-400 underline decoration-zinc-600 underline-offset-2 transition-colors hover:text-zinc-200"
+                    >
+                      Exibir no campo de texto <span aria-hidden="true">›</span>
+                    </button>
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
             {/* O textarea guarda o texto; esta camada mostra os mesmos emojis do seletor. */}
             <motion.div
               ref={textLayerRef}
@@ -241,7 +365,7 @@ export function MessageComposer({
               animate={textLayout}
               transition={transition}
               onAnimationComplete={syncTextScroll}
-              className="pointer-events-none absolute overflow-hidden p-0 text-base leading-6 whitespace-pre-wrap text-white [overflow-wrap:anywhere]"
+              className={`pointer-events-none absolute overflow-hidden p-0 text-base leading-6 whitespace-pre-wrap text-white [overflow-wrap:anywhere] ${isLongTextCollapsed ? "invisible" : ""}`}
             >
               <EmojiText content={text ? `${text}\u200b` : ""} preserveMetrics />
             </motion.div>
@@ -255,7 +379,23 @@ export function MessageComposer({
               rows={1}
               aria-label="Mensagem"
               value={text}
-              onChange={(event) => onTextChange(event.target.value)}
+              onChange={(event) => {
+                setLongTextCollapsed(false);
+                onTextChange(event.target.value);
+              }}
+              onPaste={(event) => {
+                const pasted = event.clipboardData.getData("text");
+                if (!pasted) return;
+                const target = event.currentTarget;
+                const nextValue = text.slice(0, target.selectionStart) + pasted + text.slice(target.selectionEnd);
+                if (!shouldCollapsePastedText(nextValue)) return;
+                event.preventDefault();
+                onTextChange(nextValue);
+                selectionRef.current = { start: nextValue.length, end: nextValue.length };
+                setIsFullscreen(false);
+                setLongTextCollapsed(true);
+                requestAnimationFrame(() => longTextTriggerRef.current?.focus());
+              }}
               onScroll={syncTextScroll}
               onSelect={(event) => {
                 selectionRef.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd };
@@ -280,7 +420,7 @@ export function MessageComposer({
                 }
               }}
               placeholder="Digite uma mensagem..."
-              className={`absolute caret-white placeholder:[-webkit-text-fill-color:#71717a] ${textClassName}`}
+              className={`absolute caret-white placeholder:[-webkit-text-fill-color:#71717a] ${textClassName} ${isLongTextCollapsed ? "pointer-events-none invisible" : ""}`}
               style={{ color: "transparent", WebkitTextFillColor: "transparent", overflowY: isStacked && measurements.stacked > textHeight ? "auto" : "hidden" }}
             />
 
@@ -337,6 +477,46 @@ export function MessageComposer({
             <motion.button
               type="button"
               initial={false}
+              animate={{
+                opacity: text.trim() ? 1 : 0,
+                scale: text.trim() ? 1 : 0.75,
+                bottom: isStacked ? 8 : 5,
+                right: isStacked ? 92 : 46,
+              }}
+              transition={transition}
+              whileHover={reduceMotion || rewriting ? undefined : { scale: 1.06 }}
+              whileTap={reduceMotion || rewriting ? undefined : { scale: 0.9 }}
+              aria-label="Resumir e melhorar texto com IA"
+              title={rewriteError ?? "Resumir e melhorar com IA"}
+              aria-hidden={!text.trim()}
+              tabIndex={text.trim() ? 0 : -1}
+              disabled={!text.trim() || rewriting || sending}
+              onClick={() => void handleRewrite()}
+              className="group absolute flex size-9 items-center justify-center rounded-full text-violet-300 transition-colors hover:text-violet-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400 disabled:opacity-60"
+              style={{ pointerEvents: text.trim() ? "auto" : "none", filter: text.trim() ? "drop-shadow(0 0 7px rgba(167,139,250,0.7))" : undefined }}
+            >
+              {rewriting ? (
+                <svg className="size-5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" opacity=".25" /><path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+              ) : (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-1 animate-pulse rounded-full bg-violet-500/25 blur-sm transition-opacity duration-300 group-hover:opacity-0 motion-reduce:animate-none"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-0 scale-75 rounded-full bg-violet-400/40 opacity-0 blur-md transition-[transform,opacity] duration-500 ease-out group-hover:scale-110 group-hover:opacity-100"
+                  />
+                  <span className="relative transition-transform duration-300 ease-out group-hover:scale-105">
+                    <ComposerIcon name="sparkles" />
+                  </span>
+                </>
+              )}
+            </motion.button>
+            <span className="sr-only" role="status" aria-live="polite">{rewriteError ?? (rewriting ? "Reformulando mensagem" : "")}</span>
+            <motion.button
+              type="button"
+              initial={false}
               animate={{ opacity: showControls ? 1 : 0, scale: showControls ? 1 : 0.9, bottom: isStacked ? 8 : 5, right: isStacked ? 52 : 6 }}
               transition={transition}
               aria-label="Gravar áudio"
@@ -380,11 +560,11 @@ export function MessageComposer({
             initial={false}
             animate={{ width: isStacked ? 36 : 48, height: isStacked ? 36 : 48, right: isStacked ? 8 : 0, bottom: isStacked ? 8 : 0 }}
             transition={transition}
-            disabled={sending || !text.trim()}
+            disabled={sending || (!text.trim() && !pendingFile)}
             aria-busy={sending}
             aria-label={sending ? "Enviando mensagem" : "Enviar mensagem"}
             title="Enviar mensagem"
-            className={`absolute flex items-center justify-center overflow-hidden rounded-full border bg-gradient-to-br from-white/[0.12] via-white/[0.03] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.16),0_4px_16px_rgba(0,0,0,0.18)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,color,box-shadow] duration-250 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400/50 motion-reduce:transition-none ${text.trim() ? "border-emerald-200/20 bg-emerald-600/60 text-white enabled:hover:bg-emerald-500/70 enabled:hover:border-emerald-100/30" : "border-white/10 bg-emerald-950/25 text-white/45"}`}
+            className={`absolute flex items-center justify-center overflow-hidden rounded-full border bg-gradient-to-br from-white/[0.12] via-white/[0.03] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.16),0_4px_16px_rgba(0,0,0,0.18)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,color,box-shadow] duration-250 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400/50 motion-reduce:transition-none ${text.trim() || pendingFile ? "border-emerald-200/20 bg-emerald-600/60 text-white enabled:hover:bg-emerald-500/70 enabled:hover:border-emerald-100/30" : "border-white/10 bg-emerald-950/25 text-white/45"}`}
           >
             {sending ? (
               <svg className="size-5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" opacity=".25" /><path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
@@ -397,28 +577,13 @@ export function MessageComposer({
             ref={fileInputRef}
             type="file"
             className="hidden"
-            onChange={async (event) => {
-              const file =
-                event.target.files?.[0];
-
+            onChange={(event) => {
+              const file = event.target.files?.[0];
               if (!file) return;
-
-              try {
-                await onSendMedia(
-                  file,
-                  text.trim() || undefined
-                );
-
-                onTextChange("");
-              } catch (error) {
-                console.error(
-                  "Erro ao enviar anexo:",
-                  error
-                );
-              } finally {
-                event.target.value = "";
-                textareaRef.current?.focus();
-              }
+              setPendingFile(file);
+              setAttachmentError(null);
+              event.target.value = "";
+              textareaRef.current?.focus();
             }}
           />
         </form>

@@ -74,10 +74,11 @@ export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, o
           {/* O leque abre para cima e para a direita para caber junto à lateral do chat. */}
           {options.map((option, index) => (
             <motion.button key={option.kind} type="button" role="menuitem" title={option.label} aria-label={option.label}
-              variants={{ closed: { opacity: 0, scale: 0.4, x: 0, y: 0 }, open: { opacity: 1, scale: 1, x: [22, 72, 122, 172][index], y: [-52, -60, -64, -60][index] } }}
+              variants={{ closed: { opacity: 0, scale: 0.4, x: 0, y: 0 }, open: { opacity: 1, scale: 1, x: [22, 72, 122, 172][index], y: -60 } }}
               transition={{ duration: reduceMotion ? 0 : 0.45, delay: reduceMotion ? 0 : index * 0.035, ease: [0.22, 1, 0.36, 1] }}
               whileHover={reduceMotion ? undefined : { scale: 1.08 }}
               whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+              onMouseDown={(event) => event.preventDefault()}
               onClick={() => onSelect(option.kind)}
               className="pointer-events-auto absolute bottom-0 left-0 flex size-9 items-center justify-center rounded-full border border-white/15 bg-zinc-900/95 bg-gradient-to-br from-white/10 to-transparent text-zinc-100 shadow-[inset_0_1px_2px_rgba(255,255,255,0.12),0_6px_20px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-colors hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-400">
               <svg className="size-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={option.path} /></svg>
@@ -88,12 +89,13 @@ export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, o
           <motion.button
             type="button"
             role="menuitem"
+            onMouseDown={(event) => event.preventDefault()}
             onClick={onCloseWithBot}
             disabled={closing}
             aria-busy={closing}
             title={closing ? "Encerrando..." : "Encerrar chamado com Bot"}
             aria-label={closing ? "Encerrando..." : "Encerrar chamado com Bot"}
-            variants={{ closed: { opacity: 0, scale: 0.4, x: 0, y: 0 }, open: { opacity: 1, scale: 1, x: 222, y: -52 } }}
+            variants={{ closed: { opacity: 0, scale: 0.4, x: 0, y: 0 }, open: { opacity: 1, scale: 1, x: 222, y: -60 } }}
             transition={{ duration: reduceMotion ? 0 : 0.45, delay: reduceMotion ? 0 : 0.14, ease: [0.22, 1, 0.36, 1] }}
             whileHover={reduceMotion || closing ? undefined : { scale: 1.08 }}
             whileTap={reduceMotion || closing ? undefined : { scale: 0.94 }}

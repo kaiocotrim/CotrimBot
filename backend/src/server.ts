@@ -9,6 +9,7 @@ import { contactRouter } from "./routes/contact.routes.js";
 import { messageRouter } from "./routes/message.routes.js";
 import { transcriptionRouter } from "./routes/transcription.routes.js";
 import webhookRoutes from "./routes/webhook.routes.js";
+import { aiRouter } from "./routes/ai.routes.js";
 
 // Cria a aplicação Express.
 export const app = express();
@@ -28,6 +29,7 @@ app.use(contactRouter);
 app.use(messageRouter);
 app.use(webhookRoutes);
 app.use(transcriptionRouter);
+app.use(aiRouter);
 
 // Cria o servidor HTTP que será compartilhado
 // pelo Express e pelo Socket.IO.
@@ -68,4 +70,3 @@ httpServer.listen(3333, () => {
     "Servidor rodando em http://localhost:3333"
   );
 });
-
