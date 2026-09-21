@@ -46,6 +46,13 @@ export type Message = {
   // null = ainda não foi lida.
   // string = data/hora em que foi lida.
   readAt: string | null;
+  reaction: string | null;
+};
+
+export type MessagesPage = {
+  messages: Message[];
+  hasMore: boolean;
+  nextCursor: number | null;
 };
 
 export type ContactAvatar = {

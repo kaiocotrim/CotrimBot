@@ -28,6 +28,7 @@ model Message {
 
   createdAt DateTime  @default(now())
   readAt    DateTime?
+  reaction  String?          @db.VarChar(16)
 }
 
 enum MessageDirection {

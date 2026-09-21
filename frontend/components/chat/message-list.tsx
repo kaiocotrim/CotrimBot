@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Avatar } from "@/components/chat/avatar";
 import { MessageBubble } from "@/components/chat/message-bubble";
@@ -9,6 +9,11 @@ import type { Contact, Message } from "@/types/chat";
 type MessageListProps = {
   contact: Contact;
   messages: Message[];
+  hasOlderMessages: boolean;
+  loadingOlderMessages: boolean;
+  newMessageId: number | null;
+  onLoadOlderMessages: () => Promise<void>;
+  onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
 };
 
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
@@ -46,7 +51,7 @@ function dateLabel(value: string) {
 }
 
 // Posiciona mensagens recebidas à esquerda e enviadas à direita.
-export function MessageList({ contact, messages }: MessageListProps) {
+export function MessageList({ contact, messages, hasOlderMessages, loadingOlderMessages, newMessageId, onLoadOlderMessages, onReactToMessage }: MessageListProps) {
   const reduceMotion = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -54,7 +59,9 @@ export function MessageList({ contact, messages }: MessageListProps) {
   const previousMessageCountRef = useRef(0);
   const previousLastMessageIdRef = useRef<number | null>(null);
   const nearBottomRef = useRef(true);
+  const prependAnchorRef = useRef<{ height: number; top: number; firstMessageId: number | null } | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const imageMessages = useMemo(() => messages.filter((message) => message.type === "IMAGE"), [messages]);
 
   function updateScrollState() {
     const element = scrollRef.current;
@@ -62,6 +69,15 @@ export function MessageList({ contact, messages }: MessageListProps) {
     const distanceFromBottom = element.scrollHeight - element.clientHeight - element.scrollTop;
     nearBottomRef.current = distanceFromBottom < 80;
     setShowScrollButton(distanceFromBottom > 180);
+
+    if (element.scrollTop < 120 && hasOlderMessages && !loadingOlderMessages && !prependAnchorRef.current) {
+      prependAnchorRef.current = {
+        height: element.scrollHeight,
+        top: element.scrollTop,
+        firstMessageId: messages[0]?.id ?? null,
+      };
+      void onLoadOlderMessages();
+    }
   }
 
   function scrollToBottom(behavior: ScrollBehavior = "smooth") {
@@ -80,7 +96,17 @@ export function MessageList({ contact, messages }: MessageListProps) {
     const contactChanged = previousContactIdRef.current !== contact.id;
     const lastMessageId = messages.at(-1)?.id ?? null;
     const messagesChanged = previousMessageCountRef.current !== messages.length || previousLastMessageIdRef.current !== lastMessageId;
-    if (contactChanged || (messagesChanged && nearBottomRef.current)) {
+    const prependAnchor = prependAnchorRef.current;
+
+    if (contactChanged) {
+      prependAnchorRef.current = null;
+      element.scrollTop = element.scrollHeight;
+      nearBottomRef.current = true;
+    } else if (prependAnchor && messagesChanged && previousLastMessageIdRef.current === lastMessageId) {
+      element.scrollTop = prependAnchor.top + (element.scrollHeight - prependAnchor.height);
+      prependAnchorRef.current = null;
+      nearBottomRef.current = false;
+    } else if (messagesChanged && nearBottomRef.current) {
       element.scrollTop = element.scrollHeight;
       nearBottomRef.current = true;
     }
@@ -98,11 +124,21 @@ export function MessageList({ contact, messages }: MessageListProps) {
 
     const observer = new ResizeObserver(() => {
       if (nearBottomRef.current) element.scrollTop = element.scrollHeight;
-      updateScrollState();
+      const distanceFromBottom = element.scrollHeight - element.clientHeight - element.scrollTop;
+      nearBottomRef.current = distanceFromBottom < 80;
+      setShowScrollButton(distanceFromBottom > 180);
     });
     observer.observe(content);
     return () => observer.disconnect();
   }, []);
+
+  // Libera uma nova tentativa caso a busca anterior termine sem adicionar itens.
+  useEffect(() => {
+    const anchor = prependAnchorRef.current;
+    if (!loadingOlderMessages && anchor && anchor.firstMessageId === (messages[0]?.id ?? null)) {
+      prependAnchorRef.current = null;
+    }
+  }, [loadingOlderMessages, messages]);
 
   return (
     <div className="relative flex min-h-0 flex-1">
@@ -116,27 +152,34 @@ export function MessageList({ contact, messages }: MessageListProps) {
           className="flex min-h-full flex-col gap-3 p-5 pt-16"
           style={{ paddingBottom: "max(10rem, calc(var(--chat-composer-height, 0px) + 1rem))" }}
         >
+        {loadingOlderMessages && (
+          <div className="flex justify-center py-1" role="status" aria-label="Carregando mensagens anteriores">
+            <span className="size-4 animate-spin rounded-full border-2 border-white/20 border-t-white/70 motion-reduce:animate-none" />
+          </div>
+        )}
         {messages.map((message, index) => {
         const outgoing = message.direction === "OUTGOING";
         const previousMessage = messages[index - 1];
         const showDateSeparator = dateKey(message.createdAt) !== dateKey(previousMessage?.createdAt ?? "");
         const label = showDateSeparator ? dateLabel(message.createdAt) : null;
-        const cascadeIndex = Math.max(0, index - Math.max(0, messages.length - 12));
+        const isNewMessage = message.id === newMessageId;
+        const cascadeStart = Math.max(0, messages.length - 12);
+        const cascadeOrder = Math.max(0, index - cascadeStart);
 
         return (
           <motion.div
             key={message.id}
-            initial={reduceMotion ? false : {
+            initial={!reduceMotion ? {
               opacity: 0,
-              x: outgoing ? 14 : -14,
-              y: 10,
-              rotate: outgoing ? 1.2 : -1.2,
-              scale: 0.96,
-            }}
+              x: outgoing ? 10 : -10,
+              y: 14,
+              rotate: outgoing ? 2.5 : -2.5,
+              scale: 0.97,
+            } : false}
             animate={{ opacity: 1, x: 0, y: 0, rotate: 0, scale: 1 }}
-            transition={{
-              duration: reduceMotion ? 0 : 0.38,
-              delay: reduceMotion ? 0 : cascadeIndex * 0.045,
+            transition={reduceMotion ? { duration: 0 } : {
+              duration: 0.34,
+              delay: isNewMessage ? 0 : cascadeOrder * 0.055,
               ease: [0.16, 1, 0.3, 1],
             }}
             style={{ transformOrigin: outgoing ? "bottom right" : "bottom left" }}
@@ -157,7 +200,7 @@ export function MessageList({ contact, messages }: MessageListProps) {
               {!outgoing && <Avatar contact={contact} />}
 
               {/* O balão escolhe entre player de áudio e conteúdo textual. */}
-              <MessageBubble message={message} />
+              <MessageBubble message={message} contact={contact} imageMessages={imageMessages} onReact={onReactToMessage} />
             </div>
           </motion.div>
         );

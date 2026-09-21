@@ -1,4 +1,4 @@
-import type { Contact, ContactAvatar, Message } from "@/types/chat";
+import type { Contact, ContactAvatar, Message, MessagesPage } from "@/types/chat";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 
@@ -31,9 +31,11 @@ export async function getContacts(): Promise<Contact[]> {
   );
 }
 
-export async function getMessages(contactId: number): Promise<Message[]> {
-  const response = await fetch(`${API_URL}/contacts/${contactId}/messages`);
-  return parseResponse<Message[]>(response, "Erro ao buscar mensagens");
+export async function getMessages(contactId: number, before?: number): Promise<MessagesPage> {
+  const params = new URLSearchParams({ limit: "30" });
+  if (before) params.set("before", String(before));
+  const response = await fetch(`${API_URL}/contacts/${contactId}/messages?${params}`);
+  return parseResponse<MessagesPage>(response, "Erro ao buscar mensagens");
 }
 
 export async function transcribeMessage(messageId: number) {
@@ -46,6 +48,15 @@ export async function transcribeMessage(messageId: number) {
     response,
     "Erro ao transcrever áudio"
   );
+}
+
+export async function reactToMessage(messageId: number, reaction: string): Promise<Message> {
+  const response = await fetch(`${API_URL}/messages/${messageId}/reaction`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reaction }),
+  });
+  return parseResponse<Message>(response, "Erro ao reagir à mensagem");
 }
 
 // Marca como lidas todas as mensagens recebidas do contato.

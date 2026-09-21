@@ -22,8 +22,13 @@ export default function Home() {
         text={chat.text}
         sending={chat.sending}
         closing={chat.closing}
+        hasOlderMessages={chat.hasOlderMessages}
+        loadingOlderMessages={chat.loadingOlderMessages}
+        newMessageId={chat.newMessageId}
         onTextChange={chat.setText}
         onSend={chat.sendMessage}
+        onLoadOlderMessages={chat.loadOlderMessages}
+        onReactToMessage={chat.reactToMessage}
         onSendMedia={chat.sendMediaMessage}
         onCloseWithBot={chat.closeWithBot}
       />

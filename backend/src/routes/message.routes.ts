@@ -11,6 +11,7 @@ import {
   getMessageMedia,
   getMessages,
   markMessagesAsRead,
+  reactToMessage,
   sendMediaToContact,
   sendMessageToContact,
   transcribeMessage,
@@ -24,8 +25,8 @@ export const messageRouter = Router();
 
 /**
  * GET /contacts/:id/messages
- * Consulta as mensagens do contato, da mais antiga para a mais recente.
- * Exemplo: /contacts/15/messages consulta o histórico do contato de ID 15.
+ * Consulta as mensagens do contato em páginas, da mais antiga para a mais recente.
+ * Exemplo: /contacts/15/messages?limit=30&before=120.
  */
 messageRouter.get("/contacts/:id/messages", getMessages);
 
@@ -55,6 +56,7 @@ messageRouter.patch("/contacts/:id/messages/read", markMessagesAsRead);
  * O controller rejeita mensagens de texto, pois não possuem arquivo de mídia.
  */
 messageRouter.get("/messages/:id/media", getMessageMedia);
+messageRouter.put("/messages/:id/reaction", reactToMessage);
 
 /**
  * POST /messages/:id/transcribe

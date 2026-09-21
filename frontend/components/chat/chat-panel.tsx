@@ -9,9 +9,14 @@ type ChatPanelProps = {
   text: string;
   sending: boolean;
   closing: boolean;
+  hasOlderMessages: boolean;
+  loadingOlderMessages: boolean;
+  newMessageId: number | null;
 
   onTextChange: (text: string) => void;
   onSend: () => void;
+  onLoadOlderMessages: () => Promise<void>;
+  onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
 
   // Envia arquivo + legenda opcional.
   onSendMedia: (
@@ -29,8 +34,13 @@ export function ChatPanel({
   text,
   sending,
   closing,
+  hasOlderMessages,
+  loadingOlderMessages,
+  newMessageId,
   onTextChange,
   onSend,
+  onLoadOlderMessages,
+  onReactToMessage,
   onSendMedia,
   onCloseWithBot,
 }: ChatPanelProps) {
@@ -48,7 +58,7 @@ export function ChatPanel({
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/banner.jpg')" }}
+        style={{ backgroundImage: "url('/banner2.png')" }}
       />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-zinc-950/72" />
       <div
@@ -63,6 +73,11 @@ export function ChatPanel({
       <MessageList
         contact={contact}
         messages={messages}
+        hasOlderMessages={hasOlderMessages}
+        loadingOlderMessages={loadingOlderMessages}
+        newMessageId={newMessageId}
+        onLoadOlderMessages={onLoadOlderMessages}
+        onReactToMessage={onReactToMessage}
       />
 
       <MessageComposer

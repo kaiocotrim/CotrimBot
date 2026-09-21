@@ -6,6 +6,23 @@ import { getSocketServer } from "../lib/socket.js";
 export async function whatsappWebhook(req: Request, res: Response) {
   const body = req.body;
 
+  // Confirmações de entrega/leitura das mensagens enviadas pelo CotrimBot.
+  if (body.event === "messages.update" || body.event === "send.message.update") {
+    const updates = Array.isArray(body.data) ? body.data : [body.data];
+    for (const update of updates) {
+      const externalId = update?.key?.id ?? update?.id;
+      const status = String(update?.status ?? update?.update?.status ?? "").toUpperCase();
+      if (!externalId || !["READ", "PLAYED", "4"].includes(status)) continue;
+
+      const message = await prisma.message.findUnique({ where: { externalId } });
+      if (!message || message.direction !== "OUTGOING" || message.readAt) continue;
+
+      const updated = await prisma.message.update({ where: { id: message.id }, data: { readAt: new Date() } });
+      getSocketServer().emit("message_read", { messageId: updated.id, readAt: updated.readAt });
+    }
+    return res.status(200).json({ received: true });
+  }
+
   // Aceitamos somente eventos de nova mensagem
   if (body.event !== "messages.upsert") {
     return res.status(200).json({

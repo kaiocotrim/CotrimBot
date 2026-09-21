@@ -51,6 +51,29 @@ export async function sendWhatsAppMessage(
   return response.json();
 }
 
+export async function sendWhatsAppReaction(input: {
+  remoteJid: string;
+  fromMe: boolean;
+  id: string;
+  reaction: string;
+}) {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE;
+  if (!apiUrl || !apiKey || !instance) throw new Error("Configuração da Evolution API incompleta");
+
+  const response = await fetch(`${apiUrl}/message/sendReaction/${instance}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: apiKey },
+    body: JSON.stringify({
+      key: { remoteJid: input.remoteJid, fromMe: input.fromMe, id: input.id },
+      reaction: input.reaction,
+    }),
+  });
+  if (!response.ok) throw new Error(`Erro ao enviar reação pela Evolution: ${await response.text()}`);
+  return response.json();
+}
+
 type ProfilePictureResponse = {
   profilePictureUrl?: string | null;
 };
@@ -214,4 +237,3 @@ export async function sendWhatsAppMedia({
 
   return response.json();
 }
-

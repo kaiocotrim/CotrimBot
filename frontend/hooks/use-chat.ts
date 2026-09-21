@@ -1,7 +1,7 @@
 "use client";
 
 import { socket } from "@/lib/socket";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   closeConversationWithBot,
@@ -9,6 +9,7 @@ import {
   getMessages,
   markMessagesAsRead,
   postMessage,
+  reactToMessage as reactToMessageRequest,
   sendMedia as sendMediaRequest,
 } from "@/lib/chat-api";
 
@@ -30,9 +31,15 @@ export function useChat() {
 
   const [selectedContact, setSelectedContact] =
     useState<Contact | null>(null);
+  const selectedContactIdRef = useRef<number | null>(null);
 
   const [messages, setMessages] =
     useState<Message[]>([]);
+
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
+  const loadingOlderRef = useRef(false);
+  const [newMessageId, setNewMessageId] = useState<number | null>(null);
 
   const [text, setText] =
     useState("");
@@ -79,6 +86,7 @@ export function useChat() {
       // =====================================================
 
       if (isOpenConversation) {
+        setNewMessageId(data.message.id);
         setMessages(
           (currentMessages) => {
             // Verifica se essa mensagem
@@ -191,6 +199,14 @@ export function useChat() {
       );
     }
 
+    function handleMessageReaction(data: { messageId: number; reaction: string | null }) {
+      setMessages((current) => current.map((message) => message.id === data.messageId ? { ...message, reaction: data.reaction } : message));
+    }
+
+    function handleMessageRead(data: { messageId: number; readAt: string }) {
+      setMessages((current) => current.map((message) => message.id === data.messageId ? { ...message, readAt: data.readAt } : message));
+    }
+
 
     // Começa a ouvir o evento
     // enviado pelo backend.
@@ -198,6 +214,8 @@ export function useChat() {
       "new_message",
       handleNewMessage
     );
+    socket.on("message_reaction", handleMessageReaction);
+    socket.on("message_read", handleMessageRead);
 
 
     // Remove o listener quando
@@ -207,6 +225,8 @@ export function useChat() {
         "new_message",
         handleNewMessage
       );
+      socket.off("message_reaction", handleMessageReaction);
+      socket.off("message_read", handleMessageRead);
     };
   }, [selectedContact]);
 
@@ -313,9 +333,10 @@ export function useChat() {
     getMessages(
       selectedContact.id
     )
-      .then((data) => {
+      .then((page) => {
         if (active) {
-          setMessages(data);
+          setMessages(page.messages);
+          setHasOlderMessages(page.hasMore);
         }
 
         return markMessagesAsRead(
@@ -345,6 +366,50 @@ export function useChat() {
       active = false;
     };
   }, [selectedContact]);
+
+  async function loadOlderMessages() {
+    const contact = selectedContact;
+    const firstMessageId = messages[0]?.id;
+    if (!contact || !firstMessageId || !hasOlderMessages || loadingOlderRef.current) return;
+
+    loadingOlderRef.current = true;
+    setLoadingOlderMessages(true);
+    try {
+      const page = await getMessages(contact.id, firstMessageId);
+      if (selectedContactIdRef.current !== contact.id) return;
+      setMessages((current) => {
+        const existingIds = new Set(current.map((message) => message.id));
+        return [...page.messages.filter((message) => !existingIds.has(message.id)), ...current];
+      });
+      setHasOlderMessages(page.hasMore);
+    } catch (error) {
+      console.error("Erro ao carregar mensagens anteriores:", error);
+    } finally {
+      loadingOlderRef.current = false;
+      setLoadingOlderMessages(false);
+    }
+  }
+
+  async function reactToMessage(messageId: number, reaction: string) {
+    const previous = messages.find((message) => message.id === messageId)?.reaction ?? null;
+    setMessages((current) => current.map((message) => message.id === messageId ? { ...message, reaction: reaction || null } : message));
+    try {
+      await reactToMessageRequest(messageId, reaction);
+    } catch (error) {
+      setMessages((current) => current.map((message) => message.id === messageId ? { ...message, reaction: previous } : message));
+      throw error;
+    }
+  }
+
+  function selectContact(contact: Contact | null) {
+    selectedContactIdRef.current = contact?.id ?? null;
+    setMessages([]);
+    setHasOlderMessages(false);
+    setLoadingOlderMessages(false);
+    loadingOlderRef.current = false;
+    setNewMessageId(null);
+    setSelectedContact(contact);
+  }
 
 
   // =========================================================
@@ -498,6 +563,9 @@ export function useChat() {
     contacts,
     selectedContact,
     messages,
+    hasOlderMessages,
+    loadingOlderMessages,
+    newMessageId,
 
     text,
 
@@ -506,11 +574,13 @@ export function useChat() {
 
     setText,
 
-    selectContact:
-      setSelectedContact,
+    selectContact,
 
     // Envio de texto
     sendMessage,
+
+    loadOlderMessages,
+    reactToMessage,
 
     // Envio de arquivo
     sendMediaMessage,
@@ -519,5 +589,3 @@ export function useChat() {
     closeWithBot,
   };
 }
-
-

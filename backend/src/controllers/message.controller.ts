@@ -10,6 +10,7 @@ import { getSocketServer } from "../lib/socket.js";
 // Importa o service que concentra toda a comunicação HTTP com a Evolution API.
 import {
   getMediaMessage,
+  sendWhatsAppReaction,
   sendWhatsAppMessage,
   sendWhatsAppMedia
 } from "../services/evolution.service.js";
@@ -23,6 +24,15 @@ import { getSatisfactionSurvey } from "../services/bot.service.js";
 // GET /contacts/:id/messages - Retorna as mensagens de um contato
 export async function getMessages(req: Request, res: Response) {
   const contactId = Number(req.params.id);
+  const requestedLimit = Number(req.query.limit ?? 30);
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(100, Math.max(1, Math.trunc(requestedLimit)))
+    : 30;
+  const before = req.query.before ? Number(req.query.before) : null;
+
+  if (!Number.isInteger(contactId) || contactId <= 0 || (before !== null && (!Number.isInteger(before) || before <= 0))) {
+    return res.status(400).json({ message: "Parâmetros de paginação inválidos" });
+  }
 
   const contact = await prisma.contact.findUnique({
     where: { id: contactId },
@@ -33,11 +43,48 @@ export async function getMessages(req: Request, res: Response) {
   }
 
   const messages = await prisma.message.findMany({
-    where: { contactId },
-    orderBy: { createdAt: "asc" },
+    where: {
+      contactId,
+      ...(before ? { id: { lt: before } } : {}),
+    },
+    orderBy: { id: "desc" },
+    take: limit + 1,
   });
 
-  res.json(messages);
+  const hasMore = messages.length > limit;
+  const page = messages.slice(0, limit).reverse();
+
+  return res.json({
+    messages: page,
+    hasMore,
+    nextCursor: hasMore ? page[0]?.id ?? null : null,
+  });
+}
+
+export async function reactToMessage(req: Request, res: Response) {
+  const messageId = Number(req.params.id);
+  const reaction = typeof req.body.reaction === "string" ? req.body.reaction : null;
+  if (!Number.isInteger(messageId) || messageId <= 0 || reaction === null || reaction.length > 16) {
+    return res.status(400).json({ message: "Reação inválida" });
+  }
+
+  const message = await prisma.message.findUnique({ where: { id: messageId }, include: { contact: true } });
+  if (!message) return res.status(404).json({ message: "Mensagem não encontrada" });
+
+  try {
+    await sendWhatsAppReaction({
+      remoteJid: `${message.contact.phone.replace(/\D/g, "")}@s.whatsapp.net`,
+      fromMe: message.direction === "OUTGOING",
+      id: message.externalId,
+      reaction,
+    });
+    const updated = await prisma.message.update({ where: { id: messageId }, data: { reaction: reaction || null } });
+    getSocketServer().emit("message_reaction", { messageId, reaction: updated.reaction });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Erro ao reagir à mensagem:", error);
+    return res.status(500).json({ message: "Erro ao enviar reação" });
+  }
 }
 
 // POST /contacts/:id/send-media
