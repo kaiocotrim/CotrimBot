@@ -62,9 +62,9 @@ export function ChatPanel({
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/teste.jpg')" }}
+        style={{ backgroundImage: "url('/mesh-gradient2.png')" }}
       />
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-zinc-950/72" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-zinc-950/50" />
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-[58px] z-10 h-12 bg-gradient-to-b from-zinc-950/35 to-transparent"
@@ -94,6 +94,7 @@ export function ChatPanel({
         onSend={onSend}
         onSendMedia={onSendMedia}
         onCloseWithBot={onCloseWithBot}
+        allowCloseWithBot={!contact.isGroup}
       />
     </section>
   );

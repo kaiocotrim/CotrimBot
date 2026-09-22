@@ -9,6 +9,7 @@ import { upload } from "../middlewares/upload.js";
 import {
   closeConversationWithBot,
   getMessageMedia,
+  getGroupSenderAvatar,
   getMessages,
   markMessagesAsRead,
   reactToMessage,
@@ -56,6 +57,7 @@ messageRouter.patch("/contacts/:id/messages/read", markMessagesAsRead);
  * O controller rejeita mensagens de texto, pois não possuem arquivo de mídia.
  */
 messageRouter.get("/messages/:id/media", getMessageMedia);
+messageRouter.get("/messages/:id/sender-avatar", getGroupSenderAvatar);
 messageRouter.put("/messages/:id/reaction", reactToMessage);
 
 /**

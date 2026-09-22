@@ -2,9 +2,33 @@ import type { Request, Response } from "express";
 
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
+import { getGroupInfo } from "../services/evolution.service.js";
 
 export async function whatsappWebhook(req: Request, res: Response) {
   const body = req.body;
+
+  // Mantém a separação entre conversas ativas e arquivadas sincronizada com o WhatsApp.
+  if (body.event === "chats.update" || body.event === "chats.upsert") {
+    const chats = Array.isArray(body.data) ? body.data : [body.data];
+    for (const chat of chats) {
+      const remoteJid = chat?.id ?? chat?.remoteJid;
+      const archived = chat?.archive ?? chat?.archived;
+      if (typeof remoteJid !== "string" || typeof archived !== "boolean") continue;
+
+      const phone = remoteJid.endsWith("@g.us")
+        ? remoteJid
+        : remoteJid.replace("@s.whatsapp.net", "");
+      const contact = await prisma.contact.findUnique({ where: { phone } });
+      if (!contact || contact.archived === archived) continue;
+
+      const updatedContact = await prisma.contact.update({
+        where: { id: contact.id },
+        data: { archived },
+      });
+      getSocketServer().emit("contact_updated", updatedContact);
+    }
+    return res.status(200).json({ received: true });
+  }
 
   // Confirmações de entrega/leitura das mensagens enviadas pelo CotrimBot.
   if (body.event === "messages.update" || body.event === "send.message.update") {
@@ -32,30 +56,13 @@ export async function whatsappWebhook(req: Request, res: Response) {
 
   const data = body.data;
 
-  // Ignora mensagens enviadas pelo próprio número conectado.
-  // Isso evita que o CotrimBot responda às próprias mensagens
-  // e entre em um loop infinito.
-  if (data.key?.fromMe === true) {
-    return res.status(200).json({
-      received: true,
-    });
-  }
-
   const remoteJid = data.key?.remoteJid;
   const remoteJidAlt = data.key?.remoteJidAlt;
+  const fromMe = data.key?.fromMe === true;
 
   // Ignora mensagens sem identificação.
   if (!remoteJid) {
     console.log("Mensagem sem remoteJid.");
-
-    return res.status(200).json({
-      received: true,
-    });
-  }
-
-  // Por enquanto continuamos ignorando grupos.
-  if (remoteJid.endsWith("@g.us")) {
-    console.log("Mensagem de grupo ignorada.");
 
     return res.status(200).json({
       received: true,
@@ -67,7 +74,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
   let contactJid: string;
 
   // Formato tradicional do WhatsApp.
-  if (remoteJid.endsWith("@s.whatsapp.net")) {
+  if (remoteJid.endsWith("@g.us") || remoteJid.endsWith("@s.whatsapp.net")) {
     contactJid = remoteJid;
   }
 
@@ -106,8 +113,14 @@ export async function whatsappWebhook(req: Request, res: Response) {
   // Usamos isso para impedir mensagens duplicadas no banco.
   const externalId = data.key?.id;
 
-  // Nome exibido pelo contato no WhatsApp.
-  const name = data.pushName || "Contato";
+  const isGroup = contactJid.endsWith("@g.us");
+  const participantJid = isGroup
+    ? data.key?.participant ?? data.participant ?? data.key?.participantAlt
+    : null;
+  const senderPhone = typeof participantJid === "string"
+    ? participantJid.replace("@s.whatsapp.net", "").replace("@lid", "")
+    : null;
+  const senderName = isGroup && !fromMe ? data.pushName || senderPhone || "Participante" : null;
 
   // Tipo da mensagem que será salvo no banco.
   let messageType: "TEXT" | "AUDIO" | "IMAGE" | "VIDEO" | "DOCUMENT";
@@ -163,8 +176,8 @@ export async function whatsappWebhook(req: Request, res: Response) {
     });
   }
 
-  // Remove "@s.whatsapp.net" e mantém somente o número.
-  const phone = contactJid.replace("@s.whatsapp.net", "");
+  // Contatos usam somente o número; grupos preservam o JID necessário para responder.
+  const phone = isGroup ? contactJid : contactJid.replace("@s.whatsapp.net", "");
 
   // Ignora mensagens sem ID.
   if (!externalId) {
@@ -191,7 +204,19 @@ export async function whatsappWebhook(req: Request, res: Response) {
     });
   }
 
-  // Procura o contato pelo telefone.
+  const existingContact = await prisma.contact.findUnique({ where: { phone } });
+  let name = existingContact?.name ?? data.pushName ?? "Contato";
+  if (isGroup && !existingContact) {
+    name = data.groupMetadata?.subject ?? "Grupo do WhatsApp";
+    try {
+      const group = await getGroupInfo(contactJid);
+      if (group.subject?.trim()) name = group.subject.trim();
+    } catch (error) {
+      console.error("Não foi possível buscar o nome do grupo:", error);
+    }
+  }
+
+  // Procura o contato pelo telefone/JID.
   // Se não existir, cria.
   // Se já existir, atualiza o nome.
   const contact = await prisma.contact.upsert({
@@ -201,11 +226,13 @@ export async function whatsappWebhook(req: Request, res: Response) {
 
     update: {
       name,
+      isGroup,
     },
 
     create: {
       name,
       phone,
+      isGroup,
     },
   });
 
@@ -215,9 +242,11 @@ export async function whatsappWebhook(req: Request, res: Response) {
     data: {
       externalId,
       content,
-      direction: "INCOMING",
+      direction: fromMe ? "OUTGOING" : "INCOMING",
       type: messageType,
       contactId: contact.id,
+      senderName,
+      senderPhone,
     },
   });
 

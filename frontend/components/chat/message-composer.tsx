@@ -17,6 +17,7 @@ type MessageComposerProps = {
   onTextChange: (text: string) => void;
   onSend: () => void;
   onCloseWithBot: () => void;
+  allowCloseWithBot?: boolean;
 
   onSendMedia: (
     file: File,
@@ -65,6 +66,7 @@ export function MessageComposer({
   onTextChange,
   onSend,
   onCloseWithBot,
+  allowCloseWithBot = true,
   onSendMedia,
 }: MessageComposerProps) {
   const [isFocused, setIsFocused] = useState(false);
@@ -75,6 +77,26 @@ export function MessageComposer({
   const [rewriteError, setRewriteError] = useState<string | null>(null);
   const [longTextCollapsed, setLongTextCollapsed] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  // =========================================================
+  // GRAVAÇÃO DE ÁUDIO
+  // =========================================================
+
+  const [isRecording, setIsRecording] =
+    useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [audioLevels, setAudioLevels] = useState([0.2, 0.2, 0.2, 0.2, 0.2]);
+
+  const mediaRecorderRef =
+    useRef<MediaRecorder | null>(null);
+
+  const audioChunksRef =
+    useRef<Blob[]>([]);
+
+  const microphoneStreamRef =
+    useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const recordingStartedAtRef = useRef<number | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [sendButtonRef, animateSendButton] = useAnimate<HTMLButtonElement>();
   const emojiTriggerRef = useRef<HTMLButtonElement>(null);
@@ -100,6 +122,8 @@ export function MessageComposer({
   const showControls = isFocused || text.length > 0 || isFullscreen;
   const isStacked = measurements.compact > 24 || isFullscreen || isLongTextCollapsed;
   const transition = { duration: reduceMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
+
+
 
   // A camada de desenho acompanha a rolagem do textarea, que continua editável.
   const syncTextScroll = useCallback(() => {
@@ -146,7 +170,7 @@ export function MessageComposer({
       selectionRef.current = { start: caret, end: caret };
     } catch (error) {
       console.error("Erro ao reformular mensagem:", error);
-      setRewriteError("Não foi possível reformular o texto.");
+      setRewriteError(error instanceof Error ? error.message : "Não foi possível reformular o texto.");
     } finally {
       setRewriting(false);
     }
@@ -164,7 +188,196 @@ export function MessageComposer({
       setAttachmentError("Não foi possível enviar o arquivo. Tente novamente.");
     }
   }
+  async function startRecording() {
+    if (sending || isRecording) {
+      return;
+    }
 
+    try {
+      setAttachmentError(null);
+
+      // Pede permissão para usar o microfone.
+      const stream =
+        await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+
+      microphoneStreamRef.current =
+        stream;
+
+      const AudioContextConstructor = window.AudioContext ||
+        (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextConstructor) {
+        const audioContext = new AudioContextConstructor();
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 128;
+        analyser.smoothingTimeConstant = 0.72;
+        audioContext.createMediaStreamSource(stream).connect(analyser);
+        audioContextRef.current = audioContext;
+        analyserRef.current = analyser;
+      }
+      recordingStartedAtRef.current = Date.now();
+      setRecordingSeconds(0);
+
+      // Chrome normalmente suporta WebM + Opus.
+      const preferredMimeType =
+        "audio/webm;codecs=opus";
+
+      const recorder =
+        MediaRecorder.isTypeSupported(
+          preferredMimeType
+        )
+          ? new MediaRecorder(stream, {
+            mimeType: preferredMimeType,
+          })
+          : new MediaRecorder(stream);
+
+      mediaRecorderRef.current =
+        recorder;
+
+      // Limpa pedaços de uma gravação anterior.
+      audioChunksRef.current = [];
+
+      // O navegador vai entregando pequenos
+      // pedaços do áudio enquanto grava.
+      recorder.ondataavailable = (
+        event
+      ) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(
+            event.data
+          );
+        }
+      };
+
+      // Quando terminarmos a gravação,
+      // juntamos os pedaços e criamos um File.
+      recorder.onstop = () => {
+        const mimeType =
+          recorder.mimeType ||
+          "audio/webm";
+
+        const audioBlob =
+          new Blob(
+            audioChunksRef.current,
+            {
+              type: mimeType,
+            }
+          );
+
+        if (audioBlob.size > 0) {
+          const extension =
+            mimeType.includes("ogg")
+              ? "ogg"
+              : mimeType.includes("mp4")
+                ? "m4a"
+                : "webm";
+
+          const audioFile =
+            new File(
+              [audioBlob],
+              `audio-${Date.now()}.${extension}`,
+              {
+                type: mimeType,
+              }
+            );
+
+          // Reaproveita o mesmo sistema
+          // de anexos que você já criou.
+          setPendingFile(audioFile);
+          setAttachmentError(null);
+        }
+
+        audioChunksRef.current = [];
+        mediaRecorderRef.current = null;
+      };
+
+      recorder.start();
+
+      setIsRecording(true);
+
+      console.log(
+        "🎙️ Gravação iniciada"
+      );
+
+    } catch (error) {
+      console.error(
+        "Erro ao acessar o microfone:",
+        error
+      );
+
+      setAttachmentError(
+        "Não foi possível acessar o microfone."
+      );
+    }
+  }
+
+
+  // =========================================================
+  // PARAR GRAVAÇÃO
+  // =========================================================
+
+  function stopRecording() {
+    const recorder =
+      mediaRecorderRef.current;
+
+    if (
+      !recorder ||
+      recorder.state === "inactive"
+    ) {
+      return;
+    }
+
+    recorder.stop();
+
+    // Libera o microfone do navegador.
+    microphoneStreamRef.current
+      ?.getTracks()
+      .forEach((track) => {
+        track.stop();
+      });
+
+    microphoneStreamRef.current =
+      null;
+
+    void audioContextRef.current?.close();
+    audioContextRef.current = null;
+    analyserRef.current = null;
+    recordingStartedAtRef.current = null;
+    setAudioLevels([0.2, 0.2, 0.2, 0.2, 0.2]);
+
+    setIsRecording(false);
+
+    console.log(
+      "⏹️ Gravação finalizada"
+    );
+  }
+
+  useEffect(() => {
+    if (!isRecording) return;
+    let frame = 0;
+    const data = new Uint8Array(analyserRef.current?.frequencyBinCount ?? 0);
+    const update = () => {
+      const analyser = analyserRef.current;
+      if (analyser && data.length) {
+        analyser.getByteFrequencyData(data);
+        const bands = [0, 2, 5, 9, 14].map((start, index) => {
+          const end = Math.min(data.length, start + (index === 0 ? 3 : 4));
+          const average = data.slice(start, end).reduce((sum, value) => sum + value, 0) / Math.max(1, end - start);
+          return Math.max(0.12, Math.min(1, average / 150));
+        });
+        setAudioLevels(bands);
+      }
+      if (recordingStartedAtRef.current) setRecordingSeconds(Math.floor((Date.now() - recordingStartedAtRef.current) / 1000));
+      frame = requestAnimationFrame(update);
+    };
+    frame = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(frame);
+  }, [isRecording]);
+
+  function formatRecordingTime(seconds: number) {
+    return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+  }
   function formatFileSize(bytes: number) {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
@@ -247,7 +460,9 @@ export function MessageComposer({
   const naturalHeight = isLongTextCollapsed ? 136 : Math.max(112, Math.min(measurements.stacked, 144) + 72);
   const fieldHeight = isFullscreen ? availableHeight : isStacked ? Math.min(naturalHeight, availableHeight) : 44;
   const textHeight = isStacked ? Math.max(24, fieldHeight - 72) : 24;
-  const textLayout = { height: textHeight, top: isStacked ? 16 : 10, left: isStacked ? 16 : isFocused ? 92 : 52, width: isStacked ? "calc(100% - 64px)" : `calc(100% - ${isFocused ? 184 : showControls ? 144 : 68}px)` };
+  const controlBottom = isStacked ? 8 : 6;
+  const compactTextInset = isRecording ? (isFocused ? 216 : 180) : isFocused ? 178 : showControls ? 144 : 68;
+  const textLayout = { height: textHeight, top: isStacked ? 16 : 10, left: isStacked ? 16 : isFocused ? 88 : 52, width: isStacked ? "calc(100% - 64px)" : `calc(100% - ${compactTextInset}px)` };
 
   return (
     <div ref={composerRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent px-4 pt-5 pb-[max(2.125rem,env(safe-area-inset-bottom))] sm:px-5">
@@ -316,7 +531,7 @@ export function MessageComposer({
           {attachmentError && <span role="alert" className="sr-only">{attachmentError}</span>}
           {/* Mesmo texto e fonte do campo, sem interferir na altura que está sendo animada. */}
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-0 overflow-hidden opacity-0">
-            <textarea ref={compactMirrorRef} value={text} readOnly tabIndex={-1} rows={1} className={textClassName} style={{ height: 0, width: `calc(100% - ${isFocused ? 242 : showControls ? 202 : 126}px)` }} />
+            <textarea ref={compactMirrorRef} value={text} readOnly tabIndex={-1} rows={1} className={textClassName} style={{ height: 0, width: `calc(100% - ${compactTextInset + 58}px)` }} />
             <textarea ref={stackedMirrorRef} value={text} readOnly tabIndex={-1} rows={1} className={textClassName} style={{ height: 0, width: "calc(100% - 66px)" }} />
           </div>
 
@@ -431,7 +646,7 @@ export function MessageComposer({
               ref={attachmentTriggerRef}
               type="button"
               initial={false}
-              animate={{ opacity: showControls ? 1 : 0, scale: showControls ? attachmentsOpen ? 0.96 : 1 : 0.9, rotate: reduceMotion ? 0 : attachmentsOpen ? 45 : 0, y: 0, bottom: isStacked ? 8 : 6, left: isStacked ? 8 : 8 }}
+              animate={{ opacity: showControls ? 1 : 0, scale: showControls ? attachmentsOpen ? 0.96 : 1 : 0.9, rotate: reduceMotion ? 0 : attachmentsOpen ? 45 : 0, y: 0, bottom: controlBottom, left: 8 }}
               whileTap={reduceMotion || sending ? undefined : { scale: 0.86, backgroundColor: "rgba(63,63,70,0.8)", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.3)" }}
               transition={{ ...transition, scale: reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 22 } }}
               aria-label="Abrir anexos"
@@ -455,7 +670,7 @@ export function MessageComposer({
               ref={emojiTriggerRef}
               type="button"
               initial={false}
-              animate={{ opacity: isFocused ? 1 : 0, scale: isFocused ? 1 : 0.85, x: isFocused ? 0 : -8, bottom: isStacked ? 8 : 6, left: isStacked ? 48 : 46 }}
+              animate={{ opacity: isFocused ? 1 : 0, scale: isFocused ? 1 : 0.85, x: isFocused ? 0 : -8, bottom: controlBottom, left: 46 }}
               transition={transition}
               aria-label="Abrir emojis"
               title="Abrir emojis"
@@ -480,8 +695,8 @@ export function MessageComposer({
               animate={{
                 opacity: text.trim() ? 1 : 0,
                 scale: text.trim() ? 1 : 0.75,
-                bottom: isStacked ? 8 : 6,
-                right: isStacked ? 92 : 48,
+                bottom: controlBottom,
+                right: isStacked ? isRecording ? 128 : 90 : isRecording ? 84 : 46,
               }}
               transition={transition}
               whileHover={reduceMotion || rewriting ? undefined : { scale: 1.06 }}
@@ -517,18 +732,74 @@ export function MessageComposer({
             <motion.button
               type="button"
               initial={false}
-              animate={{ opacity: showControls ? 1 : 0, scale: showControls ? 1 : 0.9, bottom: isStacked ? 8 : 6, right: isStacked ? 52 : 8 }}
-              transition={transition}
-              aria-label="Gravar áudio"
-              title="Gravar áudio"
+              animate={{
+                opacity: showControls ? 1 : 0,
+                width: 32,
+                height: 32,
+                borderRadius: 999,
+
+                scale: isRecording
+                  ? [1, 1.08, 1]
+                  : showControls
+                    ? 1
+                    : 0.9,
+
+                bottom: controlBottom,
+                right: isStacked ? 52 : 8,
+              }}
+              transition={
+                isRecording
+                  ? {
+                    duration: 1.2,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }
+                  : transition
+              }
+              aria-label={
+                isRecording
+                  ? "Parar gravação"
+                  : "Gravar áudio"
+              }
+              title={
+                isRecording
+                  ? "Parar gravação"
+                  : "Gravar áudio"
+              }
               aria-hidden={!showControls}
               tabIndex={showControls ? 0 : -1}
               disabled={!showControls || sending}
-              onClick={() => console.log("Gravar áudio")}
-              className={`absolute size-8 border border-white/10 bg-white/[0.035] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName}`}
-              style={{ pointerEvents: showControls ? "auto" : "none" }}
+              onClick={() => {
+                if (isRecording) {
+                  stopRecording();
+                } else {
+                  void startRecording();
+                }
+              }}
+              className={`absolute border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isRecording
+                  ? "border-red-400/40 bg-red-500/20 text-red-300"
+                  : "border-white/10 bg-white/[0.035]"
+                }`}
+              style={{
+                pointerEvents: showControls
+                  ? "auto"
+                  : "none",
+              }}
             >
-              <ComposerIcon name="mic" />
+              {isRecording ? (
+                <span className="flex h-4 items-center gap-[2px] text-red-300" aria-label={`Gravando ${formatRecordingTime(recordingSeconds)}`}>
+                  {audioLevels.map((level, index) => (
+                    <span
+                      key={index}
+                      className="w-[2px] rounded-full bg-current transition-[height] duration-75"
+                      style={{ height: `${Math.max(4, Math.round(level * 16))}px` }}
+                    />
+                  ))}
+                  <span className="pointer-events-none absolute right-full mr-2 min-w-[31px] text-[10px] font-medium tabular-nums text-red-200">{formatRecordingTime(recordingSeconds)}</span>
+                </span>
+              ) : (
+                <ComposerIcon name="mic" />
+              )}
             </motion.button>
             <motion.button
               type="button"
@@ -570,7 +841,7 @@ export function MessageComposer({
               <svg className="size-5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" opacity=".25" /><path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
             ) : <ComposerIcon name="send" />}
           </motion.button>
-          <AttachmentMenu open={attachmentsOpen && !sending} triggerRef={attachmentTriggerRef} onClose={closeAttachments} onSelect={selectAttachment} closing={closing} onCloseWithBot={onCloseWithBot} stacked={isStacked} />
+          <AttachmentMenu open={attachmentsOpen && !sending} triggerRef={attachmentTriggerRef} onClose={closeAttachments} onSelect={selectAttachment} closing={closing} onCloseWithBot={onCloseWithBot} allowCloseWithBot={allowCloseWithBot} stacked={isStacked} />
           <EmojiSelector id={emojiSelectorId} open={emojisOpen && !sending} triggerRef={emojiTriggerRef} onClose={closeEmojis} onSelect={selectEmoji} fieldHeight={fieldHeight} rightInset={isStacked ? 0 : 56} />
           {/* Seleciona o arquivo localmente; a integração de envio de mídia é uma etapa separada. */}
           <input
@@ -588,6 +859,6 @@ export function MessageComposer({
           />
         </form>
       </div>
-    </div>
+    </div >
   );
 }

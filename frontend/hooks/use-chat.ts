@@ -11,6 +11,7 @@ import {
   postMessage,
   reactToMessage as reactToMessageRequest,
   sendMedia as sendMediaRequest,
+  setContactArchived as setContactArchivedRequest,
 } from "@/lib/chat-api";
 
 import type {
@@ -28,6 +29,8 @@ import type {
 export function useChat() {
   const [contacts, setContacts] =
     useState<Contact[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(true);
+  const [contactsError, setContactsError] = useState<string | null>(null);
 
   const [selectedContact, setSelectedContact] =
     useState<Contact | null>(null);
@@ -207,6 +210,11 @@ export function useChat() {
       setMessages((current) => current.map((message) => message.id === data.messageId ? { ...message, readAt: data.readAt } : message));
     }
 
+    function handleContactUpdated(data: Contact) {
+      setContacts((current) => current.map((contact) => contact.id === data.id ? { ...contact, ...data } : contact));
+      setSelectedContact((current) => current?.id === data.id ? { ...current, ...data } : current);
+    }
+
 
     // Começa a ouvir o evento
     // enviado pelo backend.
@@ -216,6 +224,7 @@ export function useChat() {
     );
     socket.on("message_reaction", handleMessageReaction);
     socket.on("message_read", handleMessageRead);
+    socket.on("contact_updated", handleContactUpdated);
 
 
     // Remove o listener quando
@@ -227,6 +236,7 @@ export function useChat() {
       );
       socket.off("message_reaction", handleMessageReaction);
       socket.off("message_read", handleMessageRead);
+      socket.off("contact_updated", handleContactUpdated);
     };
   }, [selectedContact]);
 
@@ -292,6 +302,7 @@ export function useChat() {
 
     async function loadContacts() {
       try {
+        setContactsError(null);
         const data =
           await getContacts();
 
@@ -299,10 +310,13 @@ export function useChat() {
           setContacts(data);
         }
       } catch (error) {
+        if (active) setContactsError(error instanceof Error ? error.message : "Não foi possível carregar as conversas");
         console.error(
           "Erro ao carregar contatos:",
           error
         );
+      } finally {
+        if (active) setLoadingContacts(false);
       }
     }
 
@@ -409,6 +423,18 @@ export function useChat() {
     loadingOlderRef.current = false;
     setNewMessageId(null);
     setSelectedContact(contact);
+  }
+
+  async function archiveContact(contact: Contact, archived: boolean) {
+    setContacts((current) => current.map((item) => item.id === contact.id ? { ...item, archived } : item));
+    try {
+      const updated = await setContactArchivedRequest(contact.id, archived);
+      setContacts((current) => current.map((item) => item.id === updated.id ? { ...item, ...updated } : item));
+      if (selectedContactIdRef.current === contact.id) selectContact(null);
+    } catch (error) {
+      setContacts((current) => current.map((item) => item.id === contact.id ? { ...item, archived: contact.archived } : item));
+      throw error;
+    }
   }
 
 
@@ -561,6 +587,8 @@ export function useChat() {
 
   return {
     contacts,
+    loadingContacts,
+    contactsError,
     selectedContact,
     messages,
     hasOlderMessages,
@@ -575,6 +603,7 @@ export function useChat() {
     setText,
 
     selectContact,
+    archiveContact,
 
     // Envio de texto
     sendMessage,

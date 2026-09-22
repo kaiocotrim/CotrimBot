@@ -12,8 +12,11 @@ export default function Home() {
     <main className="flex h-dvh overflow-hidden bg-zinc-950 text-white">
       <ContactSidebar
         contacts={chat.contacts}
+        loading={chat.loadingContacts}
+        error={chat.contactsError}
         selectedContactId={chat.selectedContact?.id}
         onSelectContact={chat.selectContact}
+        onArchiveContact={chat.archiveContact}
       />
 
       <ChatPanel

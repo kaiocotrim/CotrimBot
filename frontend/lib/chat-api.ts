@@ -4,7 +4,11 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 
 // Centraliza o tratamento padrão das respostas do backend.
 async function parseResponse<T>(response: Response, errorMessage: string) {
-  if (!response.ok) throw new Error(errorMessage);
+  if (!response.ok) {
+    const result = await response.json().catch(() => null) as { error?: unknown; message?: unknown } | null;
+    const detail = typeof result?.error === "string" ? result.error : typeof result?.message === "string" ? result.message : errorMessage;
+    throw new Error(detail);
+  }
   return (await response.json()) as T;
 }
 
@@ -20,6 +24,7 @@ export async function getContacts(): Promise<Contact[]> {
 
   return Promise.all(
     contacts.map(async (contact) => {
+      if (contact.profilePictureUrl) return contact;
       try {
         const avatar = await getAvatar(contact.id);
         return { ...contact, profilePictureUrl: avatar.profilePictureUrl };
@@ -69,6 +74,15 @@ export async function markMessagesAsRead(contactId: number): Promise<void> {
   if (!response.ok) {
     throw new Error("Erro ao marcar mensagens como lidas");
   }
+}
+
+export async function setContactArchived(contactId: number, archived: boolean): Promise<Contact> {
+  const response = await fetch(`${API_URL}/contacts/${contactId}/archived`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ archived }),
+  });
+  return parseResponse<Contact>(response, "Erro ao alterar arquivamento");
 }
 
 export async function postMessage(contactId: number, text: string) {

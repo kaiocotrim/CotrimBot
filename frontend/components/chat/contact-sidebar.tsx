@@ -6,7 +6,7 @@ import { EmojiText } from "@/components/chat/emoji-text";
 import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
 import type { Contact } from "@/types/chat";
 
-type ContactSidebarProps = { contacts: Contact[]; selectedContactId?: number; onSelectContact: (contact: Contact) => void };
+type ContactSidebarProps = { contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onArchiveContact: (contact: Contact, archived: boolean) => Promise<void> };
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
 const dayKeyFormatter = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: CHAT_TIME_ZONE });
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: CHAT_TIME_ZONE });
@@ -25,17 +25,20 @@ function formatSidebarDate(value: string) {
   return dateFormatter.format(date);
 }
 
-export function ContactSidebar({ contacts, selectedContactId, onSelectContact }: ContactSidebarProps) {
+export function ContactSidebar({ contacts, loading, error, selectedContactId, onSelectContact, onArchiveContact }: ContactSidebarProps) {
   const [query, setQuery] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const archivedCount = contacts.filter((contact) => contact.archived).length;
   const visibleContacts = useMemo(() => {
     const search = query.trim().toLocaleLowerCase("pt-BR");
     return contacts.filter((contact) => {
+      if (contact.archived !== showArchived) return false;
       if (!search) return true;
       return contact.name.toLocaleLowerCase("pt-BR").includes(search)
         || contact.phone.includes(search)
         || Boolean(contact.messages?.[0]?.content.toLocaleLowerCase("pt-BR").includes(search));
     });
-  }, [contacts, query]);
+  }, [contacts, query, showArchived]);
 
   return (
 
@@ -80,13 +83,16 @@ export function ContactSidebar({ contacts, selectedContactId, onSelectContact }:
 
           <button
             type="button"
-            className="mt-1.5 flex h-8 w-full items-center gap-2.5 rounded-[10px] px-2 text-left text-[13px] text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-200"
+            onClick={() => setShowArchived((current) => !current)}
+            aria-pressed={showArchived}
+            className={`mt-1.5 flex h-8 w-full items-center gap-2.5 rounded-[10px] px-2 text-left text-[13px] transition-colors hover:bg-white/[0.04] hover:text-zinc-200 ${showArchived ? "bg-white/[0.06] text-zinc-100" : "text-zinc-400"}`}
           >
             <svg className="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M4 7h16v13H4zM3 4h18v3H3z" /><path d="M10 12h4" />
             </svg>
             <span className="flex-1">Arquivadas</span>
-            <svg className="size-3.5 text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            {archivedCount > 0 && <span className="text-[11px] tabular-nums text-zinc-500">{archivedCount}</span>}
+            <svg className={`size-3.5 text-zinc-600 transition-transform ${showArchived ? "rotate-90" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="m9 6 6 6-6 6" />
             </svg>
           </button>
@@ -99,12 +105,8 @@ export function ContactSidebar({ contacts, selectedContactId, onSelectContact }:
               const selected = selectedContactId === contact.id;
               const unread = contact.unreadCount > 0;
               return (
-                <button
-                  key={contact.id}
-                  type="button"
-                  onClick={() => onSelectContact(contact)}
-                  className={`group block w-full rounded-xl px-2 text-left transition-colors ${selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"}`}
-                >
+                <div key={contact.id} className={`group relative rounded-xl transition-colors ${selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"}`}>
+                  <button type="button" onClick={() => onSelectContact(contact)} className="block w-full px-2 text-left">
                   <div className="flex items-center gap-2.5">
                     <Avatar contact={contact} />
                     <div className={`min-w-0 flex-1 py-2 ${selected ? "" : "border-b border-white/[0.05] group-hover:border-transparent"}`}>
@@ -120,7 +122,7 @@ export function ContactSidebar({ contacts, selectedContactId, onSelectContact }:
                         <p className="min-w-0 flex-1 truncate text-[12px] leading-tight font-normal text-zinc-500">
                           <EmojiText content={lastMessage ? `${lastMessage.direction === "OUTGOING" ? "✓✓ " : ""}${lastMessage.content}` : "Nenhuma mensagem"} />
                         </p>
-                        {unread && (
+                         {unread && (
                           <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-semibold text-zinc-950">
                             {contact.unreadCount}
                           </span>
@@ -128,10 +130,24 @@ export function ContactSidebar({ contacts, selectedContactId, onSelectContact }:
                       </div>
                     </div>
                   </div>
-                </button>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onArchiveContact(contact, !contact.archived).catch((error) => console.error("Erro ao alterar arquivamento:", error))}
+                    aria-label={contact.archived ? `Desarquivar ${contact.name}` : `Arquivar ${contact.name}`}
+                    title={contact.archived ? "Desarquivar" : "Arquivar"}
+                    className="absolute right-2 bottom-1.5 flex size-6 items-center justify-center rounded-full bg-zinc-900/90 text-zinc-400 opacity-0 shadow-sm transition-[opacity,color,background-color] hover:bg-zinc-800 hover:text-zinc-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-white/50 group-hover:opacity-100"
+                  >
+                    <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      {contact.archived ? <path d="M4 7h16v13H4zM3 4h18v3H3zM12 17V10m-3 3 3-3 3 3" /> : <path d="M4 7h16v13H4zM3 4h18v3H3zM10 12h4" />}
+                    </svg>
+                  </button>
+                </div>
               );
             })}
-            {visibleContacts.length === 0 && <p className="px-4 py-10 text-center text-[13px] text-zinc-500">Nenhuma conversa encontrada</p>}
+            {loading && <p className="px-4 py-10 text-center text-[13px] text-zinc-500">Carregando conversas...</p>}
+            {!loading && error && <p role="alert" className="px-4 py-10 text-center text-[13px] text-red-300">{error}</p>}
+            {!loading && !error && visibleContacts.length === 0 && <p className="px-4 py-10 text-center text-[13px] text-zinc-500">{showArchived ? "Nenhuma conversa arquivada" : "Nenhuma conversa encontrada"}</p>}
           </div>
         </CompactScrollArea>
       </div>

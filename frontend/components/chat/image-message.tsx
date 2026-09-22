@@ -148,16 +148,16 @@ export function ImageMessage({ messageId, mediaUrl, content, contact, createdAt,
   );
 
   return (
-    <div className="space-y-2">
-      <button type="button" onClick={(event) => { event.stopPropagation(); openViewer(); }} aria-label="Abrir imagem" className="block overflow-hidden rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60">
+    <div>
+      <button type="button" onClick={(event) => { event.stopPropagation(); openViewer(); }} aria-label="Abrir imagem" className="block overflow-hidden rounded-[15px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60">
         <motion.img
           src={mediaUrl}
           alt={hasCaption ? content : "Imagem recebida"}
           loading="lazy"
-          className="max-h-[320px] max-w-full object-contain transition-transform duration-200 hover:scale-[1.015]"
+          className="block max-h-[360px] max-w-[min(340px,62vw)] object-contain transition-transform duration-200 hover:scale-[1.015]"
         />
       </button>
-      {hasCaption && <p className="whitespace-pre-wrap"><EmojiText content={content} /></p>}
+      {hasCaption && <p className="px-2 pt-2 pb-0.5 whitespace-pre-wrap"><EmojiText content={content} /></p>}
       {typeof document !== "undefined" && createPortal(viewer, document.body)}
     </div>
   );

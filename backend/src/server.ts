@@ -1,9 +1,12 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
 
 import { setSocketServer } from "./lib/socket.js";
+import { prisma } from "./lib/prisma.js";
+import { getAllGroups } from "./services/evolution.service.js";
 
 import { contactRouter } from "./routes/contact.routes.js";
 import { messageRouter } from "./routes/message.routes.js";
@@ -69,4 +72,18 @@ httpServer.listen(3333, () => {
   console.log(
     "Servidor rodando em http://localhost:3333"
   );
+
+  void getAllGroups()
+    .then(async (groups) => {
+      await Promise.all(groups.map((group) => {
+        if (!group.id?.endsWith("@g.us")) return Promise.resolve();
+        return prisma.contact.upsert({
+          where: { phone: group.id },
+          update: { name: group.subject?.trim() || "Grupo do WhatsApp", isGroup: true, ...(group.pictureUrl ? { profilePictureUrl: group.pictureUrl } : {}) },
+          create: { name: group.subject?.trim() || "Grupo do WhatsApp", phone: group.id, isGroup: true, profilePictureUrl: group.pictureUrl ?? null },
+        });
+      }));
+      console.log(`${groups.length} grupos sincronizados.`);
+    })
+    .catch((error) => console.error("Não foi possível sincronizar os grupos:", error));
 });

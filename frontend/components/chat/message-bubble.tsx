@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowBendUpLeft,
@@ -53,12 +54,20 @@ const messageDateFormatter = new Intl.DateTimeFormat("pt-BR", {
 // Mantém o estilo do balão e delega o conteúdo ao componente de cada tipo.
 export function MessageBubble({ message, contact, contacts, imageMessages, onReact, onForwardMessage }: MessageBubbleProps) {
   const [reacting, setReacting] = useState(false);
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [choosingContact, setChoosingContact] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const actionControlsRef = useRef<HTMLDivElement>(null);
+  const reactionControlsRef = useRef<HTMLDivElement>(null);
+  const reactionPickerRef = useRef<HTMLDivElement>(null);
+  const reactionTriggerRef = useRef<HTMLButtonElement>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  const [reactionPosition, setReactionPosition] = useState({ top: 0, left: 0 });
   const outgoing = message.direction === "OUTGOING";
   const isAudio = message.type === "AUDIO";
+  const isImage = message.type === "IMAGE";
+  const imageHasCaption = isImage && message.content !== "[Imagem]";
   const mediaUrl = `${API_URL}/messages/${message.id}/media`;
   const createdAt = new Date(message.createdAt);
   const hasValidDate = !Number.isNaN(createdAt.getTime());
@@ -117,20 +126,48 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
   ) : null;
 
   useEffect(() => {
-    if (!actionsOpen) return;
+    if (!actionsOpen && !reactionPickerOpen) return;
     function closeOnOutsideClick(event: PointerEvent) {
-      if (!actionControlsRef.current?.contains(event.target as Node)) setActionsOpen(false);
+      if (!actionControlsRef.current?.contains(event.target as Node) && !reactionControlsRef.current?.contains(event.target as Node) && !reactionPickerRef.current?.contains(event.target as Node)) {
+        setActionsOpen(false);
+        setReactionPickerOpen(false);
+      }
     }
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setActionsOpen(false);
+      if (event.key === "Escape") {
+        setActionsOpen(false);
+        setReactionPickerOpen(false);
+      }
     }
+    function closeOnScroll() { setReactionPickerOpen(false); }
     document.addEventListener("pointerdown", closeOnOutsideClick);
     document.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("scroll", closeOnScroll, true);
+    window.addEventListener("resize", closeOnScroll);
     return () => {
       document.removeEventListener("pointerdown", closeOnOutsideClick);
       document.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("scroll", closeOnScroll, true);
+      window.removeEventListener("resize", closeOnScroll);
     };
-  }, [actionsOpen]);
+  }, [actionsOpen, reactionPickerOpen]);
+
+  function openReactionPicker() {
+    const trigger = reactionTriggerRef.current?.getBoundingClientRect();
+    const bubble = bubbleRef.current?.getBoundingClientRect();
+    if (!trigger || !bubble) return;
+    const pickerWidth = 248;
+    const pickerHeight = 44;
+    const left = outgoing ? trigger.left : trigger.right - pickerWidth;
+    setReactionPosition({
+      left: Math.max(8, Math.min(left, window.innerWidth - pickerWidth - 8)),
+      top: bubble.top >= pickerHeight + 8
+        ? bubble.top - pickerHeight - 8
+        : Math.min(bubble.bottom + 8, window.innerHeight - pickerHeight - 8),
+    });
+    setActionsOpen(false);
+    setReactionPickerOpen(true);
+  }
 
   async function copyMessage() {
     try {
@@ -148,6 +185,7 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
     try {
       await onReact(message.id, message.reaction === reaction ? "" : reaction);
       setActionsOpen(false);
+      setReactionPickerOpen(false);
     } catch (error) {
       console.error("Erro ao reagir à mensagem:", error);
     } finally {
@@ -156,7 +194,7 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
   }
 
   const quickReactionBar = (
-    <div className="mb-1.5 flex w-max items-center gap-0.5 rounded-full border border-white/10 bg-zinc-900/95 p-1 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+    <div className="mb-1.5 flex w-max items-center gap-0.5 rounded-full border border-white/10 bg-zinc-900/95 px-1.5 py-1 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-xl">
       {QUICK_REACTIONS.map((reaction) => (
         <button
           key={reaction}
@@ -164,12 +202,12 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
           disabled={reacting}
           onClick={() => void chooseReaction(reaction)}
           aria-label={`${message.reaction === reaction ? "Remover" : "Reagir com"} ${reaction}`}
-          className={`flex size-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125 focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-50 ${message.reaction === reaction ? "bg-white/10" : ""}`}
+          className={`flex size-8 items-center justify-center rounded-full text-base transition-transform hover:scale-125 focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-50 ${message.reaction === reaction ? "bg-white/10" : ""}`}
         >
           <EmojiText content={reaction} />
         </button>
       ))}
-      <button type="button" aria-label="Mais reações" className="flex size-7 items-center justify-center rounded-full text-lg leading-none text-zinc-200 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/50">+</button>
+      <button type="button" aria-label="Mais reações" className="flex size-8 items-center justify-center rounded-full text-lg leading-none text-zinc-200 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/50">+</button>
     </div>
   );
 
@@ -177,13 +215,51 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
 
   return (
     <div
+      ref={bubbleRef}
       className={`group/message relative min-w-0 max-w-[min(62%,620px)] text-[13.5px] leading-[1.4] font-normal text-white [overflow-wrap:anywhere] ${message.reaction ? "mb-3" : ""} ${
         isAudio
           ? "relative w-[min(380px,62vw)] overflow-visible rounded-[24px] border border-white/15 bg-gradient-to-br from-white/[0.09] via-zinc-900/95 to-zinc-950/95 px-3.5 py-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_10px_30px_rgba(0,0,0,0.2)] backdrop-blur-xl"
-          : `rounded-[24px] px-3.5 py-2.5 ${outgoing ? "bg-green-600" : "bg-zinc-800"}`
+          : isImage
+            ? `rounded-[18px] p-[3px] shadow-[0_3px_12px_rgba(0,0,0,0.16)] ${outgoing ? "bg-green-600" : "bg-zinc-800"}`
+            : `rounded-[24px] px-3.5 py-2.5 ${outgoing ? "bg-green-600" : "bg-zinc-800"}`
       }`}
     >
-      <div ref={actionControlsRef} className="absolute -top-2 right-2 z-40">
+      {contact.isGroup && !outgoing && message.senderName && (
+        <p className={`${isImage ? "px-2 pt-1.5" : "mb-1"} pr-5 text-[11px] font-semibold leading-tight text-emerald-300`}>
+          {message.senderName}
+        </p>
+      )}
+      <div ref={reactionControlsRef} className={`absolute top-1/2 z-50 -translate-y-1/2 ${outgoing ? "-left-6" : "-right-6"}`}>
+        <button
+          ref={reactionTriggerRef}
+          type="button"
+          aria-label="Abrir sugestões de emoji"
+          aria-expanded={reactionPickerOpen}
+          onClick={() => reactionPickerOpen ? setReactionPickerOpen(false) : openReactionPicker()}
+          className={`flex size-6 items-center justify-center text-zinc-300 transition-[opacity,transform,color] duration-150 hover:scale-110 hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 group-hover/message:opacity-100 [@media(hover:none)]:opacity-100 ${reactionPickerOpen ? "opacity-100" : "opacity-0"}`}
+        >
+          <Smiley size={14} weight="regular" aria-hidden="true" />
+        </button>
+      </div>
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {reactionPickerOpen && (
+            <motion.div
+              ref={reactionPickerRef}
+              initial={{ opacity: 0, y: 8, scale: 0.92 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 5, scale: 0.96 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed z-[100] origin-bottom-left"
+              style={reactionPosition}
+            >
+              {quickReactionBar}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+      <div ref={actionControlsRef} className="absolute top-1.5 right-2 z-40">
         <button
           type="button"
           aria-label="Ações da mensagem"
@@ -191,6 +267,7 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
           aria-expanded={actionsOpen}
           onClick={() => {
             setActionsOpen((open) => !open);
+            setReactionPickerOpen(false);
             setChoosingContact(false);
             setCopyError(false);
           }}
@@ -198,9 +275,15 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
         >
           <CaretDown size={13} weight="bold" aria-hidden="true" />
         </button>
+        <AnimatePresence>
         {actionsOpen && (
-          <div className="absolute right-0 top-7 flex min-w-[178px] flex-col items-end">
-            {quickReactionBar}
+          <motion.div
+            initial={{ opacity: 0, y: -5, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute right-0 top-7 flex min-w-[178px] origin-top-right flex-col items-end"
+          >
             <div role="menu" aria-label="Ações da mensagem" className="w-[178px] overflow-hidden rounded-xl border border-white/10 bg-zinc-900/95 p-1 text-[12px] font-medium leading-tight text-zinc-100 shadow-xl backdrop-blur-xl">
               {choosingContact ? (
                 <>
@@ -221,7 +304,7 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
                     <Copy size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Copiar</span>
                   </button>
-                  <button type="button" role="menuitem" className={menuButtonClass}>
+                  <button type="button" role="menuitem" onClick={openReactionPicker} className={menuButtonClass}>
                     <Smiley size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Reagir</span>
                   </button>
@@ -256,11 +339,12 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
                 </>
               )}
             </div>
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
       {inlineTime ? (
-        <div className="flex min-w-0 items-end gap-2">
+        <div className="flex min-w-0 items-end gap-2 pr-4">
           <div className="min-w-0">{content}</div>
           <span className="flex shrink-0 items-center gap-0.5">{timestamp}{readReceipt}</span>
         </div>
@@ -268,7 +352,7 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
         content
       )}
       {!inlineTime && timestamp && (
-        <div className={`flex items-center justify-end gap-0.5 ${isAudio ? "mt-2" : "mt-1"}`}>
+        <div className={`flex items-center justify-end gap-0.5 ${isImage && !imageHasCaption ? "absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-1 shadow-sm backdrop-blur-[2px]" : isImage ? "px-2 pt-0.5 pb-1" : isAudio ? "mt-2" : "mt-1"}`}>
           {timestamp}
           {readReceipt}
         </div>

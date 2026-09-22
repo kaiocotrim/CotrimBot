@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Avatar } from "@/components/chat/avatar";
 import { MessageBubble } from "@/components/chat/message-bubble";
+import { MessageSenderAvatar } from "@/components/chat/message-sender-avatar";
 import type { Contact, Message } from "@/types/chat";
 
 type MessageListProps = {
@@ -185,7 +186,7 @@ export function MessageList({ contact, contacts, messages, hasOlderMessages, loa
               ease: [0.16, 1, 0.3, 1],
             }}
             style={{ transformOrigin: outgoing ? "bottom right" : "bottom left" }}
-            className="flex w-full flex-col gap-2"
+            className="relative z-0 flex w-full flex-col gap-2 has-[[aria-expanded=true]]:z-30"
           >
             {label && (
               <div className="flex w-full items-center justify-center py-1" role="separator" aria-label={label}>
@@ -199,7 +200,9 @@ export function MessageList({ contact, contacts, messages, hasOlderMessages, loa
                 outgoing ? "justify-end" : "justify-start"
               }`}
             >
-              {!outgoing && <Avatar contact={contact} />}
+              {!outgoing && (contact.isGroup
+                ? <MessageSenderAvatar message={message} />
+                : <Avatar contact={contact} />)}
 
               {/* O balão escolhe entre player de áudio e conteúdo textual. */}
               <MessageBubble message={message} contact={contact} contacts={contacts} imageMessages={imageMessages} onReact={onReactToMessage} onForwardMessage={onForwardMessage} />

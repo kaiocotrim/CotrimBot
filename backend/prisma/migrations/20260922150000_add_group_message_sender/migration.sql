@@ -1,0 +1,3 @@
+ALTER TABLE `Message`
+  ADD COLUMN `senderName` VARCHAR(191) NULL,
+  ADD COLUMN `senderPhone` VARCHAR(64) NULL;

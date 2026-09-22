@@ -1,0 +1,3 @@
+ALTER TABLE `Contact`
+  ADD COLUMN `isGroup` BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN `archived` BOOLEAN NOT NULL DEFAULT false;

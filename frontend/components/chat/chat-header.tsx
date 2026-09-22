@@ -17,7 +17,7 @@ export function ChatHeader({ contact }: { contact: Contact }) {
       <Avatar contact={contact} className="size-10" />
       <div className="min-w-0 flex-1">
         <h2 className="truncate text-[15px] leading-[18px] font-medium">{contact.name}</h2>
-        <p className="truncate text-[12px] leading-tight font-normal text-zinc-400">{contact.phone}</p>
+        <p className="truncate text-[12px] leading-tight font-normal text-zinc-400">{contact.isGroup ? "Grupo do WhatsApp" : contact.phone}</p>
       </div>
       <div className="ml-auto flex h-11 shrink-0 items-center rounded-full border border-white/10 bg-white/[0.035] px-1 text-zinc-100 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_6px_18px_rgba(0,0,0,0.18)] backdrop-blur-xl">
         <button

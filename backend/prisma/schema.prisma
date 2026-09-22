@@ -11,6 +11,9 @@ model Contact {
   id        Int       @id @default(autoincrement())
   name      String
   phone     String    @unique
+  isGroup   Boolean   @default(false)
+  archived  Boolean   @default(false)
+  profilePictureUrl String? @db.Text
   messages  Message[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -29,6 +32,9 @@ model Message {
   createdAt DateTime  @default(now())
   readAt    DateTime?
   reaction  String?          @db.VarChar(16)
+  senderName String?         @db.VarChar(191)
+  senderPhone String?        @db.VarChar(64)
+  senderProfilePictureUrl String? @db.Text
 }
 
 enum MessageDirection {

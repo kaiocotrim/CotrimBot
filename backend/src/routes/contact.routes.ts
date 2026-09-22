@@ -5,6 +5,7 @@ import {
   getContactAvatar,
   getContactById,
   getContacts,
+  setContactArchived,
   updateContact,
 } from "../controllers/contact.controller.js";
 
@@ -24,6 +25,7 @@ contactRouter.post("/contacts", createContact);
 
 // PATCH /contacts/:id - Atualiza um contato especifico pelo ID
 contactRouter.patch("/contacts/:id", updateContact);
+contactRouter.patch("/contacts/:id/archived", setContactArchived);
 
 // DELETE /contacts/:id - Exclui um contato especifico pelo ID
 contactRouter.delete("/contacts/:id", deleteContact);

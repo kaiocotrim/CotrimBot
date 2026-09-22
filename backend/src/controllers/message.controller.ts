@@ -10,6 +10,7 @@ import { getSocketServer } from "../lib/socket.js";
 // Importa o service que concentra toda a comunicação HTTP com a Evolution API.
 import {
   getMediaMessage,
+  getProfilePicture,
   sendWhatsAppReaction,
   sendWhatsAppMessage,
   sendWhatsAppMedia
@@ -20,6 +21,51 @@ import {
 } from "../services/transcription.service.js";
 
 import { getSatisfactionSurvey } from "../services/bot.service.js";
+
+export async function getGroupSenderAvatar(req: Request, res: Response) {
+  const messageId = Number(req.params.id);
+  if (!Number.isInteger(messageId) || messageId <= 0) {
+    return res.status(400).json({ message: "Mensagem inválida" });
+  }
+
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { contact: true },
+  });
+  if (!message) return res.status(404).json({ message: "Mensagem não encontrada" });
+  if (!message.contact.isGroup || !message.senderPhone) {
+    return res.json({ profilePictureUrl: null });
+  }
+  if (message.senderProfilePictureUrl) {
+    return res.json({ profilePictureUrl: message.senderProfilePictureUrl });
+  }
+
+  const cached = await prisma.message.findFirst({
+    where: {
+      senderPhone: message.senderPhone,
+      senderProfilePictureUrl: { not: null },
+    },
+    select: { senderProfilePictureUrl: true },
+  });
+  if (cached?.senderProfilePictureUrl) {
+    await prisma.message.update({ where: { id: message.id }, data: { senderProfilePictureUrl: cached.senderProfilePictureUrl } });
+    return res.json({ profilePictureUrl: cached.senderProfilePictureUrl });
+  }
+
+  try {
+    const profile = await getProfilePicture(message.senderPhone);
+    if (profile.profilePictureUrl) {
+      await prisma.message.updateMany({
+        where: { senderPhone: message.senderPhone },
+        data: { senderProfilePictureUrl: profile.profilePictureUrl },
+      });
+    }
+    return res.json({ profilePictureUrl: profile.profilePictureUrl ?? null });
+  } catch (error) {
+    console.error("Erro ao buscar avatar do participante:", error);
+    return res.json({ profilePictureUrl: null });
+  }
+}
 
 // GET /contacts/:id/messages - Retorna as mensagens de um contato
 export async function getMessages(req: Request, res: Response) {
@@ -73,7 +119,9 @@ export async function reactToMessage(req: Request, res: Response) {
 
   try {
     await sendWhatsAppReaction({
-      remoteJid: `${message.contact.phone.replace(/\D/g, "")}@s.whatsapp.net`,
+      remoteJid: message.contact.isGroup
+        ? message.contact.phone
+        : `${message.contact.phone.replace(/\D/g, "")}@s.whatsapp.net`,
       fromMe: message.direction === "OUTGOING",
       id: message.externalId,
       reaction,
@@ -193,8 +241,10 @@ export async function sendMediaToContact(
     }
 
     // Salva a mídia no histórico local.
-    const message = await prisma.message.create({
-      data: {
+    const message = await prisma.message.upsert({
+      where: { externalId },
+      update: {},
+      create: {
         externalId,
         content,
         direction: "OUTGOING",
@@ -338,8 +388,10 @@ export async function sendMessageToContact(req: Request, res: Response) {
 
     // Salvamos como OUTGOING porque a mensagem saiu do CotrimBot em direção ao
     // WhatsApp do contato, em vez de ter sido recebida pelo webhook.
-    const message = await prisma.message.create({
-      data: {
+    const message = await prisma.message.upsert({
+      where: { externalId },
+      update: {},
+      create: {
         externalId,
         content: text,
         direction: "OUTGOING",

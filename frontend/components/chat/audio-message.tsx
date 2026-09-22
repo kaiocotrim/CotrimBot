@@ -255,9 +255,8 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className={`size-3 transition-transform duration-200 motion-reduce:transition-none ${
-                  showTranscription ? "rotate-180" : ""
-                }`}
+                className={`size-3 transition-transform duration-200 motion-reduce:transition-none ${showTranscription ? "rotate-180" : ""
+                  }`}
                 aria-hidden="true"
               >
                 <path d="m6 9 6 6 6-6" />
@@ -288,9 +287,8 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
 
         {/* Transcrição (abre e fecha com transição suave) */}
         <div
-          className={`grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none ${
-            transcription && showTranscription ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-          }`}
+          className={`grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none ${transcription && showTranscription ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            }`}
           aria-hidden={!transcription || !showTranscription}
         >
           <div className="overflow-hidden">

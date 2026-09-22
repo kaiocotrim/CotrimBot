@@ -202,6 +202,20 @@ html[data-loading-cursor="true"] *::after {
   to { transform: rotate(360deg); }
 }
 
+@keyframes audio-frequency {
+  0%, 100% { transform: scaleY(0.35); opacity: 0.65; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
+.audio-frequency-bar {
+  transform-origin: center;
+  animation: audio-frequency 0.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .audio-frequency-bar { animation: none; transform: scaleY(0.65); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .apple-loading-cursor-wheel { animation: none; }
 }

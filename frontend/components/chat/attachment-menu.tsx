@@ -19,11 +19,12 @@ type AttachmentMenuProps = {
   onSelect: (kind: AttachmentKind) => void;
   closing: boolean;
   onCloseWithBot: () => void;
+  allowCloseWithBot: boolean;
   stacked: boolean;
 };
 
 // Fica fora do campo com overflow-hidden para o menu não ser cortado.
-export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, onCloseWithBot, stacked }: AttachmentMenuProps) {
+export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, onCloseWithBot, allowCloseWithBot, stacked }: AttachmentMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
 
@@ -86,7 +87,7 @@ export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, o
             </motion.button>
           ))}
           {/* Reutiliza o encerramento existente, incluindo proteção contra cliques repetidos. */}
-          <motion.button
+          {allowCloseWithBot && <motion.button
             type="button"
             role="menuitem"
             onMouseDown={(event) => event.preventDefault()}
@@ -107,7 +108,7 @@ export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, o
               <svg className="size-5 shrink-0 text-red-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="6" width="16" height="14" rx="4" /><path d="M12 2v4M8 11h.01M16 11h.01M9 16h6M2 11v4M22 11v4" /></svg>
             )}
             <span className="sr-only">{closing ? "Encerrando..." : "Encerrar chamado com Bot"}</span>
-          </motion.button>
+          </motion.button>}
         </motion.div>
       )}
     </AnimatePresence>

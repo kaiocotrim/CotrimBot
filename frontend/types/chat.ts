@@ -5,6 +5,8 @@ export type Contact = {
   id: number;
   name: string;
   phone: string;
+  isGroup: boolean;
+  archived: boolean;
 
   // Pode existir uma URL de foto,
   // ou null caso o WhatsApp não forneça.
@@ -47,6 +49,9 @@ export type Message = {
   // string = data/hora em que foi lida.
   readAt: string | null;
   reaction: string | null;
+  senderName: string | null;
+  senderPhone: string | null;
+  senderProfilePictureUrl: string | null;
 };
 
 export type MessagesPage = {

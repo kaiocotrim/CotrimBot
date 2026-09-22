@@ -74,9 +74,89 @@ export async function sendWhatsAppReaction(input: {
   return response.json();
 }
 
+export async function archiveWhatsAppChat(input: {
+  chat: string;
+  archive: boolean;
+  lastMessage?: { id: string; fromMe: boolean };
+}) {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE;
+  if (!apiUrl || !apiKey || !instance) throw new Error("Configuração da Evolution API incompleta");
+
+  const body = {
+    chat: input.chat,
+    archive: input.archive,
+    ...(input.lastMessage ? {
+      lastMessage: {
+        key: {
+          remoteJid: input.chat,
+          fromMe: input.lastMessage.fromMe,
+          id: input.lastMessage.id,
+        },
+      },
+    } : {}),
+  };
+  const response = await fetch(`${apiUrl}/chat/archiveChat/${instance}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: apiKey },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(`Erro ao arquivar conversa: ${response.status} - ${await response.text()}`);
+  return response.json();
+}
+
 type ProfilePictureResponse = {
   profilePictureUrl?: string | null;
 };
+
+type GroupInfoResponse = {
+  id?: string;
+  subject?: string;
+  pictureUrl?: string | null;
+};
+
+export async function getAllGroups(): Promise<GroupInfoResponse[]> {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE;
+
+  if (!apiUrl || !apiKey || !instance) {
+    throw new Error("Configuração da Evolution API incompleta");
+  }
+
+  const response = await fetch(`${apiUrl}/group/fetchAllGroups/${instance}?getParticipants=false`, {
+    headers: { apikey: apiKey },
+  });
+  if (!response.ok) {
+    throw new Error(`Erro ao buscar grupos: ${response.status}`);
+  }
+
+  const result = await response.json() as GroupInfoResponse[] | { data?: GroupInfoResponse[] };
+  return Array.isArray(result) ? result : result.data ?? [];
+}
+
+/** Busca o nome atual de um grupo do WhatsApp. */
+export async function getGroupInfo(groupJid: string): Promise<GroupInfoResponse> {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE;
+
+  if (!apiUrl || !apiKey || !instance) {
+    throw new Error("Configuração da Evolution API incompleta");
+  }
+
+  const params = new URLSearchParams({ groupJid, getParticipants: "false" });
+  const response = await fetch(`${apiUrl}/group/findGroupInfos/${instance}?${params}`, {
+    headers: { apikey: apiKey },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Erro ao buscar dados do grupo: ${response.status}`);
+  }
+
+  return (await response.json()) as GroupInfoResponse;
+}
 
 /** Busca a URL da foto de perfil de um contato na Evolution API. */
 export async function getProfilePicture(
