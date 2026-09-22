@@ -2,6 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import {
+  ArrowBendUpLeft,
+  ArrowBendUpRight,
+  CaretDown,
+  Copy,
+  PushPin,
+  Smiley,
+  Sparkle,
+  Star,
+  Trash,
+  WarningCircle,
+} from "@phosphor-icons/react";
 import { AudioMessage } from "@/components/chat/audio-message";
 import { DocumentMessage } from "@/components/chat/document-message";
 import { EmojiText } from "@/components/chat/emoji-text";
@@ -13,8 +25,10 @@ import type { Contact, Message } from "@/types/chat";
 type MessageBubbleProps = {
   message: Message;
   contact: Contact;
+  contacts: Contact[];
   imageMessages: Message[];
   onReact: (messageId: number, reaction: string) => Promise<void>;
+  onForwardMessage: (message: Message, target: Contact) => void;
 };
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
@@ -37,10 +51,12 @@ const messageDateFormatter = new Intl.DateTimeFormat("pt-BR", {
 });
 
 // Mantém o estilo do balão e delega o conteúdo ao componente de cada tipo.
-export function MessageBubble({ message, contact, imageMessages, onReact }: MessageBubbleProps) {
+export function MessageBubble({ message, contact, contacts, imageMessages, onReact, onForwardMessage }: MessageBubbleProps) {
   const [reacting, setReacting] = useState(false);
-  const [reactionsOpen, setReactionsOpen] = useState(false);
-  const reactionControlsRef = useRef<HTMLDivElement>(null);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [choosingContact, setChoosingContact] = useState(false);
+  const [copyError, setCopyError] = useState(false);
+  const actionControlsRef = useRef<HTMLDivElement>(null);
   const outgoing = message.direction === "OUTGOING";
   const isAudio = message.type === "AUDIO";
   const mediaUrl = `${API_URL}/messages/${message.id}/media`;
@@ -85,7 +101,7 @@ export function MessageBubble({ message, contact, imageMessages, onReact }: Mess
     <time
       dateTime={message.createdAt}
       title={messageDateFormatter.format(createdAt)}
-      className="shrink-0 select-none text-[9px] leading-none tabular-nums text-white/55"
+      className="shrink-0 select-none text-[10px] leading-none font-normal tabular-nums text-white/55"
     >
       {messageTimeFormatter.format(createdAt)}
     </time>
@@ -101,12 +117,12 @@ export function MessageBubble({ message, contact, imageMessages, onReact }: Mess
   ) : null;
 
   useEffect(() => {
-    if (!reactionsOpen) return;
+    if (!actionsOpen) return;
     function closeOnOutsideClick(event: PointerEvent) {
-      if (!reactionControlsRef.current?.contains(event.target as Node)) setReactionsOpen(false);
+      if (!actionControlsRef.current?.contains(event.target as Node)) setActionsOpen(false);
     }
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setReactionsOpen(false);
+      if (event.key === "Escape") setActionsOpen(false);
     }
     document.addEventListener("pointerdown", closeOnOutsideClick);
     document.addEventListener("keydown", closeOnEscape);
@@ -114,14 +130,24 @@ export function MessageBubble({ message, contact, imageMessages, onReact }: Mess
       document.removeEventListener("pointerdown", closeOnOutsideClick);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [reactionsOpen]);
+  }, [actionsOpen]);
+
+  async function copyMessage() {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopyError(false);
+      setActionsOpen(false);
+    } catch {
+      setCopyError(true);
+    }
+  }
 
   async function chooseReaction(reaction: string) {
     if (reacting) return;
     setReacting(true);
     try {
       await onReact(message.id, message.reaction === reaction ? "" : reaction);
-      setReactionsOpen(false);
+      setActionsOpen(false);
     } catch (error) {
       console.error("Erro ao reagir à mensagem:", error);
     } finally {
@@ -129,39 +155,107 @@ export function MessageBubble({ message, contact, imageMessages, onReact }: Mess
     }
   }
 
+  const quickReactionBar = (
+    <div className="mb-1.5 flex w-max items-center gap-0.5 rounded-full border border-white/10 bg-zinc-900/95 p-1 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+      {QUICK_REACTIONS.map((reaction) => (
+        <button
+          key={reaction}
+          type="button"
+          disabled={reacting}
+          onClick={() => void chooseReaction(reaction)}
+          aria-label={`${message.reaction === reaction ? "Remover" : "Reagir com"} ${reaction}`}
+          className={`flex size-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125 focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-50 ${message.reaction === reaction ? "bg-white/10" : ""}`}
+        >
+          <EmojiText content={reaction} />
+        </button>
+      ))}
+      <button type="button" aria-label="Mais reações" className="flex size-7 items-center justify-center rounded-full text-lg leading-none text-zinc-200 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/50">+</button>
+    </div>
+  );
+
+  const menuButtonClass = "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left hover:bg-white/[0.08] focus-visible:bg-white/[0.08] focus-visible:outline-none";
+
   return (
     <div
-      className={`group/message relative min-w-0 max-w-[70%] text-white [overflow-wrap:anywhere] ${message.reaction ? "mb-3" : ""} ${
+      className={`group/message relative min-w-0 max-w-[min(62%,620px)] text-[13.5px] leading-[1.4] font-normal text-white [overflow-wrap:anywhere] ${message.reaction ? "mb-3" : ""} ${
         isAudio
-          ? "relative w-[min(440px,70vw)] overflow-visible rounded-[24px] border border-white/15 bg-gradient-to-br from-white/[0.09] via-zinc-900/95 to-zinc-950/95 px-4 py-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_10px_30px_rgba(0,0,0,0.2)] backdrop-blur-xl"
-          : `rounded-[24px] px-4 py-2 ${outgoing ? "bg-green-600" : "bg-zinc-800"}`
+          ? "relative w-[min(380px,62vw)] overflow-visible rounded-[24px] border border-white/15 bg-gradient-to-br from-white/[0.09] via-zinc-900/95 to-zinc-950/95 px-3.5 py-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_10px_30px_rgba(0,0,0,0.2)] backdrop-blur-xl"
+          : `rounded-[24px] px-3.5 py-2.5 ${outgoing ? "bg-green-600" : "bg-zinc-800"}`
       }`}
     >
-      <div ref={reactionControlsRef} className={`absolute top-1/2 z-30 -translate-y-1/2 ${outgoing ? "right-full mr-1" : "left-full ml-1"}`}>
+      <div ref={actionControlsRef} className="absolute -top-2 right-2 z-40">
         <button
           type="button"
-          onClick={() => setReactionsOpen((current) => !current)}
-          aria-label="Reagir à mensagem"
-          aria-expanded={reactionsOpen}
-          className={`flex size-7 items-center justify-center text-white/75 transition-[opacity,color,transform] duration-150 hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 ${reactionsOpen ? "scale-100 text-white opacity-100" : "scale-90 opacity-0 group-hover/message:scale-100 group-hover/message:opacity-100 group-focus-within/message:scale-100 group-focus-within/message:opacity-100"}`}
+          aria-label="Ações da mensagem"
+          aria-haspopup="menu"
+          aria-expanded={actionsOpen}
+          onClick={() => {
+            setActionsOpen((open) => !open);
+            setChoosingContact(false);
+            setCopyError(false);
+          }}
+          className={`flex size-5 items-center justify-center rounded-full text-zinc-300 transition-[opacity,transform,color] duration-150 hover:text-white focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-white/50 [@media(hover:none)]:opacity-100 ${actionsOpen ? "opacity-100" : "opacity-0 group-hover/message:opacity-100"}`}
         >
-          <svg className="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" /><path d="M9 9h.01M15 9h.01" /></svg>
+          <CaretDown size={13} weight="bold" aria-hidden="true" />
         </button>
-
-        {reactionsOpen && (
-          <div className={`absolute bottom-full mb-2 flex items-center gap-0.5 rounded-full border border-white/10 bg-zinc-900/95 p-1 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-xl ${outgoing ? "right-0" : "left-0"}`}>
-            {QUICK_REACTIONS.map((reaction) => (
-              <button
-                key={reaction}
-                type="button"
-                disabled={reacting}
-                onClick={() => void chooseReaction(reaction)}
-                aria-label={`${message.reaction === reaction ? "Remover" : "Reagir com"} ${reaction}`}
-                className={`flex size-8 items-center justify-center rounded-full text-lg transition-transform hover:scale-125 focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-50 ${message.reaction === reaction ? "bg-white/10" : ""}`}
-              >
-                <EmojiText content={reaction} />
-              </button>
-            ))}
+        {actionsOpen && (
+          <div className="absolute right-0 top-7 flex min-w-[178px] flex-col items-end">
+            {quickReactionBar}
+            <div role="menu" aria-label="Ações da mensagem" className="w-[178px] overflow-hidden rounded-xl border border-white/10 bg-zinc-900/95 p-1 text-[12px] font-medium leading-tight text-zinc-100 shadow-xl backdrop-blur-xl">
+              {choosingContact ? (
+                <>
+                  <div className="px-3 py-2 text-[11px] leading-tight text-zinc-400">Encaminhar para</div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {contacts.map((target) => (
+                      <button key={target.id} type="button" role="menuitem" onClick={() => { onForwardMessage(message, target); setActionsOpen(false); }} className="block w-full truncate rounded-md px-3 py-2 text-left hover:bg-white/[0.08] focus-visible:bg-white/[0.08] focus-visible:outline-none">{target.name}</button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <button type="button" role="menuitem" className={menuButtonClass}>
+                    <ArrowBendUpLeft size={15} weight="bold" className="shrink-0 text-zinc-200" />
+                    <span>Responder</span>
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => void copyMessage()} disabled={!message.content} className={`${menuButtonClass} disabled:opacity-40`}>
+                    <Copy size={15} weight="bold" className="shrink-0 text-zinc-200" />
+                    <span>Copiar</span>
+                  </button>
+                  <button type="button" role="menuitem" className={menuButtonClass}>
+                    <Smiley size={15} weight="bold" className="shrink-0 text-zinc-200" />
+                    <span>Reagir</span>
+                  </button>
+                  {message.content && (
+                    <button type="button" role="menuitem" onClick={() => setChoosingContact(true)} className={menuButtonClass}>
+                      <ArrowBendUpRight size={15} weight="bold" className="shrink-0 text-zinc-200" />
+                      <span>Encaminhar</span>
+                    </button>
+                  )}
+                  <button type="button" role="menuitem" className={menuButtonClass}>
+                    <PushPin size={15} weight="bold" className="shrink-0 text-zinc-200" />
+                    <span>Fixar</span>
+                  </button>
+                  <button type="button" role="menuitem" className={menuButtonClass}>
+                    <Sparkle size={15} weight="bold" className="shrink-0 text-zinc-200" />
+                    <span>Pergunte a Meta AI</span>
+                  </button>
+                  <button type="button" role="menuitem" className={menuButtonClass}>
+                    <Star size={15} weight="bold" className="shrink-0 text-zinc-200" />
+                    <span>Favoritar</span>
+                  </button>
+                  <div className="my-1 border-t border-white/10" />
+                  <button type="button" role="menuitem" className={menuButtonClass}>
+                    <WarningCircle size={15} weight="bold" className="shrink-0 text-zinc-200" />
+                    <span>Denunciar</span>
+                  </button>
+                  <button type="button" role="menuitem" className={menuButtonClass}>
+                    <Trash size={15} weight="bold" className="shrink-0 text-zinc-200" />
+                    <span>Apagar</span>
+                  </button>
+                  {copyError && <p role="alert" className="px-3 py-1 text-[11px] text-red-300">Não foi possível copiar</p>}
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>

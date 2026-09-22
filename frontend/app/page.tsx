@@ -18,6 +18,7 @@ export default function Home() {
 
       <ChatPanel
         contact={chat.selectedContact}
+        contacts={chat.contacts}
         messages={chat.messages}
         text={chat.text}
         sending={chat.sending}
@@ -29,6 +30,10 @@ export default function Home() {
         onSend={chat.sendMessage}
         onLoadOlderMessages={chat.loadOlderMessages}
         onReactToMessage={chat.reactToMessage}
+        onForwardMessage={(message, target) => {
+          chat.selectContact(target);
+          chat.setText(message.content);
+        }}
         onSendMedia={chat.sendMediaMessage}
         onCloseWithBot={chat.closeWithBot}
       />

@@ -8,12 +8,14 @@ import type { Contact, Message } from "@/types/chat";
 
 type MessageListProps = {
   contact: Contact;
+  contacts: Contact[];
   messages: Message[];
   hasOlderMessages: boolean;
   loadingOlderMessages: boolean;
   newMessageId: number | null;
   onLoadOlderMessages: () => Promise<void>;
   onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
+  onForwardMessage: (message: Message, target: Contact) => void;
 };
 
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
@@ -51,7 +53,7 @@ function dateLabel(value: string) {
 }
 
 // Posiciona mensagens recebidas à esquerda e enviadas à direita.
-export function MessageList({ contact, messages, hasOlderMessages, loadingOlderMessages, newMessageId, onLoadOlderMessages, onReactToMessage }: MessageListProps) {
+export function MessageList({ contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, onLoadOlderMessages, onReactToMessage, onForwardMessage }: MessageListProps) {
   const reduceMotion = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -149,8 +151,8 @@ export function MessageList({ contact, messages, hasOlderMessages, loadingOlderM
       >
         <div
           ref={contentRef}
-          className="flex min-h-full flex-col gap-3 p-5 pt-16"
-          style={{ paddingBottom: "max(10rem, calc(var(--chat-composer-height, 0px) + 1rem))" }}
+          className="flex min-h-full flex-col gap-2 px-5 py-4 pt-16"
+          style={{ paddingBottom: "max(7rem, calc(var(--chat-composer-height, 0px) + 0.75rem))" }}
         >
         {loadingOlderMessages && (
           <div className="flex justify-center py-1" role="status" aria-label="Carregando mensagens anteriores">
@@ -183,7 +185,7 @@ export function MessageList({ contact, messages, hasOlderMessages, loadingOlderM
               ease: [0.16, 1, 0.3, 1],
             }}
             style={{ transformOrigin: outgoing ? "bottom right" : "bottom left" }}
-            className="flex w-full flex-col gap-3"
+            className="flex w-full flex-col gap-2"
           >
             {label && (
               <div className="flex w-full items-center justify-center py-1" role="separator" aria-label={label}>
@@ -200,7 +202,7 @@ export function MessageList({ contact, messages, hasOlderMessages, loadingOlderM
               {!outgoing && <Avatar contact={contact} />}
 
               {/* O balão escolhe entre player de áudio e conteúdo textual. */}
-              <MessageBubble message={message} contact={contact} imageMessages={imageMessages} onReact={onReactToMessage} />
+              <MessageBubble message={message} contact={contact} contacts={contacts} imageMessages={imageMessages} onReact={onReactToMessage} onForwardMessage={onForwardMessage} />
             </div>
           </motion.div>
         );

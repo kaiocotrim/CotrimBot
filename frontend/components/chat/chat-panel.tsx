@@ -5,6 +5,7 @@ import type { Contact, Message } from "@/types/chat";
 
 type ChatPanelProps = {
   contact: Contact | null;
+  contacts: Contact[];
   messages: Message[];
   text: string;
   sending: boolean;
@@ -17,6 +18,7 @@ type ChatPanelProps = {
   onSend: () => void;
   onLoadOlderMessages: () => Promise<void>;
   onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
+  onForwardMessage: (message: Message, target: Contact) => void;
 
   // Envia arquivo + legenda opcional.
   onSendMedia: (
@@ -30,6 +32,7 @@ type ChatPanelProps = {
 // Agrupa todas as partes visuais da conversa selecionada.
 export function ChatPanel({
   contact,
+  contacts,
   messages,
   text,
   sending,
@@ -41,6 +44,7 @@ export function ChatPanel({
   onSend,
   onLoadOlderMessages,
   onReactToMessage,
+  onForwardMessage,
   onSendMedia,
   onCloseWithBot,
 }: ChatPanelProps) {
@@ -58,7 +62,7 @@ export function ChatPanel({
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/banner2.png')" }}
+        style={{ backgroundImage: "url('/teste.jpg')" }}
       />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-zinc-950/72" />
       <div
@@ -72,12 +76,14 @@ export function ChatPanel({
 
       <MessageList
         contact={contact}
+        contacts={contacts}
         messages={messages}
         hasOlderMessages={hasOlderMessages}
         loadingOlderMessages={loadingOlderMessages}
         newMessageId={newMessageId}
         onLoadOlderMessages={onLoadOlderMessages}
         onReactToMessage={onReactToMessage}
+        onForwardMessage={onForwardMessage}
       />
 
       <MessageComposer

@@ -55,8 +55,8 @@ function ComposerIcon({ name }: { name: ComposerIconName }) {
 }
 
 // Oculta a barra lateral, mantendo a rolagem por mouse, toque e teclado.
-const textClassName = "resize-none bg-transparent p-0 text-base leading-6 text-white outline-none placeholder:text-zinc-500 [overflow-wrap:anywhere] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
-const buttonClassName = "flex items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-700/70 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 disabled:text-zinc-500 motion-reduce:transition-none";
+const textClassName = "resize-none bg-transparent p-0 text-[13.5px] leading-6 font-normal text-white outline-none placeholder:text-zinc-400 [overflow-wrap:anywhere] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+const buttonClassName = "flex items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 disabled:text-zinc-500 motion-reduce:transition-none";
 
 export function MessageComposer({
   text,
@@ -245,12 +245,12 @@ export function MessageComposer({
   }, []);
 
   const naturalHeight = isLongTextCollapsed ? 136 : Math.max(112, Math.min(measurements.stacked, 144) + 72);
-  const fieldHeight = isFullscreen ? availableHeight : isStacked ? Math.min(naturalHeight, availableHeight) : 48;
+  const fieldHeight = isFullscreen ? availableHeight : isStacked ? Math.min(naturalHeight, availableHeight) : 44;
   const textHeight = isStacked ? Math.max(24, fieldHeight - 72) : 24;
-  const textLayout = { height: textHeight, top: isStacked ? 16 : 11, left: isStacked ? 16 : isFocused ? 92 : 52, width: isStacked ? "calc(100% - 64px)" : `calc(100% - ${isFocused ? 184 : showControls ? 144 : 68}px)` };
+  const textLayout = { height: textHeight, top: isStacked ? 16 : 10, left: isStacked ? 16 : isFocused ? 92 : 52, width: isStacked ? "calc(100% - 64px)" : `calc(100% - ${isFocused ? 184 : showControls ? 144 : 68}px)` };
 
   return (
-    <div ref={composerRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent px-4 pt-8 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
+    <div ref={composerRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent px-4 pt-5 pb-[max(2.125rem,env(safe-area-inset-bottom))] sm:px-5">
       <div className="pointer-events-auto mx-auto max-w-2xl">
         <form
           ref={formRef}
@@ -325,7 +325,7 @@ export function MessageComposer({
             animate={{ height: fieldHeight, marginRight: isStacked ? 0 : 56, borderTopLeftRadius: emojisOpen && !sending ? 0 : 24, borderTopRightRadius: emojisOpen && !sending ? 0 : 24 }}
             style={emojisOpen && !sending ? { borderTopWidth: 0, boxShadow: "inset 0 -1px 1px rgba(0,0,0,0.12), 0 4px 20px rgba(0,0,0,0.16)" } : undefined}
             transition={transition}
-            className={`relative overflow-hidden rounded-[24px] border bg-gradient-to-br from-white/[0.06] via-white/[0.015] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),inset_0_-1px_1px_rgba(0,0,0,0.12),0_4px_20px_rgba(0,0,0,0.16)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow] duration-250 motion-reduce:transition-none ${emojisOpen && !sending ? "border-[#2f2f33] bg-zinc-900/95" : isFocused ? "border-white/25 bg-zinc-800/85 ring-2 ring-white/5" : "border-white/10 bg-zinc-950/25"}`}
+            className={`relative overflow-hidden rounded-[24px] border bg-gradient-to-b from-white/[0.075] via-white/[0.03] to-white/[0.015] shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.22),0_6px_22px_rgba(0,0,0,0.2)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow] duration-250 motion-reduce:transition-none ${emojisOpen && !sending ? "border-white/15 bg-zinc-900/90" : isFocused ? "border-white/25 bg-zinc-900/65 ring-2 ring-white/[0.06]" : "border-white/12 bg-zinc-950/35"}`}
           >
             <AnimatePresence initial={false}>
               {isLongTextCollapsed && (
@@ -340,7 +340,7 @@ export function MessageComposer({
                     <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3h6l4 4v14H8z" /><path d="M14 3v5h4" /></svg>
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-zinc-100">{longTextPreview(text)}</span>
+                    <span className="block truncate text-sm font-medium text-zinc-100">{longTextPreview(text)}</span>
                     <button
                       ref={longTextTriggerRef}
                       type="button"
@@ -365,7 +365,7 @@ export function MessageComposer({
               animate={textLayout}
               transition={transition}
               onAnimationComplete={syncTextScroll}
-              className={`pointer-events-none absolute overflow-hidden p-0 text-base leading-6 whitespace-pre-wrap text-white [overflow-wrap:anywhere] ${isLongTextCollapsed ? "invisible" : ""}`}
+              className={`pointer-events-none absolute overflow-hidden p-0 text-[13.5px] leading-6 font-normal whitespace-pre-wrap text-white [overflow-wrap:anywhere] ${isLongTextCollapsed ? "invisible" : ""}`}
             >
               <EmojiText content={text ? `${text}\u200b` : ""} preserveMetrics />
             </motion.div>
@@ -420,18 +420,18 @@ export function MessageComposer({
                 }
               }}
               placeholder="Digite uma mensagem..."
-              className={`absolute caret-white placeholder:[-webkit-text-fill-color:#71717a] ${textClassName} ${isLongTextCollapsed ? "pointer-events-none invisible" : ""}`}
+              className={`absolute caret-white placeholder:[-webkit-text-fill-color:#a1a1aa] ${textClassName} ${isLongTextCollapsed ? "pointer-events-none invisible" : ""}`}
               style={{ color: "transparent", WebkitTextFillColor: "transparent", overflowY: isStacked && measurements.stacked > textHeight ? "auto" : "hidden" }}
             />
 
-            <motion.span initial={false} animate={{ opacity: showControls ? 0 : 1, scale: showControls ? 0.9 : 1 }} transition={transition} className="pointer-events-none absolute bottom-[13px] left-[14px] text-zinc-300">
+            <motion.span initial={false} animate={{ opacity: showControls ? 0 : 1, scale: showControls ? 0.9 : 1 }} transition={transition} className="pointer-events-none absolute bottom-3 left-[13px] text-zinc-300">
               <ComposerIcon name="message" />
             </motion.span>
             <motion.button
               ref={attachmentTriggerRef}
               type="button"
               initial={false}
-              animate={{ opacity: showControls ? 1 : 0, scale: showControls ? attachmentsOpen ? 0.96 : 1 : 0.9, rotate: reduceMotion ? 0 : attachmentsOpen ? 45 : 0, y: 0, bottom: isStacked ? 8 : 5, left: isStacked ? 8 : 6 }}
+              animate={{ opacity: showControls ? 1 : 0, scale: showControls ? attachmentsOpen ? 0.96 : 1 : 0.9, rotate: reduceMotion ? 0 : attachmentsOpen ? 45 : 0, y: 0, bottom: isStacked ? 8 : 6, left: isStacked ? 8 : 8 }}
               whileTap={reduceMotion || sending ? undefined : { scale: 0.86, backgroundColor: "rgba(63,63,70,0.8)", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.3)" }}
               transition={{ ...transition, scale: reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 22 } }}
               aria-label="Abrir anexos"
@@ -445,7 +445,7 @@ export function MessageComposer({
                 closeEmojis();
                 setAttachmentsOpen((current) => !current);
               }}
-              className={`absolute size-9 ${buttonClassName}`}
+              className={`absolute size-8 border border-white/10 bg-white/[0.035] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName}`}
               style={{ pointerEvents: showControls ? "auto" : "none", transformOrigin: "center" }}
             >
               <ComposerIcon name="plus" />
@@ -455,7 +455,7 @@ export function MessageComposer({
               ref={emojiTriggerRef}
               type="button"
               initial={false}
-              animate={{ opacity: isFocused ? 1 : 0, scale: isFocused ? 1 : 0.85, x: isFocused ? 0 : -8, bottom: isStacked ? 8 : 5, left: isStacked ? 48 : 46 }}
+              animate={{ opacity: isFocused ? 1 : 0, scale: isFocused ? 1 : 0.85, x: isFocused ? 0 : -8, bottom: isStacked ? 8 : 6, left: isStacked ? 48 : 46 }}
               transition={transition}
               aria-label="Abrir emojis"
               title="Abrir emojis"
@@ -469,7 +469,7 @@ export function MessageComposer({
                 closeAttachments();
                 setEmojisOpen((current) => !current);
               }}
-              className={`absolute size-9 ${buttonClassName}`}
+              className={`absolute size-8 border border-white/10 bg-white/[0.035] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName}`}
               style={{ pointerEvents: isFocused ? "auto" : "none" }}
             >
               <ComposerIcon name="sticker" />
@@ -480,8 +480,8 @@ export function MessageComposer({
               animate={{
                 opacity: text.trim() ? 1 : 0,
                 scale: text.trim() ? 1 : 0.75,
-                bottom: isStacked ? 8 : 5,
-                right: isStacked ? 92 : 46,
+                bottom: isStacked ? 8 : 6,
+                right: isStacked ? 92 : 48,
               }}
               transition={transition}
               whileHover={reduceMotion || rewriting ? undefined : { scale: 1.06 }}
@@ -492,7 +492,7 @@ export function MessageComposer({
               tabIndex={text.trim() ? 0 : -1}
               disabled={!text.trim() || rewriting || sending}
               onClick={() => void handleRewrite()}
-              className="group absolute flex size-9 items-center justify-center rounded-full text-violet-300 transition-colors hover:text-violet-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400 disabled:opacity-60"
+              className="group absolute flex size-8 items-center justify-center rounded-full text-violet-300 transition-colors hover:text-violet-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400 disabled:opacity-60"
               style={{ pointerEvents: text.trim() ? "auto" : "none", filter: text.trim() ? "drop-shadow(0 0 7px rgba(167,139,250,0.7))" : undefined }}
             >
               {rewriting ? (
@@ -517,7 +517,7 @@ export function MessageComposer({
             <motion.button
               type="button"
               initial={false}
-              animate={{ opacity: showControls ? 1 : 0, scale: showControls ? 1 : 0.9, bottom: isStacked ? 8 : 5, right: isStacked ? 52 : 6 }}
+              animate={{ opacity: showControls ? 1 : 0, scale: showControls ? 1 : 0.9, bottom: isStacked ? 8 : 6, right: isStacked ? 52 : 8 }}
               transition={transition}
               aria-label="Gravar áudio"
               title="Gravar áudio"
@@ -525,7 +525,7 @@ export function MessageComposer({
               tabIndex={showControls ? 0 : -1}
               disabled={!showControls || sending}
               onClick={() => console.log("Gravar áudio")}
-              className={`absolute size-9 border border-white/10 bg-zinc-800/90 ${buttonClassName}`}
+              className={`absolute size-8 border border-white/10 bg-white/[0.035] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName}`}
               style={{ pointerEvents: showControls ? "auto" : "none" }}
             >
               <ComposerIcon name="mic" />
@@ -558,7 +558,7 @@ export function MessageComposer({
             ref={sendButtonRef}
             type="submit"
             initial={false}
-            animate={{ width: isStacked ? 36 : 48, height: isStacked ? 36 : 48, right: isStacked ? 8 : 0, bottom: isStacked ? 8 : 0 }}
+            animate={{ width: isStacked ? 36 : 44, height: isStacked ? 36 : 44, right: isStacked ? 8 : 0, bottom: isStacked ? 8 : 0 }}
             transition={transition}
             disabled={sending || (!text.trim() && !pendingFile)}
             aria-busy={sending}

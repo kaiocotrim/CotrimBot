@@ -295,7 +295,7 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
         >
           <div className="overflow-hidden">
             {transcription && (
-              <p className="mt-2 cursor-text whitespace-pre-wrap rounded-2xl bg-black/20 px-3.5 py-3 text-[14px] leading-[1.5] text-white/85">
+              <p className="mt-2 cursor-text whitespace-pre-wrap rounded-2xl bg-black/20 px-3.5 py-3 text-[13.5px] leading-[1.4] font-normal text-white/85">
                 {transcription}
               </p>
             )}

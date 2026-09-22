@@ -12,7 +12,7 @@ export function VideoMessage({ mediaUrl, content }: VideoMessageProps) {
         controls
         preload="metadata"
         src={mediaUrl}
-        className="max-h-[420px] max-w-full rounded-xl"
+        className="max-h-[320px] max-w-full rounded-xl"
         aria-label="Vídeo da mensagem"
       >
         Seu navegador não suporta reprodução de vídeo.
