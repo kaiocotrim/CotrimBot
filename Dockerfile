@@ -2,11 +2,10 @@ FROM node:22-bookworm-slim AS build
 
 WORKDIR /app
 
-COPY frontend/package*.json ./frontend/
-RUN cd frontend && npm ci
-
-COPY backend/package*.json ./backend/
-RUN cd backend && npm ci
+COPY package.json package-lock.json turbo.json ./
+COPY frontend/package.json ./frontend/package.json
+COPY backend/package.json ./backend/package.json
+RUN npm ci
 
 COPY frontend ./frontend
 COPY backend ./backend
@@ -14,21 +13,25 @@ COPY backend ./backend
 ARG NEXT_PUBLIC_API_URL=/api
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
-RUN cd frontend && npm run build
-RUN cd backend && DATABASE_URL=mysql://build:build@localhost:3306/build npm run prisma:generate
-RUN cd backend && npm run build
+RUN DATABASE_URL=mysql://build:build@localhost:3306/build npm run prisma:generate
+RUN npm run build
 
 FROM node:22-bookworm-slim AS production
 
 ENV NODE_ENV=production
-WORKDIR /app/backend
+WORKDIR /app
 
-COPY backend/package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+COPY package.json package-lock.json ./
+COPY frontend/package.json ./frontend/package.json
+COPY backend/package.json ./backend/package.json
+RUN npm ci --omit=dev --workspace=@cotrimbot/backend --include-workspace-root=false \
+    && npm cache clean --force
 
-COPY --from=build /app/backend/dist ./dist
+COPY --from=build /app/backend/dist /app/backend/dist
 COPY --from=build /app/frontend/out /app/frontend/out
 
-EXPOSE 3000
+WORKDIR /app/backend
+
+EXPOSE 3333
 
 CMD ["npm", "start"]

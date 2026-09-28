@@ -2,6 +2,7 @@
 .vscode
 **/node_modules
 **/.next
+**/.turbo
 **/out
 **/dist
 **/generated

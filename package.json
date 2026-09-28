@@ -1,0 +1,23 @@
+{
+  "name": "cotrimbot-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "prisma:generate": "npm run prisma:generate --workspace=@cotrimbot/backend",
+    "prisma:migrate": "npm run prisma:migrate --workspace=@cotrimbot/backend"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.8"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "npm@11.6.2"
+}

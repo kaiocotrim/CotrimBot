@@ -1,13 +1,9 @@
-import dotenv from "dotenv";
+import "./config/env.js";
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "path";
-
-// Usa o mesmo .env da raiz em desenvolvimento; no Docker as variáveis já são
-// injetadas pelo Compose.
-dotenv.config({ path: "../.env" });
 
 import { setSocketServer } from "./lib/socket.js";
 import { prisma } from "./lib/prisma.js";

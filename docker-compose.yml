@@ -19,6 +19,13 @@ services:
     env_file:
       - .env
 
+    # Dentro do Docker, os serviços são acessados pelos nomes do Compose.
+    environment:
+      DATABASE_URL: mysql://${DATABASE_USER}:${DATABASE_PASSWORD}@mysql:3306/${DATABASE_NAME}
+      DATABASE_HOST: mysql
+      DATABASE_PORT: "3306"
+      EVOLUTION_API_URL: http://evolution-api:8080
+
   # Banco principal do CotrimBot
   mysql:
     image: mysql:8.4
