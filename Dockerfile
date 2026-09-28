@@ -1,34 +1,36 @@
-FROM node:22-bookworm-slim AS build
+FROM node:22
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    openssl \
+    nano \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY package.json package-lock.json turbo.json ./
-COPY frontend/package.json ./frontend/package.json
-COPY backend/package.json ./backend/package.json
-RUN npm ci
+ENV TZ=America/Sao_Paulo
 
-COPY frontend ./frontend
-COPY backend ./backend
+# 1. Copiar apenas os arquivos package.json e turbo.json
+COPY package.json turbo.json ./
+COPY frontend/package.json ./frontend/
+COPY backend/package.json ./backend/
 
-ARG NEXT_PUBLIC_API_URL=/api
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+# 2. Remover qualquer lockfile ou .npmrc residual e limpar o cache
+RUN find /app -name ".npmrc" -delete || true \
+    && rm -f /app/package-lock.json \
+    && npm cache clean --force \
+    && npm config set registry https://registry.npmjs.org --global \
+    && echo "registry=https://registry.npmjs.org/" > .npmrc  
 
+# 3. Instalar do zero baixando as dependências nativas para Linux x64
+RUN npm install
+
+# 4. Copiar o restante dos arquivos do projeto
+COPY . .
+
+# 5. Gerar o Prisma e fazer o build com o Turbo
 RUN DATABASE_URL=mysql://build:build@localhost:3306/build npm run prisma:generate
 RUN npm run build
-
-FROM node:22-bookworm-slim AS production
-
-ENV NODE_ENV=production
-WORKDIR /app
-
-COPY package.json package-lock.json ./
-COPY frontend/package.json ./frontend/package.json
-COPY backend/package.json ./backend/package.json
-RUN npm ci --omit=dev --workspace=@cotrimbot/backend --include-workspace-root=false \
-    && npm cache clean --force
-
-COPY --from=build /app/backend/dist /app/backend/dist
-COPY --from=build /app/frontend/out /app/frontend/out
 
 WORKDIR /app/backend
 
