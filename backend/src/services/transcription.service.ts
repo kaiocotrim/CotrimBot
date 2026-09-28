@@ -9,6 +9,11 @@ type PythonTranscriptionResponse = {
   language?: string;
 };
 
+// Aponta para o serviço interno do Compose em produção; fallback para dev local fora do Docker.
+const TRANSCRIPTION_SERVICE_URL =
+  process.env.TRANSCRIPTION_SERVICE_URL ??
+  "http://localhost:5000";
+
 export async function transcribeAudio({
   base64,
   mimetype,
@@ -44,7 +49,7 @@ export async function transcribeAudio({
 
   // Envia o áudio para nosso FastAPI.
   const response = await fetch(
-    "http://localhost:5000/transcribe",
+    `${TRANSCRIPTION_SERVICE_URL}/transcribe`,
     {
       method: "POST",
       body: formData,
@@ -77,10 +82,6 @@ export type TranscriptionSettings = {
   vad_filter: boolean;
   language: string;
 };
-
-const TRANSCRIPTION_SERVICE_URL =
-  "http://localhost:5000";
-
 
 export async function getTranscriptionSettings(): Promise<TranscriptionSettings> {
   const response = await fetch(

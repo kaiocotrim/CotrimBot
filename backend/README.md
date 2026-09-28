@@ -58,9 +58,11 @@ a configuração ESM/NodeNext do projeto.
 ## Serviços e upload
 
 O frontend usa `http://localhost:3000`, o backend usa a porta `3333` e
-o microserviço Python de transcrição deve responder em `http://localhost:5000`.
-Os serviços da Evolution usam `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` e
-`EVOLUTION_INSTANCE` do ambiente.
+o microserviço Python de transcrição deve responder em `http://localhost:5000`
+localmente. A URL é lida de `TRANSCRIPTION_SERVICE_URL`; em produção
+(docker-compose) ela aponta para `http://transcription:5000`, o hostname do
+serviço no Compose. Os serviços da Evolution usam `EVOLUTION_API_URL`,
+`EVOLUTION_API_KEY` e `EVOLUTION_INSTANCE` do ambiente.
 
 `POST /contacts/:id/send-media` recebe um arquivo no campo `file` de uma
 requisição `multipart/form-data`, com `caption` opcional. Atualmente, o controller
