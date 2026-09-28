@@ -4,6 +4,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: cotrimbot-app
     restart: unless-stopped
 
@@ -12,21 +14,10 @@ services:
       - evolution-api
 
     ports:
-      - "3333:3333"
+      - "${APP_PORT}:${APP_PORT}"
 
     env_file:
       - .env
-
-    # environment:
-    #   PORT: "3333"
-    #   DATABASE_URL: mysql://cotrimbot:cotrimbot123@mysql:3306/cotrimbot
-    #   DATABASE_HOST: mysql
-    #   DATABASE_PORT: "3306"
-    #   DATABASE_USER: cotrimbot
-    #   DATABASE_PASSWORD: cotrimbot123
-    #   DATABASE_NAME: cotrimbot
-    #   EVOLUTION_API_URL: http://evolution-api:8080
-    #   EVOLUTION_API_KEY: cotrimbot-dev-key
 
   # Banco principal do CotrimBot
   mysql:
@@ -35,13 +26,13 @@ services:
     restart: unless-stopped
 
     environment:
-      MYSQL_ROOT_PASSWORD: root123
-      MYSQL_DATABASE: cotrimbot
-      MYSQL_USER: cotrimbot
-      MYSQL_PASSWORD: cotrimbot123
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DATABASE_NAME}
+      MYSQL_USER: ${DATABASE_USER}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD}
 
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT}:3306"
 
     volumes:
       - mysql_data:/var/lib/mysql
@@ -53,12 +44,12 @@ services:
     restart: unless-stopped
 
     environment:
-      POSTGRES_USER: evolution
-      POSTGRES_PASSWORD: evolution123
-      POSTGRES_DB: evolution
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
 
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -70,7 +61,7 @@ services:
     restart: unless-stopped
 
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
 
     volumes:
       - redis_data:/data
@@ -86,14 +77,14 @@ services:
       - redis
 
     ports:
-      - "8090:8080"
+      - "${EVOLUTION_PORT}:8080"
 
     environment:
-      SERVER_URL: http://localhost:8090
+      SERVER_URL: http://localhost:${EVOLUTION_PORT}
       SERVER_DISABLE_MANAGER: "false"
 
       DATABASE_PROVIDER: postgresql
-      DATABASE_CONNECTION_URI: postgresql://evolution:evolution123@postgres:5432/evolution
+      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       DATABASE_CONNECTION_CLIENT_NAME: evolution
 
       CACHE_REDIS_ENABLED: "true"
@@ -101,11 +92,11 @@ services:
       CACHE_REDIS_PREFIX_KEY: evolution
       CACHE_REDIS_SAVE_INSTANCES: "true"
 
-      AUTHENTICATION_API_KEY: cotrimbot-dev-key
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
 
       # A Evolution e o CotrimBot se comunicam pela rede interna do Compose.
       WEBHOOK_GLOBAL_ENABLED: "true"
-      WEBHOOK_GLOBAL_URL: http://cotrimbot:3333/api/webhook/whatsapp
+      WEBHOOK_GLOBAL_URL: http://cotrimbot:${APP_PORT}/api/webhook/whatsapp
       WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS: "false"
       WEBHOOK_EVENTS_MESSAGES_UPSERT: "true"
       WEBHOOK_EVENTS_SEND_MESSAGE: "true"

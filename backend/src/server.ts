@@ -1,9 +1,13 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "path";
+
+// Usa o mesmo .env da raiz em desenvolvimento; no Docker as variáveis já são
+// injetadas pelo Compose.
+dotenv.config({ path: "../.env" });
 
 import { setSocketServer } from "./lib/socket.js";
 import { prisma } from "./lib/prisma.js";
@@ -70,8 +74,10 @@ io.on("connection", (socket) => {
   });
 });
 
-// Aponta para a pasta 'out' do seu projeto Next.js
-const nextBuildPath = path.join(__dirname, (process.env.NODE_ENV === 'production' ? '/app/frontend/out/index.html' : '../../../frontend/out')); // Ajuste o caminho relativo
+// Aponta para a pasta exportada pelo Next.js.
+const nextBuildPath = process.env.NODE_ENV === "production"
+  ? "/app/frontend/out"
+  : path.join(__dirname, "../../../frontend/out");
 
 // Serve os arquivos estáticos (CSS, JS, imagens)
 app.use(express.static(nextBuildPath));

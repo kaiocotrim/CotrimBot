@@ -11,6 +11,9 @@ RUN cd backend && npm ci
 COPY frontend ./frontend
 COPY backend ./backend
 
+ARG NEXT_PUBLIC_API_URL=/api
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
 RUN cd frontend && npm run build
 RUN cd backend && DATABASE_URL=mysql://build:build@localhost:3306/build npm run prisma:generate
 RUN cd backend && npm run build
