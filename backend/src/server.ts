@@ -71,7 +71,7 @@ io.on("connection", (socket) => {
 });
 
 // Aponta para a pasta 'out' do seu projeto Next.js
-const nextBuildPath = path.join(__dirname, '../../../frontend/out'); // Ajuste o caminho relativo
+const nextBuildPath = path.join(__dirname, (process.env.NODE_ENV === 'production' ? '/app/frontend/out/index.html' : '../../../frontend/out')); // Ajuste o caminho relativo
 
 // Serve os arquivos estáticos (CSS, JS, imagens)
 app.use(express.static(nextBuildPath));
