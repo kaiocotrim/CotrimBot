@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   closeConversationWithBot,
+  getContactAvatar,
   getContacts,
   getMessages,
   markMessagesAsRead,
@@ -31,6 +32,7 @@ export function useChat() {
     useState<Contact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(true);
   const [contactsError, setContactsError] = useState<string | null>(null);
+  const avatarRequestsRef = useRef<Set<number>>(new Set());
 
   const [selectedContact, setSelectedContact] =
     useState<Contact | null>(null);
@@ -291,6 +293,27 @@ export function useChat() {
       socket.disconnect();
     };
   }, []);
+
+  // As fotos chegam em segundo plano e nunca bloqueiam a lista de conversas.
+  useEffect(() => {
+    for (const contact of contacts) {
+      if (contact.profilePictureUrl || avatarRequestsRef.current.has(contact.id)) continue;
+
+      avatarRequestsRef.current.add(contact.id);
+      void getContactAvatar(contact.id)
+        .then((avatar) => {
+          if (!avatar.profilePictureUrl) return;
+          setContacts((current) => current.map((item) =>
+            item.id === contact.id
+              ? { ...item, profilePictureUrl: avatar.profilePictureUrl }
+              : item
+          ));
+        })
+        .catch(() => {
+          // Uma foto ausente não deve atrasar nem interromper o chat.
+        });
+    }
+  }, [contacts]);
 
 
   // =========================================================

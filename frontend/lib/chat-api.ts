@@ -12,7 +12,7 @@ async function parseResponse<T>(response: Response, errorMessage: string) {
   return (await response.json()) as T;
 }
 
-async function getAvatar(contactId: number) {
+export async function getContactAvatar(contactId: number) {
   const response = await fetch(`${API_URL}/contacts/${contactId}/avatar`);
   return parseResponse<ContactAvatar>(response, "Erro ao buscar avatar");
 }
@@ -20,20 +20,7 @@ async function getAvatar(contactId: number) {
 // Busca os contatos e adiciona o avatar quando ele estiver disponível.
 export async function getContacts(): Promise<Contact[]> {
   const response = await fetch(`${API_URL}/contacts`);
-  const contacts = await parseResponse<Contact[]>(response, "Erro ao buscar contatos");
-
-  return Promise.all(
-    contacts.map(async (contact) => {
-      if (contact.profilePictureUrl) return contact;
-      try {
-        const avatar = await getAvatar(contact.id);
-        return { ...contact, profilePictureUrl: avatar.profilePictureUrl };
-      } catch {
-        // Uma foto ausente não deve impedir a exibição do contato.
-        return contact;
-      }
-    })
-  );
+  return parseResponse<Contact[]>(response, "Erro ao buscar contatos");
 }
 
 export async function getMessages(contactId: number, before?: number): Promise<MessagesPage> {
