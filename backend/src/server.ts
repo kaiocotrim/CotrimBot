@@ -76,9 +76,9 @@ const nextBuildPath = process.env.NODE_ENV === "production"
   : path.join(__dirname, "../../../frontend/out");
 
 // O export estático do Next gera login.html; atende as duas formas da URL.
-app.get(/^\/login\/?$/, (_req, res) => {
-  res.sendFile(path.join(nextBuildPath, "login.html"));
-});
+// app.get(/^\/login\/?$/, (_req, res) => {
+//   res.sendFile(path.join(nextBuildPath, "login.html"));
+// });
 
 // Serve os arquivos estáticos (CSS, JS, imagens)
 app.use(express.static(nextBuildPath));
