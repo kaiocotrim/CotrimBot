@@ -1,0 +1,9 @@
+.git
+.vscode
+**/node_modules
+**/.next
+**/out
+**/dist
+**/generated
+**/.env*
+frontend/public/Install Termius.exe

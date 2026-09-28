@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Message } from "@/types/chat";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 export function MessageSenderAvatar({ message }: { message: Message }) {
   const [pictureUrl, setPictureUrl] = useState(message.senderProfilePictureUrl);
