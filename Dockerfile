@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package.json package-lock.json turbo.json ./
 COPY frontend/package.json ./frontend/package.json
 COPY backend/package.json ./backend/package.json
-RUN npm ci
+RUN npm i
 
 COPY frontend ./frontend
 COPY backend ./backend
@@ -24,7 +24,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY frontend/package.json ./frontend/package.json
 COPY backend/package.json ./backend/package.json
-RUN npm ci --omit=dev --workspace=@cotrimbot/backend --include-workspace-root=false \
+RUN npm i --omit=dev --workspace=@cotrimbot/backend --include-workspace-root=false \
     && npm cache clean --force
 
 COPY --from=build /app/backend/dist /app/backend/dist
