@@ -155,9 +155,10 @@ export async function whatsappWebhook(req: Request, res: Response) {
     ? participantJid.replace("@s.whatsapp.net", "").replace("@lid", "")
     : null;
   const senderName = isGroup && !fromMe ? data.pushName || senderPhone || "Participante" : null;
+  const reportedMessageType = String(data.messageType ?? data.type ?? body.messageType ?? "").toLowerCase();
 
   // Tipo da mensagem que será salvo no banco.
-  let messageType: "TEXT" | "AUDIO" | "IMAGE" | "VIDEO" | "DOCUMENT";
+  let messageType: "TEXT" | "AUDIO" | "IMAGE" | "STICKER" | "VIDEO" | "DOCUMENT";
 
   // Conteúdo exibido no CotrimBot.
   let content: string;
@@ -187,6 +188,10 @@ export async function whatsappWebhook(req: Request, res: Response) {
     );
   }
   // Imagem: usa a legenda quando disponível.
+  else if (data.message?.stickerMessage || reportedMessageType.includes("sticker")) {
+    messageType = "STICKER";
+    content = "[Figurinha]";
+  }
   else if (data.message?.imageMessage) {
     messageType = "IMAGE";
     content = data.message.imageMessage.caption || "[Imagem]";

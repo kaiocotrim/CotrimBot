@@ -36,7 +36,7 @@ export type Message = {
   direction: "INCOMING" | "OUTGOING";
 
   // Define como o conteúdo será renderizado: texto, áudio ou outra mídia.
-  type: "TEXT" | "AUDIO" | "IMAGE" | "VIDEO" | "DOCUMENT";
+  type: "TEXT" | "AUDIO" | "IMAGE" | "STICKER" | "VIDEO" | "DOCUMENT";
 
   // Contato ao qual a mensagem pertence.
   contactId: number;

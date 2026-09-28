@@ -19,6 +19,7 @@ import { AudioMessage } from "@/components/chat/audio-message";
 import { DocumentMessage } from "@/components/chat/document-message";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { ImageMessage } from "@/components/chat/image-message";
+import { StickerMessage } from "@/components/chat/sticker-message";
 import { TextMessage } from "@/components/chat/text-message";
 import { VideoMessage } from "@/components/chat/video-message";
 import type { Contact, Message } from "@/types/chat";
@@ -67,6 +68,7 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
   const outgoing = message.direction === "OUTGOING";
   const isAudio = message.type === "AUDIO";
   const isImage = message.type === "IMAGE";
+  const isSticker = message.type === "STICKER";
   const imageHasCaption = isImage && message.content !== "[Imagem]";
   const mediaUrl = `${API_URL}/messages/${message.id}/media`;
   const createdAt = new Date(message.createdAt);
@@ -99,6 +101,8 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
         />;
       case "VIDEO":
         return <VideoMessage mediaUrl={mediaUrl} content={message.content} />;
+      case "STICKER":
+        return <StickerMessage mediaUrl={mediaUrl} />;
       case "DOCUMENT":
         return <DocumentMessage mediaUrl={mediaUrl} content={message.content} />;
       default:
@@ -217,7 +221,9 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
     <div
       ref={bubbleRef}
       className={`group/message relative min-w-0 max-w-[min(62%,620px)] text-[13.5px] leading-[1.4] font-normal text-white [overflow-wrap:anywhere] ${message.reaction ? "mb-3" : ""} ${
-        isAudio
+        isSticker
+          ? "overflow-visible bg-transparent p-0"
+          : isAudio
           ? "relative w-[min(380px,62vw)] overflow-visible rounded-[24px] border border-white/15 bg-gradient-to-br from-white/[0.09] via-zinc-900/95 to-zinc-950/95 px-3.5 py-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_10px_30px_rgba(0,0,0,0.2)] backdrop-blur-xl"
           : isImage
             ? `rounded-[18px] p-[3px] shadow-[0_3px_12px_rgba(0,0,0,0.16)] ${outgoing ? "bg-green-600" : "bg-zinc-800"}`
@@ -352,7 +358,7 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
         content
       )}
       {!inlineTime && timestamp && (
-        <div className={`flex items-center justify-end gap-0.5 ${isImage && !imageHasCaption ? "absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-1 shadow-sm backdrop-blur-[2px]" : isImage ? "px-2 pt-0.5 pb-1" : isAudio ? "mt-2" : "mt-1"}`}>
+        <div className={`flex items-center justify-end gap-0.5 ${isSticker ? "absolute right-1 bottom-1 rounded-md bg-black/55 px-1.5 py-1 shadow-sm backdrop-blur-sm" : isImage && !imageHasCaption ? "absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-1 shadow-sm backdrop-blur-[2px]" : isImage ? "px-2 pt-0.5 pb-1" : isAudio ? "mt-2" : "mt-1"}`}>
           {timestamp}
           {readReceipt}
         </div>

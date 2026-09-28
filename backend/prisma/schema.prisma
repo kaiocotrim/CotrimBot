@@ -45,6 +45,7 @@ enum MessageDirection {
 enum MessageType {
   TEXT
   IMAGE
+  STICKER
   VIDEO
   AUDIO
   DOCUMENT
