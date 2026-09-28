@@ -12,6 +12,7 @@ services:
     depends_on:
       - mysql
       - evolution-api
+      - transcription
 
     ports:
       - "${APP_PORT}:${APP_PORT}"
@@ -25,6 +26,7 @@ services:
       DATABASE_HOST: mysql
       DATABASE_PORT: "3306"
       EVOLUTION_API_URL: http://evolution-api:8080
+      TRANSCRIPTION_SERVICE_URL: http://transcription:5000
 
   # Banco principal do CotrimBot
   mysql:
@@ -111,8 +113,21 @@ services:
     volumes:
       - evolution_instances:/evolution/instances
 
+  # Microserviço de transcrição de áudio (faster-whisper)
+  transcription:
+    build:
+      context: ./transcription-service
+      dockerfile: Dockerfile
+    container_name: cotrimbot-transcription
+    restart: unless-stopped
+
+    # Sem porta publicada: só o container cotrimbot acessa via rede interna do Compose.
+    volumes:
+      - whisper_models:/root/.cache/huggingface
+
 volumes:
   mysql_data:
   postgres_data:
   redis_data:
   evolution_instances:
+  whisper_models:
