@@ -35,6 +35,9 @@ app.use("/api", webhookRoutes);
 app.use("/api", transcriptionRouter);
 app.use("/api", aiRouter);
 
+// Compatibilidade com instalações da Evolution que ainda usam a URL antiga.
+app.use(webhookRoutes);
+
 // Cria o servidor HTTP que será compartilhado
 // pelo Express e pelo Socket.IO.
 const httpServer = createServer(app);
