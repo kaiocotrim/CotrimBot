@@ -26,6 +26,6 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/backend/dist ./dist
 COPY --from=build /app/frontend/out /app/frontend/out
 
-EXPOSE 3333
+EXPOSE 3000
 
 CMD ["npm", "start"]

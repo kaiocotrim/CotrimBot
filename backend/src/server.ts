@@ -79,11 +79,13 @@ app.get(/(.*)/, (req, res) => {
   res.sendFile(path.join(nextBuildPath, 'index.html'));
 });
 
-// Inicia o servidor HTTP na porta 3333.
+// No Dokploy, PORT define a porta; localmente usamos 3333.
 // Express e Socket.IO usam essa mesma porta.
-httpServer.listen(3333, () => {
+const port = Number(process.env.PORT ?? 3333);
+
+httpServer.listen(port, () => {
   console.log(
-    "Servidor rodando em http://localhost:3333"
+    `Servidor rodando em http://localhost:${port}`
   );
 
   void getAllGroups()
