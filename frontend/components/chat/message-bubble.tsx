@@ -36,7 +36,7 @@ const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:3333";
+  "http://localhost:3333/api";
 
 const messageTimeFormatter = new Intl.DateTimeFormat("pt-BR", {
   hour: "2-digit",

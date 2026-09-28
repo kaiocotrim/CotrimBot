@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import path from "path";
 
 import { setSocketServer } from "./lib/socket.js";
 import { prisma } from "./lib/prisma.js";
@@ -28,11 +29,11 @@ app.use(
 app.use(express.json());
 
 // Registra as rotas da aplicação.
-app.use(contactRouter);
-app.use(messageRouter);
-app.use(webhookRoutes);
-app.use(transcriptionRouter);
-app.use(aiRouter);
+app.use("/api", contactRouter);
+app.use("/api", messageRouter);
+app.use("/api", webhookRoutes);
+app.use("/api", transcriptionRouter);
+app.use("/api", aiRouter);
 
 // Cria o servidor HTTP que será compartilhado
 // pelo Express e pelo Socket.IO.
@@ -64,6 +65,18 @@ io.on("connection", (socket) => {
       socket.id
     );
   });
+});
+
+// Aponta para a pasta 'out' do seu projeto Next.js
+const nextBuildPath = path.join(__dirname, '../../../frontend/out'); // Ajuste o caminho relativo
+
+// Serve os arquivos estáticos (CSS, JS, imagens)
+app.use(express.static(nextBuildPath));
+
+// 3. Rota catch-all para Express 5+
+// Use '(.*)' em vez de '*'
+app.get(/(.*)/, (req, res) => {
+  res.sendFile(path.join(nextBuildPath, 'index.html'));
 });
 
 // Inicia o servidor HTTP na porta 3333.

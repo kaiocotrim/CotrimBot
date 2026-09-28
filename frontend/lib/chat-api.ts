@@ -1,6 +1,6 @@
 import type { Contact, ContactAvatar, Message, MessagesPage } from "@/types/chat";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333/api";
 
 // Centraliza o tratamento padrão das respostas do backend.
 async function parseResponse<T>(response: Response, errorMessage: string) {
