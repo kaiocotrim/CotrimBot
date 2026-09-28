@@ -4,6 +4,31 @@ import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { getGroupInfo } from "../services/evolution.service.js";
 
+// Impede que sincronizações da Evolution repovoem o banco com o histórico antigo.
+// Mantemos uma pequena tolerância para mensagens que estavam em trânsito no reinício.
+const webhookStartedAt = Date.now();
+const messageGracePeriodMs = 60_000;
+
+function getMessageTimestamp(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value > 1_000_000_000_000 ? value : value * 1000;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed)
+      ? parsed > 1_000_000_000_000 ? parsed : parsed * 1000
+      : null;
+  }
+
+  if (value && typeof value === "object" && "low" in value) {
+    const low = Number((value as { low: unknown }).low);
+    return Number.isFinite(low) ? low * 1000 : null;
+  }
+
+  return null;
+}
+
 export async function whatsappWebhook(req: Request, res: Response) {
   const body = req.body;
 
@@ -55,6 +80,15 @@ export async function whatsappWebhook(req: Request, res: Response) {
   }
 
   const data = body.data;
+
+  const messageTimestamp = getMessageTimestamp(data?.messageTimestamp);
+  if (
+    messageTimestamp !== null &&
+    messageTimestamp < webhookStartedAt - messageGracePeriodMs
+  ) {
+    console.log("Mensagem antiga ignorada durante sincronização.");
+    return res.status(200).json({ received: true });
+  }
 
   const remoteJid = data.key?.remoteJid;
   const remoteJidAlt = data.key?.remoteJidAlt;
