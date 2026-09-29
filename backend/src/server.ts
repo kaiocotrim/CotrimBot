@@ -26,7 +26,7 @@ app.use(
 );
 
 // Converte JSON recebido para req.body.
-app.use(express.json({ limit: "100mb" }));
+app.use(express.json({ limit: "250mb" }));
 
 // Registra as rotas da aplicação.
 app.use("/api", contactRouter);
