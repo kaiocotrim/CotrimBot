@@ -13,27 +13,27 @@ async function parseResponse<T>(response: Response, errorMessage: string) {
 }
 
 export async function getContactAvatar(contactId: number) {
-  const response = await fetch(`${API_URL}/contacts/${contactId}/avatar`);
+  const response = await fetch(`${API_URL}/contacts/${contactId}/avatar`, { credentials: "include" });
   return parseResponse<ContactAvatar>(response, "Erro ao buscar avatar");
 }
 
 // Busca os contatos e adiciona o avatar quando ele estiver disponível.
 export async function getContacts(): Promise<Contact[]> {
-  const response = await fetch(`${API_URL}/contacts`);
+  const response = await fetch(`${API_URL}/contacts`, { credentials: "include" });
   return parseResponse<Contact[]>(response, "Erro ao buscar contatos");
 }
 
 export async function getMessages(contactId: number, before?: number): Promise<MessagesPage> {
   const params = new URLSearchParams({ limit: "30" });
   if (before) params.set("before", String(before));
-  const response = await fetch(`${API_URL}/contacts/${contactId}/messages?${params}`);
+  const response = await fetch(`${API_URL}/contacts/${contactId}/messages?${params}`, { credentials: "include" });
   return parseResponse<MessagesPage>(response, "Erro ao buscar mensagens");
 }
 
 export async function transcribeMessage(messageId: number) {
   const response = await fetch(
     `${API_URL}/messages/${messageId}/transcribe`,
-    { method: "POST" }
+    { method: "POST", credentials: "include" }
   );
 
   return parseResponse<{ messageId: number; transcription: string }>(
@@ -47,6 +47,7 @@ export async function reactToMessage(messageId: number, reaction: string): Promi
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reaction }),
+    credentials: "include",
   });
   return parseResponse<Message>(response, "Erro ao reagir à mensagem");
 }
@@ -55,7 +56,7 @@ export async function reactToMessage(messageId: number, reaction: string): Promi
 export async function markMessagesAsRead(contactId: number): Promise<void> {
   const response = await fetch(
     `${API_URL}/contacts/${contactId}/messages/read`,
-    { method: "PATCH" }
+    { method: "PATCH", credentials: "include" }
   );
 
   if (!response.ok) {
@@ -68,6 +69,7 @@ export async function setContactArchived(contactId: number, archived: boolean): 
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ archived }),
+    credentials: "include",
   });
   return parseResponse<Contact>(response, "Erro ao alterar arquivamento");
 }
@@ -77,6 +79,7 @@ export async function postMessage(contactId: number, text: string, clientId?: st
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, clientId, private: isPrivate }),
+    credentials: "include",
   });
 
   return parseResponse<{ message: Message }>(response, "Erro ao enviar mensagem");
@@ -87,6 +90,7 @@ export async function rewriteMessage(text: string): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
+    credentials: "include",
   });
 
   const result = await parseResponse<{ text: string }>(response, "Erro ao reformular a mensagem");
@@ -97,7 +101,7 @@ export async function rewriteMessage(text: string): Promise<string> {
 export async function closeConversationWithBot(contactId: number) {
   const response = await fetch(
     `${API_URL}/contacts/${contactId}/close-with-bot`,
-    { method: "POST" }
+    { method: "POST", credentials: "include" }
   );
 
   return parseResponse(response, "Erro ao encerrar chamado com o bot");
@@ -126,6 +130,7 @@ export async function sendMedia(
     {
       method: "POST",
       body: formData,
+      credentials: "include",
     }
   );
 

@@ -10,7 +10,7 @@ export type TranscriptionSettings = {
 };
 
 export async function getTranscriptionSettings(): Promise<TranscriptionSettings> {
-  const response = await fetch(`${API_URL}/transcription/settings`, { cache: "no-store" });
+  const response = await fetch(`${API_URL}/transcription/settings`, { cache: "no-store", credentials: "include" });
   if (!response.ok) throw new Error("Não foi possível carregar as configurações.");
   return response.json();
 }
@@ -20,6 +20,7 @@ export async function updateTranscriptionSettings(settings: TranscriptionSetting
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(settings),
+    credentials: "include",
   });
   if (!response.ok) throw new Error("Não foi possível alterar o modelo. Tente novamente.");
 }

@@ -1,4 +1,48 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { authClient, useSession } from "@/lib/auth-client";
+
 export default function LoginPage() {
+  const router = useRouter();
+  const { data: session, isPending } = useSession();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isPending && session) {
+      router.replace("/");
+    }
+  }, [isPending, session, router]);
+
+  async function handleSubmit() {
+    if (!email || !password) {
+      setError("Preencha e-mail e senha.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const { error: signInError } = await authClient.signIn.email({ email, password });
+
+    setLoading(false);
+
+    if (signInError) {
+      setError("E-mail ou senha inválidos.");
+      return;
+    }
+
+    router.replace("/");
+  }
+
+  async function handleGoogleSignIn() {
+    await authClient.signIn.social({ provider: "google", callbackURL: "/" });
+  }
+
   return (
     <main className="relative isolate min-h-dvh overflow-x-clip bg-black font-sans text-[#ededed] selection:bg-[#03f183]/25 selection:text-white">
       {/* Decorative conversations follow the reference's four tilted columns. */}
@@ -170,16 +214,15 @@ export default function LoginPage() {
             Suas conversas<br />— no CotrimBot
           </h1>
 
-          {/* Presentation only: no form submission, handlers, or auth integration. */}
           <div role="group" aria-label="Acesso ao CotrimBot" className="space-y-4">
             <div className="grid grid-cols-3 gap-3">
-              <button type="button" aria-label="Continuar com Google" className="flex h-12 w-full cursor-pointer items-center justify-center rounded-full border border-black/10 bg-white px-5 text-black transition-colors hover:bg-white/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#b5e8cb] motion-reduce:transition-none">
+              <button type="button" aria-label="Continuar com Google" onClick={handleGoogleSignIn} className="flex h-12 w-full cursor-pointer items-center justify-center rounded-full border border-black/10 bg-white px-5 text-black transition-colors hover:bg-white/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#b5e8cb] motion-reduce:transition-none">
                 <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="size-5"><path d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.89-1.74 2.98-4.3 2.98-7.36Z" /><path d="M12 22c2.7 0 4.96-.9 6.62-2.41l-3.24-2.51c-.9.6-2.05.96-3.38.96-2.6 0-4.81-1.76-5.6-4.12H3.06v2.59A10 10 0 0 0 12 22Z" /><path d="M6.4 13.92a6 6 0 0 1 0-3.84V7.49H3.06a10 10 0 0 0 0 9.02l3.34-2.59Z" /><path d="M12 5.96c1.47 0 2.79.5 3.82 1.5l2.87-2.87A9.6 9.6 0 0 0 12 2a10 10 0 0 0-8.94 5.49l3.34 2.59C7.19 7.72 9.4 5.96 12 5.96Z" /></svg>
               </button>
-              <button type="button" aria-label="Continuar com Apple" className="flex h-12 w-full cursor-pointer items-center justify-center rounded-full border border-black/10 bg-white px-5 text-black transition-colors hover:bg-white/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#b5e8cb] motion-reduce:transition-none">
+              <button type="button" disabled aria-label="Continuar com Apple (em breve)" className="flex h-12 w-full cursor-not-allowed items-center justify-center rounded-full border border-black/10 bg-white/60 px-5 text-black/40 motion-reduce:transition-none">
                 <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="size-5"><path d="M17.05 12.54c.03 3.18 2.79 4.24 2.82 4.25-.02.08-.44 1.51-1.45 2.99-.88 1.28-1.79 2.56-3.23 2.59-1.42.03-1.88-.84-3.51-.84-1.62 0-2.13.81-3.48.87-1.39.05-2.45-1.39-3.34-2.67-1.81-2.62-3.19-7.4-1.33-10.63a5.18 5.18 0 0 1 4.37-2.65c1.37-.03 2.66.93 3.5.93.83 0 2.4-1.15 4.05-.98.69.03 2.63.28 3.88 2.11-.1.06-2.32 1.35-2.28 4.03ZM14.38 4.67c.74-.9 1.25-2.15 1.11-3.4-1.07.04-2.36.71-3.13 1.61-.69.8-1.3 2.07-1.14 3.3 1.19.1 2.41-.62 3.16-1.51Z" /></svg>
               </button>
-              <button type="button" aria-label="Continuar com X" className="flex h-12 w-full cursor-pointer items-center justify-center rounded-full border border-black/10 bg-white px-5 text-black transition-colors hover:bg-white/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#b5e8cb] motion-reduce:transition-none">
+              <button type="button" disabled aria-label="Continuar com X (em breve)" className="flex h-12 w-full cursor-not-allowed items-center justify-center rounded-full border border-black/10 bg-white/60 px-5 text-black/40 motion-reduce:transition-none">
                 <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="size-5"><path d="M18.9 2H22l-6.77 7.74L23.2 22h-6.24l-4.89-7.4L5.6 22H2.47l7.98-9.13L2.8 2h6.4l4.43 6.77L18.9 2Zm-1.1 18h1.73L8.25 3.9H6.39L17.8 20Z" /></svg>
               </button>
             </div>
@@ -192,15 +235,47 @@ export default function LoginPage() {
 
             <div>
               <label htmlFor="login-email" className="sr-only">Endereço de e-mail</label>
-              <input id="login-email" name="email" type="email" autoComplete="email" autoCapitalize="none" spellCheck={false} placeholder="Endereço de e-mail" className="h-12 w-full rounded-2xl border border-[#ededed]/10 bg-[#ededed]/6 px-5 text-base text-[#ededed] caret-[#b5e8cb] backdrop-blur-xl transition-colors outline-none placeholder:text-[#ededed]/40 focus:border-[#ededed]/30 focus:bg-[#ededed]/8 motion-reduce:transition-none" />
+              <input
+                id="login-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder="Endereço de e-mail"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="h-12 w-full rounded-2xl border border-[#ededed]/10 bg-[#ededed]/6 px-5 text-base text-[#ededed] caret-[#b5e8cb] backdrop-blur-xl transition-colors outline-none placeholder:text-[#ededed]/40 focus:border-[#ededed]/30 focus:bg-[#ededed]/8 motion-reduce:transition-none"
+              />
             </div>
 
             <div>
               <label htmlFor="login-password" className="sr-only">Senha</label>
-              <input id="login-password" name="password" type="password" autoComplete="current-password" placeholder="Senha" className="h-12 w-full rounded-2xl border border-[#ededed]/10 bg-[#ededed]/6 px-5 text-base text-[#ededed] caret-[#b5e8cb] backdrop-blur-xl transition-colors outline-none placeholder:text-[#ededed]/40 focus:border-[#ededed]/30 focus:bg-[#ededed]/8 motion-reduce:transition-none" />
+              <input
+                id="login-password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                placeholder="Senha"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Enter") void handleSubmit(); }}
+                className="h-12 w-full rounded-2xl border border-[#ededed]/10 bg-[#ededed]/6 px-5 text-base text-[#ededed] caret-[#b5e8cb] backdrop-blur-xl transition-colors outline-none placeholder:text-[#ededed]/40 focus:border-[#ededed]/30 focus:bg-[#ededed]/8 motion-reduce:transition-none"
+              />
             </div>
 
-            <button type="button" className="flex h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[#ededed]/15 px-5 text-base font-semibold text-[#ededed]/55 backdrop-blur-xl transition-colors hover:bg-[#ededed]/20 hover:text-[#ededed]/80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#b5e8cb] motion-reduce:transition-none">Continuar</button>
+            {error && (
+              <p role="alert" className="text-center text-xs text-red-400">{error}</p>
+            )}
+
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void handleSubmit()}
+              className="flex h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[#ededed]/15 px-5 text-base font-semibold text-[#ededed]/55 backdrop-blur-xl transition-colors hover:bg-[#ededed]/20 hover:text-[#ededed]/80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#b5e8cb] motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? "Entrando..." : "Continuar"}
+            </button>
           </div>
 
           <p className="mt-5 text-center text-[11px] leading-relaxed text-[#ededed]/40 sm:text-xs">

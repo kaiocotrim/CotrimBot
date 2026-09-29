@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/src/server.js",
     "prisma:generate": "prisma generate --config prisma.config.ts",
-    "prisma:migrate": "prisma migrate dev --config prisma.config.ts"
+    "prisma:migrate": "prisma migrate dev --config prisma.config.ts",
+    "prisma:seed": "tsx prisma/seed.ts"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -22,9 +23,11 @@
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.10.0",
     "@prisma/client": "^7.10.0",
+    "better-auth": "^1.7.6",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "lucide-react": "^1.48.0",
     "multer": "^2.4.0",
     "socket.io": "^4.8.3"
   }

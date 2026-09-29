@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Avatar } from "@/components/chat/avatar";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
+import { authClient } from "@/lib/auth-client";
 import type { Contact } from "@/types/chat";
 
 type ContactSidebarProps = { contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onArchiveContact: (contact: Contact, archived: boolean) => Promise<void> };
@@ -28,6 +29,7 @@ function formatSidebarDate(value: string) {
 export function ContactSidebar({ contacts, loading, error, selectedContactId, onSelectContact, onArchiveContact }: ContactSidebarProps) {
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const archivedCount = contacts.filter((contact) => contact.archived).length;
   const visibleContacts = useMemo(() => {
     const search = query.trim().toLocaleLowerCase("pt-BR");
@@ -47,15 +49,29 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
           <div className="flex items-center justify-between">
             <h1 className="text-[23px] font-semibold leading-none tracking-tight text-zinc-50">CotrimBot</h1>
             <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                aria-label="Mais opções"
-                className="flex size-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100 active:scale-95"
-              >
-                <svg className="size-[18px]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" />
-                </svg>
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  aria-label="Mais opções"
+                  onClick={() => setShowMenu((current) => !current)}
+                  className="flex size-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100 active:scale-95"
+                >
+                  <svg className="size-[18px]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" />
+                  </svg>
+                </button>
+                {showMenu && (
+                  <div className="absolute top-full left-0 z-10 mt-1 w-40 overflow-hidden rounded-lg border border-white/10 bg-zinc-900 py-1 shadow-xl">
+                    <button
+                      type="button"
+                      onClick={() => authClient.signOut({ fetchOptions: { onSuccess: () => { window.location.href = "/login"; } } })}
+                      className="flex w-full items-center px-3 py-2 text-left text-[13px] text-zinc-200 transition-colors hover:bg-white/[0.06]"
+                    >
+                      Sair
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
                 type="button"
                 aria-label="Nova conversa"

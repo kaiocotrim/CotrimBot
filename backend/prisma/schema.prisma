@@ -8,33 +8,52 @@ datasource db {
 }
 
 model Contact {
-  id        Int       @id @default(autoincrement())
-  name      String
-  phone     String    @unique
-  isGroup   Boolean   @default(false)
-  archived  Boolean   @default(false)
-  profilePictureUrl String? @db.Text
-  messages  Message[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                Int       @id @default(autoincrement())
+  name              String
+  phone             String    @unique
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  isGroup           Boolean   @default(false)
+  archived          Boolean   @default(false)
+  profilePictureUrl String?   @db.Text
+  whatsappLid       String?   @unique
+  muted             Boolean   @default(false)
+  favorited         Boolean   @default(false)
+  blocked           Boolean   @default(false)
+  ephemeralSeconds  Int?
+  advancedPrivacy   Boolean   @default(false)
+  chatTheme         String    @default("default") @db.VarChar(32)
+  listName          String?   @db.VarChar(64)
+  messages          Message[]
 }
 
 model Message {
-  id         Int              @id @default(autoincrement())
-  externalId String           @unique
-  content    String           @db.Text
-  direction  MessageDirection
-  type       MessageType      @default(TEXT)
+  id                      Int              @id @default(autoincrement())
+  content                 String           @db.Text
+  direction               MessageDirection
+  contactId               Int
+  createdAt               DateTime         @default(now())
+  externalId              String           @unique
+  readAt                  DateTime?
+  type                    MessageType      @default(TEXT)
+  reaction                String?          @db.VarChar(16)
+  senderName              String?
+  senderPhone             String?          @db.VarChar(64)
+  senderProfilePictureUrl String?          @db.Text
+  private                 Boolean          @default(false)
+  pinned                  Boolean          @default(false)
+  favorited               Boolean          @default(false)
+  quotedExternalId        String?
+  quotedMessageId         Int?
+  quotedContent           String?          @db.Text
+  quotedSenderName        String?
+  contact                 Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  quotedMessage           Message?         @relation("MessageToMessage", fields: [quotedMessageId], references: [id])
+  quotedByMessages        Message[]        @relation("MessageToMessage")
 
-  contactId Int
-  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime  @default(now())
-  readAt    DateTime?
-  reaction  String?          @db.VarChar(16)
-  senderName String?         @db.VarChar(191)
-  senderPhone String?        @db.VarChar(64)
-  senderProfilePictureUrl String? @db.Text
+  @@index([contactId], map: "Message_contactId_fkey")
+  @@index([quotedExternalId])
+  @@index([quotedMessageId])
 }
 
 enum MessageDirection {
@@ -51,3 +70,56 @@ enum MessageType {
   DOCUMENT
 }
 
+// Tabelas exigidas pelo Better Auth (https://www.better-auth.com/docs/adapters/prisma).
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions Session[]
+  accounts Account[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?  @db.Text
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Verification {
+  id         String    @id @default(cuid())
+  identifier String
+  value      String    @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
+}

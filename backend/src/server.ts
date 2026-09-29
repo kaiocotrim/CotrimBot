@@ -4,9 +4,12 @@ import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "path";
+import { toNodeHandler } from "better-auth/node";
 
 import { setSocketServer } from "./lib/socket.js";
 import { prisma } from "./lib/prisma.js";
+import { auth } from "./lib/auth.js";
+import { requireAuth } from "./middlewares/auth.middleware.js";
 import { getAllGroups } from "./services/evolution.service.js";
 
 import { contactRouter } from "./routes/contact.routes.js";
@@ -21,19 +24,23 @@ export const app = express();
 // Permite que o frontend do CotrimBot acesse o backend.
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: process.env.FRONTEND_URL ?? "http://localhost:3000",
+    credentials: true,
   })
 );
+
+// O Better Auth precisa do corpo bruto da requisição; registrar antes do express.json().
+app.all("/api/auth/*splat", toNodeHandler(auth));
 
 // Converte JSON recebido para req.body.
 app.use(express.json({ limit: "250mb" }));
 
 // Registra as rotas da aplicação.
-app.use("/api", contactRouter);
-app.use("/api", messageRouter);
 app.use("/api", webhookRoutes);
-app.use("/api", transcriptionRouter);
-app.use("/api", aiRouter);
+app.use("/api", requireAuth, contactRouter);
+app.use("/api", requireAuth, messageRouter);
+app.use("/api", requireAuth, transcriptionRouter);
+app.use("/api", requireAuth, aiRouter);
 
 // Compatibilidade com instalações da Evolution que ainda usam a URL antiga.
 app.use(webhookRoutes);

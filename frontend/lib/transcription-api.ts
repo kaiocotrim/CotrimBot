@@ -11,7 +11,8 @@ export type TranscriptionSettings = {
 
 export async function getTranscriptionSettings(): Promise<TranscriptionSettings> {
   const response = await fetch(
-    `${API_URL}/transcription/settings`
+    `${API_URL}/transcription/settings`,
+    { credentials: "include" }
   );
 
   if (!response.ok) {
@@ -36,6 +37,7 @@ export async function updateTranscriptionSettings(
       },
 
       body: JSON.stringify(settings),
+      credentials: "include",
     }
   );
 

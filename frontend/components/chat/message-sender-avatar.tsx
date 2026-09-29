@@ -11,7 +11,7 @@ export function MessageSenderAvatar({ message }: { message: Message }) {
   useEffect(() => {
     if (pictureUrl || !message.senderPhone) return;
     let active = true;
-    fetch(`${API_URL}/messages/${message.id}/sender-avatar`)
+    fetch(`${API_URL}/messages/${message.id}/sender-avatar`, { credentials: "include" })
       .then((response) => response.ok ? response.json() as Promise<{ profilePictureUrl: string | null }> : null)
       .then((result) => {
         if (active && result?.profilePictureUrl) setPictureUrl(result.profilePictureUrl);

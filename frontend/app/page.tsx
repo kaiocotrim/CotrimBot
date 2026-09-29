@@ -1,12 +1,31 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ContactSidebar } from "@/components/chat/contact-sidebar";
 import { useChat } from "@/hooks/use-chat";
+import { useSession } from "@/lib/auth-client";
 
 // A página apenas conecta o estado da conversa aos componentes visuais.
 export default function Home() {
+  const router = useRouter();
+  const { data: session, isPending } = useSession();
   const chat = useChat();
+
+  useEffect(() => {
+    if (!isPending && !session) {
+      router.replace("/login");
+    }
+  }, [isPending, session, router]);
+
+  if (isPending || !session) {
+    return (
+      <main className="flex h-dvh items-center justify-center bg-zinc-950 text-white">
+        <p className="text-sm text-zinc-400">Carregando...</p>
+      </main>
+    );
+  }
 
   return (
     <main className="flex h-dvh overflow-hidden bg-zinc-950 text-white">
@@ -40,3 +59,4 @@ export default function Home() {
     </main>
   );
 }
+
