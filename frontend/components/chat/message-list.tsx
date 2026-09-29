@@ -65,7 +65,10 @@ export function MessageList({ contact, contacts, messages, hasOlderMessages, loa
   const nearBottomRef = useRef(true);
   const prependAnchorRef = useRef<{ height: number; top: number; firstMessageId: number | null } | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const imageMessages = useMemo(() => messages.filter((message) => message.type === "IMAGE"), [messages]);
+  const mediaMessages = useMemo(
+    () => messages.filter((message) => message.type === "IMAGE" || message.type === "VIDEO"),
+    [messages],
+  );
 
   function updateScrollState() {
     const element = scrollRef.current;
@@ -213,7 +216,7 @@ export function MessageList({ contact, contacts, messages, hasOlderMessages, loa
                 : <Avatar contact={contact} />)}
 
               {/* O balão escolhe entre player de áudio e conteúdo textual. */}
-              <MessageBubble message={message} contact={contact} contacts={contacts} imageMessages={imageMessages} onReact={onReactToMessage} onForwardMessage={onForwardMessage} />
+              <MessageBubble message={message} contact={contact} contacts={contacts} mediaMessages={mediaMessages} onReact={onReactToMessage} onForwardMessage={onForwardMessage} />
             </div>
           </motion.div>
         );

@@ -28,7 +28,7 @@ type MessageBubbleProps = {
   message: Message;
   contact: Contact;
   contacts: Contact[];
-  imageMessages: Message[];
+  mediaMessages: Message[];
   onReact: (messageId: number, reaction: string) => Promise<void>;
   onForwardMessage: (message: Message, target: Contact) => void;
 };
@@ -53,7 +53,7 @@ const messageDateFormatter = new Intl.DateTimeFormat("pt-BR", {
 });
 
 // Mantém o estilo do balão e delega o conteúdo ao componente de cada tipo.
-export function MessageBubble({ message, contact, contacts, imageMessages, onReact, onForwardMessage }: MessageBubbleProps) {
+export function MessageBubble({ message, contact, contacts, mediaMessages, onReact, onForwardMessage }: MessageBubbleProps) {
   const [reacting, setReacting] = useState(false);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -69,6 +69,7 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
   const isPrivate = Boolean(message.private);
   const isAudio = message.type === "AUDIO";
   const isImage = message.type === "IMAGE";
+  const isVideo = message.type === "VIDEO";
   const isSticker = message.type === "STICKER";
   const imageHasCaption = isImage && message.content !== "[Imagem]";
   const mediaUrl = `${API_URL}/messages/${message.id}/media`;
@@ -93,7 +94,7 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
           content={message.content}
           contact={contact}
           createdAt={message.createdAt}
-          gallery={imageMessages.map((image) => ({
+          gallery={mediaMessages.filter((media) => media.type === "IMAGE").map((image) => ({
             id: image.id,
             mediaUrl: `${API_URL}/messages/${image.id}/media`,
             content: image.content,
@@ -101,7 +102,20 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
           }))}
         />;
       case "VIDEO":
-        return <VideoMessage mediaUrl={mediaUrl} content={message.content} />;
+        return <VideoMessage
+          messageId={message.id}
+          mediaUrl={mediaUrl}
+          content={message.content}
+          contact={contact}
+          createdAt={message.createdAt}
+          gallery={mediaMessages.map((media) => ({
+            id: media.id,
+            type: media.type as "IMAGE" | "VIDEO",
+            mediaUrl: `${API_URL}/messages/${media.id}/media`,
+            content: media.content,
+            createdAt: media.createdAt,
+          }))}
+        />;
       case "STICKER":
         return <StickerMessage mediaUrl={mediaUrl} />;
       case "DOCUMENT":
@@ -234,6 +248,8 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
           ? "overflow-visible bg-transparent p-0"
           : isAudio
           ? "relative w-[min(380px,62vw)] overflow-visible rounded-[24px] border border-white/15 bg-gradient-to-br from-white/[0.09] via-zinc-900/95 to-zinc-950/95 px-3.5 py-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_10px_30px_rgba(0,0,0,0.2)] backdrop-blur-xl"
+          : isVideo
+            ? `rounded-[20px] p-[3px] shadow-[0_3px_12px_rgba(0,0,0,0.16)] ${outgoing ? "bg-green-600" : "bg-zinc-800"}`
           : isImage
             ? `rounded-[18px] p-[3px] shadow-[0_3px_12px_rgba(0,0,0,0.16)] ${outgoing ? "bg-green-600" : "bg-zinc-800"}`
             : `rounded-[24px] px-3.5 py-2.5 ${outgoing ? "bg-green-600" : "bg-zinc-800"}`
@@ -246,7 +262,7 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
         </div>
       )}
       {contact.isGroup && !outgoing && message.senderName && (
-        <p className={`${isImage ? "px-2 pt-1.5" : "mb-1"} pr-5 text-[11px] font-semibold leading-tight text-emerald-300`}>
+        <p className={`${isImage || isVideo ? "px-3 pt-2 pb-2" : "mb-1"} pr-5 text-[11px] font-semibold leading-tight text-emerald-300`}>
           {message.senderName}
         </p>
       )}
@@ -373,7 +389,7 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
         content
       )}
       {!inlineTime && timestamp && (
-        <div className={`flex items-center justify-end gap-0.5 ${isSticker ? "absolute right-1 bottom-1 rounded-md bg-black/55 px-1.5 py-1 shadow-sm backdrop-blur-sm" : isImage && !imageHasCaption ? "absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-1 shadow-sm backdrop-blur-[2px]" : isImage ? "px-2 pt-0.5 pb-1" : isAudio ? "mt-2" : "mt-1"}`}>
+        <div className={`flex items-center justify-end gap-0.5 ${isSticker ? "absolute right-1 bottom-1 rounded-md bg-black/55 px-1.5 py-1 shadow-sm backdrop-blur-sm" : (isImage && !imageHasCaption) || (isVideo && message.content === "[Vídeo]") ? "absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-1 shadow-sm backdrop-blur-[2px]" : isImage || isVideo ? "px-2 pt-0.5 pb-1" : isAudio ? "mt-2" : "mt-1"}`}>
           {timestamp}
           {readReceipt}
         </div>
