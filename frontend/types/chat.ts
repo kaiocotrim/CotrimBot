@@ -38,6 +38,9 @@ export type Message = {
   // Define como o conteúdo será renderizado: texto, áudio ou outra mídia.
   type: "TEXT" | "AUDIO" | "IMAGE" | "STICKER" | "VIDEO" | "DOCUMENT";
 
+  // Observação interna visível apenas no CotrimBot.
+  private?: boolean;
+
   // Contato ao qual a mensagem pertence.
   contactId: number;
 
@@ -52,6 +55,14 @@ export type Message = {
   senderName: string | null;
   senderPhone: string | null;
   senderProfilePictureUrl: string | null;
+
+  // Estado local usado enquanto um encaminhamento acontece em segundo plano.
+  // Mensagens vindas da API não precisam preencher este campo.
+  deliveryStatus?: "sending" | "sent" | "failed";
+
+  // Mantém a mesma identidade visual entre a criação otimista e a
+  // confirmação recebida da API/WebSocket.
+  clientId?: string;
 };
 
 export type MessagesPage = {

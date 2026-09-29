@@ -93,6 +93,7 @@ app.get(/(.*)/, (req, res) => {
 // Express e Socket.IO usam essa mesma porta.
 const port = Number(process.env.PORT ?? 3333);
 
+
 httpServer.listen(port, () => {
   console.log(
     `Servidor rodando em http://localhost:${port}`

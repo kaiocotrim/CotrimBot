@@ -66,6 +66,7 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
   const bubbleRef = useRef<HTMLDivElement>(null);
   const [reactionPosition, setReactionPosition] = useState({ top: 0, left: 0 });
   const outgoing = message.direction === "OUTGOING";
+  const isPrivate = Boolean(message.private);
   const isAudio = message.type === "AUDIO";
   const isImage = message.type === "IMAGE";
   const isSticker = message.type === "STICKER";
@@ -114,19 +115,25 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
     <time
       dateTime={message.createdAt}
       title={messageDateFormatter.format(createdAt)}
-      className="shrink-0 select-none text-[10px] leading-none font-normal tabular-nums text-white/55"
+      className={`shrink-0 select-none text-[10px] leading-none font-normal tabular-nums ${isPrivate ? "text-amber-800/70" : "text-white/55"}`}
     >
       {messageTimeFormatter.format(createdAt)}
     </time>
   ) : null;
 
   const readReceipt = outgoing ? (
-    <span className={message.readAt ? "text-sky-300" : "text-white/50"} title={message.readAt ? "Visualizada" : "Enviada"} aria-label={message.readAt ? "Mensagem visualizada" : "Mensagem enviada"}>
-      <svg className="h-3 w-[17px]" viewBox="0 0 18 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="m1 6 3 3 6-7" />
-        <path d="m7 8 2 2 8-8" />
-      </svg>
-    </span>
+    message.deliveryStatus === "failed" ? (
+      <span className="text-red-200" title="Mensagem não enviada" aria-label="Mensagem não enviada">
+        <WarningCircle size={14} weight="fill" aria-hidden="true" />
+      </span>
+    ) : (
+      <span className={message.readAt ? "text-sky-300" : "text-white/50"} title={message.readAt ? "Visualizada" : "Enviada"} aria-label={message.readAt ? "Mensagem visualizada" : "Mensagem enviada"}>
+        <svg className="h-3 w-[17px]" viewBox="0 0 18 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="m1 6 3 3 6-7" />
+          <path d="m7 8 2 2 8-8" />
+        </svg>
+      </span>
+    )
   ) : null;
 
   useEffect(() => {
@@ -220,8 +227,10 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
   return (
     <div
       ref={bubbleRef}
-      className={`group/message relative min-w-0 max-w-[min(62%,620px)] text-[13.5px] leading-[1.4] font-normal text-white [overflow-wrap:anywhere] ${message.reaction ? "mb-3" : ""} ${
-        isSticker
+      className={`group/message relative min-w-0 max-w-[min(62%,620px)] text-[13.5px] leading-[1.4] font-normal [overflow-wrap:anywhere] ${isPrivate ? "text-amber-950" : "text-white"} ${message.reaction ? "mb-3" : ""} ${
+        isPrivate
+          ? "rounded-[24px] bg-amber-100 px-3.5 py-2.5 shadow-[0_4px_16px_rgba(120,83,15,0.12)]"
+          : isSticker
           ? "overflow-visible bg-transparent p-0"
           : isAudio
           ? "relative w-[min(380px,62vw)] overflow-visible rounded-[24px] border border-white/15 bg-gradient-to-br from-white/[0.09] via-zinc-900/95 to-zinc-950/95 px-3.5 py-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_10px_30px_rgba(0,0,0,0.2)] backdrop-blur-xl"
@@ -230,6 +239,12 @@ export function MessageBubble({ message, contact, contacts, imageMessages, onRea
             : `rounded-[24px] px-3.5 py-2.5 ${outgoing ? "bg-green-600" : "bg-zinc-800"}`
       }`}
     >
+      {isPrivate && (
+        <div className="mb-1 flex items-center gap-1 text-[10px] font-semibold tracking-wide text-amber-700">
+          <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
+          <span>Privado</span>
+        </div>
+      )}
       {contact.isGroup && !outgoing && message.senderName && (
         <p className={`${isImage ? "px-2 pt-1.5" : "mb-1"} pr-5 text-[11px] font-semibold leading-tight text-emerald-300`}>
           {message.senderName}

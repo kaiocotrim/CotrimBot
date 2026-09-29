@@ -19,5 +19,8 @@
   "engines": {
     "node": ">=22"
   },
-  "packageManager": "npm@11.6.2"
+  "packageManager": "npm@11.6.2",
+  "dependencies": {
+    "lucide-react": "^1.48.0"
+  }
 }

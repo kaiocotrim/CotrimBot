@@ -40,6 +40,8 @@ export function useChat() {
 
   const [messages, setMessages] =
     useState<Message[]>([]);
+  const forwardedMessagesRef = useRef<Map<number, Message[]>>(new Map());
+  const nextOptimisticIdRef = useRef(-1);
 
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
@@ -94,6 +96,18 @@ export function useChat() {
         setNewMessageId(data.message.id);
         setMessages(
           (currentMessages) => {
+            const optimisticIndex = data.message.clientId
+              ? currentMessages.findIndex((message) => message.clientId === data.message.clientId)
+              : -1;
+
+            if (optimisticIndex >= 0) {
+              return currentMessages.map((message, index) =>
+                index === optimisticIndex
+                  ? { ...data.message, clientId: message.clientId }
+                  : message
+              );
+            }
+
             // Verifica se essa mensagem
             // já está aparecendo na tela.
             const alreadyExists =
@@ -372,7 +386,13 @@ export function useChat() {
     )
       .then((page) => {
         if (active) {
-          setMessages(page.messages);
+          const localMessages = forwardedMessagesRef.current.get(selectedContact.id) ?? [];
+          const persistedExternalIds = new Set(page.messages.map((message) => message.externalId));
+          const unpersistedLocalMessages = localMessages.filter(
+            (message) => !persistedExternalIds.has(message.externalId)
+          );
+          forwardedMessagesRef.current.set(selectedContact.id, unpersistedLocalMessages);
+          setMessages([...page.messages, ...unpersistedLocalMessages]);
           setHasOlderMessages(page.hasMore);
         }
 
@@ -465,42 +485,163 @@ export function useChat() {
   // ENVIAR MENSAGEM DE TEXTO
   // =========================================================
 
-  async function sendMessage() {
+  function sendMessage(isPrivate = false) {
     const content =
       text.trim();
+    const contact = selectedContact;
 
     if (
-      !selectedContact ||
+      !contact ||
       !content ||
       sending
     ) {
       return;
     }
 
-    try {
-      setSending(true);
+    const optimisticId = nextOptimisticIdRef.current--;
+    const optimisticMessage: Message = {
+      id: optimisticId,
+      externalId: `sending:${optimisticId}`,
+      content,
+      direction: "OUTGOING",
+      type: "TEXT",
+      contactId: contact.id,
+      createdAt: new Date().toISOString(),
+      readAt: null,
+      reaction: null,
+      senderName: null,
+      senderPhone: null,
+      senderProfilePictureUrl: null,
+      deliveryStatus: "sent",
+      clientId: `sending:${optimisticId}`,
+      private: isPrivate,
+    };
 
-      // Envia a mensagem
-      // para o backend.
-      await postMessage(
-        selectedContact.id,
-        content
-      );
+    const localMessages = forwardedMessagesRef.current.get(contact.id) ?? [];
+    forwardedMessagesRef.current.set(contact.id, [...localMessages, optimisticMessage]);
+    setText("");
+    setMessages((current) => [...current, optimisticMessage]);
+    setNewMessageId(optimisticId);
+    setContacts((current) => {
+      const existingContact = current.find((item) => item.id === contact.id) ?? contact;
+      const updatedContact = { ...existingContact, messages: [optimisticMessage] };
+      return [updatedContact, ...current.filter((item) => item.id !== contact.id)];
+    });
 
-      // O Socket.IO será responsável
-      // por adicionar a mensagem
-      // ao histórico.
-      setText("");
+    void postMessage(contact.id, content, optimisticMessage.clientId, isPrivate)
+      .then(({ message }) => {
+        const confirmedMessage = { ...message, clientId: optimisticMessage.clientId };
+        const replaceOptimistic = (items: Message[]) => {
+          const withoutOptimistic = items.filter((item) => item.id !== optimisticId);
+          return withoutOptimistic.some((item) => item.externalId === confirmedMessage.externalId)
+            ? withoutOptimistic
+            : [...withoutOptimistic, confirmedMessage];
+        };
+        const currentLocal = forwardedMessagesRef.current.get(contact.id) ?? [];
+        forwardedMessagesRef.current.set(contact.id, replaceOptimistic(currentLocal));
+        if (selectedContactIdRef.current === contact.id) {
+          setMessages(replaceOptimistic);
+          setNewMessageId(confirmedMessage.id);
+        }
+        setContacts((current) => current.map((item) =>
+          item.id === contact.id ? { ...item, messages: [confirmedMessage] } : item
+        ));
+      })
+      .catch((error) => {
+        console.error("Erro ao enviar mensagem:", error);
+        const markAsFailed = (items: Message[]) => items.map((item) =>
+          item.id === optimisticId ? { ...item, deliveryStatus: "failed" as const } : item
+        );
+        const currentLocal = forwardedMessagesRef.current.get(contact.id) ?? [];
+        forwardedMessagesRef.current.set(contact.id, markAsFailed(currentLocal));
+        if (selectedContactIdRef.current === contact.id) setMessages(markAsFailed);
+        setContacts((current) => current.map((item) =>
+          item.id === contact.id
+            ? { ...item, messages: item.messages?.map((message) => message.id === optimisticId ? { ...message, deliveryStatus: "failed" as const } : message) }
+            : item
+        ));
+      });
+  }
 
-    } catch (error) {
-      console.error(
-        "Erro ao enviar mensagem:",
-        error
-      );
+  // Exibe o encaminhamento no destino antes de esperar a API. A mensagem local
+  // é reconciliada com o registro definitivo retornado pelo backend.
+  function forwardMessage(sourceMessage: Message, target: Contact) {
+    const content = sourceMessage.content.trim();
+    if (!content) return;
 
-    } finally {
-      setSending(false);
-    }
+    const optimisticId = nextOptimisticIdRef.current--;
+    const optimisticMessage: Message = {
+      id: optimisticId,
+      externalId: `forwarding:${optimisticId}`,
+      content,
+      direction: "OUTGOING",
+      type: "TEXT",
+      contactId: target.id,
+      createdAt: new Date().toISOString(),
+      readAt: null,
+      reaction: null,
+      senderName: null,
+      senderPhone: null,
+      senderProfilePictureUrl: null,
+      // A interface assume sucesso imediatamente; a API confirma em segundo
+      // plano e somente uma falha altera o estado visível da mensagem.
+      deliveryStatus: "sent",
+      clientId: `forwarding:${optimisticId}`,
+    };
+
+    const localMessages = forwardedMessagesRef.current.get(target.id) ?? [];
+    forwardedMessagesRef.current.set(target.id, [...localMessages, optimisticMessage]);
+
+    const targetWasAlreadyOpen = selectedContactIdRef.current === target.id;
+    selectedContactIdRef.current = target.id;
+    if (!targetWasAlreadyOpen) setSelectedContact(target);
+    setMessages((current) => targetWasAlreadyOpen
+      ? [...current, optimisticMessage]
+      : [...localMessages, optimisticMessage]
+    );
+    setHasOlderMessages(false);
+    setLoadingOlderMessages(false);
+    setNewMessageId(optimisticId);
+    setText("");
+    setContacts((current) => {
+      const updatedTarget = { ...target, messages: [optimisticMessage] };
+      return [updatedTarget, ...current.filter((contact) => contact.id !== target.id)];
+    });
+
+    void postMessage(target.id, content, optimisticMessage.clientId)
+      .then(({ message }) => {
+        const sentMessage = { ...message, clientId: optimisticMessage.clientId, deliveryStatus: "sent" as const };
+        const replaceOptimistic = (items: Message[]) => {
+          const withoutOptimistic = items.filter((item) => item.id !== optimisticId);
+          return withoutOptimistic.some((item) => item.externalId === sentMessage.externalId)
+            ? withoutOptimistic
+            : [...withoutOptimistic, sentMessage];
+        };
+
+        const currentLocal = forwardedMessagesRef.current.get(target.id) ?? [];
+        forwardedMessagesRef.current.set(target.id, replaceOptimistic(currentLocal));
+        if (selectedContactIdRef.current === target.id) {
+          setMessages(replaceOptimistic);
+          setNewMessageId(message.id);
+        }
+        setContacts((current) => current.map((contact) =>
+          contact.id === target.id ? { ...contact, messages: [sentMessage] } : contact
+        ));
+      })
+      .catch((error) => {
+        console.error("Erro ao encaminhar mensagem:", error);
+        const markAsFailed = (items: Message[]) => items.map((item) =>
+          item.id === optimisticId ? { ...item, deliveryStatus: "failed" as const } : item
+        );
+        const currentLocal = forwardedMessagesRef.current.get(target.id) ?? [];
+        forwardedMessagesRef.current.set(target.id, markAsFailed(currentLocal));
+        if (selectedContactIdRef.current === target.id) setMessages(markAsFailed);
+        setContacts((current) => current.map((contact) =>
+          contact.id === target.id
+            ? { ...contact, messages: contact.messages?.map((item) => item.id === optimisticId ? { ...item, deliveryStatus: "failed" as const } : item) }
+            : contact
+        ));
+      });
   }
 
 
@@ -630,6 +771,7 @@ export function useChat() {
 
     // Envio de texto
     sendMessage,
+    forwardMessage,
 
     loadOlderMessages,
     reactToMessage,

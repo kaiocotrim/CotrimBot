@@ -17,6 +17,11 @@ const nextConfig: NextConfig = {
   output: 'export',
   trailingSlash: true,
 
+
+
+
+
+  
   // Se estiver usando tags de imagem do Next.js, adicione isso para evitar erros no export estático:
   images: {
     unoptimized: true,

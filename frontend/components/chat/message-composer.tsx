@@ -15,7 +15,7 @@ type MessageComposerProps = {
   closing: boolean;
 
   onTextChange: (text: string) => void;
-  onSend: () => void;
+  onSend: (isPrivate?: boolean) => void;
   onCloseWithBot: () => void;
   allowCloseWithBot?: boolean;
 
@@ -24,7 +24,7 @@ type MessageComposerProps = {
     caption?: string
   ) => Promise<void>;
 };
-type ComposerIconName = "message" | "plus" | "sticker" | "mic" | "send" | "expand" | "collapse" | "sparkles";
+type ComposerIconName = "message" | "lock" | "plus" | "sticker" | "mic" | "send" | "expand" | "collapse" | "sparkles";
 
 const LONG_PASTE_CHARACTER_LIMIT = 1200;
 const LONG_PASTE_LINE_LIMIT = 18;
@@ -44,6 +44,7 @@ function ComposerIcon({ name }: { name: ComposerIconName }) {
   return (
     <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {name === "message" && <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z" />}
+      {name === "lock" && <><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></>}
       {name === "plus" && <path d="M12 5v14M5 12h14" />}
       {name === "sticker" && <><path d="M9 3h6a6 6 0 0 1 6 6v5l-7 7H9a6 6 0 0 1-6-6V9a6 6 0 0 1 6-6ZM14 21v-4a3 3 0 0 1 3-3h4" /><path d="M8 9h.01M15 9h.01M8 13a4 4 0 0 0 5 2" /></>}
       {name === "mic" && <><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8" /></>}
@@ -77,6 +78,7 @@ export function MessageComposer({
   const [rewriteError, setRewriteError] = useState<string | null>(null);
   const [longTextCollapsed, setLongTextCollapsed] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [isPrivateMode, setIsPrivateMode] = useState(false);
   // =========================================================
   // GRAVAÇÃO DE ÁUDIO
   // =========================================================
@@ -122,6 +124,17 @@ export function MessageComposer({
   const showControls = isFocused || text.length > 0 || isFullscreen;
   const isStacked = measurements.compact > 24 || isFullscreen || isLongTextCollapsed;
   const transition = { duration: reduceMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
+
+  useEffect(() => {
+    function togglePrivateMode(event: KeyboardEvent) {
+      if (!event.ctrlKey || event.altKey || event.metaKey || event.key.toLowerCase() !== "m") return;
+      event.preventDefault();
+      setIsPrivateMode((current) => !current);
+      textareaRef.current?.focus();
+    }
+    window.addEventListener("keydown", togglePrivateMode);
+    return () => window.removeEventListener("keydown", togglePrivateMode);
+  }, []);
 
 
 
@@ -461,8 +474,13 @@ export function MessageComposer({
   const fieldHeight = isFullscreen ? availableHeight : isStacked ? Math.min(naturalHeight, availableHeight) : 44;
   const textHeight = isStacked ? Math.max(24, fieldHeight - 72) : 24;
   const controlBottom = isStacked ? 8 : 6;
-  const compactTextInset = isRecording ? (isFocused ? 216 : 180) : isFocused ? 178 : showControls ? 144 : 68;
-  const textLayout = { height: textHeight, top: isStacked ? 16 : 10, left: isStacked ? 16 : isFocused ? 88 : 52, width: isStacked ? "calc(100% - 64px)" : `calc(100% - ${compactTextInset}px)` };
+  const compactTextInset = (isRecording ? (isFocused ? 216 : 180) : isFocused ? 178 : showControls ? 144 : 68) + (isPrivateMode && showControls ? 24 : 0);
+  const textLayout = {
+    height: textHeight,
+    top: isStacked ? 16 : 10,
+    left: isStacked ? 16 : isFocused ? isPrivateMode ? 112 : 88 : showControls && isPrivateMode ? 76 : 52,
+    width: isStacked ? "calc(100% - 64px)" : `calc(100% - ${compactTextInset}px)`,
+  };
 
   return (
     <div ref={composerRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent px-4 pt-5 pb-[max(2.125rem,env(safe-area-inset-bottom))] sm:px-5">
@@ -496,7 +514,7 @@ export function MessageComposer({
                   ease: "easeInOut",
                 });
               }
-              onSend();
+              onSend(isPrivateMode);
             }
           }}
         >
@@ -540,7 +558,7 @@ export function MessageComposer({
             animate={{ height: fieldHeight, marginRight: isStacked ? 0 : 56, borderTopLeftRadius: emojisOpen && !sending ? 0 : 24, borderTopRightRadius: emojisOpen && !sending ? 0 : 24 }}
             style={emojisOpen && !sending ? { borderTopWidth: 0, boxShadow: "inset 0 -1px 1px rgba(0,0,0,0.12), 0 4px 20px rgba(0,0,0,0.16)" } : undefined}
             transition={transition}
-            className={`relative overflow-hidden rounded-[24px] border bg-gradient-to-b from-white/[0.075] via-white/[0.03] to-white/[0.015] shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.22),0_6px_22px_rgba(0,0,0,0.2)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow] duration-250 motion-reduce:transition-none ${emojisOpen && !sending ? "border-white/15 bg-zinc-900/90" : isFocused ? "border-white/25 bg-zinc-900/65 ring-2 ring-white/[0.06]" : "border-white/12 bg-zinc-950/35"}`}
+            className={`relative overflow-hidden rounded-[24px] border bg-gradient-to-b from-white/[0.075] via-white/[0.03] to-white/[0.015] shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.22),0_6px_22px_rgba(0,0,0,0.2)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow] duration-250 motion-reduce:transition-none ${isPrivateMode ? "border-amber-300/35 bg-amber-950/25 ring-2 ring-amber-400/10" : emojisOpen && !sending ? "border-white/15 bg-zinc-900/90" : isFocused ? "border-white/25 bg-zinc-900/65 ring-2 ring-white/[0.06]" : "border-white/12 bg-zinc-950/35"}`}
           >
             <AnimatePresence initial={false}>
               {isLongTextCollapsed && (
@@ -580,7 +598,7 @@ export function MessageComposer({
               animate={textLayout}
               transition={transition}
               onAnimationComplete={syncTextScroll}
-              className={`pointer-events-none absolute overflow-hidden p-0 text-[13.5px] leading-6 font-normal whitespace-pre-wrap text-white [overflow-wrap:anywhere] ${isLongTextCollapsed ? "invisible" : ""}`}
+              className={`pointer-events-none absolute overflow-hidden p-0 text-[13.5px] leading-6 font-normal whitespace-pre-wrap [overflow-wrap:anywhere] ${isPrivateMode ? "text-amber-100" : "text-white"} ${isLongTextCollapsed ? "invisible" : ""}`}
             >
               <EmojiText content={text ? `${text}\u200b` : ""} preserveMetrics />
             </motion.div>
@@ -634,13 +652,22 @@ export function MessageComposer({
                   event.currentTarget.form?.requestSubmit();
                 }
               }}
-              placeholder="Digite uma mensagem..."
-              className={`absolute caret-white placeholder:[-webkit-text-fill-color:#a1a1aa] ${textClassName} ${isLongTextCollapsed ? "pointer-events-none invisible" : ""}`}
+              placeholder={isPrivateMode ? "Digite uma mensagem privada..." : "Digite uma mensagem..."}
+              className={`absolute ${isPrivateMode ? "caret-amber-300 placeholder:[-webkit-text-fill-color:#d6b96f]" : "caret-white placeholder:[-webkit-text-fill-color:#a1a1aa]"} ${textClassName} ${isLongTextCollapsed ? "pointer-events-none invisible" : ""}`}
               style={{ color: "transparent", WebkitTextFillColor: "transparent", overflowY: isStacked && measurements.stacked > textHeight ? "auto" : "hidden" }}
             />
 
-            <motion.span initial={false} animate={{ opacity: showControls ? 0 : 1, scale: showControls ? 0.9 : 1 }} transition={transition} className="pointer-events-none absolute bottom-3 left-[13px] text-zinc-300">
-              <ComposerIcon name="message" />
+            <motion.span
+              initial={false}
+              animate={{
+                opacity: isPrivateMode || !showControls ? 1 : 0,
+                scale: isPrivateMode || !showControls ? 1 : 0.9,
+                left: isPrivateMode && showControls ? isFocused ? 84 : 46 : 13,
+              }}
+              transition={transition}
+              className={`pointer-events-none absolute bottom-3 ${isPrivateMode ? "text-amber-300" : "text-zinc-300"}`}
+            >
+              <ComposerIcon name={isPrivateMode ? "lock" : "message"} />
             </motion.span>
             <motion.button
               ref={attachmentTriggerRef}
@@ -660,7 +687,7 @@ export function MessageComposer({
                 closeEmojis();
                 setAttachmentsOpen((current) => !current);
               }}
-              className={`absolute size-8 border border-white/10 bg-white/[0.035] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName}`}
+              className={`absolute size-8 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isPrivateMode ? "border-amber-300/25 bg-amber-400/10 !text-amber-200 hover:bg-amber-400/15 hover:!text-amber-100 focus-visible:!outline-amber-300/60" : "border-white/10 bg-white/[0.035]"}`}
               style={{ pointerEvents: showControls ? "auto" : "none", transformOrigin: "center" }}
             >
               <ComposerIcon name="plus" />
@@ -684,7 +711,7 @@ export function MessageComposer({
                 closeAttachments();
                 setEmojisOpen((current) => !current);
               }}
-              className={`absolute size-8 border border-white/10 bg-white/[0.035] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName}`}
+              className={`absolute size-8 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isPrivateMode ? "border-amber-300/25 bg-amber-400/10 !text-amber-200 hover:bg-amber-400/15 hover:!text-amber-100 focus-visible:!outline-amber-300/60" : "border-white/10 bg-white/[0.035]"}`}
               style={{ pointerEvents: isFocused ? "auto" : "none" }}
             >
               <ComposerIcon name="sticker" />
@@ -707,8 +734,8 @@ export function MessageComposer({
               tabIndex={text.trim() ? 0 : -1}
               disabled={!text.trim() || rewriting || sending}
               onClick={() => void handleRewrite()}
-              className="group absolute flex size-8 items-center justify-center rounded-full text-violet-300 transition-colors hover:text-violet-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400 disabled:opacity-60"
-              style={{ pointerEvents: text.trim() ? "auto" : "none", filter: text.trim() ? "drop-shadow(0 0 7px rgba(167,139,250,0.7))" : undefined }}
+              className={`group absolute flex size-8 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60 ${isPrivateMode ? "text-amber-300 hover:text-amber-200 focus-visible:outline-amber-400" : "text-violet-300 hover:text-violet-200 focus-visible:outline-violet-400"}`}
+              style={{ pointerEvents: text.trim() ? "auto" : "none", filter: text.trim() ? isPrivateMode ? "drop-shadow(0 0 7px rgba(252,211,77,0.65))" : "drop-shadow(0 0 7px rgba(167,139,250,0.7))" : undefined }}
             >
               {rewriting ? (
                 <svg className="size-5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" opacity=".25" /><path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
@@ -716,11 +743,11 @@ export function MessageComposer({
                 <>
                   <span
                     aria-hidden="true"
-                    className="absolute inset-1 animate-pulse rounded-full bg-violet-500/25 blur-sm transition-opacity duration-300 group-hover:opacity-0 motion-reduce:animate-none"
+                    className={`absolute inset-1 animate-pulse rounded-full blur-sm transition-opacity duration-300 group-hover:opacity-0 motion-reduce:animate-none ${isPrivateMode ? "bg-amber-400/25" : "bg-violet-500/25"}`}
                   />
                   <span
                     aria-hidden="true"
-                    className="absolute inset-0 scale-75 rounded-full bg-violet-400/40 opacity-0 blur-md transition-[transform,opacity] duration-500 ease-out group-hover:scale-110 group-hover:opacity-100"
+                    className={`absolute inset-0 scale-75 rounded-full opacity-0 blur-md transition-[transform,opacity] duration-500 ease-out group-hover:scale-110 group-hover:opacity-100 ${isPrivateMode ? "bg-amber-300/35" : "bg-violet-400/40"}`}
                   />
                   <span className="relative transition-transform duration-300 ease-out group-hover:scale-105">
                     <ComposerIcon name="sparkles" />
@@ -778,7 +805,9 @@ export function MessageComposer({
               }}
               className={`absolute border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isRecording
                   ? "border-red-400/40 bg-red-500/20 text-red-300"
-                  : "border-white/10 bg-white/[0.035]"
+                  : isPrivateMode
+                    ? "border-amber-300/25 bg-amber-400/10 !text-amber-200 hover:bg-amber-400/15 hover:!text-amber-100 focus-visible:!outline-amber-300/60"
+                    : "border-white/10 bg-white/[0.035]"
                 }`}
               style={{
                 pointerEvents: showControls
@@ -817,7 +846,7 @@ export function MessageComposer({
                 setIsFullscreen((current) => !current);
                 textareaRef.current?.focus();
               }}
-              className={`absolute top-2 right-2 size-8 ${buttonClassName}`}
+              className={`absolute top-2 right-2 size-8 ${buttonClassName} ${isPrivateMode ? "!text-amber-200 hover:!text-amber-100 focus-visible:!outline-amber-300/60" : ""}`}
               style={{ pointerEvents: isStacked ? "auto" : "none" }}
             >
               <ComposerIcon name={isFullscreen ? "collapse" : "expand"} />
@@ -835,7 +864,7 @@ export function MessageComposer({
             aria-busy={sending}
             aria-label={sending ? "Enviando mensagem" : "Enviar mensagem"}
             title="Enviar mensagem"
-            className={`absolute flex items-center justify-center overflow-hidden rounded-full border bg-gradient-to-br from-white/[0.12] via-white/[0.03] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.16),0_4px_16px_rgba(0,0,0,0.18)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,color,box-shadow] duration-250 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400/50 motion-reduce:transition-none ${text.trim() || pendingFile ? "border-emerald-200/20 bg-emerald-600/60 text-white enabled:hover:bg-emerald-500/70 enabled:hover:border-emerald-100/30" : "border-white/10 bg-emerald-950/25 text-white/45"}`}
+            className={`absolute flex items-center justify-center overflow-hidden rounded-full border bg-gradient-to-br from-white/[0.12] via-white/[0.03] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.16),0_4px_16px_rgba(0,0,0,0.18)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,color,box-shadow] duration-250 focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none ${isPrivateMode ? `focus-visible:outline-amber-400/50 ${text.trim() || pendingFile ? "border-amber-200/30 bg-amber-500/60 text-amber-50 enabled:hover:border-amber-100/40 enabled:hover:bg-amber-400/70" : "border-amber-300/20 bg-amber-950/30 text-amber-200/55"}` : `focus-visible:outline-emerald-400/50 ${text.trim() || pendingFile ? "border-emerald-200/20 bg-emerald-600/60 text-white enabled:hover:bg-emerald-500/70 enabled:hover:border-emerald-100/30" : "border-white/10 bg-emerald-950/25 text-white/45"}`}`}
           >
             {sending ? (
               <svg className="size-5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" opacity=".25" /><path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>

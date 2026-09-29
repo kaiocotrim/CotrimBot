@@ -1,5 +1,6 @@
 // Importa somente os tipos HTTP do Express usados nas assinaturas dos controllers.
 import type { Request, Response } from "express";
+import { randomUUID } from "node:crypto";
 
 // Importa a instância do Prisma usada para consultar contatos e salvar mensagens.
 import { prisma } from "../lib/prisma.js";
@@ -98,7 +99,10 @@ export async function getMessages(req: Request, res: Response) {
   });
 
   const hasMore = messages.length > limit;
-  const page = messages.slice(0, limit).reverse();
+  const page = messages.slice(0, limit).reverse().map((message) => ({
+    ...message,
+    private: message.externalId.startsWith("private:"),
+  }));
 
   return res.json({
     messages: page,
@@ -347,7 +351,7 @@ export async function sendMessageToContact(req: Request, res: Response) {
   const contactId = Number(req.params.id);
 
   // O texto enviado pelo cliente da API é recebido no corpo JSON da requisição.
-  const { text } = req.body;
+  const { text, clientId, private: isPrivate = false } = req.body;
 
   // Procuramos o contato antes do envio porque precisamos do telefone cadastrado.
   // Isso também impede uma chamada desnecessária à Evolution para um contato
@@ -371,7 +375,30 @@ export async function sendMessageToContact(req: Request, res: Response) {
     });
   }
 
+  if (typeof isPrivate !== "boolean") {
+    return res.status(400).json({ message: "Indicador de mensagem privada inválido" });
+  }
+
   try {
+    if (isPrivate) {
+      const privateMessage = await prisma.message.create({
+        data: {
+          externalId: `private:${randomUUID()}`,
+          content: text,
+          direction: "OUTGOING",
+          type: "TEXT",
+          contactId: contact.id,
+        },
+      });
+      const responseMessage = {
+        ...privateMessage,
+        private: true,
+        ...(typeof clientId === "string" ? { clientId } : {}),
+      };
+      getSocketServer().emit("new_message", { message: responseMessage, contact });
+      return res.status(201).json({ message: responseMessage, evolution: null });
+    }
+
     // O service recebe apenas telefone e texto e cuida de toda a comunicação HTTP
     // com a Evolution API, mantendo esse detalhe fora do controller.
     const evolutionResponse = await sendWhatsAppMessage(contact.phone, text);
@@ -403,14 +430,18 @@ export async function sendMessageToContact(req: Request, res: Response) {
     // mensagem OUTGOING foi salva.
     const io = getSocketServer();
 
+    const responseMessage = typeof clientId === "string"
+      ? { ...message, clientId }
+      : message;
+
     io.emit("new_message", {
-      message,
+      message: responseMessage,
       contact,
     });
 
     // Mantém a resposta atual: registro local e resposta original da Evolution.
     return res.status(201).json({
-      message,
+      message: responseMessage,
       evolution: evolutionResponse,
     });
   } catch (error) {

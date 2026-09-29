@@ -14,6 +14,7 @@ type MessageListProps = {
   hasOlderMessages: boolean;
   loadingOlderMessages: boolean;
   newMessageId: number | null;
+  highlightedMessageId?: number | null;
   onLoadOlderMessages: () => Promise<void>;
   onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
   onForwardMessage: (message: Message, target: Contact) => void;
@@ -54,7 +55,7 @@ function dateLabel(value: string) {
 }
 
 // Posiciona mensagens recebidas à esquerda e enviadas à direita.
-export function MessageList({ contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, onLoadOlderMessages, onReactToMessage, onForwardMessage }: MessageListProps) {
+export function MessageList({ contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, onLoadOlderMessages, onReactToMessage, onForwardMessage }: MessageListProps) {
   const reduceMotion = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -166,27 +167,34 @@ export function MessageList({ contact, contacts, messages, hasOlderMessages, loa
         const showDateSeparator = dateKey(message.createdAt) !== dateKey(previousMessage?.createdAt ?? "");
         const label = showDateSeparator ? dateLabel(message.createdAt) : null;
         const isNewMessage = message.id === newMessageId;
+        const isNewOutgoingMessage = isNewMessage && outgoing;
         const cascadeStart = Math.max(0, messages.length - 12);
         const cascadeOrder = Math.max(0, index - cascadeStart);
 
         return (
           <motion.div
-            key={message.id}
+            id={`message-${message.id}`}
+            key={message.clientId ?? message.id}
             initial={!reduceMotion ? {
-              opacity: 0,
-              x: outgoing ? 10 : -10,
-              y: 14,
-              rotate: outgoing ? 2.5 : -2.5,
-              scale: 0.97,
+              opacity: isNewOutgoingMessage ? 0.25 : 0,
+              x: isNewOutgoingMessage ? 34 : outgoing ? 10 : -10,
+              y: isNewOutgoingMessage ? 20 : 14,
+              rotate: isNewOutgoingMessage ? 1.5 : outgoing ? 2.5 : -2.5,
+              scale: isNewOutgoingMessage ? 0.82 : 0.97,
             } : false}
             animate={{ opacity: 1, x: 0, y: 0, rotate: 0, scale: 1 }}
-            transition={reduceMotion ? { duration: 0 } : {
-              duration: 0.34,
-              delay: isNewMessage ? 0 : cascadeOrder * 0.055,
-              ease: [0.16, 1, 0.3, 1],
-            }}
+            transition={reduceMotion
+              ? { duration: 0 }
+              : isNewOutgoingMessage
+                ? { type: "spring", stiffness: 460, damping: 28, mass: 0.72 }
+                : {
+                    duration: 0.34,
+                    delay: isNewMessage ? 0 : cascadeOrder * 0.055,
+                    ease: [0.16, 1, 0.3, 1],
+                  }
+            }
             style={{ transformOrigin: outgoing ? "bottom right" : "bottom left" }}
-            className="relative z-0 flex w-full flex-col gap-2 has-[[aria-expanded=true]]:z-30"
+            className={`relative z-0 flex w-full flex-col gap-2 rounded-2xl transition-[background-color,box-shadow] duration-300 has-[[aria-expanded=true]]:z-30 ${highlightedMessageId === message.id ? "bg-amber-300/10 shadow-[0_0_0_2px_rgba(252,211,77,0.28)]" : ""}`}
           >
             {label && (
               <div className="flex w-full items-center justify-center py-1" role="separator" aria-label={label}>

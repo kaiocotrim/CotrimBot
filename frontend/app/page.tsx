@@ -33,10 +33,7 @@ export default function Home() {
         onSend={chat.sendMessage}
         onLoadOlderMessages={chat.loadOlderMessages}
         onReactToMessage={chat.reactToMessage}
-        onForwardMessage={(message, target) => {
-          chat.selectContact(target);
-          chat.setText(message.content);
-        }}
+        onForwardMessage={chat.forwardMessage}
         onSendMedia={chat.sendMediaMessage}
         onCloseWithBot={chat.closeWithBot}
       />
