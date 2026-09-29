@@ -1,10 +1,13 @@
-.git
-.vscode
 **/node_modules
 **/.next
 **/.turbo
 **/out
 **/dist
 **/generated
-**/.env*
+.git
+.vscode
 frontend/public/Install Termius.exe
+
+# Ignora .env de subpastas, mas permite o da raiz (usado pelo Dokploy/Dockerfile)
+frontend/.env*
+backend/.env*
