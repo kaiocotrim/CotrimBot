@@ -19,8 +19,8 @@ async function main() {
 
   const user = await prisma.user.upsert({
     where: { email },
-    update: { name },
-    create: { email, name, emailVerified: true },
+    update: { name, role: "admin" },
+    create: { email, name, emailVerified: true, role: "admin" },
   });
 
   const existingAccount = await prisma.account.findFirst({

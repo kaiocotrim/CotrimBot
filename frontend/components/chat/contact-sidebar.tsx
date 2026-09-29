@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Avatar } from "@/components/chat/avatar";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
-import { authClient } from "@/lib/auth-client";
+import { authClient, useSession } from "@/lib/auth-client";
 import type { Contact } from "@/types/chat";
 
 type ContactSidebarProps = { contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onArchiveContact: (contact: Contact, archived: boolean) => Promise<void> };
@@ -27,6 +28,8 @@ function formatSidebarDate(value: string) {
 }
 
 export function ContactSidebar({ contacts, loading, error, selectedContactId, onSelectContact, onArchiveContact }: ContactSidebarProps) {
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "admin";
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -62,6 +65,14 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
                 </button>
                 {showMenu && (
                   <div className="absolute top-full left-0 z-10 mt-1 w-40 overflow-hidden rounded-lg border border-white/10 bg-zinc-900 py-1 shadow-xl">
+                    {isAdmin && (
+                      <Link
+                        href="/admin"
+                        className="flex w-full items-center px-3 py-2 text-left text-[13px] text-zinc-200 transition-colors hover:bg-white/[0.06]"
+                      >
+                        Usuários
+                      </Link>
+                    )}
                     <button
                       type="button"
                       onClick={() => authClient.signOut({ fetchOptions: { onSuccess: () => { window.location.href = "/login"; } } })}
