@@ -15,6 +15,11 @@ COPY package.json turbo.json ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/
 
+# Copy .env to root and apps/web
+COPY .env /app/.env
+COPY .env /app/backend/.env
+COPY .env /app/frontend/.env
+
 # 2. Remover qualquer lockfile ou .npmrc residual e limpar o cache
 RUN find /app -name ".npmrc" -delete || true \
     && rm -f /app/package-lock.json \
