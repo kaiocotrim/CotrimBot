@@ -22,9 +22,9 @@ services:
 
     # Dentro do Docker, os serviços são acessados pelos nomes do Compose.
     environment:
-      DATABASE_URL: mysql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}:3306/${DATABASE_NAME}
+      DATABASE_URL: mysql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT}/${DATABASE_NAME}
       DATABASE_HOST: ${DATABASE_HOST}
-      DATABASE_PORT: "3306"
+      DATABASE_PORT: ${DATABASE_PORT}
       EVOLUTION_API_URL: http://evolution-api:8080
       TRANSCRIPTION_SERVICE_URL: http://transcription:5000
 
@@ -41,7 +41,7 @@ services:
       MYSQL_PASSWORD: ${DATABASE_PASSWORD}
 
     ports:
-      - "${MYSQL_PORT}:3306"
+      - "${DATABASE_PORT}:3306"
 
     volumes:
       - mysql_data:/var/lib/mysql
