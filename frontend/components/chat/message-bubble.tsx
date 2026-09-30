@@ -243,6 +243,13 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
   return (
     <div
       ref={bubbleRef}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        setActionsOpen(true);
+        setReactionPickerOpen(false);
+        setChoosingContact(false);
+        setCopyError(false);
+      }}
       className={`group/message relative min-w-0 max-w-[min(62%,620px)] text-[13.5px] leading-[1.4] font-normal [overflow-wrap:anywhere] ${isPrivate ? "text-amber-950" : "text-white"} ${message.reaction ? "mb-3" : ""} ${
         isPrivate
           ? "rounded-[24px] bg-amber-100 px-3.5 py-2.5 shadow-[0_4px_16px_rgba(120,83,15,0.12)]"
