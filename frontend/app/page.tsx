@@ -51,6 +51,7 @@ export default function Home() {
         onTextChange={chat.setText}
         onSend={chat.sendMessage}
         onLoadOlderMessages={chat.loadOlderMessages}
+        onEnsureMessageLoaded={chat.ensureMessageLoaded}
         onReactToMessage={chat.reactToMessage}
         onForwardMessage={chat.forwardMessage}
         onSendMedia={chat.sendMediaMessage}

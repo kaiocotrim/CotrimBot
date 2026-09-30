@@ -6,7 +6,8 @@
  */
 export async function sendWhatsAppMessage(
   number: string,
-  text: string
+  text: string,
+  quoted?: { externalId: string; content: string; fromMe: boolean }
 ) {
   // As credenciais e a instância vêm do ambiente, podendo variar por execução
   // sem que dados de configuração fiquem fixos no código-fonte.
@@ -33,6 +34,12 @@ export async function sendWhatsAppMessage(
       body: JSON.stringify({
         number,
         text,
+        ...(quoted ? {
+          quoted: {
+            key: { id: quoted.externalId, fromMe: quoted.fromMe },
+            message: { conversation: quoted.content },
+          },
+        } : {}),
       }),
     }
   );

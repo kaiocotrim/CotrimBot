@@ -74,11 +74,11 @@ export async function setContactArchived(contactId: number, archived: boolean): 
   return parseResponse<Contact>(response, "Erro ao alterar arquivamento");
 }
 
-export async function postMessage(contactId: number, text: string, clientId?: string, isPrivate = false): Promise<{ message: Message }> {
+export async function postMessage(contactId: number, text: string, clientId?: string, isPrivate = false, replyToMessageId?: number): Promise<{ message: Message }> {
   const response = await fetch(`${API_URL}/contacts/${contactId}/send`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, clientId, private: isPrivate }),
+    body: JSON.stringify({ text, clientId, private: isPrivate, replyToMessageId }),
     credentials: "include",
   });
 

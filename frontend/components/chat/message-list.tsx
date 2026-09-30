@@ -18,6 +18,8 @@ type MessageListProps = {
   onLoadOlderMessages: () => Promise<void>;
   onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
   onForwardMessage: (message: Message, target: Contact) => void;
+  onReplyToMessage: (message: Message) => void;
+  onEnsureMessageLoaded: (messageId: number) => Promise<boolean>;
 };
 
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
@@ -55,7 +57,7 @@ function dateLabel(value: string) {
 }
 
 // Posiciona mensagens recebidas à esquerda e enviadas à direita.
-export function MessageList({ contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, onLoadOlderMessages, onReactToMessage, onForwardMessage }: MessageListProps) {
+export function MessageList({ contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, onLoadOlderMessages, onReactToMessage, onForwardMessage, onReplyToMessage, onEnsureMessageLoaded }: MessageListProps) {
   const reduceMotion = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -65,6 +67,7 @@ export function MessageList({ contact, contacts, messages, hasOlderMessages, loa
   const nearBottomRef = useRef(true);
   const prependAnchorRef = useRef<{ height: number; top: number; firstMessageId: number | null } | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [navigatedMessageId, setNavigatedMessageId] = useState<number | null>(null);
   const mediaMessages = useMemo(
     () => messages.filter((message) => message.type === "IMAGE" || message.type === "VIDEO"),
     [messages],
@@ -147,6 +150,22 @@ export function MessageList({ contact, contacts, messages, hasOlderMessages, loa
     }
   }, [loadingOlderMessages, messages]);
 
+  useEffect(() => {
+    if (navigatedMessageId === null) return;
+    const target = scrollRef.current?.querySelector<HTMLElement>(`[data-message-id="${navigatedMessageId}"]`);
+    if (!target) return;
+    nearBottomRef.current = false;
+    target.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+    const timeout = window.setTimeout(() => setNavigatedMessageId(null), 1800);
+    return () => window.clearTimeout(timeout);
+  }, [messages, navigatedMessageId, reduceMotion]);
+
+  async function navigateToMessage(messageId: number) {
+    const available = messages.some((message) => message.id === messageId)
+      || await onEnsureMessageLoaded(messageId);
+    if (available) setNavigatedMessageId(messageId);
+  }
+
   return (
     <div className="relative flex min-h-0 flex-1">
       <div
@@ -177,6 +196,7 @@ export function MessageList({ contact, contacts, messages, hasOlderMessages, loa
         return (
           <motion.div
             id={`message-${message.id}`}
+            data-message-id={message.id}
             key={message.clientId ?? message.id}
             initial={!reduceMotion ? {
               opacity: isNewOutgoingMessage ? 0.25 : 0,
@@ -197,7 +217,7 @@ export function MessageList({ contact, contacts, messages, hasOlderMessages, loa
                   }
             }
             style={{ transformOrigin: outgoing ? "bottom right" : "bottom left" }}
-            className={`relative z-0 flex w-full flex-col gap-2 rounded-2xl transition-[background-color,box-shadow] duration-300 has-[[aria-expanded=true]]:z-30 ${highlightedMessageId === message.id ? "bg-amber-300/10 shadow-[0_0_0_2px_rgba(252,211,77,0.28)]" : ""}`}
+            className={`relative z-0 flex w-full flex-col gap-2 rounded-2xl transition-[background-color,box-shadow] duration-300 has-[[aria-expanded=true]]:z-30 ${highlightedMessageId === message.id ? "bg-amber-300/10 shadow-[0_0_0_2px_rgba(252,211,77,0.28)]" : navigatedMessageId === message.id ? "bg-emerald-300/10 shadow-[0_0_0_2px_rgba(110,231,183,0.28)]" : ""}`}
           >
             {label && (
               <div className="flex w-full items-center justify-center py-1" role="separator" aria-label={label}>
@@ -216,7 +236,7 @@ export function MessageList({ contact, contacts, messages, hasOlderMessages, loa
                 : <Avatar contact={contact} />)}
 
               {/* O balão escolhe entre player de áudio e conteúdo textual. */}
-              <MessageBubble message={message} contact={contact} contacts={contacts} mediaMessages={mediaMessages} onReact={onReactToMessage} onForwardMessage={onForwardMessage} />
+              <MessageBubble message={message} contact={contact} contacts={contacts} mediaMessages={mediaMessages} onReact={onReactToMessage} onForwardMessage={onForwardMessage} onReply={onReplyToMessage} onNavigateToMessage={navigateToMessage} />
             </div>
           </motion.div>
         );

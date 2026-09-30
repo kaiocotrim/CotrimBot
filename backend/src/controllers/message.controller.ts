@@ -351,7 +351,7 @@ export async function sendMessageToContact(req: Request, res: Response) {
   const contactId = Number(req.params.id);
 
   // O texto enviado pelo cliente da API é recebido no corpo JSON da requisição.
-  const { text, clientId, private: isPrivate = false } = req.body;
+  const { text, clientId, private: isPrivate = false, replyToMessageId } = req.body;
 
   // Procuramos o contato antes do envio porque precisamos do telefone cadastrado.
   // Isso também impede uma chamada desnecessária à Evolution para um contato
@@ -379,6 +379,20 @@ export async function sendMessageToContact(req: Request, res: Response) {
     return res.status(400).json({ message: "Indicador de mensagem privada inválido" });
   }
 
+  if (replyToMessageId !== undefined && (!Number.isInteger(replyToMessageId) || replyToMessageId <= 0)) {
+    return res.status(400).json({ message: "Mensagem respondida inválida" });
+  }
+
+  const quotedMessage = replyToMessageId === undefined
+    ? null
+    : await prisma.message.findFirst({ where: { id: replyToMessageId, contactId: contact.id } });
+  if (replyToMessageId !== undefined && !quotedMessage) {
+    return res.status(404).json({ message: "Mensagem respondida não encontrada" });
+  }
+  const quotedSenderName = quotedMessage
+    ? quotedMessage.direction === "OUTGOING" ? "Você" : quotedMessage.senderName ?? contact.name
+    : null;
+
   try {
     if (isPrivate) {
       const privateMessage = await prisma.message.create({
@@ -388,6 +402,10 @@ export async function sendMessageToContact(req: Request, res: Response) {
           direction: "OUTGOING",
           type: "TEXT",
           contactId: contact.id,
+          quotedExternalId: quotedMessage?.externalId ?? null,
+          quotedMessageId: quotedMessage?.id ?? null,
+          quotedContent: quotedMessage?.content ?? null,
+          quotedSenderName,
         },
       });
       const responseMessage = {
@@ -401,7 +419,15 @@ export async function sendMessageToContact(req: Request, res: Response) {
 
     // O service recebe apenas telefone e texto e cuida de toda a comunicação HTTP
     // com a Evolution API, mantendo esse detalhe fora do controller.
-    const evolutionResponse = await sendWhatsAppMessage(contact.phone, text);
+    const evolutionResponse = await sendWhatsAppMessage(
+      contact.phone,
+      text,
+      quotedMessage && !quotedMessage.private ? {
+        externalId: quotedMessage.externalId,
+        content: quotedMessage.content,
+        fromMe: quotedMessage.direction === "OUTGOING",
+      } : undefined
+    );
 
     // externalId é o identificador único criado pelo WhatsApp/Evolution para a
     // mensagem. Ele permite relacionar o registro local ao envio externo.
@@ -417,12 +443,21 @@ export async function sendMessageToContact(req: Request, res: Response) {
     // WhatsApp do contato, em vez de ter sido recebida pelo webhook.
     const message = await prisma.message.upsert({
       where: { externalId },
-      update: {},
+      update: {
+        quotedExternalId: quotedMessage?.externalId ?? null,
+        quotedMessageId: quotedMessage?.id ?? null,
+        quotedContent: quotedMessage?.content ?? null,
+        quotedSenderName,
+      },
       create: {
         externalId,
         content: text,
         direction: "OUTGOING",
         contactId: contact.id,
+        quotedExternalId: quotedMessage?.externalId ?? null,
+        quotedMessageId: quotedMessage?.id ?? null,
+        quotedContent: quotedMessage?.content ?? null,
+        quotedSenderName,
       },
     });
 

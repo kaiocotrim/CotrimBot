@@ -20,8 +20,9 @@ type ChatPanelProps = {
   newMessageId: number | null;
 
   onTextChange: (text: string) => void;
-  onSend: (isPrivate?: boolean) => void;
+  onSend: (options: { private: boolean; replyToMessageId?: number }) => void;
   onLoadOlderMessages: () => Promise<void>;
+  onEnsureMessageLoaded: (messageId: number) => Promise<boolean>;
   onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
   onForwardMessage: (message: Message, target: Contact) => void;
 
@@ -48,11 +49,14 @@ export function ChatPanel({
   onTextChange,
   onSend,
   onLoadOlderMessages,
+  onEnsureMessageLoaded,
   onReactToMessage,
   onForwardMessage,
   onSendMedia,
   onCloseWithBot,
 }: ChatPanelProps) {
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [composerFocusKey, setComposerFocusKey] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchIndex, setSearchIndex] = useState(0);
@@ -65,6 +69,12 @@ export function ChatPanel({
     ? Math.min(searchIndex, searchResults.length - 1)
     : 0;
   const highlightedMessageId = searchResults[normalizedSearchIndex]?.id ?? null;
+  const activeReply = replyingTo?.contactId === contact?.id ? replyingTo : null;
+
+  function replyToMessage(message: Message) {
+    setReplyingTo(message);
+    setComposerFocusKey((current) => current + 1);
+  }
 
   useEffect(() => {
     function handleSearchShortcut(event: KeyboardEvent) {
@@ -138,6 +148,8 @@ export function ChatPanel({
         onLoadOlderMessages={onLoadOlderMessages}
         onReactToMessage={onReactToMessage}
         onForwardMessage={onForwardMessage}
+        onReplyToMessage={replyToMessage}
+        onEnsureMessageLoaded={onEnsureMessageLoaded}
       />
 
       <MessageComposer
@@ -145,10 +157,16 @@ export function ChatPanel({
         sending={sending}
         closing={closing}
         onTextChange={onTextChange}
-        onSend={onSend}
+        onSend={(options) => {
+          onSend({ ...options, replyToMessageId: activeReply?.id });
+          setReplyingTo(null);
+        }}
         onSendMedia={onSendMedia}
         onCloseWithBot={onCloseWithBot}
         allowCloseWithBot={!contact.isGroup}
+        focusRequestKey={composerFocusKey}
+        replyingTo={activeReply}
+        onCancelReply={() => setReplyingTo(null)}
       />
 
       <AnimatePresence>

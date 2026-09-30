@@ -55,6 +55,10 @@ export type Message = {
   senderName: string | null;
   senderPhone: string | null;
   senderProfilePictureUrl: string | null;
+  quotedExternalId?: string | null;
+  quotedMessageId?: number | null;
+  quotedContent?: string | null;
+  quotedSenderName?: string | null;
 
   // Estado local usado enquanto um encaminhamento acontece em segundo plano.
   // Mensagens vindas da API não precisam preencher este campo.

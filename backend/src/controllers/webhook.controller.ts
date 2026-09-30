@@ -3,6 +3,11 @@ import type { Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { getGroupInfo } from "../services/evolution.service.js";
+import {
+  findReplyContextInfo,
+  getQuotedContent,
+  unwrapWhatsAppMessage,
+} from "../utils/whatsapp-message.js";
 
 // Impede que sincronizações da Evolution repovoem o banco com o histórico antigo.
 // Mantemos uma pequena tolerância para mensagens que estavam em trânsito no reinício.
@@ -79,7 +84,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
     });
   }
 
-  const data = body.data;
+  const data = Array.isArray(body.data) ? body.data[0] : body.data;
 
   const messageTimestamp = getMessageTimestamp(data?.messageTimestamp);
   if (
@@ -89,6 +94,18 @@ export async function whatsappWebhook(req: Request, res: Response) {
     console.log("Mensagem antiga ignorada durante sincronização.");
     return res.status(200).json({ received: true });
   }
+
+  const messagePayload = unwrapWhatsAppMessage(data?.message);
+  data.message = messagePayload;
+  const dataContextInfo = (data.contextInfo ?? data.messageContextInfo) as Record<string, unknown> | undefined;
+  const replyContextInfo = findReplyContextInfo(messagePayload, dataContextInfo);
+  const rawQuotedExternalId = replyContextInfo?.stanzaId;
+  const quotedExternalId = typeof rawQuotedExternalId === "string" && rawQuotedExternalId.trim()
+    ? rawQuotedExternalId.trim()
+    : null;
+  const quotedContent = replyContextInfo
+    ? getQuotedContent(replyContextInfo.quotedMessage)
+    : null;
 
   const remoteJid = data.key?.remoteJid;
   const remoteJidAlt = data.key?.remoteJidAlt;
@@ -234,8 +251,42 @@ export async function whatsappWebhook(req: Request, res: Response) {
     },
   });
 
-  // Se já existir, não salvamos novamente.
+  // A Evolution pode repetir o mesmo ID com os metadados completos alguns
+  // instantes depois. Só enriquecemos como resposta quando há quotedMessage.
   if (existingMessage) {
+    if (replyContextInfo && !existingMessage.quotedMessageId) {
+      const quotedMessage = quotedExternalId
+        ? await prisma.message.findFirst({
+            where: { externalId: quotedExternalId, contactId: existingMessage.contactId },
+          })
+        : null;
+      const contact = await prisma.contact.findUnique({ where: { id: existingMessage.contactId } });
+      const quotedParticipant = typeof replyContextInfo.participant === "string"
+        ? replyContextInfo.participant.replace("@s.whatsapp.net", "").replace("@lid", "")
+        : null;
+      const quotedSenderName = quotedMessage
+        ? quotedMessage.direction === "OUTGOING" ? "Você" : quotedMessage.senderName ?? contact?.name ?? null
+        : quotedParticipant;
+
+      const updatedMessage = await prisma.message.update({
+        where: { id: existingMessage.id },
+        data: {
+          quotedExternalId,
+          quotedMessageId: quotedMessage?.id ?? null,
+          quotedContent: quotedMessage?.content ?? quotedContent,
+          quotedSenderName,
+        },
+      });
+
+      getSocketServer().emit("message_quote_updated", {
+        messageId: updatedMessage.id,
+        quotedExternalId: updatedMessage.quotedExternalId,
+        quotedMessageId: updatedMessage.quotedMessageId,
+        quotedContent: updatedMessage.quotedContent,
+        quotedSenderName: updatedMessage.quotedSenderName,
+      });
+    }
+
     console.log("Mensagem já registrada:", externalId);
 
     return res.status(200).json({
@@ -275,6 +326,18 @@ export async function whatsappWebhook(req: Request, res: Response) {
     },
   });
 
+  const quotedMessage = replyContextInfo && quotedExternalId
+    ? await prisma.message.findFirst({ where: { externalId: quotedExternalId, contactId: contact.id } })
+    : null;
+  const quotedParticipant = replyContextInfo && typeof replyContextInfo.participant === "string"
+    ? replyContextInfo.participant.replace("@s.whatsapp.net", "").replace("@lid", "")
+    : null;
+  const quotedSenderName = replyContextInfo
+    ? quotedMessage
+      ? quotedMessage.direction === "OUTGOING" ? "Você" : quotedMessage.senderName ?? contact.name
+      : quotedParticipant
+    : null;
+
   // Salva a mensagem recebida no banco.
   // INCOMING significa que a mensagem veio do usuário para o CotrimBot.
   const incomingMessage = await prisma.message.create({
@@ -286,8 +349,23 @@ export async function whatsappWebhook(req: Request, res: Response) {
       contactId: contact.id,
       senderName,
       senderPhone,
+      quotedExternalId: replyContextInfo ? quotedExternalId : null,
+      quotedMessageId: replyContextInfo ? quotedMessage?.id ?? null : null,
+      quotedContent: replyContextInfo ? quotedMessage?.content ?? quotedContent : null,
+      quotedSenderName,
     },
   });
+
+  const waitingReplies = await prisma.message.findMany({
+    where: { contactId: contact.id, quotedExternalId: externalId, quotedMessageId: null },
+    select: { id: true },
+  });
+  if (waitingReplies.length) {
+    await prisma.message.updateMany({
+      where: { id: { in: waitingReplies.map((reply) => reply.id) } },
+      data: { quotedMessageId: incomingMessage.id },
+    });
+  }
 
   const io = getSocketServer();
 
@@ -296,6 +374,9 @@ export async function whatsappWebhook(req: Request, res: Response) {
     message: incomingMessage,
     contact,
   });
+  for (const reply of waitingReplies) {
+    io.emit("message_reply_resolved", { messageId: reply.id, quotedMessageId: incomingMessage.id });
+  }
 
   console.log("Evento new_message enviado pelo WebSocket.");
 

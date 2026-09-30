@@ -226,6 +226,26 @@ export function useChat() {
       setMessages((current) => current.map((message) => message.id === data.messageId ? { ...message, readAt: data.readAt } : message));
     }
 
+    function handleMessageReplyResolved(data: { messageId: number; quotedMessageId: number }) {
+      setMessages((current) => current.map((message) =>
+        message.id === data.messageId ? { ...message, quotedMessageId: data.quotedMessageId } : message
+      ));
+    }
+
+    function handleMessageQuoteUpdated(data: Pick<Message, "quotedExternalId" | "quotedMessageId" | "quotedContent" | "quotedSenderName"> & { messageId: number }) {
+      setMessages((current) => current.map((message) =>
+        message.id === data.messageId
+          ? {
+              ...message,
+              quotedExternalId: data.quotedExternalId,
+              quotedMessageId: data.quotedMessageId,
+              quotedContent: data.quotedContent,
+              quotedSenderName: data.quotedSenderName,
+            }
+          : message
+      ));
+    }
+
     function handleContactUpdated(data: Contact) {
       setContacts((current) => current.map((contact) => contact.id === data.id ? { ...contact, ...data } : contact));
       setSelectedContact((current) => current?.id === data.id ? { ...current, ...data } : current);
@@ -240,6 +260,8 @@ export function useChat() {
     );
     socket.on("message_reaction", handleMessageReaction);
     socket.on("message_read", handleMessageRead);
+    socket.on("message_reply_resolved", handleMessageReplyResolved);
+    socket.on("message_quote_updated", handleMessageQuoteUpdated);
     socket.on("contact_updated", handleContactUpdated);
 
 
@@ -252,6 +274,8 @@ export function useChat() {
       );
       socket.off("message_reaction", handleMessageReaction);
       socket.off("message_read", handleMessageRead);
+      socket.off("message_reply_resolved", handleMessageReplyResolved);
+      socket.off("message_quote_updated", handleMessageQuoteUpdated);
       socket.off("contact_updated", handleContactUpdated);
     };
   }, [selectedContact]);
@@ -447,6 +471,35 @@ export function useChat() {
     }
   }
 
+  async function ensureMessageLoaded(messageId: number) {
+    if (messages.some((message) => message.id === messageId)) return true;
+    const contactId = selectedContactIdRef.current;
+    if (!contactId || loadingOlderRef.current) return false;
+
+    let loaded = messages;
+    let more = hasOlderMessages;
+    loadingOlderRef.current = true;
+    setLoadingOlderMessages(true);
+    try {
+      while (more && loaded.length && !loaded.some((message) => message.id === messageId)) {
+        const page = await getMessages(contactId, loaded[0].id);
+        if (selectedContactIdRef.current !== contactId) return false;
+        const existingIds = new Set(loaded.map((message) => message.id));
+        loaded = [...page.messages.filter((message) => !existingIds.has(message.id)), ...loaded];
+        more = page.hasMore;
+      }
+      setMessages(loaded);
+      setHasOlderMessages(more);
+      return loaded.some((message) => message.id === messageId);
+    } catch (error) {
+      console.error("Erro ao localizar mensagem respondida:", error);
+      return false;
+    } finally {
+      loadingOlderRef.current = false;
+      setLoadingOlderMessages(false);
+    }
+  }
+
   async function reactToMessage(messageId: number, reaction: string) {
     const previous = messages.find((message) => message.id === messageId)?.reaction ?? null;
     setMessages((current) => current.map((message) => message.id === messageId ? { ...message, reaction: reaction || null } : message));
@@ -485,7 +538,7 @@ export function useChat() {
   // ENVIAR MENSAGEM DE TEXTO
   // =========================================================
 
-  function sendMessage(isPrivate = false) {
+  function sendMessage(options: { private: boolean; replyToMessageId?: number } = { private: false }) {
     const content =
       text.trim();
     const contact = selectedContact;
@@ -514,7 +567,16 @@ export function useChat() {
       senderProfilePictureUrl: null,
       deliveryStatus: "sent",
       clientId: `sending:${optimisticId}`,
-      private: isPrivate,
+      private: options.private,
+      quotedExternalId: options.replyToMessageId ? messages.find((message) => message.id === options.replyToMessageId)?.externalId ?? null : null,
+      quotedMessageId: options.replyToMessageId ?? null,
+      quotedContent: options.replyToMessageId ? messages.find((message) => message.id === options.replyToMessageId)?.content ?? null : null,
+      quotedSenderName: options.replyToMessageId
+        ? (() => {
+            const quoted = messages.find((message) => message.id === options.replyToMessageId);
+            return quoted?.direction === "OUTGOING" ? "Você" : quoted?.senderName ?? contact.name;
+          })()
+        : null,
     };
 
     const localMessages = forwardedMessagesRef.current.get(contact.id) ?? [];
@@ -528,7 +590,7 @@ export function useChat() {
       return [updatedContact, ...current.filter((item) => item.id !== contact.id)];
     });
 
-    void postMessage(contact.id, content, optimisticMessage.clientId, isPrivate)
+    void postMessage(contact.id, content, optimisticMessage.clientId, options.private, options.replyToMessageId)
       .then(({ message }) => {
         const confirmedMessage = { ...message, clientId: optimisticMessage.clientId };
         const replaceOptimistic = (items: Message[]) => {
@@ -774,6 +836,7 @@ export function useChat() {
     forwardMessage,
 
     loadOlderMessages,
+    ensureMessageLoaded,
     reactToMessage,
 
     // Envio de arquivo
