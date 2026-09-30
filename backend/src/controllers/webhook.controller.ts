@@ -97,7 +97,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
 
   const messagePayload = unwrapWhatsAppMessage(data?.message);
   data.message = messagePayload;
-  const dataContextInfo = (data.contextInfo ?? data.messageContextInfo) as Record<string, unknown> | undefined;
+  const dataContextInfo = [data.contextInfo, data.messageContextInfo];
   const replyContextInfo = findReplyContextInfo(messagePayload, dataContextInfo);
   const rawQuotedExternalId = replyContextInfo?.stanzaId;
   const quotedExternalId = typeof rawQuotedExternalId === "string" && rawQuotedExternalId.trim()
