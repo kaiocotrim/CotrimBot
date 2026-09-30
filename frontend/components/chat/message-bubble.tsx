@@ -31,6 +31,8 @@ type MessageBubbleProps = {
   mediaMessages: Message[];
   onReact: (messageId: number, reaction: string) => Promise<void>;
   onForwardMessage: (message: Message, target: Contact) => void;
+  onReply: (message: Message) => void;
+  onNavigateToMessage: (messageId: number) => Promise<void>;
 };
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
@@ -53,7 +55,7 @@ const messageDateFormatter = new Intl.DateTimeFormat("pt-BR", {
 });
 
 // Mantém o estilo do balão e delega o conteúdo ao componente de cada tipo.
-export function MessageBubble({ message, contact, contacts, mediaMessages, onReact, onForwardMessage }: MessageBubbleProps) {
+export function MessageBubble({ message, contact, contacts, mediaMessages, onReact, onForwardMessage, onReply, onNavigateToMessage }: MessageBubbleProps) {
   const [reacting, setReacting] = useState(false);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -333,7 +335,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
                 </>
               ) : (
                 <>
-                  <button type="button" role="menuitem" className={menuButtonClass}>
+                  <button type="button" role="menuitem" onClick={() => { onReply(message); setActionsOpen(false); }} className={menuButtonClass}>
                     <ArrowBendUpLeft size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Responder</span>
                   </button>
@@ -380,6 +382,19 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
         )}
         </AnimatePresence>
       </div>
+      {message.quotedContent && (
+        <button
+          type="button"
+          disabled={!message.quotedMessageId}
+          onClick={() => message.quotedMessageId && void onNavigateToMessage(message.quotedMessageId)}
+          className={`mb-2 block w-full border-l-4 border-emerald-300 bg-black/15 px-2.5 py-2 text-left ${isImage || isVideo ? "rounded-xl" : "rounded-lg"} disabled:cursor-default`}
+        >
+          <span className="block truncate text-[11px] font-semibold text-emerald-200">
+            {message.quotedSenderName || "Mensagem"}
+          </span>
+          <span className="block truncate text-xs text-white/75">{message.quotedContent}</span>
+        </button>
+      )}
       {inlineTime ? (
         <div className="flex min-w-0 items-end gap-2 pr-4">
           <div className="min-w-0">{content}</div>

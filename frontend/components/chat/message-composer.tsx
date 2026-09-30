@@ -7,6 +7,7 @@ import { EmojiSelector } from "@/components/chat/emoji-selector";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { insertEmojiAtSelection } from "@/lib/emoji-text";
 import { rewriteMessage } from "@/lib/chat-api";
+import type { Message } from "@/types/chat";
 
 
 type MessageComposerProps = {
@@ -15,9 +16,12 @@ type MessageComposerProps = {
   closing: boolean;
 
   onTextChange: (text: string) => void;
-  onSend: (isPrivate?: boolean) => void;
+  onSend: (options: { private: boolean }) => void;
   onCloseWithBot: () => void;
   allowCloseWithBot?: boolean;
+  focusRequestKey: number;
+  replyingTo: Message | null;
+  onCancelReply: () => void;
 
   onSendMedia: (
     file: File,
@@ -69,6 +73,9 @@ export function MessageComposer({
   onCloseWithBot,
   allowCloseWithBot = true,
   onSendMedia,
+  focusRequestKey,
+  replyingTo,
+  onCancelReply,
 }: MessageComposerProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -135,6 +142,12 @@ export function MessageComposer({
     window.addEventListener("keydown", togglePrivateMode);
     return () => window.removeEventListener("keydown", togglePrivateMode);
   }, []);
+
+  useEffect(() => {
+    if (focusRequestKey === 0) return;
+    const frame = requestAnimationFrame(() => textareaRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [focusRequestKey]);
 
 
 
@@ -514,10 +527,38 @@ export function MessageComposer({
                   ease: "easeInOut",
                 });
               }
-              onSend(isPrivateMode);
+              onSend({ private: isPrivateMode });
             }
           }}
         >
+          <AnimatePresence initial={false}>
+            {replyingTo && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 4 }}
+                transition={transition}
+                className="mb-2 flex items-center gap-3 rounded-2xl border border-white/15 bg-zinc-900/95 px-3 py-2.5 shadow-[0_8px_24px_rgba(0,0,0,0.3)] backdrop-blur-xl"
+              >
+                <span className="h-9 w-1 shrink-0 rounded-full bg-emerald-400" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-semibold text-emerald-300">
+                    {replyingTo.direction === "OUTGOING" ? "Você" : replyingTo.senderName || "Contato"}
+                  </span>
+                  <span className="block truncate text-xs text-zinc-300">{replyingTo.content}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={onCancelReply}
+                  aria-label="Cancelar resposta"
+                  title="Cancelar resposta"
+                  className="flex size-7 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white/50"
+                >
+                  <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <AnimatePresence>
             {pendingFile && (
               <motion.div
