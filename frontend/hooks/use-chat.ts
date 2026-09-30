@@ -13,6 +13,7 @@ import {
   reactToMessage as reactToMessageRequest,
   sendMedia as sendMediaRequest,
   setContactArchived as setContactArchivedRequest,
+  updateMessageFlags as updateMessageFlagsRequest,
 } from "@/lib/chat-api";
 
 import type {
@@ -246,6 +247,14 @@ export function useChat() {
       ));
     }
 
+    function handleMessageFlagsUpdated(data: { messageId: number; pinned: boolean; favorited: boolean }) {
+      setMessages((current) => current.map((message) =>
+        message.id === data.messageId
+          ? { ...message, pinned: data.pinned, favorited: data.favorited }
+          : message
+      ));
+    }
+
     function handleContactUpdated(data: Contact) {
       setContacts((current) => current.map((contact) => contact.id === data.id ? { ...contact, ...data } : contact));
       setSelectedContact((current) => current?.id === data.id ? { ...current, ...data } : current);
@@ -262,6 +271,7 @@ export function useChat() {
     socket.on("message_read", handleMessageRead);
     socket.on("message_reply_resolved", handleMessageReplyResolved);
     socket.on("message_quote_updated", handleMessageQuoteUpdated);
+    socket.on("message_flags_updated", handleMessageFlagsUpdated);
     socket.on("contact_updated", handleContactUpdated);
 
 
@@ -276,6 +286,7 @@ export function useChat() {
       socket.off("message_read", handleMessageRead);
       socket.off("message_reply_resolved", handleMessageReplyResolved);
       socket.off("message_quote_updated", handleMessageQuoteUpdated);
+      socket.off("message_flags_updated", handleMessageFlagsUpdated);
       socket.off("contact_updated", handleContactUpdated);
     };
   }, [selectedContact]);
@@ -724,7 +735,8 @@ export function useChat() {
   // então consegue descobrir para quem enviar.
   async function sendMediaMessage(
     file: File,
-    caption?: string
+    caption?: string,
+    replyToMessageId?: number,
   ) {
     if (
       !selectedContact ||
@@ -748,7 +760,8 @@ export function useChat() {
       await sendMediaRequest(
         selectedContact.id,
         file,
-        caption
+        caption,
+        replyToMessageId,
       );
 
       // Não adicionamos a mensagem
@@ -772,6 +785,23 @@ export function useChat() {
 
     } finally {
       setSending(false);
+    }
+  }
+
+  async function updateMessageFlags(messageId: number, flags: { pinned?: boolean; favorited?: boolean }) {
+    const previous = messages.find((message) => message.id === messageId);
+    setMessages((current) => current.map((message) =>
+      message.id === messageId ? { ...message, ...flags } : message
+    ));
+    try {
+      await updateMessageFlagsRequest(messageId, flags);
+    } catch (error) {
+      if (previous) {
+        setMessages((current) => current.map((message) =>
+          message.id === messageId ? previous : message
+        ));
+      }
+      throw error;
     }
   }
 
@@ -841,6 +871,7 @@ export function useChat() {
 
     // Envio de arquivo
     sendMediaMessage,
+    updateMessageFlags,
 
     // Encerramento
     closeWithBot,

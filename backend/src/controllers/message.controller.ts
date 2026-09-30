@@ -139,6 +139,31 @@ export async function reactToMessage(req: Request, res: Response) {
   }
 }
 
+export async function updateMessageFlags(req: Request, res: Response) {
+  const messageId = Number(req.params.id);
+  if (!Number.isInteger(messageId) || messageId <= 0) {
+    return res.status(400).json({ message: "Mensagem inválida" });
+  }
+
+  const data: { pinned?: boolean; favorited?: boolean } = {};
+  if (typeof req.body.pinned === "boolean") data.pinned = req.body.pinned;
+  if (typeof req.body.favorited === "boolean") data.favorited = req.body.favorited;
+  if (data.pinned === undefined && data.favorited === undefined) {
+    return res.status(400).json({ message: "Nenhuma alteração informada" });
+  }
+
+  const existing = await prisma.message.findUnique({ where: { id: messageId } });
+  if (!existing) return res.status(404).json({ message: "Mensagem não encontrada" });
+
+  const message = await prisma.message.update({ where: { id: messageId }, data });
+  getSocketServer().emit("message_flags_updated", {
+    messageId: message.id,
+    pinned: message.pinned,
+    favorited: message.favorited,
+  });
+  return res.json(message);
+}
+
 // POST /contacts/:id/send-media
 // Recebe uma mídia, envia pela Evolution
 // e salva a mensagem como OUTGOING.
@@ -152,7 +177,15 @@ export async function sendMediaToContact(
   const file = req.file;
 
   // Legenda opcional enviada no form-data.
-  const { caption } = req.body;
+  const caption = typeof req.body.caption === "string" ? req.body.caption : "";
+  const rawReplyToMessageId = req.body.replyToMessageId;
+  const replyToMessageId = rawReplyToMessageId === undefined || rawReplyToMessageId === ""
+    ? undefined
+    : Number(rawReplyToMessageId);
+
+  if (replyToMessageId !== undefined && (!Number.isInteger(replyToMessageId) || replyToMessageId <= 0)) {
+    return res.status(400).json({ message: "Mensagem respondida inválida" });
+  }
 
   if (!file) {
     return res.status(400).json({
@@ -172,6 +205,16 @@ export async function sendMediaToContact(
       message: "Contato não encontrado",
     });
   }
+
+  const quotedMessage = replyToMessageId === undefined
+    ? null
+    : await prisma.message.findFirst({ where: { id: replyToMessageId, contactId: contact.id } });
+  if (replyToMessageId !== undefined && !quotedMessage) {
+    return res.status(404).json({ message: "Mensagem respondida não encontrada" });
+  }
+  const quotedSenderName = quotedMessage
+    ? quotedMessage.direction === "OUTGOING" ? "Você" : quotedMessage.senderName ?? contact.name
+    : null;
 
   // Descobre qual tipo de mídia será enviado
   // usando o MIME type do arquivo.
@@ -216,7 +259,14 @@ export async function sendMediaToContact(
         mimetype: file.mimetype,
         media: base64,
         fileName: file.originalname,
-        caption: caption ?? "",
+        caption,
+        ...(quotedMessage && !quotedMessage.private ? {
+          quoted: {
+            externalId: quotedMessage.externalId,
+            content: quotedMessage.content,
+            fromMe: quotedMessage.direction === "OUTGOING",
+          },
+        } : {}),
       });
 
     // ID criado pelo WhatsApp/Evolution.
@@ -247,13 +297,22 @@ export async function sendMediaToContact(
     // Salva a mídia no histórico local.
     const message = await prisma.message.upsert({
       where: { externalId },
-      update: {},
+      update: {
+        quotedExternalId: quotedMessage?.externalId ?? null,
+        quotedMessageId: quotedMessage?.id ?? null,
+        quotedContent: quotedMessage?.content ?? null,
+        quotedSenderName,
+      },
       create: {
         externalId,
         content,
         direction: "OUTGOING",
         type: messageType,
         contactId: contact.id,
+        quotedExternalId: quotedMessage?.externalId ?? null,
+        quotedMessageId: quotedMessage?.id ?? null,
+        quotedContent: quotedMessage?.content ?? null,
+        quotedSenderName,
       },
     });
 

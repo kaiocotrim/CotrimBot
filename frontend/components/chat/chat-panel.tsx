@@ -24,12 +24,14 @@ type ChatPanelProps = {
   onLoadOlderMessages: () => Promise<void>;
   onEnsureMessageLoaded: (messageId: number) => Promise<boolean>;
   onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
+  onUpdateMessageFlags: (messageId: number, flags: { pinned?: boolean; favorited?: boolean }) => Promise<void>;
   onForwardMessage: (message: Message, target: Contact) => void;
 
   // Envia arquivo + legenda opcional.
   onSendMedia: (
     file: File,
-    caption?: string
+    caption?: string,
+    replyToMessageId?: number,
   ) => Promise<void>;
 
   onCloseWithBot: () => void;
@@ -51,6 +53,7 @@ export function ChatPanel({
   onLoadOlderMessages,
   onEnsureMessageLoaded,
   onReactToMessage,
+  onUpdateMessageFlags,
   onForwardMessage,
   onSendMedia,
   onCloseWithBot,
@@ -147,6 +150,7 @@ export function ChatPanel({
         highlightedMessageId={highlightedMessageId}
         onLoadOlderMessages={onLoadOlderMessages}
         onReactToMessage={onReactToMessage}
+        onUpdateMessageFlags={onUpdateMessageFlags}
         onForwardMessage={onForwardMessage}
         onReplyToMessage={replyToMessage}
         onEnsureMessageLoaded={onEnsureMessageLoaded}
@@ -161,7 +165,10 @@ export function ChatPanel({
           onSend({ ...options, replyToMessageId: activeReply?.id });
           setReplyingTo(null);
         }}
-        onSendMedia={onSendMedia}
+        onSendMedia={async (file, caption) => {
+          await onSendMedia(file, caption, activeReply?.id);
+          setReplyingTo(null);
+        }}
         onCloseWithBot={onCloseWithBot}
         allowCloseWithBot={!contact.isGroup}
         focusRequestKey={composerFocusKey}

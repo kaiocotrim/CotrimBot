@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
+import Image from "next/image";
 import {
   ArrowBendUpLeft,
   ArrowBendUpRight,
@@ -30,6 +31,7 @@ type MessageBubbleProps = {
   contacts: Contact[];
   mediaMessages: Message[];
   onReact: (messageId: number, reaction: string) => Promise<void>;
+  onUpdateFlags: (messageId: number, flags: { pinned?: boolean; favorited?: boolean }) => Promise<void>;
   onForwardMessage: (message: Message, target: Contact) => void;
   onReply: (message: Message) => void;
   onNavigateToMessage: (messageId: number) => Promise<void>;
@@ -55,12 +57,14 @@ const messageDateFormatter = new Intl.DateTimeFormat("pt-BR", {
 });
 
 // Mantém o estilo do balão e delega o conteúdo ao componente de cada tipo.
-export function MessageBubble({ message, contact, contacts, mediaMessages, onReact, onForwardMessage, onReply, onNavigateToMessage }: MessageBubbleProps) {
+export function MessageBubble({ message, contact, contacts, mediaMessages, onReact, onUpdateFlags, onForwardMessage, onReply, onNavigateToMessage }: MessageBubbleProps) {
   const [reacting, setReacting] = useState(false);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [choosingContact, setChoosingContact] = useState(false);
   const [copyError, setCopyError] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [updatingFlags, setUpdatingFlags] = useState(false);
   const actionControlsRef = useRef<HTMLDivElement>(null);
   const reactionControlsRef = useRef<HTMLDivElement>(null);
   const reactionPickerRef = useRef<HTMLDivElement>(null);
@@ -75,6 +79,9 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
   const isSticker = message.type === "STICKER";
   const imageHasCaption = isImage && message.content !== "[Imagem]";
   const mediaUrl = `${API_URL}/messages/${message.id}/media`;
+  const quotedMediaMessage = message.quotedMessageId
+    ? mediaMessages.find((media) => media.id === message.quotedMessageId)
+    : undefined;
   const createdAt = new Date(message.createdAt);
   const hasValidDate = !Number.isNaN(createdAt.getTime());
   const inlineTime = message.type === "TEXT" && !/[\r\n]/.test(message.content);
@@ -220,6 +227,20 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
     }
   }
 
+  async function updateFlag(flags: { pinned?: boolean; favorited?: boolean }) {
+    if (updatingFlags) return;
+    setUpdatingFlags(true);
+    setActionError(null);
+    try {
+      await onUpdateFlags(message.id, flags);
+      setActionsOpen(false);
+    } catch {
+      setActionError("Não foi possível atualizar a mensagem");
+    } finally {
+      setUpdatingFlags(false);
+    }
+  }
+
   const quickReactionBar = (
     <div className="mb-1.5 flex w-max items-center gap-0.5 rounded-full border border-white/10 bg-zinc-900/95 px-1.5 py-1 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-xl">
       {QUICK_REACTIONS.map((reaction) => (
@@ -249,6 +270,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
         setReactionPickerOpen(false);
         setChoosingContact(false);
         setCopyError(false);
+        setActionError(null);
       }}
       className={`group/message relative min-w-0 max-w-[min(62%,620px)] text-[13.5px] leading-[1.4] font-normal [overflow-wrap:anywhere] ${isPrivate ? "text-amber-950" : "text-white"} ${message.reaction ? "mb-3" : ""} ${
         isPrivate
@@ -264,6 +286,15 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
             : `rounded-[24px] px-3.5 py-2.5 ${outgoing ? "bg-green-600" : "bg-zinc-800"}`
       }`}
     >
+      {(message.pinned || message.favorited) && (
+        <span
+          className={`absolute -top-2 z-20 flex h-5 items-center gap-1 rounded-full border border-white/10 bg-zinc-900 px-1.5 text-amber-300 shadow-md ${outgoing ? "left-3" : "right-3"}`}
+          title={[message.pinned ? "Mensagem fixada" : "", message.favorited ? "Mensagem favorita" : ""].filter(Boolean).join(" e ")}
+        >
+          {message.pinned && <PushPin size={11} weight="fill" aria-hidden="true" />}
+          {message.favorited && <Star size={11} weight="fill" aria-hidden="true" />}
+        </span>
+      )}
       {isPrivate && (
         <div className="mb-1 flex items-center gap-1 text-[10px] font-semibold tracking-wide text-amber-700">
           <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
@@ -316,6 +347,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
             setReactionPickerOpen(false);
             setChoosingContact(false);
             setCopyError(false);
+            setActionError(null);
           }}
           className={`flex size-5 items-center justify-center rounded-full text-zinc-300 transition-[opacity,transform,color] duration-150 hover:text-white focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-white/50 [@media(hover:none)]:opacity-100 ${actionsOpen ? "opacity-100" : "opacity-0 group-hover/message:opacity-100"}`}
         >
@@ -360,28 +392,29 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
                       <span>Encaminhar</span>
                     </button>
                   )}
-                  <button type="button" role="menuitem" className={menuButtonClass}>
-                    <PushPin size={15} weight="bold" className="shrink-0 text-zinc-200" />
-                    <span>Fixar</span>
+                  <button type="button" role="menuitem" disabled={updatingFlags} onClick={() => void updateFlag({ pinned: !message.pinned })} className={`${menuButtonClass} disabled:opacity-50`}>
+                    <PushPin size={15} weight={message.pinned ? "fill" : "bold"} className="shrink-0 text-zinc-200" />
+                    <span>{message.pinned ? "Desafixar" : "Fixar"}</span>
                   </button>
-                  <button type="button" role="menuitem" className={menuButtonClass}>
+                  <button type="button" role="menuitem" disabled className={`${menuButtonClass} cursor-not-allowed opacity-40`} title="Em breve">
                     <Sparkle size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Pergunte a Meta AI</span>
                   </button>
-                  <button type="button" role="menuitem" className={menuButtonClass}>
-                    <Star size={15} weight="bold" className="shrink-0 text-zinc-200" />
-                    <span>Favoritar</span>
+                  <button type="button" role="menuitem" disabled={updatingFlags} onClick={() => void updateFlag({ favorited: !message.favorited })} className={`${menuButtonClass} disabled:opacity-50`}>
+                    <Star size={15} weight={message.favorited ? "fill" : "bold"} className="shrink-0 text-zinc-200" />
+                    <span>{message.favorited ? "Desfavoritar" : "Favoritar"}</span>
                   </button>
                   <div className="my-1 border-t border-white/10" />
-                  <button type="button" role="menuitem" className={menuButtonClass}>
+                  <button type="button" role="menuitem" disabled className={`${menuButtonClass} cursor-not-allowed opacity-40`} title="Em breve">
                     <WarningCircle size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Denunciar</span>
                   </button>
-                  <button type="button" role="menuitem" className={menuButtonClass}>
+                  <button type="button" role="menuitem" disabled className={`${menuButtonClass} cursor-not-allowed opacity-40`} title="Em breve">
                     <Trash size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Apagar</span>
                   </button>
                   {copyError && <p role="alert" className="px-3 py-1 text-[11px] text-red-300">Não foi possível copiar</p>}
+                  {actionError && <p role="alert" className="px-3 py-1 text-[11px] text-red-300">{actionError}</p>}
                 </>
               )}
             </div>
@@ -396,10 +429,17 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
           onClick={() => message.quotedMessageId && void onNavigateToMessage(message.quotedMessageId)}
           className={`mb-2 block w-full border-l-4 border-emerald-300 bg-black/15 px-2.5 py-2 text-left ${isImage || isVideo ? "rounded-xl" : "rounded-lg"} disabled:cursor-default`}
         >
-          <span className="block truncate text-[11px] font-semibold text-emerald-200">
-            {message.quotedSenderName || "Mensagem"}
+          <span className="flex min-w-0 items-center gap-2">
+            {quotedMediaMessage?.type === "IMAGE" && message.quotedMessageId && (
+              <Image unoptimized src={`${API_URL}/messages/${message.quotedMessageId}/media`} alt="" width={36} height={36} className="size-9 shrink-0 rounded-md object-cover" />
+            )}
+            <span className="min-w-0">
+              <span className="block truncate text-[11px] font-semibold text-emerald-200">
+                {message.quotedSenderName || "Mensagem"}
+              </span>
+              <span className="block truncate text-xs text-white/75">{message.quotedContent}</span>
+            </span>
           </span>
-          <span className="block truncate text-xs text-white/75">{message.quotedContent}</span>
         </button>
       )}
       {inlineTime ? (

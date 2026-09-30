@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from "framer-motion";
+import Image from "next/image";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { AttachmentMenu, type AttachmentKind } from "@/components/chat/attachment-menu";
 import { EmojiSelector } from "@/components/chat/emoji-selector";
@@ -30,6 +31,7 @@ type MessageComposerProps = {
 };
 type ComposerIconName = "message" | "lock" | "plus" | "sticker" | "mic" | "send" | "expand" | "collapse" | "sparkles";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 const LONG_PASTE_CHARACTER_LIMIT = 1200;
 const LONG_PASTE_LINE_LIMIT = 18;
 
@@ -41,6 +43,18 @@ function longTextPreview(value: string) {
   const normalized = value.replace(/\s+/g, " ").trim();
   if (!normalized) return "Texto colado";
   return normalized.length > 42 ? `${normalized.slice(0, 42).trimEnd()}…` : normalized;
+}
+
+function replyPreview(message: Message) {
+  const labels: Partial<Record<Message["type"], string>> = {
+    AUDIO: "Áudio",
+    IMAGE: "Imagem",
+    VIDEO: "Vídeo",
+    DOCUMENT: "Documento",
+    STICKER: "Figurinha",
+  };
+  const label = labels[message.type];
+  return label && !message.content.startsWith("[") ? `${label} · ${message.content}` : label ?? message.content;
 }
 
 // Os controles compartilham tamanho e espessura de traço.
@@ -85,6 +99,9 @@ export function MessageComposer({
   const [rewriteError, setRewriteError] = useState<string | null>(null);
   const [longTextCollapsed, setLongTextCollapsed] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingPreviewUrl, setPendingPreviewUrl] = useState<string | null>(null);
+  const pendingPreviewUrlRef = useRef<string | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [isPrivateMode, setIsPrivateMode] = useState(false);
   // =========================================================
   // GRAVAÇÃO DE ÁUDIO
@@ -149,6 +166,10 @@ export function MessageComposer({
     return () => cancelAnimationFrame(frame);
   }, [focusRequestKey]);
 
+  useEffect(() => () => {
+    if (pendingPreviewUrlRef.current) URL.revokeObjectURL(pendingPreviewUrlRef.current);
+  }, []);
+
 
 
   // A camada de desenho acompanha a rolagem do textarea, que continua editável.
@@ -173,6 +194,15 @@ export function MessageComposer({
     setEmojisOpen(false);
     if (restoreFocus) emojiTriggerRef.current?.focus();
   }, []);
+
+  function stagePendingFile(file: File | null) {
+    if (pendingPreviewUrlRef.current) URL.revokeObjectURL(pendingPreviewUrlRef.current);
+    const previewUrl = file?.type.startsWith("image/") ? URL.createObjectURL(file) : null;
+    pendingPreviewUrlRef.current = previewUrl;
+    setPendingPreviewUrl(previewUrl);
+    setPendingFile(file);
+    setAttachmentError(null);
+  }
 
   function selectEmoji(emoji: string) {
     if (sending) return;
@@ -207,7 +237,7 @@ export function MessageComposer({
     setAttachmentError(null);
     try {
       await onSendMedia(pendingFile, text.trim() || undefined);
-      setPendingFile(null);
+      stagePendingFile(null);
       onTextChange("");
     } catch (error) {
       console.error("Erro ao enviar anexo:", error);
@@ -310,8 +340,7 @@ export function MessageComposer({
 
           // Reaproveita o mesmo sistema
           // de anexos que você já criou.
-          setPendingFile(audioFile);
-          setAttachmentError(null);
+          stagePendingFile(audioFile);
         }
 
         audioChunksRef.current = [];
@@ -500,7 +529,28 @@ export function MessageComposer({
       <div className="pointer-events-auto mx-auto max-w-2xl">
         <form
           ref={formRef}
-          className="relative"
+          className={`relative rounded-[26px] transition-shadow ${isDraggingFile ? "ring-2 ring-emerald-400/70 ring-offset-4 ring-offset-zinc-950" : ""}`}
+          onDragEnter={(event) => {
+            if (!event.dataTransfer.types.includes("Files")) return;
+            event.preventDefault();
+            setIsDraggingFile(true);
+          }}
+          onDragOver={(event) => {
+            if (!event.dataTransfer.types.includes("Files")) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+          }}
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsDraggingFile(false);
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setIsDraggingFile(false);
+            const file = Array.from(event.dataTransfer.files)[0];
+            if (!file) return;
+            stagePendingFile(file);
+            textareaRef.current?.focus();
+          }}
           onFocus={() => setIsFocused(true)}
           onBlur={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget)) {
@@ -531,6 +581,18 @@ export function MessageComposer({
             }
           }}
         >
+          <AnimatePresence>
+            {isDraggingFile && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-[26px] border-2 border-dashed border-emerald-300 bg-zinc-950/90 text-sm font-semibold text-emerald-200 backdrop-blur-sm"
+              >
+                Solte o arquivo para anexar
+              </motion.div>
+            )}
+          </AnimatePresence>
           <AnimatePresence initial={false}>
             {replyingTo && (
               <motion.div
@@ -545,7 +607,12 @@ export function MessageComposer({
                   <span className="block truncate text-xs font-semibold text-emerald-300">
                     {replyingTo.direction === "OUTGOING" ? "Você" : replyingTo.senderName || "Contato"}
                   </span>
-                  <span className="block truncate text-xs text-zinc-300">{replyingTo.content}</span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    {replyingTo.type === "IMAGE" && (
+                      <Image unoptimized src={`${API_URL}/messages/${replyingTo.id}/media`} alt="" width={32} height={32} className="size-8 shrink-0 rounded-md object-cover" />
+                    )}
+                    <span className="block truncate text-xs text-zinc-300">{replyPreview(replyingTo)}</span>
+                  </span>
                 </span>
                 <button
                   type="button"
@@ -568,16 +635,20 @@ export function MessageComposer({
                 transition={transition}
                 className="absolute bottom-full left-0 mb-2 flex max-w-[min(360px,85vw)] items-center gap-3 rounded-2xl border border-white/15 bg-zinc-900/95 px-3 py-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl"
               >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-zinc-200">
-                  <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" /><path d="M14 2v6h6M8 13h8M8 17h6" /></svg>
-                </span>
+                {pendingPreviewUrl ? (
+                  <Image unoptimized src={pendingPreviewUrl} alt="Prévia do anexo" width={48} height={48} className="size-12 shrink-0 rounded-xl object-cover" />
+                ) : (
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-zinc-200">
+                    <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" /><path d="M14 2v6h6M8 13h8M8 17h6" /></svg>
+                  </span>
+                )}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-zinc-100">{pendingFile.name}</span>
                   <span className={`block text-[11px] ${attachmentError ? "text-red-300" : "text-zinc-400"}`}>{attachmentError ?? formatFileSize(pendingFile.size)}</span>
                 </span>
                 <button
                   type="button"
-                  onClick={() => { setPendingFile(null); setAttachmentError(null); }}
+                  onClick={() => stagePendingFile(null)}
                   aria-label="Remover arquivo"
                   title="Remover arquivo"
                   className="flex size-7 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white/50"
@@ -672,8 +743,7 @@ export function MessageComposer({
                     `imagem-colada-${Date.now()}.${extension}`,
                     { type: clipboardImage.type || "image/png", lastModified: Date.now() },
                   );
-                  setPendingFile(pastedImage);
-                  setAttachmentError(null);
+                  stagePendingFile(pastedImage);
                   setLongTextCollapsed(false);
                   return;
                 }
@@ -698,6 +768,11 @@ export function MessageComposer({
                 selectionRef.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd };
               }}
               onKeyDown={(event) => {
+                if (event.key === "Escape" && replyingTo) {
+                  event.preventDefault();
+                  onCancelReply();
+                  return;
+                }
                 if (event.key === "Escape" && isFullscreen) {
                   event.preventDefault();
                   setIsFullscreen(false);
@@ -941,8 +1016,7 @@ export function MessageComposer({
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (!file) return;
-              setPendingFile(file);
-              setAttachmentError(null);
+              stagePendingFile(file);
               event.target.value = "";
               textareaRef.current?.focus();
             }}

@@ -40,6 +40,8 @@ export type Message = {
 
   // Observação interna visível apenas no CotrimBot.
   private?: boolean;
+  pinned?: boolean;
+  favorited?: boolean;
 
   // Contato ao qual a mensagem pertence.
   contactId: number;

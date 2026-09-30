@@ -16,6 +16,7 @@ import {
   sendMediaToContact,
   sendMessageToContact,
   transcribeMessage,
+  updateMessageFlags,
 } from "../controllers/message.controller.js";
 
 export const messageRouter = Router();
@@ -59,6 +60,7 @@ messageRouter.patch("/contacts/:id/messages/read", markMessagesAsRead);
 messageRouter.get("/messages/:id/media", getMessageMedia);
 messageRouter.get("/messages/:id/sender-avatar", getGroupSenderAvatar);
 messageRouter.put("/messages/:id/reaction", reactToMessage);
+messageRouter.patch("/messages/:id/flags", updateMessageFlags);
 
 /**
  * POST /messages/:id/transcribe

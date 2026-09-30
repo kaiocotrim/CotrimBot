@@ -53,6 +53,7 @@ export default function Home() {
         onLoadOlderMessages={chat.loadOlderMessages}
         onEnsureMessageLoaded={chat.ensureMessageLoaded}
         onReactToMessage={chat.reactToMessage}
+        onUpdateMessageFlags={chat.updateMessageFlags}
         onForwardMessage={chat.forwardMessage}
         onSendMedia={chat.sendMediaMessage}
         onCloseWithBot={chat.closeWithBot}

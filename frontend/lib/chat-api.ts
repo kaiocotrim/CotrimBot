@@ -52,6 +52,19 @@ export async function reactToMessage(messageId: number, reaction: string): Promi
   return parseResponse<Message>(response, "Erro ao reagir à mensagem");
 }
 
+export async function updateMessageFlags(
+  messageId: number,
+  flags: { pinned?: boolean; favorited?: boolean },
+): Promise<Message> {
+  const response = await fetch(`${API_URL}/messages/${messageId}/flags`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(flags),
+    credentials: "include",
+  });
+  return parseResponse<Message>(response, "Erro ao atualizar mensagem");
+}
+
 // Marca como lidas todas as mensagens recebidas do contato.
 export async function markMessagesAsRead(contactId: number): Promise<void> {
   const response = await fetch(
@@ -112,7 +125,8 @@ export async function closeConversationWithBot(contactId: number) {
 export async function sendMedia(
   contactId: number,
   file: File,
-  caption?: string
+  caption?: string,
+  replyToMessageId?: number,
 ) {
   const formData = new FormData();
 
@@ -123,6 +137,10 @@ export async function sendMedia(
       "caption",
       caption.trim()
     );
+  }
+
+  if (replyToMessageId) {
+    formData.append("replyToMessageId", String(replyToMessageId));
   }
 
   const response = await fetch(

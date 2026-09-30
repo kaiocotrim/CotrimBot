@@ -274,6 +274,7 @@ type SendMediaInput = {
   media: string;
   fileName: string;
   caption?: string;
+  quoted?: { externalId: string; content: string; fromMe: boolean };
 };
 export async function sendWhatsAppMedia({
   number,
@@ -282,6 +283,7 @@ export async function sendWhatsAppMedia({
   media,
   fileName,
   caption = "",
+  quoted,
 }: SendMediaInput) {
   const apiUrl = process.env.EVOLUTION_API_URL;
   const apiKey = process.env.EVOLUTION_API_KEY;
@@ -310,6 +312,12 @@ export async function sendWhatsAppMedia({
         media,
         fileName,
         caption,
+        ...(quoted ? {
+          quoted: {
+            key: { id: quoted.externalId, fromMe: quoted.fromMe },
+            message: { conversation: quoted.content },
+          },
+        } : {}),
       }),
     }
   );
