@@ -658,6 +658,26 @@ export function MessageComposer({
                 onTextChange(event.target.value);
               }}
               onPaste={(event) => {
+                const clipboardImage = Array.from(event.clipboardData.items)
+                  .find((item) => item.kind === "file" && item.type.startsWith("image/"))
+                  ?.getAsFile()
+                  ?? Array.from(event.clipboardData.files).find((file) => file.type.startsWith("image/"));
+
+                if (clipboardImage) {
+                  event.preventDefault();
+                  const imageSubtype = clipboardImage.type.split("/")[1]?.split("+")[0] || "png";
+                  const extension = imageSubtype === "jpeg" ? "jpg" : imageSubtype;
+                  const pastedImage = new File(
+                    [clipboardImage],
+                    `imagem-colada-${Date.now()}.${extension}`,
+                    { type: clipboardImage.type || "image/png", lastModified: Date.now() },
+                  );
+                  setPendingFile(pastedImage);
+                  setAttachmentError(null);
+                  setLongTextCollapsed(false);
+                  return;
+                }
+
                 const pasted = event.clipboardData.getData("text");
                 if (!pasted) return;
                 const target = event.currentTarget;
