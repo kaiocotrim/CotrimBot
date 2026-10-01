@@ -3,6 +3,7 @@
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AttachmentMenu, type AttachmentKind } from "@/components/chat/attachment-menu";
 import { EmojiSelector } from "@/components/chat/emoji-selector";
 import { EmojiText } from "@/components/chat/emoji-text";
@@ -12,6 +13,7 @@ import type { Message } from "@/types/chat";
 
 
 type MessageComposerProps = {
+  dropZoneContainer: HTMLElement | null;
   text: string;
   sending: boolean;
   closing: boolean;
@@ -25,9 +27,14 @@ type MessageComposerProps = {
   onCancelReply: () => void;
 
   onSendMedia: (
-    file: File,
+    files: File[],
     caption?: string
   ) => Promise<void>;
+};
+type PendingAttachment = {
+  id: number;
+  file: File;
+  previewUrl: string | null;
 };
 type ComposerIconName = "message" | "lock" | "plus" | "sticker" | "mic" | "send" | "expand" | "collapse" | "sparkles";
 
@@ -79,6 +86,7 @@ const textClassName = "resize-none bg-transparent p-0 text-[13.5px] leading-6 fo
 const buttonClassName = "flex items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 disabled:text-zinc-500 motion-reduce:transition-none";
 
 export function MessageComposer({
+  dropZoneContainer,
   text,
   sending,
   closing,
@@ -98,9 +106,9 @@ export function MessageComposer({
   const [rewriting, setRewriting] = useState(false);
   const [rewriteError, setRewriteError] = useState<string | null>(null);
   const [longTextCollapsed, setLongTextCollapsed] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [pendingPreviewUrl, setPendingPreviewUrl] = useState<string | null>(null);
-  const pendingPreviewUrlRef = useRef<string | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  const pendingPreviewUrlsRef = useRef(new Set<string>());
+  const nextAttachmentIdRef = useRef(1);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [isPrivateMode, setIsPrivateMode] = useState(false);
   // =========================================================
@@ -167,7 +175,8 @@ export function MessageComposer({
   }, [focusRequestKey]);
 
   useEffect(() => () => {
-    if (pendingPreviewUrlRef.current) URL.revokeObjectURL(pendingPreviewUrlRef.current);
+    pendingPreviewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    pendingPreviewUrlsRef.current.clear();
   }, []);
 
 
@@ -195,14 +204,86 @@ export function MessageComposer({
     if (restoreFocus) emojiTriggerRef.current?.focus();
   }, []);
 
-  function stagePendingFile(file: File | null) {
-    if (pendingPreviewUrlRef.current) URL.revokeObjectURL(pendingPreviewUrlRef.current);
-    const previewUrl = file?.type.startsWith("image/") ? URL.createObjectURL(file) : null;
-    pendingPreviewUrlRef.current = previewUrl;
-    setPendingPreviewUrl(previewUrl);
-    setPendingFile(file);
+  const stagePendingFiles = useCallback((files: File[]) => {
+    if (!files.length) return;
+    const attachments = files.map((file) => {
+      const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
+      if (previewUrl) pendingPreviewUrlsRef.current.add(previewUrl);
+      return { id: nextAttachmentIdRef.current++, file, previewUrl };
+    });
+    setPendingAttachments((current) => [...current, ...attachments]);
     setAttachmentError(null);
-  }
+  }, []);
+
+  const removePendingAttachment = useCallback((id: number) => {
+    setPendingAttachments((current) => current.filter((attachment) => {
+      if (attachment.id !== id) return true;
+      if (attachment.previewUrl) {
+        URL.revokeObjectURL(attachment.previewUrl);
+        pendingPreviewUrlsRef.current.delete(attachment.previewUrl);
+      }
+      return false;
+    }));
+    setAttachmentError(null);
+  }, []);
+
+  const clearPendingAttachments = useCallback(() => {
+    pendingPreviewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    pendingPreviewUrlsRef.current.clear();
+    setPendingAttachments([]);
+    setAttachmentError(null);
+  }, []);
+
+  // Aceita arquivos apenas dentro do painel da conversa aberta.
+  useEffect(() => {
+    const dropZone = dropZoneContainer;
+    if (!dropZone) return;
+    const isFileDrag = (event: DragEvent) => event.dataTransfer?.types.includes("Files") ?? false;
+
+    const handleDragEnter = (event: DragEvent) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      setIsDraggingFile(true);
+    };
+    const handleDragOver = (event: DragEvent) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+      setIsDraggingFile(true);
+    };
+    const handleDragLeave = (event: DragEvent) => {
+      const nextTarget = event.relatedTarget;
+      if (nextTarget instanceof Node && dropZone.contains(nextTarget)) return;
+      setIsDraggingFile(false);
+    };
+    const handleDrop = (event: DragEvent) => {
+      setIsDraggingFile(false);
+      const files = Array.from(event.dataTransfer?.files ?? []);
+      if (!files.length) return;
+      event.preventDefault();
+      stagePendingFiles(files);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    };
+
+    const preventFileDropOutsideConversation = (event: DragEvent) => {
+      if (isFileDrag(event)) event.preventDefault();
+    };
+
+    dropZone.addEventListener("dragenter", handleDragEnter);
+    dropZone.addEventListener("dragover", handleDragOver);
+    dropZone.addEventListener("dragleave", handleDragLeave);
+    dropZone.addEventListener("drop", handleDrop);
+    window.addEventListener("dragover", preventFileDropOutsideConversation);
+    window.addEventListener("drop", preventFileDropOutsideConversation);
+    return () => {
+      dropZone.removeEventListener("dragenter", handleDragEnter);
+      dropZone.removeEventListener("dragover", handleDragOver);
+      dropZone.removeEventListener("dragleave", handleDragLeave);
+      dropZone.removeEventListener("drop", handleDrop);
+      window.removeEventListener("dragover", preventFileDropOutsideConversation);
+      window.removeEventListener("drop", preventFileDropOutsideConversation);
+    };
+  }, [dropZoneContainer, stagePendingFiles]);
 
   function selectEmoji(emoji: string) {
     if (sending) return;
@@ -233,11 +314,11 @@ export function MessageComposer({
   }
 
   async function sendPendingAttachment() {
-    if (!pendingFile || sending) return;
+    if (!pendingAttachments.length || sending) return;
     setAttachmentError(null);
     try {
-      await onSendMedia(pendingFile, text.trim() || undefined);
-      stagePendingFile(null);
+      await onSendMedia(pendingAttachments.map((attachment) => attachment.file), text.trim() || undefined);
+      clearPendingAttachments();
       onTextChange("");
     } catch (error) {
       console.error("Erro ao enviar anexo:", error);
@@ -340,7 +421,7 @@ export function MessageComposer({
 
           // Reaproveita o mesmo sistema
           // de anexos que você já criou.
-          stagePendingFile(audioFile);
+          stagePendingFiles([audioFile]);
         }
 
         audioChunksRef.current = [];
@@ -529,28 +610,7 @@ export function MessageComposer({
       <div className="pointer-events-auto mx-auto max-w-2xl">
         <form
           ref={formRef}
-          className={`relative rounded-[26px] transition-shadow ${isDraggingFile ? "ring-2 ring-emerald-400/70 ring-offset-4 ring-offset-zinc-950" : ""}`}
-          onDragEnter={(event) => {
-            if (!event.dataTransfer.types.includes("Files")) return;
-            event.preventDefault();
-            setIsDraggingFile(true);
-          }}
-          onDragOver={(event) => {
-            if (!event.dataTransfer.types.includes("Files")) return;
-            event.preventDefault();
-            event.dataTransfer.dropEffect = "copy";
-          }}
-          onDragLeave={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsDraggingFile(false);
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            setIsDraggingFile(false);
-            const file = Array.from(event.dataTransfer.files)[0];
-            if (!file) return;
-            stagePendingFile(file);
-            textareaRef.current?.focus();
-          }}
+          className="relative rounded-[26px]"
           onFocus={() => setIsFocused(true)}
           onBlur={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget)) {
@@ -564,7 +624,7 @@ export function MessageComposer({
             event.preventDefault();
             closeAttachments();
             closeEmojis();
-            if (pendingFile) {
+            if (pendingAttachments.length) {
               void sendPendingAttachment();
               return;
             }
@@ -581,18 +641,6 @@ export function MessageComposer({
             }
           }}
         >
-          <AnimatePresence>
-            {isDraggingFile && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-[26px] border-2 border-dashed border-emerald-300 bg-zinc-950/90 text-sm font-semibold text-emerald-200 backdrop-blur-sm"
-              >
-                Solte o arquivo para anexar
-              </motion.div>
-            )}
-          </AnimatePresence>
           <AnimatePresence initial={false}>
             {replyingTo && (
               <motion.div
@@ -627,34 +675,59 @@ export function MessageComposer({
             )}
           </AnimatePresence>
           <AnimatePresence>
-            {pendingFile && (
+            {pendingAttachments.length > 0 && (
               <motion.div
-                initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                initial={{ opacity: 0, y: 22, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                exit={{ opacity: 0, y: 14, scale: 0.97 }}
                 transition={transition}
-                className="absolute bottom-full left-0 mb-2 flex max-w-[min(360px,85vw)] items-center gap-3 rounded-2xl border border-white/15 bg-zinc-900/95 px-3 py-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl"
+                style={{ marginRight: isStacked ? 0 : 56, transformOrigin: "bottom center" }}
+                className="relative mb-2 flex max-h-[min(48vh,430px)] flex-col overflow-hidden rounded-[26px] border border-white/15 bg-zinc-950/65 bg-gradient-to-b from-white/[0.1] via-white/[0.035] to-white/[0.015] shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.2),0_18px_48px_rgba(0,0,0,0.35)] backdrop-blur-2xl backdrop-saturate-150"
               >
-                {pendingPreviewUrl ? (
-                  <Image unoptimized src={pendingPreviewUrl} alt="Prévia do anexo" width={48} height={48} className="size-12 shrink-0 rounded-xl object-cover" />
-                ) : (
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-zinc-200">
-                    <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" /><path d="M14 2v6h6M8 13h8M8 17h6" /></svg>
+                <div className={`grid min-h-0 max-h-[min(42vh,340px)] gap-2 overflow-y-auto overscroll-contain p-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${pendingAttachments.length === 1 ? "grid-cols-1" : "auto-rows-[112px] grid-cols-2 sm:auto-rows-[124px] sm:grid-cols-3"}`}>
+                  {pendingAttachments.map((attachment) => (
+                    <div key={attachment.id} className={`relative min-h-0 overflow-hidden rounded-[18px] border border-white/10 bg-black/20 ${pendingAttachments.length === 1 ? "h-[clamp(190px,32vh,280px)]" : "h-full"}`}>
+                      {attachment.previewUrl ? (
+                        <>
+                          <Image unoptimized fill sizes={pendingAttachments.length === 1 ? "(max-width: 768px) 100vw, 672px" : "220px"} src={attachment.previewUrl} alt={`Prévia de ${attachment.file.name}`} className={pendingAttachments.length === 1 ? "object-contain p-2" : "object-cover"} />
+                          {pendingAttachments.length > 1 && (
+                            <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/90 via-black/65 to-transparent px-2.5 pt-6 pb-2 text-[11px] text-zinc-100">
+                              {attachment.file.name}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex size-full min-h-0 flex-col items-center justify-center gap-2 px-3 pt-3 text-center">
+                          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/[0.065] text-zinc-100">
+                            <svg className="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" /><path d="M14 2v6h6M8 13h8M8 17h6" /></svg>
+                          </span>
+                          <span className="w-full min-w-0">
+                            <span className="block truncate text-[11px] font-medium text-zinc-200">{attachment.file.name}</span>
+                            <span className="mt-0.5 block text-[10px] text-zinc-500">{formatFileSize(attachment.file.size)}</span>
+                          </span>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removePendingAttachment(attachment.id)}
+                        aria-label={`Remover ${attachment.file.name}`}
+                        title="Remover arquivo"
+                        className="absolute top-2 right-2 z-10 flex size-7 items-center justify-center rounded-full border border-white/15 bg-zinc-950/80 text-zinc-300 shadow-lg backdrop-blur-xl transition-colors hover:bg-red-500/25 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
+                      >
+                        <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="relative z-20 flex shrink-0 items-center gap-3 border-t border-white/10 bg-zinc-950/95 px-4 py-3 backdrop-blur-xl">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-zinc-100">{pendingAttachments.length === 1 ? pendingAttachments[0].file.name : `${pendingAttachments.length} arquivos selecionados`}</span>
+                    <span className={`block text-[11px] ${attachmentError ? "text-red-300" : "text-zinc-400"}`}>{attachmentError ?? formatFileSize(pendingAttachments.reduce((total, attachment) => total + attachment.file.size, 0))}</span>
                   </span>
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-zinc-100">{pendingFile.name}</span>
-                  <span className={`block text-[11px] ${attachmentError ? "text-red-300" : "text-zinc-400"}`}>{attachmentError ?? formatFileSize(pendingFile.size)}</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => stagePendingFile(null)}
-                  aria-label="Remover arquivo"
-                  title="Remover arquivo"
-                  className="flex size-7 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white/50"
-                >
-                  <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
-                </button>
+                  <button type="button" onClick={clearPendingAttachments} className="shrink-0 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[11px] font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white">
+                    Remover todos
+                  </button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -743,7 +816,7 @@ export function MessageComposer({
                     `imagem-colada-${Date.now()}.${extension}`,
                     { type: clipboardImage.type || "image/png", lastModified: Date.now() },
                   );
-                  stagePendingFile(pastedImage);
+                  stagePendingFiles([pastedImage]);
                   setLongTextCollapsed(false);
                   return;
                 }
@@ -996,11 +1069,11 @@ export function MessageComposer({
             initial={false}
             animate={{ width: isStacked ? 36 : 44, height: isStacked ? 36 : 44, right: isStacked ? 8 : 0, bottom: isStacked ? 8 : 0 }}
             transition={transition}
-            disabled={sending || (!text.trim() && !pendingFile)}
+            disabled={sending || (!text.trim() && !pendingAttachments.length)}
             aria-busy={sending}
             aria-label={sending ? "Enviando mensagem" : "Enviar mensagem"}
             title="Enviar mensagem"
-            className={`absolute flex items-center justify-center overflow-hidden rounded-full border bg-gradient-to-br from-white/[0.12] via-white/[0.03] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.16),0_4px_16px_rgba(0,0,0,0.18)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,color,box-shadow] duration-250 focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none ${isPrivateMode ? `focus-visible:outline-amber-400/50 ${text.trim() || pendingFile ? "border-amber-200/30 bg-amber-500/60 text-amber-50 enabled:hover:border-amber-100/40 enabled:hover:bg-amber-400/70" : "border-amber-300/20 bg-amber-950/30 text-amber-200/55"}` : `focus-visible:outline-emerald-400/50 ${text.trim() || pendingFile ? "border-emerald-200/20 bg-emerald-600/60 text-white enabled:hover:bg-emerald-500/70 enabled:hover:border-emerald-100/30" : "border-white/10 bg-emerald-950/25 text-white/45"}`}`}
+            className={`absolute flex items-center justify-center overflow-hidden rounded-full border bg-gradient-to-br from-white/[0.12] via-white/[0.03] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.16),0_4px_16px_rgba(0,0,0,0.18)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,color,box-shadow] duration-250 focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none ${isPrivateMode ? `focus-visible:outline-amber-400/50 ${text.trim() || pendingAttachments.length ? "border-amber-200/30 bg-amber-500/60 text-amber-50 enabled:hover:border-amber-100/40 enabled:hover:bg-amber-400/70" : "border-amber-300/20 bg-amber-950/30 text-amber-200/55"}` : `focus-visible:outline-emerald-400/50 ${text.trim() || pendingAttachments.length ? "border-emerald-200/20 bg-emerald-600/60 text-white enabled:hover:bg-emerald-500/70 enabled:hover:border-emerald-100/30" : "border-white/10 bg-emerald-950/25 text-white/45"}`}`}
           >
             {sending ? (
               <svg className="size-5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" opacity=".25" /><path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
@@ -1012,17 +1085,56 @@ export function MessageComposer({
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             className="hidden"
             onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (!file) return;
-              stagePendingFile(file);
+              const files = Array.from(event.target.files ?? []);
+              if (!files.length) return;
+              stagePendingFiles(files);
               event.target.value = "";
               textareaRef.current?.focus();
             }}
           />
         </form>
       </div>
+      {dropZoneContainer && createPortal(
+        <AnimatePresence>
+          {isDraggingFile && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.18 }}
+              className="pointer-events-none absolute inset-0 z-[30] flex items-center justify-center bg-black/35 p-3 backdrop-blur-md sm:p-5"
+            >
+              <motion.div
+                initial={{ y: 18, scale: 0.985 }}
+                animate={{ y: 0, scale: 1 }}
+                exit={{ y: 14, scale: 0.99 }}
+                transition={transition}
+                role="status"
+                aria-live="polite"
+                className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-[32px] border-2 border-dashed border-emerald-300/75 bg-zinc-950/65 bg-gradient-to-br from-white/[0.1] via-emerald-950/[0.16] to-white/[0.025] px-6 text-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),inset_0_-1px_1px_rgba(0,0,0,0.3),0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-3xl backdrop-saturate-150"
+              >
+                <span aria-hidden="true" className="absolute top-0 left-[12%] h-40 w-2/3 rounded-full bg-white/[0.055] blur-3xl" />
+                <span aria-hidden="true" className="absolute right-[8%] bottom-[4%] size-64 rounded-full bg-emerald-400/[0.07] blur-3xl" />
+                <span className="relative mb-6 flex size-20 items-center justify-center rounded-[26px] border border-white/20 bg-gradient-to-br from-white/[0.2] via-white/[0.07] to-transparent text-emerald-50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),inset_0_-1px_1px_rgba(0,0,0,0.16),0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-2xl">
+                  <svg className="size-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" />
+                    <path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+                  </svg>
+                </span>
+                <span className="relative text-[clamp(1.5rem,3vw,2.25rem)] font-semibold tracking-[-0.035em] text-white">Arraste os arquivos aqui</span>
+                <span className="relative mt-2 max-w-md text-sm text-zinc-300 sm:text-base">Solte para preparar os anexos antes de enviar</span>
+                <span className="relative mt-8 rounded-full border border-white/20 bg-white/[0.075] px-5 py-2.5 text-xs font-medium text-emerald-50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_24px_rgba(0,0,0,0.22)] backdrop-blur-2xl sm:text-sm">
+                  Solte para adicionar
+                </span>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        dropZoneContainer,
+      )}
     </div >
   );
 }

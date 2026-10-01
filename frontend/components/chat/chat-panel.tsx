@@ -27,9 +27,9 @@ type ChatPanelProps = {
   onUpdateMessageFlags: (messageId: number, flags: { pinned?: boolean; favorited?: boolean }) => Promise<void>;
   onForwardMessage: (message: Message, target: Contact) => void;
 
-  // Envia arquivo + legenda opcional.
+  // Envia arquivos + legenda opcional.
   onSendMedia: (
-    file: File,
+    files: File[],
     caption?: string,
     replyToMessageId?: number,
   ) => Promise<void>;
@@ -58,6 +58,7 @@ export function ChatPanel({
   onSendMedia,
   onCloseWithBot,
 }: ChatPanelProps) {
+  const [conversationPanel, setConversationPanel] = useState<HTMLElement | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [composerFocusKey, setComposerFocusKey] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -111,7 +112,7 @@ export function ChatPanel({
   }
 
   return (
-    <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+    <section ref={setConversationPanel} className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       {/* Papel de parede fornecido pelo usuário via Unsplash. */}
       <div
         aria-hidden="true"
@@ -157,6 +158,7 @@ export function ChatPanel({
       />
 
       <MessageComposer
+        dropZoneContainer={conversationPanel}
         text={text}
         sending={sending}
         closing={closing}
@@ -165,8 +167,8 @@ export function ChatPanel({
           onSend({ ...options, replyToMessageId: activeReply?.id });
           setReplyingTo(null);
         }}
-        onSendMedia={async (file, caption) => {
-          await onSendMedia(file, caption, activeReply?.id);
+        onSendMedia={async (files, caption) => {
+          await onSendMedia(files, caption, activeReply?.id);
           setReplyingTo(null);
         }}
         onCloseWithBot={onCloseWithBot}

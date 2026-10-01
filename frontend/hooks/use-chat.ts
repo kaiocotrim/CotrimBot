@@ -734,12 +734,13 @@ export function useChat() {
   // O useChat sabe qual contato está aberto,
   // então consegue descobrir para quem enviar.
   async function sendMediaMessage(
-    file: File,
+    files: File[],
     caption?: string,
     replyToMessageId?: number,
   ) {
     if (
       !selectedContact ||
+      !files.length ||
       sending
     ) {
       return;
@@ -757,12 +758,14 @@ export function useChat() {
       // legenda opcional
       //
       // para o chat-api.
-      await sendMediaRequest(
-        selectedContact.id,
-        file,
-        caption,
-        replyToMessageId,
-      );
+      for (const [index, file] of files.entries()) {
+        await sendMediaRequest(
+          selectedContact.id,
+          file,
+          index === 0 ? caption : undefined,
+          index === 0 ? replyToMessageId : undefined,
+        );
+      }
 
       // Não adicionamos a mensagem
       // manualmente no estado.
