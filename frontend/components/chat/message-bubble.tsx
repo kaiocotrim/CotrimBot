@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import {
   ArrowBendUpLeft,
@@ -65,6 +65,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
   const [copyError, setCopyError] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [updatingFlags, setUpdatingFlags] = useState(false);
+  const [pinAnimationKey, setPinAnimationKey] = useState(0);
   const actionControlsRef = useRef<HTMLDivElement>(null);
   const reactionControlsRef = useRef<HTMLDivElement>(null);
   const reactionPickerRef = useRef<HTMLDivElement>(null);
@@ -84,7 +85,8 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
     : undefined;
   const createdAt = new Date(message.createdAt);
   const hasValidDate = !Number.isNaN(createdAt.getTime());
-  const inlineTime = message.type === "TEXT" && !/[\r\n]/.test(message.content);
+  const inlineTime = message.type === "TEXT" && !/[\r\n]/.test(message.content) && !message.deletedAt;
+  const reduceMotion = useReducedMotion();
 
   // Cada caso seleciona um único componente, sem duplicar o conteúdo da mídia.
   const content = (() => {
@@ -231,6 +233,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
     if (updatingFlags) return;
     setUpdatingFlags(true);
     setActionError(null);
+    if (flags.pinned) setPinAnimationKey((key) => key + 1);
     try {
       await onUpdateFlags(message.id, flags);
       setActionsOpen(false);
@@ -286,15 +289,48 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
             : `rounded-[24px] px-3.5 py-2.5 ${outgoing ? "bg-green-600" : "bg-zinc-800"}`
       }`}
     >
+      <AnimatePresence>
+        {pinAnimationKey > 0 && (
+          <motion.span
+            key={pinAnimationKey}
+            aria-hidden="true"
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.97 }}
+            animate={reduceMotion ? { opacity: 0 } : { opacity: [0, 0.8, 0], scale: [0.97, 1.025, 1.045] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.72, times: [0, 0.35, 1], ease: [0.22, 1, 0.36, 1] }}
+            className="pointer-events-none absolute -inset-[3px] z-10 rounded-[27px] border border-amber-300/55 shadow-[0_0_22px_rgba(252,211,77,0.22)]"
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence initial={false}>
       {(message.pinned || message.favorited) && (
-        <span
+        <motion.span
+          layout
+          initial={reduceMotion ? false : { opacity: 0, y: 5, scale: 0.72 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 3, scale: 0.8 }}
+          transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 24, mass: 0.65 }}
           className={`absolute -top-2 z-20 flex h-5 items-center gap-1 rounded-full border border-white/10 bg-zinc-900 px-1.5 text-amber-300 shadow-md ${outgoing ? "left-3" : "right-3"}`}
           title={[message.pinned ? "Mensagem fixada" : "", message.favorited ? "Mensagem favorita" : ""].filter(Boolean).join(" e ")}
         >
-          {message.pinned && <PushPin size={11} weight="fill" aria-hidden="true" />}
+          <AnimatePresence initial={false}>
+            {message.pinned && (
+              <motion.span
+                key="pinned"
+                initial={reduceMotion ? false : { opacity: 0, rotate: -35, scale: 0.4 }}
+                animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, rotate: 25, scale: 0.5 }}
+                transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 650, damping: 20 }}
+                className="flex"
+              >
+                <PushPin size={11} weight="fill" aria-hidden="true" />
+              </motion.span>
+            )}
+          </AnimatePresence>
           {message.favorited && <Star size={11} weight="fill" aria-hidden="true" />}
-        </span>
+        </motion.span>
       )}
+      </AnimatePresence>
       {isPrivate && (
         <div className="mb-1 flex items-center gap-1 text-[10px] font-semibold tracking-wide text-amber-700">
           <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
@@ -449,6 +485,18 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
         </div>
       ) : (
         content
+      )}
+      {message.deletedAt && (
+        <motion.p
+          role="note"
+          initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.24, ease: [0.22, 1, 0.36, 1] }}
+          className={`mt-1.5 flex items-center gap-1.5 text-[11px] italic ${isPrivate ? "text-amber-800/65" : "text-white/55"}`}
+        >
+          <Trash size={12} weight="regular" aria-hidden="true" />
+          <span>{message.direction === "INCOMING" ? "Apagada pelo usuário" : "Mensagem apagada"}</span>
+        </motion.p>
       )}
       {!inlineTime && timestamp && (
         <div className={`flex items-center justify-end gap-0.5 ${isSticker ? "absolute right-1 bottom-1 rounded-md bg-black/55 px-1.5 py-1 shadow-sm backdrop-blur-sm" : (isImage && !imageHasCaption) || (isVideo && message.content === "[Vídeo]") ? "absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-1 shadow-sm backdrop-blur-[2px]" : isImage || isVideo ? "px-2 pt-0.5 pb-1" : isAudio ? "mt-2" : "mt-1"}`}>

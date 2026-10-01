@@ -621,6 +621,26 @@ export async function markMessagesAsRead(
 // GET /messages/:id/media
 // Busca a mídia de uma mensagem na Evolution
 // e entrega os bytes reais para o navegador.
+function sendMediaResponse(
+  req: Request,
+  res: Response,
+  buffer: Buffer,
+  mimetype: string,
+  fileName?: string | null,
+) {
+  res.setHeader("Content-Type", mimetype);
+
+  if (fileName) {
+    const disposition = req.query.download === "1" ? "attachment" : "inline";
+    const safeFileName = fileName.replace(/["\r\n]/g, "_");
+    res.setHeader("Content-Disposition", `${disposition}; filename="${safeFileName}"`);
+  } else if (req.query.download === "1") {
+    res.setHeader("Content-Disposition", "attachment");
+  }
+
+  return res.send(buffer);
+}
+
 export async function getMessageMedia(
   req: Request,
   res: Response
@@ -649,6 +669,20 @@ export async function getMessageMedia(
   }
 
   try {
+    const cachedMedia = await prisma.messageMedia.findUnique({
+      where: { messageId: message.id },
+    });
+
+    if (cachedMedia) {
+      return sendMediaResponse(
+        req,
+        res,
+        Buffer.from(cachedMedia.data),
+        cachedMedia.mimetype,
+        cachedMedia.fileName,
+      );
+    }
+
     // Usa o externalId salvo no banco
     // para pedir a mídia original à Evolution.
     const media = await getMediaMessage(
@@ -662,23 +696,20 @@ export async function getMessageMedia(
       "base64"
     );
 
-    // Informa ao navegador qual tipo
-    // de arquivo estamos enviando.
-    res.setHeader(
-      "Content-Type",
-      media.mimetype
-    );
-
-    // Permite que o navegador tente exibir/tocar
-    // a mídia diretamente.
-    if (media.fileName) {
-      res.setHeader(
-        "Content-Disposition",
-        `inline; filename="${media.fileName}"`
-      );
+    try {
+      await prisma.messageMedia.create({
+        data: {
+          messageId: message.id,
+          data: buffer,
+          mimetype: media.mimetype,
+          fileName: media.fileName ?? null,
+        },
+      });
+    } catch (cacheError) {
+      console.error("Não foi possível guardar a mídia no cache:", cacheError);
     }
 
-    return res.send(buffer);
+    return sendMediaResponse(req, res, buffer, media.mimetype, media.fileName);
   } catch (error) {
     console.error(
       "Erro ao buscar mídia da mensagem:",

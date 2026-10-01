@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
-import { getGroupInfo } from "../services/evolution.service.js";
+import { getGroupInfo, getMediaMessage } from "../services/evolution.service.js";
 import {
   findReplyContextInfo,
   getQuotedContent,
@@ -34,6 +34,62 @@ function getMessageTimestamp(value: unknown): number | null {
   return null;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+function getDeletedMessageExternalId(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+
+  const key = isRecord(value.key) ? value.key : null;
+  const message = isRecord(value.message) ? value.message : null;
+  const protocolMessage = isRecord(value.protocolMessage)
+    ? value.protocolMessage
+    : message && isRecord(message.protocolMessage)
+      ? message.protocolMessage
+      : null;
+  const protocolKey = protocolMessage && isRecord(protocolMessage.key)
+    ? protocolMessage.key
+    : null;
+  const candidates = [key?.id, value.id, value.keyId, protocolKey?.id];
+  const externalId = candidates.find((candidate) => typeof candidate === "string" && candidate.trim());
+
+  return typeof externalId === "string" ? externalId.trim() : null;
+}
+
+async function markMessageAsDeleted(externalId: string) {
+  const message = await prisma.message.findUnique({ where: { externalId } });
+  if (!message || message.deletedAt) return;
+
+  const updated = await prisma.message.update({
+    where: { id: message.id },
+    data: { deletedAt: new Date() },
+  });
+
+  getSocketServer().emit("message_deleted", {
+    messageId: updated.id,
+    deletedAt: updated.deletedAt,
+  });
+}
+
+async function cacheMessageMedia(messageId: number, externalId: string) {
+  const media = await getMediaMessage(externalId);
+  await prisma.messageMedia.upsert({
+    where: { messageId },
+    create: {
+      messageId,
+      data: Buffer.from(media.base64, "base64"),
+      mimetype: media.mimetype,
+      fileName: media.fileName ?? null,
+    },
+    update: {
+      data: Buffer.from(media.base64, "base64"),
+      mimetype: media.mimetype,
+      fileName: media.fileName ?? null,
+    },
+  });
+}
+
 export async function whatsappWebhook(req: Request, res: Response) {
   const body = req.body;
 
@@ -61,11 +117,24 @@ export async function whatsappWebhook(req: Request, res: Response) {
   }
 
   // Confirmações de entrega/leitura das mensagens enviadas pelo CotrimBot.
+  if (body.event === "messages.delete") {
+    const deletions = Array.isArray(body.data) ? body.data : [body.data];
+    for (const deletion of deletions) {
+      const externalId = getDeletedMessageExternalId(deletion);
+      if (externalId) await markMessageAsDeleted(externalId);
+    }
+    return res.status(200).json({ received: true });
+  }
+
   if (body.event === "messages.update" || body.event === "send.message.update") {
     const updates = Array.isArray(body.data) ? body.data : [body.data];
     for (const update of updates) {
       const externalId = update?.key?.id ?? update?.id;
       const status = String(update?.status ?? update?.update?.status ?? "").toUpperCase();
+      if (externalId && status === "DELETED") {
+        await markMessageAsDeleted(externalId);
+        continue;
+      }
       if (!externalId || !["READ", "PLAYED", "4"].includes(status)) continue;
 
       const message = await prisma.message.findUnique({ where: { externalId } });
@@ -97,6 +166,11 @@ export async function whatsappWebhook(req: Request, res: Response) {
 
   const messagePayload = unwrapWhatsAppMessage(data?.message);
   data.message = messagePayload;
+  const revokedExternalId = getDeletedMessageExternalId({ message: messagePayload });
+  if (revokedExternalId && messagePayload.protocolMessage) {
+    await markMessageAsDeleted(revokedExternalId);
+    return res.status(200).json({ received: true });
+  }
   const dataContextInfo = [data.contextInfo, data.messageContextInfo];
   const replyContextInfo = findReplyContextInfo(messagePayload, dataContextInfo);
   const rawQuotedExternalId = replyContextInfo?.stanzaId;
@@ -355,6 +429,14 @@ export async function whatsappWebhook(req: Request, res: Response) {
       quotedSenderName,
     },
   });
+
+  if (messageType === "IMAGE" || messageType === "VIDEO") {
+    try {
+      await cacheMessageMedia(incomingMessage.id, incomingMessage.externalId);
+    } catch (error) {
+      console.error("Não foi possível guardar a mídia recebida:", error);
+    }
+  }
 
   const waitingReplies = await prisma.message.findMany({
     where: { contactId: contact.id, quotedExternalId: externalId, quotedMessageId: null },

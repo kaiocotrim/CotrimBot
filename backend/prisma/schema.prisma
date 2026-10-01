@@ -43,6 +43,7 @@ model Message {
   private                 Boolean          @default(false)
   pinned                  Boolean          @default(false)
   favorited               Boolean          @default(false)
+  deletedAt               DateTime?
   quotedExternalId        String?
   quotedMessageId         Int?
   quotedContent           String?          @db.Text
@@ -50,10 +51,19 @@ model Message {
   contact                 Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
   quotedMessage           Message?         @relation("MessageToMessage", fields: [quotedMessageId], references: [id])
   quotedByMessages        Message[]        @relation("MessageToMessage")
+  cachedMedia             MessageMedia?
 
   @@index([contactId], map: "Message_contactId_fkey")
   @@index([quotedExternalId])
   @@index([quotedMessageId])
+}
+
+model MessageMedia {
+  messageId Int     @id
+  data      Bytes   @db.LongBlob
+  mimetype  String  @db.VarChar(255)
+  fileName  String? @db.VarChar(512)
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
 }
 
 enum MessageDirection {

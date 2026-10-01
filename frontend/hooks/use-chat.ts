@@ -229,6 +229,12 @@ export function useChat() {
       setMessages((current) => current.map((message) => message.id === data.messageId ? { ...message, readAt: data.readAt } : message));
     }
 
+    function handleMessageDeleted(data: { messageId: number; deletedAt: string }) {
+      setMessages((current) => current.map((message) =>
+        message.id === data.messageId ? { ...message, deletedAt: data.deletedAt } : message
+      ));
+    }
+
     function handleMessageReplyResolved(data: { messageId: number; quotedMessageId: number }) {
       setMessages((current) => current.map((message) =>
         message.id === data.messageId ? { ...message, quotedMessageId: data.quotedMessageId } : message
@@ -271,6 +277,7 @@ export function useChat() {
     );
     socket.on("message_reaction", handleMessageReaction);
     socket.on("message_read", handleMessageRead);
+    socket.on("message_deleted", handleMessageDeleted);
     socket.on("message_reply_resolved", handleMessageReplyResolved);
     socket.on("message_quote_updated", handleMessageQuoteUpdated);
     socket.on("message_flags_updated", handleMessageFlagsUpdated);
@@ -286,6 +293,7 @@ export function useChat() {
       );
       socket.off("message_reaction", handleMessageReaction);
       socket.off("message_read", handleMessageRead);
+      socket.off("message_deleted", handleMessageDeleted);
       socket.off("message_reply_resolved", handleMessageReplyResolved);
       socket.off("message_quote_updated", handleMessageQuoteUpdated);
       socket.off("message_flags_updated", handleMessageFlagsUpdated);

@@ -685,8 +685,29 @@ export function MessageComposer({
                 className="relative mb-2 flex max-h-[min(48vh,430px)] flex-col overflow-hidden rounded-[26px] border border-white/15 bg-zinc-950/65 bg-gradient-to-b from-white/[0.1] via-white/[0.035] to-white/[0.015] shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.2),0_18px_48px_rgba(0,0,0,0.35)] backdrop-blur-2xl backdrop-saturate-150"
               >
                 <div className={`grid min-h-0 max-h-[min(42vh,340px)] gap-2 overflow-y-auto overscroll-contain p-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${pendingAttachments.length === 1 ? "grid-cols-1" : "auto-rows-[112px] grid-cols-2 sm:auto-rows-[124px] sm:grid-cols-3"}`}>
-                  {pendingAttachments.map((attachment) => (
-                    <div key={attachment.id} className={`relative min-h-0 overflow-hidden rounded-[18px] border border-white/10 bg-black/20 ${pendingAttachments.length === 1 ? "h-[clamp(190px,32vh,280px)]" : "h-full"}`}>
+                  <AnimatePresence initial mode="popLayout">
+                    {pendingAttachments.map((attachment, index) => (
+                    <motion.div
+                      layout
+                      key={attachment.id}
+                      initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.97 }}
+                      transition={{
+                        duration: reduceMotion ? 0 : 0.32,
+                        delay: reduceMotion ? 0 : Math.min(index * 0.045, 0.18),
+                        ease: [0.22, 1, 0.36, 1],
+                        layout: { duration: reduceMotion ? 0 : 0.3, ease: [0.22, 1, 0.36, 1] },
+                      }}
+                      className={`relative min-h-0 overflow-hidden rounded-[18px] border border-white/10 bg-black/20 ${pendingAttachments.length === 1 ? "h-[clamp(190px,32vh,280px)]" : "h-full"}`}
+                    >
+                      <motion.span
+                        aria-hidden="true"
+                        initial={{ opacity: 0 }}
+                        animate={reduceMotion ? { opacity: 0 } : { opacity: [0, 0.9, 0] }}
+                        transition={{ duration: 0.85, times: [0, 0.3, 1], ease: "easeOut", delay: Math.min(index * 0.045, 0.18) }}
+                        className="pointer-events-none absolute inset-0 z-10 rounded-[18px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.42),0_0_22px_rgba(255,255,255,0.1)]"
+                      />
                       {attachment.previewUrl ? (
                         <>
                           <Image unoptimized fill sizes={pendingAttachments.length === 1 ? "(max-width: 768px) 100vw, 672px" : "220px"} src={attachment.previewUrl} alt={`Prévia de ${attachment.file.name}`} className={pendingAttachments.length === 1 ? "object-contain p-2" : "object-cover"} />
@@ -716,8 +737,9 @@ export function MessageComposer({
                       >
                         <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
                       </button>
-                    </div>
-                  ))}
+                    </motion.div>
+                    ))}
+                  </AnimatePresence>
                 </div>
                 <div className="relative z-20 flex shrink-0 items-center gap-3 border-t border-white/10 bg-zinc-950/95 px-4 py-3 backdrop-blur-xl">
                   <span className="min-w-0 flex-1">

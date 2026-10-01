@@ -42,6 +42,7 @@ export type Message = {
   private?: boolean;
   pinned?: boolean;
   favorited?: boolean;
+  deletedAt?: string | null;
 
   // Contato ao qual a mensagem pertence.
   contactId: number;
