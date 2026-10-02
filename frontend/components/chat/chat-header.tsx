@@ -1,10 +1,10 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
 import { Info } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { Contact } from "@/types/chat";
 import { Avatar } from "@/components/chat/avatar";
+import { TypingIndicator } from "@/components/chat/typing-indicator";
 
 type ChatHeaderProps = {
   contact: Contact;
@@ -22,24 +22,6 @@ type ChatHeaderProps = {
 };
 
 const actionClass = "flex size-9 items-center justify-center rounded-full transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-35";
-
-function TypingIndicator({ contactName }: { contactName: string }) {
-  const reduceMotion = useReducedMotion();
-
-  return (
-    <span role="status" aria-label={`${contactName} está digitando`} className="flex h-4 items-center gap-1 text-emerald-400">
-      <span className="sr-only">Digitando</span>
-      {[0, 1, 2].map((dot) => (
-        <motion.span
-          key={dot}
-          className="size-1 rounded-full bg-current"
-          animate={reduceMotion ? undefined : { y: [0, -3, 0], opacity: [0.45, 1, 0.45] }}
-          transition={{ duration: 0.72, repeat: Infinity, ease: "easeInOut", delay: dot * 0.12 }}
-        />
-      ))}
-    </span>
-  );
-}
 
 export function ChatHeader({ contact, isTyping, searchOpen, searchQuery, currentResult, resultCount, onOpenSearch, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch }: ChatHeaderProps) {
   const searchRef = useRef<HTMLInputElement>(null);
@@ -65,7 +47,7 @@ export function ChatHeader({ contact, isTyping, searchOpen, searchQuery, current
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[15px] font-medium">{contact.name}</span>
               {isTyping
-                ? <TypingIndicator contactName={contact.name} />
+                ? <TypingIndicator label={`${contact.name} está digitando`} />
                 : <span className="block truncate text-xs text-zinc-400">{contact.isGroup ? "Grupo do WhatsApp" : contact.phone}</span>}
             </span>
           </button>

@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { AttachmentMenu, type AttachmentKind } from "@/components/chat/attachment-menu";
 import { EmojiSelector } from "@/components/chat/emoji-selector";
 import { EmojiText } from "@/components/chat/emoji-text";
+import { TypingIndicator } from "@/components/chat/typing-indicator";
 import { insertEmojiAtSelection } from "@/lib/emoji-text";
 import { rewriteMessage } from "@/lib/chat-api";
 import type { Message } from "@/types/chat";
@@ -152,6 +153,7 @@ export function MessageComposer({
   const previousText = useRef(text);
   const textareaId = useId();
   const reduceMotion = useReducedMotion();
+  const isTyping = text.trim().length > 0;
   const isLongTextCollapsed = longTextCollapsed && Boolean(text);
   const showControls = isFocused || text.length > 0 || isFullscreen;
   const isStacked = measurements.compact > 24 || isFullscreen || isLongTextCollapsed;
@@ -1101,6 +1103,11 @@ export function MessageComposer({
               <svg className="size-5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" opacity=".25" /><path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
             ) : <ComposerIcon name="send" />}
           </motion.button>
+          {isTyping && (
+            <span className="pointer-events-none absolute -bottom-5 left-4">
+              <TypingIndicator label="Você está digitando" className={isPrivateMode ? "text-amber-300/70" : "text-zinc-400"} />
+            </span>
+          )}
           <AttachmentMenu open={attachmentsOpen && !sending} triggerRef={attachmentTriggerRef} onClose={closeAttachments} onSelect={selectAttachment} closing={closing} onCloseWithBot={onCloseWithBot} allowCloseWithBot={allowCloseWithBot} stacked={isStacked} />
           <EmojiSelector id={emojiSelectorId} open={emojisOpen && !sending} triggerRef={emojiTriggerRef} onClose={closeEmojis} onSelect={selectEmoji} fieldHeight={fieldHeight} rightInset={isStacked ? 0 : 56} />
           {/* Seleciona o arquivo localmente; a integração de envio de mídia é uma etapa separada. */}
