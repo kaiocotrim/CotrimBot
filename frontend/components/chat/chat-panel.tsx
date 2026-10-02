@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { ChatHeader } from "@/components/chat/chat-header";
+import { EmptyChatAnimation } from "@/components/chat/empty-chat-animation";
 import { ContactInfoPanel } from "@/components/chat/contact-info-panel";
 import { MessageComposer } from "@/components/chat/message-composer";
 import { MessageList } from "@/components/chat/message-list";
@@ -107,8 +108,9 @@ export function ChatPanel({
 
   if (!contact) {
     return (
-      <section className="flex flex-1 items-center justify-center text-zinc-500">
-        Selecione um contato para iniciar
+      <section className="flex min-w-0 flex-1 flex-col items-center justify-center gap-4 p-6 text-center text-zinc-500">
+        <EmptyChatAnimation />
+        <p>Selecione um contato para iniciar</p>
       </section>
     );
   }
