@@ -87,6 +87,16 @@ export async function setContactArchived(contactId: number, archived: boolean): 
   return parseResponse<Contact>(response, "Erro ao alterar arquivamento");
 }
 
+export async function updateContactName(contactId: number, name: string) {
+  const response = await fetch(`${API_URL}/contacts/${contactId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+    credentials: "include",
+  });
+  return parseResponse<Pick<Contact, "id" | "name">>(response, "Erro ao editar contato");
+}
+
 export async function postMessage(contactId: number, text: string, clientId?: string, isPrivate = false, replyToMessageId?: number): Promise<{ message: Message }> {
   const response = await fetch(`${API_URL}/contacts/${contactId}/send`, {
     method: "POST",

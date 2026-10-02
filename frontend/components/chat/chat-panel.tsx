@@ -35,6 +35,7 @@ type ChatPanelProps = {
   ) => Promise<void>;
 
   onCloseWithBot: () => void;
+  onRenameContact: (contactId: number, name: string) => Promise<void>;
 };
 
 // Agrupa todas as partes visuais da conversa selecionada.
@@ -57,6 +58,7 @@ export function ChatPanel({
   onForwardMessage,
   onSendMedia,
   onCloseWithBot,
+  onRenameContact,
 }: ChatPanelProps) {
   const [conversationPanel, setConversationPanel] = useState<HTMLElement | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -181,7 +183,9 @@ export function ChatPanel({
       <AnimatePresence>
         {contactInfoOpen && (
           <ContactInfoPanel
+            key={contact.id}
             contact={contact}
+            onRenameContact={onRenameContact}
             onClose={() => setContactInfoOpen(false)}
             onSearch={() => { setContactInfoOpen(false); setSearchOpen(true); }}
           />

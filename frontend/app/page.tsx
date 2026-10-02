@@ -57,6 +57,7 @@ export default function Home() {
         onForwardMessage={chat.forwardMessage}
         onSendMedia={chat.sendMediaMessage}
         onCloseWithBot={chat.closeWithBot}
+        onRenameContact={chat.renameContact}
       />
     </main>
   );

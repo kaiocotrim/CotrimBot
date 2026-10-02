@@ -1,6 +1,8 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { Pencil } from "lucide-react";
+import { useState, type FormEvent } from "react";
 import { Avatar } from "@/components/chat/avatar";
 import type { Contact } from "@/types/chat";
 
@@ -8,12 +10,44 @@ export function ContactInfoPanel({
   contact,
   onClose,
   onSearch,
+  onRenameContact,
 }: {
   contact: Contact;
   onClose: () => void;
   onSearch: () => void;
+  onRenameContact: (contactId: number, name: string) => Promise<void>;
 }) {
   const reduceMotion = useReducedMotion();
+  const [editing, setEditing] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function startEditing() {
+    const [first = "", ...rest] = contact.name.trim().split(/\s+/);
+    setFirstName(first);
+    setLastName(rest.join(" "));
+    setError(null);
+    setEditing(true);
+  }
+
+  async function saveName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving || !firstName.trim()) return;
+
+    const name = `${firstName.trim()} ${lastName.trim()}`.trim().replace(/\s+/g, " ");
+    setSaving(true);
+    setError(null);
+    try {
+      await onRenameContact(contact.id, name);
+      setEditing(false);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Não foi possível editar o contato");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <motion.aside
@@ -54,6 +88,65 @@ export function ContactInfoPanel({
         <p className="mt-1 text-sm text-zinc-300/80">
           {contact.isGroup ? "Grupo do WhatsApp" : contact.phone}
         </p>
+
+        {editing ? (
+          <form
+            onSubmit={saveName}
+            aria-label="Editar contato"
+            aria-busy={saving}
+            className="mt-4 w-full space-y-4 rounded-2xl border border-white/15 bg-white/[0.07] p-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)] backdrop-blur-md"
+          >
+            <label className="block text-xs text-zinc-300/80">
+              Nome
+              <input
+                autoFocus
+                required
+                autoComplete="given-name"
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+                disabled={saving}
+                className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-white/30 focus:ring-2 focus:ring-white/[0.05] disabled:opacity-50"
+              />
+            </label>
+            <label className="block text-xs text-zinc-300/80">
+              Sobrenome
+              <input
+                autoComplete="family-name"
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+                disabled={saving}
+                className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-white/30 focus:ring-2 focus:ring-white/[0.05] disabled:opacity-50"
+              />
+            </label>
+            {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                disabled={saving}
+                className="rounded-xl px-3 py-2 text-sm text-zinc-300 transition hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !firstName.trim()}
+                className="rounded-xl border border-white/15 bg-white/[0.08] px-3 py-2 text-sm text-white transition hover:bg-white/[0.14] focus-visible:outline-2 focus-visible:outline-white/50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button
+            type="button"
+            onClick={startEditing}
+            className="mt-3 flex items-center gap-2 rounded-full px-3 py-1.5 text-xs text-zinc-300/80 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50"
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
+            Editar contato
+          </button>
+        )}
 
         {/* Card de vidro interno */}
         <div className="mt-7 w-full overflow-hidden rounded-2xl border border-white/15 bg-white/[0.07] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)] backdrop-blur-md">

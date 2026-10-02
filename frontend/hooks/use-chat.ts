@@ -13,6 +13,7 @@ import {
   reactToMessage as reactToMessageRequest,
   sendMedia as sendMediaRequest,
   setContactArchived as setContactArchivedRequest,
+  updateContactName as updateContactNameRequest,
   updateMessageFlags as updateMessageFlagsRequest,
 } from "@/lib/chat-api";
 
@@ -38,6 +39,7 @@ export function useChat() {
   const [selectedContact, setSelectedContact] =
     useState<Contact | null>(null);
   const selectedContactIdRef = useRef<number | null>(null);
+  const selectedContactId = selectedContact?.id;
 
   const [messages, setMessages] =
     useState<Message[]>([]);
@@ -410,29 +412,29 @@ export function useChat() {
   // 2. Marca mensagens como lidas.
   // 3. Atualiza a sidebar.
   useEffect(() => {
-    if (!selectedContact) {
+    if (selectedContactId === undefined) {
       return;
     }
 
     let active = true;
 
     getMessages(
-      selectedContact.id
+      selectedContactId
     )
       .then((page) => {
         if (active) {
-          const localMessages = forwardedMessagesRef.current.get(selectedContact.id) ?? [];
+          const localMessages = forwardedMessagesRef.current.get(selectedContactId) ?? [];
           const persistedExternalIds = new Set(page.messages.map((message) => message.externalId));
           const unpersistedLocalMessages = localMessages.filter(
             (message) => !persistedExternalIds.has(message.externalId)
           );
-          forwardedMessagesRef.current.set(selectedContact.id, unpersistedLocalMessages);
+          forwardedMessagesRef.current.set(selectedContactId, unpersistedLocalMessages);
           setMessages([...page.messages, ...unpersistedLocalMessages]);
           setHasOlderMessages(page.hasMore);
         }
 
         return markMessagesAsRead(
-          selectedContact.id
+          selectedContactId
         );
       })
 
@@ -457,7 +459,7 @@ export function useChat() {
     return () => {
       active = false;
     };
-  }, [selectedContact]);
+  }, [selectedContactId]);
 
   async function loadOlderMessages() {
     const contact = selectedContact;
@@ -542,6 +544,16 @@ export function useChat() {
       setContacts((current) => current.map((item) => item.id === contact.id ? { ...item, archived: contact.archived } : item));
       throw error;
     }
+  }
+
+  async function renameContact(contactId: number, name: string) {
+    const updated = await updateContactNameRequest(contactId, name);
+    setContacts((current) => current.map((contact) =>
+      contact.id === updated.id ? { ...contact, name: updated.name } : contact
+    ));
+    setSelectedContact((current) =>
+      current?.id === updated.id ? { ...current, name: updated.name } : current
+    );
   }
 
 
@@ -863,6 +875,7 @@ export function useChat() {
 
     selectContact,
     archiveContact,
+    renameContact,
 
     // Envio de texto
     sendMessage,
