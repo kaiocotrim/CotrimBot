@@ -44,6 +44,7 @@ model Message {
   pinned                  Boolean          @default(false)
   favorited               Boolean          @default(false)
   deletedAt               DateTime?
+  viewOnce                Boolean          @default(false)
   quotedExternalId        String?
   quotedMessageId         Int?
   quotedContent           String?          @db.Text

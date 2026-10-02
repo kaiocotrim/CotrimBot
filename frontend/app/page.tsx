@@ -48,6 +48,7 @@ export default function Home() {
         hasOlderMessages={chat.hasOlderMessages}
         loadingOlderMessages={chat.loadingOlderMessages}
         newMessageId={chat.newMessageId}
+        isTyping={chat.isTyping}
         onTextChange={chat.setText}
         onSend={chat.sendMessage}
         onLoadOlderMessages={chat.loadOlderMessages}

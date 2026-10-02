@@ -1,14 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Avatar } from "@/components/chat/avatar";
 import { EmojiText } from "@/components/chat/emoji-text";
+import { QuickConversationPreview } from "@/components/chat/quick-conversation-preview";
 import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
 import { authClient, useSession } from "@/lib/auth-client";
-import type { Contact } from "@/types/chat";
+import { getMessages } from "@/lib/chat-api";
+import type { Contact, Message } from "@/types/chat";
 
 type ContactSidebarProps = { contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onArchiveContact: (contact: Contact, archived: boolean) => Promise<void> };
+type ConversationFilter = "conversations" | "groups";
+const LONG_PRESS_DURATION = 1_000;
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
 const dayKeyFormatter = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: CHAT_TIME_ZONE });
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: CHAT_TIME_ZONE });
@@ -31,23 +35,144 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "admin";
   const [query, setQuery] = useState("");
+  const [conversationFilter, setConversationFilter] = useState<ConversationFilter>("conversations");
   const [showArchived, setShowArchived] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [holdingContactId, setHoldingContactId] = useState<number | null>(null);
+  const [completedContactId, setCompletedContactId] = useState<number | null>(null);
+  const [previewContact, setPreviewContact] = useState<Contact | null>(null);
+  const [previewMessages, setPreviewMessages] = useState<Message[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressContactIdRef = useRef<number | null>(null);
+  const suppressClickContactIdRef = useRef<number | null>(null);
+  const previewRequestRef = useRef(0);
+  const previewPanelRef = useRef<HTMLElement>(null);
   const archivedCount = contacts.filter((contact) => contact.archived).length;
   const visibleContacts = useMemo(() => {
     const search = query.trim().toLocaleLowerCase("pt-BR");
     return contacts.filter((contact) => {
       if (contact.archived !== showArchived) return false;
+      if (contact.isGroup !== (conversationFilter === "groups")) return false;
       if (!search) return true;
       return contact.name.toLocaleLowerCase("pt-BR").includes(search)
         || contact.phone.includes(search)
         || Boolean(contact.messages?.[0]?.content.toLocaleLowerCase("pt-BR").includes(search));
     });
-  }, [contacts, query, showArchived]);
+  }, [contacts, conversationFilter, query, showArchived]);
+
+  const closePreview = useCallback(() => {
+    previewRequestRef.current += 1;
+    setPreviewContact(null);
+    setPreviewMessages([]);
+    setPreviewLoading(false);
+    setPreviewError(null);
+  }, []);
+
+  const openPreview = useCallback((contact: Contact) => {
+    const requestId = previewRequestRef.current + 1;
+    previewRequestRef.current = requestId;
+    setPreviewContact(contact);
+    setPreviewMessages([]);
+    setPreviewError(null);
+    setPreviewLoading(true);
+
+    void getMessages(contact.id, undefined, 5)
+      .then((page) => {
+        if (previewRequestRef.current !== requestId) return;
+        setPreviewMessages(page.messages);
+      })
+      .catch((requestError: unknown) => {
+        if (previewRequestRef.current !== requestId) return;
+        setPreviewError(requestError instanceof Error ? requestError.message : "Não foi possível carregar a prévia");
+      })
+      .finally(() => {
+        if (previewRequestRef.current === requestId) setPreviewLoading(false);
+      });
+  }, []);
+
+  const cancelLongPress = useCallback((contactId?: number) => {
+    if (contactId !== undefined && longPressContactIdRef.current !== contactId) return;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+    longPressContactIdRef.current = null;
+    setHoldingContactId(null);
+  }, []);
+
+  function startLongPress(contact: Contact, event: ReactPointerEvent<HTMLButtonElement>) {
+    if (event.pointerType !== "mouse" || event.button !== 0) return;
+    cancelLongPress();
+    if (suppressClickTimerRef.current) clearTimeout(suppressClickTimerRef.current);
+    suppressClickContactIdRef.current = null;
+    longPressContactIdRef.current = contact.id;
+    setHoldingContactId(contact.id);
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = null;
+      longPressContactIdRef.current = null;
+      suppressClickContactIdRef.current = contact.id;
+      setHoldingContactId(null);
+      setCompletedContactId(contact.id);
+      openPreview(contact);
+
+      if (completionTimerRef.current) clearTimeout(completionTimerRef.current);
+      completionTimerRef.current = setTimeout(() => setCompletedContactId(null), 180);
+    }, LONG_PRESS_DURATION);
+  }
+
+  function releaseLongPress(contactId: number) {
+    cancelLongPress(contactId);
+    if (suppressClickContactIdRef.current !== contactId) return;
+    if (suppressClickTimerRef.current) clearTimeout(suppressClickTimerRef.current);
+    suppressClickTimerRef.current = setTimeout(() => {
+      if (suppressClickContactIdRef.current === contactId) suppressClickContactIdRef.current = null;
+    }, 0);
+  }
+
+  function selectContactFromClick(contact: Contact) {
+    if (suppressClickContactIdRef.current === contact.id) {
+      suppressClickContactIdRef.current = null;
+      return;
+    }
+    onSelectContact(contact);
+  }
+
+  function openConversation(contact: Contact) {
+    closePreview();
+    onSelectContact(contact);
+  }
+
+  useEffect(() => {
+    if (!previewContact) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!previewPanelRef.current?.contains(event.target as Node)) closePreview();
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") closePreview();
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closePreview, previewContact]);
+
+  useEffect(() => () => {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    if (completionTimerRef.current) clearTimeout(completionTimerRef.current);
+    if (suppressClickTimerRef.current) clearTimeout(suppressClickTimerRef.current);
+    previewRequestRef.current += 1;
+  }, []);
 
   return (
 
-      <div className="flex h-full min-h-0 w-[320px] min-w-[280px] max-w-[42vw] shrink-0 flex-col border-r border-white/[0.08]">
+      <div className="relative flex h-full min-h-0 w-[320px] min-w-[280px] max-w-[42vw] shrink-0 flex-col border-r border-white/[0.08]">
         <header className="px-4 pt-4 pb-2">
           <div className="flex items-center justify-between">
             <h1 className="text-[23px] font-semibold leading-none tracking-tight text-zinc-50">CotrimBot</h1>
@@ -108,6 +233,25 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
             />
           </label>
 
+          <div className="mt-1.5 grid grid-cols-2 gap-1" role="group" aria-label="Filtrar conversas">
+            <button
+              type="button"
+              onClick={() => setConversationFilter("conversations")}
+              aria-pressed={conversationFilter === "conversations"}
+              className={`h-8 rounded-[10px] px-3 text-[13px] font-medium transition-colors ${conversationFilter === "conversations" ? "bg-white/[0.07] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-300"}`}
+            >
+              Conversas
+            </button>
+            <button
+              type="button"
+              onClick={() => setConversationFilter("groups")}
+              aria-pressed={conversationFilter === "groups"}
+              className={`h-8 rounded-[10px] px-3 text-[13px] font-medium transition-colors ${conversationFilter === "groups" ? "bg-white/[0.07] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-300"}`}
+            >
+              Grupos
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={() => setShowArchived((current) => !current)}
@@ -133,9 +277,31 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
               const unread = contact.unreadCount > 0;
               return (
                 <div key={contact.id} className={`group relative rounded-xl transition-colors ${selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"}`}>
-                  <button type="button" onClick={() => onSelectContact(contact)} className="block w-full px-2 text-left">
+                  <button
+                    type="button"
+                    onPointerDown={(event) => startLongPress(contact, event)}
+                    onPointerUp={() => releaseLongPress(contact.id)}
+                    onPointerLeave={() => releaseLongPress(contact.id)}
+                    onPointerCancel={() => releaseLongPress(contact.id)}
+                    onContextMenu={(event) => {
+                      if (longPressContactIdRef.current === contact.id || suppressClickContactIdRef.current === contact.id) event.preventDefault();
+                    }}
+                    onDragStart={(event) => event.preventDefault()}
+                    onClick={() => selectContactFromClick(contact)}
+                    className="block w-full select-none px-2 text-left"
+                  >
                   <div className="flex items-center gap-2.5">
-                    <Avatar contact={contact} />
+                    <span className={`relative shrink-0 transition-transform duration-150 ${completedContactId === contact.id ? "scale-[1.04]" : ""}`}>
+                      <Avatar contact={contact} />
+                      {holdingContactId === contact.id && (
+                        <svg className="pointer-events-none absolute -inset-1 size-12 -rotate-90" viewBox="0 0 48 48" aria-hidden="true">
+                          <circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/[0.08]" />
+                          <circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="138.23" strokeDashoffset="138.23" className="text-emerald-400/75">
+                            <animate attributeName="stroke-dashoffset" from="138.23" to="0" dur={`${LONG_PRESS_DURATION / 1_000}s`} fill="freeze" />
+                          </circle>
+                        </svg>
+                      )}
+                    </span>
                     <div className={`min-w-0 flex-1 py-2 ${selected ? "" : "border-b border-white/[0.05] group-hover:border-transparent"}`}>
                       <div className="flex items-baseline justify-between gap-3">
                         <p className="truncate text-[14px] leading-tight font-medium tracking-[-0.01em] text-zinc-50">{contact.name}</p>
@@ -174,9 +340,24 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
             })}
             {loading && <p className="px-4 py-10 text-center text-[13px] text-zinc-500">Carregando conversas...</p>}
             {!loading && error && <p role="alert" className="px-4 py-10 text-center text-[13px] text-red-300">{error}</p>}
-            {!loading && !error && visibleContacts.length === 0 && <p className="px-4 py-10 text-center text-[13px] text-zinc-500">{showArchived ? "Nenhuma conversa arquivada" : "Nenhuma conversa encontrada"}</p>}
+            {!loading && !error && visibleContacts.length === 0 && (
+              <p className="px-4 py-10 text-center text-[13px] text-zinc-500">
+                {conversationFilter === "groups"
+                  ? showArchived ? "Nenhum grupo arquivado" : "Nenhum grupo encontrado"
+                  : showArchived ? "Nenhuma conversa arquivada" : "Nenhuma conversa encontrada"}
+              </p>
+            )}
           </div>
         </CompactScrollArea>
+        <QuickConversationPreview
+          contact={previewContact}
+          messages={previewMessages}
+          loading={previewLoading}
+          error={previewError}
+          panelRef={previewPanelRef}
+          onClose={closePreview}
+          onOpenConversation={openConversation}
+        />
       </div>
   );
 }

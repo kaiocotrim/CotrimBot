@@ -50,6 +50,8 @@ export function useChat() {
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
   const loadingOlderRef = useRef(false);
   const [newMessageId, setNewMessageId] = useState<number | null>(null);
+  const [typingContactIds, setTypingContactIds] = useState<Set<number>>(() => new Set());
+  const typingTimeoutsRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
   const [text, setText] =
     useState("");
@@ -66,6 +68,32 @@ export function useChat() {
   // =========================================================
 
   useEffect(() => {
+    function setContactTyping(contactId: number, isTyping: boolean) {
+      const existingTimeout = typingTimeoutsRef.current.get(contactId);
+      if (existingTimeout) clearTimeout(existingTimeout);
+      typingTimeoutsRef.current.delete(contactId);
+
+      setTypingContactIds((current) => {
+        const next = new Set(current);
+        if (isTyping) next.add(contactId);
+        else next.delete(contactId);
+        return next;
+      });
+
+      if (isTyping) {
+        const timeout = setTimeout(() => {
+          typingTimeoutsRef.current.delete(contactId);
+          setTypingContactIds((current) => {
+            if (!current.has(contactId)) return current;
+            const next = new Set(current);
+            next.delete(contactId);
+            return next;
+          });
+        }, 6_000);
+        typingTimeoutsRef.current.set(contactId, timeout);
+      }
+    }
+
     async function handleNewMessage(data: {
       message: Message;
       contact: Contact;
@@ -89,6 +117,8 @@ export function useChat() {
       const isIncoming =
         data.message.direction ===
         "INCOMING";
+
+      setContactTyping(data.contact.id, false);
 
 
       // =====================================================
@@ -268,6 +298,11 @@ export function useChat() {
       setSelectedContact((current) => current?.id === data.id ? { ...current, ...data } : current);
     }
 
+    function handleContactPresence(data: { contactId: number; isTyping: boolean }) {
+      if (!Number.isInteger(data.contactId) || typeof data.isTyping !== "boolean") return;
+      setContactTyping(data.contactId, data.isTyping);
+    }
+
 
     // Começa a ouvir o evento
     // enviado pelo backend.
@@ -282,6 +317,7 @@ export function useChat() {
     socket.on("message_quote_updated", handleMessageQuoteUpdated);
     socket.on("message_flags_updated", handleMessageFlagsUpdated);
     socket.on("contact_updated", handleContactUpdated);
+    socket.on("contact_presence", handleContactPresence);
 
 
     // Remove o listener quando
@@ -298,8 +334,14 @@ export function useChat() {
       socket.off("message_quote_updated", handleMessageQuoteUpdated);
       socket.off("message_flags_updated", handleMessageFlagsUpdated);
       socket.off("contact_updated", handleContactUpdated);
+      socket.off("contact_presence", handleContactPresence);
     };
   }, [selectedContact]);
+
+  useEffect(() => () => {
+    for (const timeout of typingTimeoutsRef.current.values()) clearTimeout(timeout);
+    typingTimeoutsRef.current.clear();
+  }, []);
 
 
   // =========================================================
@@ -873,6 +915,7 @@ export function useChat() {
     hasOlderMessages,
     loadingOlderMessages,
     newMessageId,
+    isTyping: selectedContactId !== undefined && typingContactIds.has(selectedContactId),
 
     text,
 

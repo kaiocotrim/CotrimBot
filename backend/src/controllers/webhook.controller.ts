@@ -6,6 +6,7 @@ import { getGroupInfo, getMediaMessage } from "../services/evolution.service.js"
 import {
   findReplyContextInfo,
   getQuotedContent,
+  isViewOnceMessage,
   unwrapWhatsAppMessage,
 } from "../utils/whatsapp-message.js";
 
@@ -36,6 +37,43 @@ function getMessageTimestamp(value: unknown): number | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
+}
+
+type PresenceStatus = "unavailable" | "available" | "composing" | "recording" | "paused";
+const presenceStatuses = new Set<PresenceStatus>(["unavailable", "available", "composing", "recording", "paused"]);
+
+function asPresenceStatus(value: unknown): PresenceStatus | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.toLowerCase() as PresenceStatus;
+  return presenceStatuses.has(normalized) ? normalized : null;
+}
+
+function getPresenceStatus(value: unknown): PresenceStatus | null {
+  if (!isRecord(value)) return null;
+
+  const directStatus = asPresenceStatus(value.presence)
+    ?? asPresenceStatus(value.lastKnownPresence)
+    ?? asPresenceStatus(value.status);
+  if (directStatus) return directStatus;
+
+  if (!isRecord(value.presences)) return null;
+  const statuses = Object.values(value.presences)
+    .map((presence) => isRecord(presence)
+      ? asPresenceStatus(presence.lastKnownPresence) ?? asPresenceStatus(presence.presence) ?? asPresenceStatus(presence.status)
+      : null)
+    .filter((status): status is PresenceStatus => status !== null);
+
+  return statuses.includes("composing") ? "composing" : statuses[0] ?? null;
+}
+
+function getPresenceJids(value: unknown) {
+  if (!isRecord(value)) return [];
+  const key = isRecord(value.key) ? value.key : null;
+  const directCandidates = [value.id, value.remoteJid, value.remoteJidAlt, value.jid, key?.remoteJid, key?.remoteJidAlt]
+    .filter((candidate): candidate is string => typeof candidate === "string" && candidate.includes("@"));
+
+  if (directCandidates.length || !isRecord(value.presences)) return [...new Set(directCandidates)];
+  return [...new Set(Object.keys(value.presences).filter((candidate) => candidate.includes("@")))];
 }
 
 function getDeletedMessageExternalId(value: unknown): string | null {
@@ -92,6 +130,33 @@ async function cacheMessageMedia(messageId: number, externalId: string) {
 
 export async function whatsappWebhook(req: Request, res: Response) {
   const body = req.body;
+
+  if (body.event === "presence.update") {
+    const updates = Array.isArray(body.data) ? body.data : [body.data];
+    for (const update of updates) {
+      const presence = getPresenceStatus(update);
+      const jids = getPresenceJids(update);
+      if (!presence || !jids.length) continue;
+
+      const phones = jids.map((jid) => jid.endsWith("@g.us") ? jid : jid.replace("@s.whatsapp.net", ""));
+      const contact = await prisma.contact.findFirst({
+        where: {
+          OR: [
+            { phone: { in: phones } },
+            { whatsappLid: { in: jids } },
+          ],
+        },
+      });
+      if (!contact) continue;
+
+      getSocketServer().emit("contact_presence", {
+        contactId: contact.id,
+        presence,
+        isTyping: presence === "composing",
+      });
+    }
+    return res.status(200).json({ received: true });
+  }
 
   // Mantém a separação entre conversas ativas e arquivadas sincronizada com o WhatsApp.
   if (body.event === "chats.update" || body.event === "chats.upsert") {
@@ -164,6 +229,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
     return res.status(200).json({ received: true });
   }
 
+  const viewOnce = isViewOnceMessage(data?.message);
   const messagePayload = unwrapWhatsAppMessage(data?.message);
   data.message = messagePayload;
   const revokedExternalId = getDeletedMessageExternalId({ message: messagePayload });
@@ -391,12 +457,14 @@ export async function whatsappWebhook(req: Request, res: Response) {
     update: {
       name,
       isGroup,
+      ...(remoteJid.endsWith("@lid") ? { whatsappLid: remoteJid } : {}),
     },
 
     create: {
       name,
       phone,
       isGroup,
+      ...(remoteJid.endsWith("@lid") ? { whatsappLid: remoteJid } : {}),
     },
   });
 
@@ -423,6 +491,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
       contactId: contact.id,
       senderName,
       senderPhone,
+      viewOnce,
       quotedExternalId: replyContextInfo ? quotedExternalId : null,
       quotedMessageId: replyContextInfo ? quotedMessage?.id ?? null : null,
       quotedContent: replyContextInfo ? quotedMessage?.content ?? quotedContent : null,

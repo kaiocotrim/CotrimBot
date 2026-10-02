@@ -28,6 +28,22 @@ export function unwrapWhatsAppMessage(message: WhatsAppMessagePayload | null | u
   return current;
 }
 
+export function isViewOnceMessage(message: WhatsAppMessagePayload | null | undefined): boolean {
+  const original = message ?? {};
+  if (
+    original.viewOnceMessage
+    || original.viewOnceMessageV2
+    || original.viewOnceMessageV2Extension
+  ) {
+    return true;
+  }
+
+  const unwrapped = unwrapWhatsAppMessage(original);
+  const imageMessage = isRecord(unwrapped.imageMessage) ? unwrapped.imageMessage : null;
+  const videoMessage = isRecord(unwrapped.videoMessage) ? unwrapped.videoMessage : null;
+  return imageMessage?.viewOnce === true || videoMessage?.viewOnce === true;
+}
+
 export function findReplyContextInfo(
   message: WhatsAppMessagePayload,
   dataContextInfo?: unknown,

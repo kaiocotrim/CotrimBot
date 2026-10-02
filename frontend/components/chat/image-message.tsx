@@ -11,9 +11,10 @@ type ImageMessageProps = {
   messageId: number;
   mediaUrl: string;
   content: string;
+  viewOnce: boolean;
   contact: Contact;
   createdAt: string;
-  gallery: Array<{ id: number; mediaUrl: string; content: string; createdAt: string }>;
+  gallery: Array<{ id: number; mediaUrl: string; content: string; createdAt: string; viewOnce: boolean }>;
 };
 
 const viewerDateFormatter = new Intl.DateTimeFormat("pt-BR", {
@@ -26,13 +27,13 @@ const viewerButtonClass = "flex size-10 items-center justify-center rounded-full
 const viewerIconButtonClass = "flex size-9 items-center justify-center rounded-full transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-white/50";
 const sideButtonClass = "absolute flex size-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.035] text-zinc-100 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_8px_22px_rgba(0,0,0,0.24)] backdrop-blur-xl transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-white/50";
 
-export function ImageMessage({ messageId, mediaUrl, content, contact, createdAt, gallery }: ImageMessageProps) {
+export function ImageMessage({ messageId, mediaUrl, content, viewOnce, contact, createdAt, gallery }: ImageMessageProps) {
   const [open, setOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [activeIndex, setActiveIndex] = useState(0);
   const reduceMotion = useReducedMotion();
   const hasCaption = content !== "[Imagem]";
-  const fallbackItem = { id: messageId, mediaUrl, content, createdAt };
+  const fallbackItem = { id: messageId, mediaUrl, content, createdAt, viewOnce };
   const activeItem = gallery[activeIndex] ?? fallbackItem;
   const activeHasCaption = activeItem.content !== "[Imagem]";
 
@@ -95,7 +96,10 @@ export function ImageMessage({ messageId, mediaUrl, content, contact, createdAt,
             <Avatar contact={contact} />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{contact.name}</p>
-              <p className="text-[11px] text-zinc-400">{viewerDateFormatter.format(new Date(activeItem.createdAt))}</p>
+              <p className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                <span>{viewerDateFormatter.format(new Date(activeItem.createdAt))}</span>
+                {activeItem.viewOnce && <span className="text-amber-300/85">· Visualização única</span>}
+              </p>
             </div>
             <div className="ml-auto flex h-11 items-center rounded-full border border-white/10 bg-white/[0.035] px-1 text-zinc-100 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_6px_18px_rgba(0,0,0,0.18)] backdrop-blur-xl">
               <button type="button" onClick={() => setZoom((value) => Math.max(0.5, value - 0.25))} aria-label="Diminuir zoom" className={viewerIconButtonClass}><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M7.5 10.5h6M15.5 15.5 21 21" /></svg></button>
@@ -149,13 +153,19 @@ export function ImageMessage({ messageId, mediaUrl, content, contact, createdAt,
 
   return (
     <div>
-      <button type="button" onClick={(event) => { event.stopPropagation(); openViewer(); }} aria-label="Abrir imagem" className="block overflow-hidden rounded-[15px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60">
+      <button type="button" onClick={(event) => { event.stopPropagation(); openViewer(); }} aria-label={viewOnce ? "Abrir imagem de visualização única" : "Abrir imagem"} className="relative block overflow-hidden rounded-[15px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60">
         <motion.img
           src={mediaUrl}
           alt={hasCaption ? content : "Imagem recebida"}
           loading="lazy"
           className="block max-h-[360px] max-w-[min(340px,62vw)] object-contain transition-transform duration-200 hover:scale-[1.015]"
         />
+        {viewOnce && (
+          <span className="absolute top-2 left-2 flex items-center gap-1 rounded-full border border-white/15 bg-black/55 px-2 py-1 text-[10px] font-medium text-white/90 shadow-sm backdrop-blur-md">
+            <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.5" /><path d="m4 4 16 16" /></svg>
+            <span>Visualização única</span>
+          </span>
+        )}
       </button>
       {hasCaption && <p className="px-2 pt-2 pb-0.5 whitespace-pre-wrap"><EmojiText content={content} /></p>}
       {typeof document !== "undefined" && createPortal(viewer, document.body)}

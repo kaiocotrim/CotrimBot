@@ -23,8 +23,8 @@ export async function getContacts(): Promise<Contact[]> {
   return parseResponse<Contact[]>(response, "Erro ao buscar contatos");
 }
 
-export async function getMessages(contactId: number, before?: number): Promise<MessagesPage> {
-  const params = new URLSearchParams({ limit: "30" });
+export async function getMessages(contactId: number, before?: number, limit = 30): Promise<MessagesPage> {
+  const params = new URLSearchParams({ limit: String(limit) });
   if (before) params.set("before", String(before));
   const response = await fetch(`${API_URL}/contacts/${contactId}/messages?${params}`, { credentials: "include" });
   return parseResponse<MessagesPage>(response, "Erro ao buscar mensagens");

@@ -19,6 +19,7 @@ type ChatPanelProps = {
   hasOlderMessages: boolean;
   loadingOlderMessages: boolean;
   newMessageId: number | null;
+  isTyping: boolean;
 
   onTextChange: (text: string) => void;
   onSend: (options: { private: boolean; replyToMessageId?: number }) => void;
@@ -50,6 +51,7 @@ export function ChatPanel({
   hasOlderMessages,
   loadingOlderMessages,
   newMessageId,
+  isTyping,
   onTextChange,
   onSend,
   onLoadOlderMessages,
@@ -132,6 +134,7 @@ export function ChatPanel({
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20">
         <ChatHeader
           contact={contact}
+          isTyping={isTyping}
           searchOpen={searchOpen}
           searchQuery={searchQuery}
           currentResult={normalizedSearchIndex}

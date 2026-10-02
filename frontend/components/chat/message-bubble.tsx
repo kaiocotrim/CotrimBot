@@ -103,6 +103,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
           messageId={message.id}
           mediaUrl={mediaUrl}
           content={message.content}
+          viewOnce={Boolean(message.viewOnce)}
           contact={contact}
           createdAt={message.createdAt}
           gallery={mediaMessages.filter((media) => media.type === "IMAGE").map((image) => ({
@@ -110,6 +111,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
             mediaUrl: `${API_URL}/messages/${image.id}/media`,
             content: image.content,
             createdAt: image.createdAt,
+            viewOnce: Boolean(image.viewOnce),
           }))}
         />;
       case "VIDEO":

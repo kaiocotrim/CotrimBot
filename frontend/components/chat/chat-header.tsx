@@ -1,5 +1,6 @@
 "use client";
 
+import { motion, useReducedMotion } from "framer-motion";
 import { Info } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { Contact } from "@/types/chat";
@@ -7,6 +8,7 @@ import { Avatar } from "@/components/chat/avatar";
 
 type ChatHeaderProps = {
   contact: Contact;
+  isTyping: boolean;
   searchOpen: boolean;
   searchQuery: string;
   currentResult: number;
@@ -21,7 +23,25 @@ type ChatHeaderProps = {
 
 const actionClass = "flex size-9 items-center justify-center rounded-full transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-35";
 
-export function ChatHeader({ contact, searchOpen, searchQuery, currentResult, resultCount, onOpenSearch, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch }: ChatHeaderProps) {
+function TypingIndicator({ contactName }: { contactName: string }) {
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <span role="status" aria-label={`${contactName} está digitando`} className="flex h-4 items-center gap-1 text-emerald-400">
+      <span className="sr-only">Digitando</span>
+      {[0, 1, 2].map((dot) => (
+        <motion.span
+          key={dot}
+          className="size-1 rounded-full bg-current"
+          animate={reduceMotion ? undefined : { y: [0, -3, 0], opacity: [0.45, 1, 0.45] }}
+          transition={{ duration: 0.72, repeat: Infinity, ease: "easeInOut", delay: dot * 0.12 }}
+        />
+      ))}
+    </span>
+  );
+}
+
+export function ChatHeader({ contact, isTyping, searchOpen, searchQuery, currentResult, resultCount, onOpenSearch, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch }: ChatHeaderProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => { if (searchOpen) searchRef.current?.focus(); }, [searchOpen]);
 
@@ -42,7 +62,12 @@ export function ChatHeader({ contact, searchOpen, searchQuery, currentResult, re
         <>
           <button type="button" onClick={onOpenContactInfo} aria-label={`Abrir informações de ${contact.name}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus-visible:outline-2 focus-visible:outline-white/50">
             <Avatar contact={contact} className="size-10" />
-            <span className="min-w-0 flex-1"><span className="block truncate text-[15px] font-medium">{contact.name}</span><span className="block truncate text-xs text-zinc-400">{contact.isGroup ? "Grupo do WhatsApp" : contact.phone}</span></span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[15px] font-medium">{contact.name}</span>
+              {isTyping
+                ? <TypingIndicator contactName={contact.name} />
+                : <span className="block truncate text-xs text-zinc-400">{contact.isGroup ? "Grupo do WhatsApp" : contact.phone}</span>}
+            </span>
           </button>
           <div className="ml-auto flex h-11 items-center rounded-full border border-white/10 bg-white/[0.035] px-1">
             <button type="button" onClick={onOpenSearch} aria-label="Localizar mensagens" title="Localizar mensagens" className={actionClass}><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg></button>
