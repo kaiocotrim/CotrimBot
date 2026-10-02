@@ -44,6 +44,25 @@ async function main() {
   }
 
   console.log(`Usuário autorizado: ${email}`);
+
+  // Organização padrão que recebe os convites; o admin inicial é o proprietário.
+  const organization = await prisma.organization.upsert({
+    where: { slug: "cotrim" },
+    update: {},
+    create: { name: "Cotrim", slug: "cotrim" },
+  });
+
+  const existingMember = await prisma.member.findFirst({
+    where: { organizationId: organization.id, userId: user.id },
+  });
+
+  if (existingMember) {
+    await prisma.member.update({ where: { id: existingMember.id }, data: { role: "owner" } });
+  } else {
+    await prisma.member.create({
+      data: { organizationId: organization.id, userId: user.id, role: "owner" },
+    });
+  }
 }
 
 main()

@@ -1,6 +1,6 @@
 import "../config/env.js";
 import { betterAuth } from "better-auth";
-import { admin } from "better-auth/plugins";
+import { admin, organization } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma.js";
 import { sendEmail } from "./mailer.js";
@@ -17,6 +17,14 @@ function requireEnv(name: string): string {
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
 // Servidor de autenticação do CotrimBot. Roda no Express porque o
 // frontend Next.js é exportado como site estático (sem rotas de API).
@@ -54,5 +62,23 @@ export const auth = betterAuth({
     : {}),
 
   // Plugin admin self-hosted (sem depender de serviços externos como o dash() da Better Auth).
-  plugins: [admin()],
+  plugins: [
+    admin(),
+    organization({
+      // Organizações são criadas apenas pelo seed; usuários comuns não criam novas.
+      allowUserToCreateOrganization: false,
+      async sendInvitationEmail(data) {
+        const frontendUrl = (process.env.FRONTEND_URL ?? "http://localhost:3000").replace(/\/$/, "");
+        const inviteLink = `${frontendUrl}/accept-invitation?id=${encodeURIComponent(data.id)}`;
+        const inviterName = data.inviter.user.name;
+
+        sendEmail({
+          to: data.email,
+          subject: `Convite para ${data.organization.name} no CotrimBot`,
+          text: `${inviterName} convidou você para participar de ${data.organization.name} no CotrimBot. Acesse o link a seguir para aceitar o convite: ${inviteLink}`,
+          html: `<p>${escapeHtml(inviterName)} convidou você para participar de <strong>${escapeHtml(data.organization.name)}</strong> no CotrimBot.</p><p>Acesse o link a seguir para aceitar o convite:</p><p><a href="${inviteLink}">${inviteLink}</a></p>`,
+        }).catch((error: unknown) => console.error("Falha ao enviar e-mail de convite:", error));
+      },
+    }),
+  ],
 });

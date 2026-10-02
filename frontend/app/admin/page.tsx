@@ -14,6 +14,14 @@ type AdminUser = {
   banReason?: string | null;
 };
 
+type PendingInvitation = {
+  id: string;
+  email: string;
+  role?: string | null;
+  status: string;
+  expiresAt: string | Date;
+};
+
 export default function AdminPage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
@@ -22,8 +30,10 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
 
-  const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
@@ -47,6 +57,21 @@ export default function AdminPage() {
     setLoading(false);
   }, []);
 
+  const loadInvitations = useCallback(async (orgId: string) => {
+    const { data } = await authClient.organization.listInvitations({ query: { organizationId: orgId } });
+    setInvitations(((data ?? []) as PendingInvitation[]).filter((invitation) => invitation.status === "pending"));
+  }, []);
+
+  const loadOrganization = useCallback(async () => {
+    const { data } = await authClient.organization.list();
+    const orgId = data?.[0]?.id ?? null;
+
+    setOrganizationId(orgId);
+    if (orgId) {
+      await loadInvitations(orgId);
+    }
+  }, [loadInvitations]);
+
   useEffect(() => {
     if (!isPending && !session) {
       router.replace("/login");
@@ -58,8 +83,9 @@ export default function AdminPage() {
     }
     if (isAdmin) {
       void loadUsers();
+      void loadOrganization();
     }
-  }, [isPending, session, isAdmin, router, loadUsers]);
+  }, [isPending, session, isAdmin, router, loadUsers, loadOrganization]);
 
   async function toggleRole(user: AdminUser) {
     const nextRole = user.role === "admin" ? "user" : "admin";
@@ -97,8 +123,14 @@ export default function AdminPage() {
   }
 
   async function handleInvite() {
-    if (!inviteName.trim() || !inviteEmail.trim()) {
-      setInviteError("Preencha nome e e-mail.");
+    const email = inviteEmail.trim();
+
+    if (!email) {
+      setInviteError("Informe o e-mail do convidado.");
+      return;
+    }
+    if (!organizationId) {
+      setInviteError("Nenhuma organização encontrada para a sua conta. Execute o seed (npm run prisma:seed).");
       return;
     }
 
@@ -106,39 +138,36 @@ export default function AdminPage() {
     setInviteError(null);
     setInviteSuccess(null);
 
-    // Senha aleatória descartável: o convidado define a senha real pelo e-mail de convite.
-    const temporaryPassword = window.crypto.randomUUID();
+    try {
+      const { error: inviteResultError } = await authClient.organization.inviteMember({
+        email,
+        role: inviteRole,
+        organizationId,
+        resend: true,
+      });
 
-    const { error: createError } = await authClient.admin.createUser({
-      name: inviteName.trim(),
-      email: inviteEmail.trim(),
-      password: temporaryPassword,
-      role: "user",
-    });
+      if (inviteResultError) {
+        setInviteError(inviteResultError.message ?? "Não foi possível enviar o convite.");
+        return;
+      }
 
-    if (createError) {
-      setInviteError(createError.message ?? "Não foi possível criar o usuário.");
+      setInviteSuccess(`Convite enviado para ${email}.`);
+      setInviteEmail("");
+      await loadInvitations(organizationId);
+    } catch {
+      setInviteError("Não foi possível conectar ao servidor.");
+    } finally {
       setInviting(false);
-      return;
     }
+  }
 
-    const { error: resetError } = await authClient.requestPasswordReset({
-      email: inviteEmail.trim(),
-      redirectTo: "/reset-password",
-    });
+  async function cancelInvitation(invitationId: string) {
+    if (!organizationId) return;
 
-    setInviting(false);
-
-    if (resetError) {
-      setInviteError("Usuário criado, mas o e-mail de convite falhou. Verifique a configuração de SMTP.");
-      await loadUsers();
-      return;
-    }
-
-    setInviteSuccess(`Convite enviado para ${inviteEmail.trim()}.`);
-    setInviteName("");
-    setInviteEmail("");
-    await loadUsers();
+    setBusyUserId(invitationId);
+    await authClient.organization.cancelInvitation({ invitationId });
+    await loadInvitations(organizationId);
+    setBusyUserId(null);
   }
 
   if (isPending || !session || !isAdmin) {
@@ -163,19 +192,20 @@ export default function AdminPage() {
           <h2 className="mb-3 text-sm font-semibold text-zinc-200">Convidar usuário</h2>
           <div className="flex flex-col gap-3 sm:flex-row">
             <input
-              type="text"
-              placeholder="Nome"
-              value={inviteName}
-              onChange={(event) => setInviteName(event.target.value)}
-              className="h-10 flex-1 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-white/20"
-            />
-            <input
               type="email"
               placeholder="E-mail"
               value={inviteEmail}
               onChange={(event) => setInviteEmail(event.target.value)}
-              className="h-10 flex-1 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-white/20"
+              className="h-10 flex-1 rounded-lg border border-white/10 bg-white/4 px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-white/20"
             />
+            <select
+              value={inviteRole}
+              onChange={(event) => setInviteRole(event.target.value as "member" | "admin")}
+              className="h-10 rounded-lg border border-white/10 bg-zinc-900 px-3 text-sm text-zinc-100 outline-none focus:border-white/20"
+            >
+              <option value="member">Membro</option>
+              <option value="admin">Admin</option>
+            </select>
             <button
               type="button"
               disabled={inviting}
@@ -187,6 +217,29 @@ export default function AdminPage() {
           </div>
           {inviteError && <p className="mt-2 text-xs text-red-400">{inviteError}</p>}
           {inviteSuccess && <p className="mt-2 text-xs text-emerald-400">{inviteSuccess}</p>}
+
+          {invitations.length > 0 && (
+            <ul className="mt-4 divide-y divide-white/5 border-t border-white/10">
+              {invitations.map((invitation) => (
+                <li key={invitation.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate text-zinc-100">{invitation.email}</p>
+                    <p className="text-xs text-zinc-500">
+                      {invitation.role === "admin" ? "Admin" : "Membro"} · expira em {new Date(invitation.expiresAt).toLocaleDateString("pt-BR")}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busyUserId === invitation.id}
+                    onClick={() => void cancelInvitation(invitation.id)}
+                    className="rounded-md border border-white/10 px-2 py-1 text-xs text-zinc-300 transition-colors hover:bg-white/6 disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {loading && <p className="text-sm text-zinc-400">Carregando usuários...</p>}
