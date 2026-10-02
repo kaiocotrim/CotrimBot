@@ -1,7 +1,11 @@
 import type { Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
-import { archiveWhatsAppChat, getProfilePicture } from "../services/evolution.service.js";
+import {
+  archiveWhatsAppChat,
+  getProfilePicture,
+  subscribeWhatsAppPresence,
+} from "../services/evolution.service.js";
 
 // GET /contacts - Retorna todos os contatos
 export async function getContacts(_req: Request, res: Response) {
@@ -100,6 +104,38 @@ export async function getContactAvatar(req: Request, res: Response) {
     return res.status(500).json({
       message: "Erro ao buscar foto do contato",
     });
+  }
+}
+
+// POST /contacts/:id/presence-subscription - Habilita o evento "digitando" desse contato.
+export async function subscribeContactPresence(req: Request, res: Response) {
+  const id = Number(req.params.id);
+
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ message: "Contato inválido" });
+  }
+
+  const contact = await prisma.contact.findUnique({
+    where: { id },
+    select: { phone: true, isGroup: true },
+  });
+
+  if (!contact) {
+    return res.status(404).json({ message: "Contato não encontrado" });
+  }
+
+  // O indicador atual representa uma pessoa digitando; grupos não precisam
+  // desta assinatura enquanto não houver identificação do participante.
+  if (contact.isGroup) {
+    return res.status(204).send();
+  }
+
+  try {
+    await subscribeWhatsAppPresence(contact.phone);
+    return res.status(204).send();
+  } catch (error) {
+    console.error("Erro ao assinar presença do contato:", error);
+    return res.status(502).json({ message: "Não foi possível acompanhar a digitação deste contato" });
   }
 }
 

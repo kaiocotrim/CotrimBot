@@ -13,6 +13,7 @@ import {
   reactToMessage as reactToMessageRequest,
   sendMedia as sendMediaRequest,
   setContactArchived as setContactArchivedRequest,
+  subscribeToContactPresence,
   updateContactName as updateContactNameRequest,
   updateMessageFlags as updateMessageFlagsRequest,
 } from "@/lib/chat-api";
@@ -510,6 +511,30 @@ export function useChat() {
       active = false;
     };
   }, [selectedContactId]);
+
+  // A Evolution 2.3.7 só encaminha a presença depois que o Baileys assina
+  // o contato. Renovamos enquanto a conversa individual estiver aberta para
+  // continuar recebendo "composing" mesmo após uma reconexão do WhatsApp.
+  useEffect(() => {
+    if (!selectedContactId || selectedContact?.isGroup) return;
+
+    let active = true;
+
+    const subscribe = () => {
+      if (!active) return;
+      void subscribeToContactPresence(selectedContactId).catch((error) => {
+        console.warn("Não foi possível assinar a presença do contato:", error);
+      });
+    };
+
+    subscribe();
+    const interval = window.setInterval(subscribe, 30_000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [selectedContactId, selectedContact?.isGroup]);
 
   async function loadOlderMessages() {
     const contact = selectedContact;

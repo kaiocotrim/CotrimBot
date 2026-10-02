@@ -30,6 +30,17 @@ export async function getMessages(contactId: number, before?: number, limit = 30
   return parseResponse<MessagesPage>(response, "Erro ao buscar mensagens");
 }
 
+export async function subscribeToContactPresence(contactId: number): Promise<void> {
+  const response = await fetch(`${API_URL}/contacts/${contactId}/presence-subscription`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Erro ao acompanhar digitação do contato");
+  }
+}
+
 export async function transcribeMessage(messageId: number) {
   const response = await fetch(
     `${API_URL}/messages/${messageId}/transcribe`,

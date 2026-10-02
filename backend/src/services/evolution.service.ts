@@ -113,6 +113,42 @@ export async function archiveWhatsAppChat(input: {
   return response.json();
 }
 
+/**
+ * Assina as atualizações de presença de um contato no WhatsApp.
+ *
+ * A Evolution/Baileys só começa a encaminhar eventos como `composing`
+ * depois de executar `presenceSubscribe` para aquele contato. Na Evolution
+ * 2.3.7 essa assinatura acontece dentro do endpoint sendPresence.
+ * Enviamos `paused` por 1 ms para fazer a assinatura sem exibir "digitando"
+ * para o contato do outro lado.
+ */
+export async function subscribeWhatsAppPresence(number: string): Promise<void> {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE;
+
+  if (!apiUrl || !apiKey || !instance) {
+    throw new Error("Configuração da Evolution API incompleta");
+  }
+
+  const response = await fetch(`${apiUrl}/chat/sendPresence/${instance}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: apiKey,
+    },
+    body: JSON.stringify({
+      number,
+      presence: "paused",
+      delay: 1,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Erro ao assinar presença: ${response.status} - ${await response.text()}`);
+  }
+}
+
 type ProfilePictureResponse = {
   profilePictureUrl?: string | null;
 };

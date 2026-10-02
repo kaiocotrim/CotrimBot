@@ -6,6 +6,7 @@ import {
   getContactById,
   getContacts,
   setContactArchived,
+  subscribeContactPresence,
   updateContact,
 } from "../controllers/contact.controller.js";
 
@@ -16,6 +17,9 @@ contactRouter.get("/contacts", getContacts);
 
 // GET /contacts/:id/avatar - Busca a foto do contato na Evolution API
 contactRouter.get("/contacts/:id/avatar", getContactAvatar);
+
+// POST /contacts/:id/presence-subscription - Assina o status de digitação no WhatsApp
+contactRouter.post("/contacts/:id/presence-subscription", subscribeContactPresence);
 
 // GET /contacts/:id - Retorna um contato especifico pelo ID
 contactRouter.get("/contacts/:id", getContactById);
