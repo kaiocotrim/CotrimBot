@@ -110,9 +110,13 @@ services:
       WEBHOOK_GLOBAL_URL: http://cotrimbot:${APP_PORT}/api/webhook/whatsapp
       WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS: "false"
       WEBHOOK_EVENTS_MESSAGES_UPSERT: "true"
+      WEBHOOK_EVENTS_MESSAGES_UPDATE: "true"
       WEBHOOK_EVENTS_MESSAGES_DELETE: "true"
+      WEBHOOK_EVENTS_CHATS_UPDATE: "true"
+      WEBHOOK_EVENTS_CHATS_UPSERT: "true"      
       WEBHOOK_EVENTS_SEND_MESSAGE: "true"
       WEBHOOK_EVENTS_PRESENCE_UPDATE: "true"
+      
     volumes:
       - evolution_instances:/evolution/instances
 
