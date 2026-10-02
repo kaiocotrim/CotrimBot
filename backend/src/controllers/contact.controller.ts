@@ -117,7 +117,7 @@ export async function subscribeContactPresence(req: Request, res: Response) {
 
   const contact = await prisma.contact.findUnique({
     where: { id },
-    select: { phone: true, isGroup: true },
+    select: { phone: true, whatsappLid: true, isGroup: true },
   });
 
   if (!contact) {
@@ -131,8 +131,21 @@ export async function subscribeContactPresence(req: Request, res: Response) {
   }
 
   try {
-    await subscribeWhatsAppPresence(contact.phone);
-    return res.status(204).send();
+    // Contatos Multi-Device publicam presença pelo JID @lid. O telefone
+    // continua como fallback para conversas que ainda usam @s.whatsapp.net.
+    const identifiers = [...new Set([contact.whatsappLid, contact.phone].filter(Boolean))] as string[];
+    let lastError: unknown;
+
+    for (const identifier of identifiers) {
+      try {
+        await subscribeWhatsAppPresence(identifier);
+        return res.status(204).send();
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError;
   } catch (error) {
     console.error("Erro ao assinar presença do contato:", error);
     return res.status(502).json({ message: "Não foi possível acompanhar a digitação deste contato" });
