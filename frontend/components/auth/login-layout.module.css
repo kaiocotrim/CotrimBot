@@ -1,0 +1,198 @@
+.page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  overflow: clip;
+  background: #000;
+  color: #ededed;
+  color-scheme: dark;
+}
+
+.container {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  align-items: center;
+  padding: 64px 24px max(40px, env(safe-area-inset-bottom));
+}
+
+.logoStage {
+  display: flex;
+  width: 100%;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 48px;
+}
+
+.logo {
+  display: block;
+  width: 300px;
+  height: 300px;
+  flex-shrink: 0;
+  background: linear-gradient(125deg, #e9e0f7 5%, #d3e3e8 28%, #edebe3 48%, #e5d9ee 70%, #d9e9ef 95%);
+  background-size: 240% 240%;
+  mask: url('/Logo-CotrimBot.png') 50% 53% / 236% 236% no-repeat;
+  filter: drop-shadow(0 1px 0 #ffffff50);
+}
+
+.form {
+  width: 100%;
+  max-width: 360px;
+  flex-shrink: 0;
+}
+
+.title {
+  position: relative;
+  isolation: isolate;
+  margin: 0 0 32px;
+  color: #ededed;
+  font-family: inherit;
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -1px;
+  text-align: center;
+}
+
+.title::before {
+  position: absolute;
+  z-index: -1;
+  inset: -40px -48px;
+  background: radial-gradient(ellipse, #000 0%, transparent 70%);
+  opacity: .7;
+  pointer-events: none;
+  content: '';
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.button {
+  display: flex;
+  width: 100%;
+  height: 48px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  transition: background .2s, opacity .2s, border-color .2s;
+}
+
+.socialButton {
+  border-color: #0000001a;
+  background: #fff;
+  color: #000;
+}
+
+.socialButton:hover:not(:disabled) { background: #e8e8e8; }
+.socialButton:disabled { opacity: .6; }
+.googleIcon { width: 20px; height: 20px; }
+
+.divider {
+  display: flex;
+  height: 24px;
+  align-items: center;
+  gap: 12px;
+  color: #a3a3a3;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.divider > span { height: 1px; flex: 1; background: #ffffff26; }
+
+.input {
+  display: block;
+  width: 100%;
+  height: 48px;
+  padding: 0 20px;
+  border: 1px solid #ffffff1a;
+  border-radius: 16px;
+  outline: none;
+  background: #ffffff0f;
+  color: #ededed;
+  font-size: 16px;
+  line-height: 24px;
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  transition: border-color .2s, box-shadow .2s;
+}
+
+.input::placeholder { color: #a3a3a3; opacity: 1; }
+.input:focus { border-color: #ffffff66; box-shadow: 0 0 0 3px #ffffff0d; }
+.input[aria-invalid='true'] { border-color: #fda4af99; }
+.input:disabled { opacity: .65; }
+.input:-webkit-autofill { -webkit-text-fill-color: #ededed; box-shadow: 0 0 0 100px #222 inset; }
+
+.continueButton {
+  background: #ededed;
+  color: #000;
+  font-weight: 600;
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+
+.continueButton:hover:not(:disabled) { background: #d5d5d5; }
+.continueButton:disabled { background: #ffffff26; color: #ffffff73; }
+.button:focus-visible { outline: 2px solid #e4dcf4; outline-offset: 4px; }
+.error { margin: 0; color: #fda4af; font-size: 14px; line-height: 20px; }
+.spinner { width: 18px; height: 18px; }
+
+.footer {
+  margin: 20px 0 0;
+  color: #909090;
+  font-size: 12px;
+  line-height: 1.625;
+  text-align: center;
+}
+
+.footer strong { color: #a3a3a3; font-weight: 500; }
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@keyframes shimmer {
+  0%, 100% { background-position: 0% 30%; }
+  50% { background-position: 100% 70%; }
+}
+
+@keyframes entrance {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .logo { animation: shimmer 14s ease-in-out infinite; }
+  .form { animation: entrance .6s ease-out both; }
+  .spinner { animation: spin 1s linear infinite; }
+}
+
+@media (max-width: 639px) {
+  .container { padding: max(48px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); }
+  .logo { width: 220px; height: 220px; }
+  .title { font-size: 36px; letter-spacing: -.9px; }
+  .footer { font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .input, .button { transition: none; }
+}

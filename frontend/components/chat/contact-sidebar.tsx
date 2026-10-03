@@ -302,7 +302,7 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
                         </svg>
                       )}
                     </span>
-                    <div className={`min-w-0 flex-1 py-2 ${selected ? "" : "border-b border-white/[0.05] group-hover:border-transparent"}`}>
+                    <div className="min-w-0 flex-1 py-2">
                       <div className="flex items-baseline justify-between gap-3">
                         <p className="truncate text-[14px] leading-tight font-medium tracking-[-0.01em] text-zinc-50">{contact.name}</p>
                         {lastMessage && (

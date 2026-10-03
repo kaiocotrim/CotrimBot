@@ -4,7 +4,7 @@ import { Info } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { Contact } from "@/types/chat";
 import { Avatar } from "@/components/chat/avatar";
-import { TypingIndicator } from "@/components/chat/typing-indicator";
+import styles from "./chat-header.module.css";
 
 type ChatHeaderProps = {
   contact: Contact;
@@ -28,7 +28,14 @@ export function ChatHeader({ contact, isTyping, searchOpen, searchQuery, current
   useEffect(() => { if (searchOpen) searchRef.current?.focus(); }, [searchOpen]);
 
   return (
-    <header className="pointer-events-auto flex h-[64px] w-full items-center gap-3 border-b border-white/10 bg-zinc-950/55 px-4 py-2 shadow-[0_8px_28px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
+    <header className="pointer-events-auto relative isolate flex h-[64px] w-full items-center gap-3 px-4 py-2">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[200px] backdrop-blur-3xl backdrop-saturate-150 [mask-image:linear-gradient(to_bottom,black_0%,black_35%,rgba(0,0,0,0.75)_55%,rgba(0,0,0,0.3)_78%,transparent_100%)]"
+        style={{
+          backgroundImage: "radial-gradient(ellipse at 25% 0%, rgba(0,0,0,0.08), transparent 70%), linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.42) 35%, rgba(0,0,0,0.22) 60%, rgba(0,0,0,0.06) 82%, transparent 100%)",
+        }}
+      />
       {searchOpen ? (
         <>
           <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3">
@@ -44,11 +51,11 @@ export function ChatHeader({ contact, isTyping, searchOpen, searchQuery, current
         <>
           <button type="button" onClick={onOpenContactInfo} aria-label={`Abrir informações de ${contact.name}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus-visible:outline-2 focus-visible:outline-white/50">
             <Avatar contact={contact} className="size-10" />
-            <span className="min-w-0 flex-1">
+            <span key={contact.id} className="min-w-0 flex-1">
               <span className="block truncate text-[15px] font-medium">{contact.name}</span>
               {isTyping
-                ? <TypingIndicator label={`${contact.name} está digitando`} />
-                : <span className="block truncate text-xs text-zinc-400">{contact.isGroup ? "Grupo do WhatsApp" : contact.phone}</span>}
+                ? <span role="status" aria-label={`${contact.name} está digitando`} className="block h-4 truncate text-xs text-emerald-400">digitando…</span>
+                : <span className={`${styles.subtitle} block truncate text-xs text-zinc-400`}>{contact.isGroup ? "Grupo do WhatsApp" : contact.phone}</span>}
             </span>
           </button>
           <div className="ml-auto flex h-11 items-center rounded-full border border-white/10 bg-white/[0.035] px-1">

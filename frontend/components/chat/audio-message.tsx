@@ -125,10 +125,9 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
             aria-label={isPlaying ? "Pausar áudio" : "Reproduzir áudio"}
             className="
               flex size-11 shrink-0 items-center justify-center
-              rounded-full border border-white/20 bg-gradient-to-br from-white/20 to-white/[0.06] text-white
-              shadow-[inset_0_1px_2px_rgba(255,255,255,0.2),0_6px_18px_rgba(0,0,0,0.25)]
+              rounded-full bg-white/10 text-white
               transition duration-200 ease-out
-              hover:bg-white/90 active:scale-95
+              hover:bg-white/20 active:scale-95
               focus-visible:outline-none focus-visible:ring-2
               focus-visible:ring-white/60 focus-visible:ring-offset-2
               focus-visible:ring-offset-zinc-900

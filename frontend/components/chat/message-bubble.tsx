@@ -142,7 +142,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
     <time
       dateTime={message.createdAt}
       title={messageDateFormatter.format(createdAt)}
-      className={`shrink-0 select-none text-[10px] leading-none font-normal tabular-nums ${isPrivate ? "text-amber-800/70" : "text-white/55"}`}
+      className={`shrink-0 select-none text-[9px] leading-none font-normal tabular-nums ${isPrivate ? "text-amber-800/70" : "text-white/55"}`}
     >
       {messageTimeFormatter.format(createdAt)}
     </time>
@@ -151,11 +151,11 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
   const readReceipt = outgoing ? (
     message.deliveryStatus === "failed" ? (
       <span className="text-red-200" title="Mensagem não enviada" aria-label="Mensagem não enviada">
-        <WarningCircle size={14} weight="fill" aria-hidden="true" />
+        <WarningCircle size={12} weight="fill" aria-hidden="true" />
       </span>
     ) : (
       <span className={message.readAt ? "text-sky-300" : "text-white/50"} title={message.readAt ? "Visualizada" : "Enviada"} aria-label={message.readAt ? "Mensagem visualizada" : "Mensagem enviada"}>
-        <svg className="h-3 w-[17px]" viewBox="0 0 18 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg className="h-2.5 w-[15px]" viewBox="0 0 18 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="m1 6 3 3 6-7" />
           <path d="m7 8 2 2 8-8" />
         </svg>
@@ -283,12 +283,12 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
           : isSticker
           ? "overflow-visible bg-transparent p-0"
           : isAudio
-          ? "relative w-[min(380px,62vw)] overflow-visible rounded-[24px] border border-white/15 bg-gradient-to-br from-white/[0.09] via-zinc-900/95 to-zinc-950/95 px-3.5 py-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_10px_30px_rgba(0,0,0,0.2)] backdrop-blur-xl"
+          ? "relative w-[min(380px,62vw)] overflow-visible rounded-[24px] bg-zinc-800 px-3.5 py-3"
           : isVideo
-            ? `rounded-[20px] p-[3px] shadow-[0_3px_12px_rgba(0,0,0,0.16)] ${outgoing ? "bg-green-600" : "bg-zinc-800"}`
+            ? `rounded-[20px] p-[3px] shadow-[0_3px_12px_rgba(0,0,0,0.16)] bg-zinc-800`
           : isImage
-            ? `rounded-[18px] p-[3px] shadow-[0_3px_12px_rgba(0,0,0,0.16)] ${outgoing ? "bg-green-600" : "bg-zinc-800"}`
-            : `rounded-[24px] px-3.5 py-2.5 ${outgoing ? "bg-green-600" : "bg-zinc-800"}`
+            ? `rounded-[18px] p-[3px] shadow-[0_3px_12px_rgba(0,0,0,0.16)] bg-zinc-800`
+            : `rounded-[24px] px-3.5 py-2.5 bg-zinc-800`
       }`}
     >
       <AnimatePresence>
@@ -481,9 +481,9 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
         </button>
       )}
       {inlineTime ? (
-        <div className="flex min-w-0 items-end gap-2 pr-4">
+        <div className="flex min-w-0 items-end gap-2">
           <div className="min-w-0">{content}</div>
-          <span className="flex shrink-0 items-center gap-0.5">{timestamp}{readReceipt}</span>
+          <span className="-mr-1 -mb-1 flex shrink-0 items-center gap-0.5">{timestamp}{readReceipt}</span>
         </div>
       ) : (
         content
@@ -501,7 +501,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
         </motion.p>
       )}
       {!inlineTime && timestamp && (
-        <div className={`flex items-center justify-end gap-0.5 ${isSticker ? "absolute right-1 bottom-1 rounded-md bg-black/55 px-1.5 py-1 shadow-sm backdrop-blur-sm" : (isImage && !imageHasCaption) || (isVideo && message.content === "[Vídeo]") ? "absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-1 shadow-sm backdrop-blur-[2px]" : isImage || isVideo ? "px-2 pt-0.5 pb-1" : isAudio ? "mt-2" : "mt-1"}`}>
+        <div className={`flex items-center justify-end gap-0.5 ${isSticker ? "absolute right-1 bottom-1 rounded-md bg-black/55 px-1.5 py-0.5 shadow-sm backdrop-blur-sm" : (isImage && !imageHasCaption) || (isVideo && message.content === "[Vídeo]") ? "absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-0.5 shadow-sm backdrop-blur-[2px]" : isImage || isVideo ? "px-2 pt-0.5 pb-1" : "-mr-1 -mb-1 mt-1"}`}>
           {timestamp}
           {readReceipt}
         </div>
