@@ -17,7 +17,7 @@
 
 .selector :global(.epr-cat-btn):hover {
   background-color: transparent;
-  color: #34d399;
+  color: var(--epr-highlight-color);
 }
 
 /* Remove o círculo de foco padrão; teclado mantém um contorno discreto. */
@@ -38,13 +38,13 @@
   right: 20%;
   height: 3px;
   border-radius: 999px;
-  background: #34d399;
+  background: var(--epr-highlight-color);
 }
 
 .selector :global(.epr-emoji-category-label) {
   /* Evita recalcular blur sobre os emojis a cada quadro da rolagem. */
   backdrop-filter: none;
-  color: #a1a1aa;
+  color: var(--epr-search-input-placeholder-color);
   font-size: 13px;
   font-weight: 600;
 }
@@ -52,4 +52,8 @@
 .selector :global(.epr-body) {
   scrollbar-width: thin;
   scrollbar-color: #3f3f46 transparent;
+}
+
+.privateSelector :global(.epr-body) {
+  scrollbar-color: #d4d4d8 transparent;
 }

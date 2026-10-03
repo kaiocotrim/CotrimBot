@@ -14,7 +14,7 @@ const Picker = dynamic(async () => {
   return function PortuguesePicker(props: import("emoji-picker-react").PickerProps) {
     return <EmojiPicker {...props} emojiData={data} />;
   };
-}, { ssr: false, loading: () => <p role="status" className="p-5 text-xs text-zinc-400">Carregando emojis...</p> });
+}, { ssr: false, loading: () => <p role="status" className="p-5 text-xs">Carregando emojis...</p> });
 
 const pickerStyle = {
   "--epr-bg-color": "transparent",
@@ -39,9 +39,29 @@ const pickerStyle = {
   "--epr-category-icon-inactive-color": "#a1a1aa",
 } as CSSProperties;
 
+const privatePickerStyle = {
+  ...pickerStyle,
+  "--epr-bg-color": "#fff",
+  "--epr-text-color": "#3f3f46",
+  "--epr-category-label-bg-color": "#fff",
+  "--epr-search-input-bg-color": "#f4f4f5",
+  "--epr-hover-bg-color": "#e4e4e7",
+  "--epr-hover-bg-color-reduced-opacity": "rgba(228,228,231,0.5)",
+  "--epr-focus-bg-color": "#e4e4e7",
+  "--epr-highlight-color": "#52525b",
+  "--epr-search-input-bg-color-active": "#fff",
+  "--epr-search-border-color": "#d4d4d8",
+  "--epr-search-border-color-active": "#71717a",
+  "--epr-search-input-text-color": "#18181b",
+  "--epr-search-input-placeholder-color": "#71717a",
+  "--epr-category-icon-active-color": "#3f3f46",
+  "--epr-category-icon-inactive-color": "#71717a",
+} as CSSProperties;
+
 type EmojiSelectorProps = {
   id: string;
   open: boolean;
+  isPrivateMode: boolean;
   triggerRef: RefObject<HTMLButtonElement | null>;
   onClose: (restoreFocus?: boolean) => void;
   onSelect: (emoji: string) => void;
@@ -49,7 +69,7 @@ type EmojiSelectorProps = {
   rightInset: number;
 };
 
-export function EmojiSelector({ id, open, triggerRef, onClose, onSelect, fieldHeight, rightInset }: EmojiSelectorProps) {
+export function EmojiSelector({ id, open, isPrivateMode, triggerRef, onClose, onSelect, fieldHeight, rightInset }: EmojiSelectorProps) {
   const selectorRef = useRef<HTMLDivElement>(null);
   const categoryAnimationRef = useRef<{ stop: () => void } | null>(null);
   const reduceMotion = useReducedMotion();
@@ -129,7 +149,7 @@ export function EmojiSelector({ id, open, triggerRef, onClose, onSelect, fieldHe
             opacity: { duration: reduceMotion ? 0 : 0.35 },
           }}
           style={{ transformOrigin: "bottom left", bottom: fieldHeight - 1, right: rightInset, borderBottomWidth: 0 }}
-          className={`${styles.selector} absolute left-0 z-40 overflow-hidden rounded-t-[24px] border border-[#2f2f33] bg-zinc-900/95 bg-gradient-to-br from-white/[0.04] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_-12px_36px_rgba(0,0,0,0.25)] backdrop-blur-2xl backdrop-saturate-150`}
+          className={`${styles.selector} absolute left-0 z-40 overflow-hidden rounded-t-[24px] border bg-gradient-to-br from-white/[0.04] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_-12px_36px_rgba(0,0,0,0.25)] backdrop-blur-2xl backdrop-saturate-150 ${isPrivateMode ? `${styles.privateSelector} border-zinc-200 bg-white text-zinc-600` : "border-[#2f2f33] bg-zinc-900/95 text-zinc-400"}`}
           // Enter na busca nunca deve disparar o envio do formulário do chat.
           onKeyDown={(event) => {
             if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault();
@@ -142,12 +162,12 @@ export function EmojiSelector({ id, open, triggerRef, onClose, onSelect, fieldHe
             transition={{ duration: reduceMotion ? 0 : 0.4, delay: reduceMotion ? 0 : 0.08, ease: [0.4, 0, 0.2, 1] }}
           >
           <Picker
-            theme={"dark" as import("emoji-picker-react").Theme}
+            theme={(isPrivateMode ? "light" : "dark") as import("emoji-picker-react").Theme}
             emojiStyle={"apple" as import("emoji-picker-react").EmojiStyle}
             suggestedEmojisMode={"recent" as import("emoji-picker-react").SuggestionMode}
             width="100%"
             height="min(420px, 50dvh)"
-            style={pickerStyle}
+            style={isPrivateMode ? privatePickerStyle : pickerStyle}
             searchPlaceholder="Pesquisar emoji"
             categories={[
               { category: "suggested" as import("emoji-picker-react").Categories, name: "Recentes" },
@@ -167,12 +187,12 @@ export function EmojiSelector({ id, open, triggerRef, onClose, onSelect, fieldHe
             onEmojiClick={(data) => onSelect(data.emoji)}
           />
           <div className="flex items-center justify-center px-4 pb-3 pt-2">
-            <div className="flex h-9 overflow-hidden rounded-full border border-white/10 bg-black/15" aria-label="Tipos de conteúdo">
-              <span className="flex w-16 items-center justify-center bg-white/5 text-emerald-400" aria-label="Emojis">
+            <div className={`flex h-9 overflow-hidden rounded-full border ${isPrivateMode ? "border-zinc-200 bg-zinc-100" : "border-white/10 bg-black/15"}`} aria-label="Tipos de conteúdo">
+              <span className={`flex w-16 items-center justify-center ${isPrivateMode ? "bg-zinc-200 text-zinc-700" : "bg-white/5 text-emerald-400"}`} aria-label="Emojis">
                 <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 3 4 3 4-3 4-3M8.5 8.5h.01M15.5 8.5h.01" /></svg>
               </span>
-              <button type="button" disabled title="GIFs em breve" className="w-16 border-l border-white/10 text-xs font-semibold text-zinc-600">GIF</button>
-              <button type="button" disabled title="Figurinhas em breve" aria-label="Figurinhas em breve" className="flex w-16 items-center justify-center border-l border-white/10 text-zinc-600">
+              <button type="button" disabled title="GIFs em breve" className={`w-16 border-l text-xs font-semibold ${isPrivateMode ? "border-zinc-200 text-zinc-400" : "border-white/10 text-zinc-600"}`}>GIF</button>
+              <button type="button" disabled title="Figurinhas em breve" aria-label="Figurinhas em breve" className={`flex w-16 items-center justify-center border-l ${isPrivateMode ? "border-zinc-200 text-zinc-400" : "border-white/10 text-zinc-600"}`}>
                 <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 21H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8l-6 6Z" /><path d="M15 21v-4a2 2 0 0 1 2-2h4" /></svg>
               </button>
             </div>

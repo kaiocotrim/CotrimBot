@@ -10,7 +10,7 @@ import { authClient, useSession } from "@/lib/auth-client";
 import { getMessages } from "@/lib/chat-api";
 import type { Contact, Message } from "@/types/chat";
 
-type ContactSidebarProps = { contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onArchiveContact: (contact: Contact, archived: boolean) => Promise<void> };
+type ContactSidebarProps = { contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void };
 type ConversationFilter = "conversations" | "groups";
 const LONG_PRESS_DURATION = 1_000;
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
@@ -31,7 +31,7 @@ function formatSidebarDate(value: string) {
   return dateFormatter.format(date);
 }
 
-export function ContactSidebar({ contacts, loading, error, selectedContactId, onSelectContact, onArchiveContact }: ContactSidebarProps) {
+export function ContactSidebar({ contacts, loading, error, selectedContactId, onSelectContact }: ContactSidebarProps) {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "admin";
   const [query, setQuery] = useState("");
@@ -175,7 +175,19 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
       <div className="relative flex h-full min-h-0 w-[320px] min-w-[280px] max-w-[42vw] shrink-0 flex-col border-r border-white/[0.08]">
         <header className="px-4 pt-4 pb-2">
           <div className="flex items-center justify-between">
-            <h1 className="text-[23px] font-semibold leading-none tracking-tight text-zinc-50">CotrimBot</h1>
+            <h1 className="shrink-0">
+              <span className="sr-only">CotrimBot</span>
+              <svg
+                aria-hidden="true"
+                focusable="false"
+                viewBox="380 380 492 536"
+                fill="currentColor"
+                className="block size-9 text-white"
+              >
+                <path d="M686 385C518 385 386 507 386 660C386 799 500 909 655 909V754C608 749 573 711 573 661C573 604 623 557 686 557Z" />
+                <ellipse cx="776" cy="792" rx="91" ry="93" />
+              </svg>
+            </h1>
             <div className="flex items-center gap-1.5">
               <div className="relative">
                 <button
@@ -324,17 +336,6 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
                     </div>
                   </div>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void onArchiveContact(contact, !contact.archived).catch((error) => console.error("Erro ao alterar arquivamento:", error))}
-                    aria-label={contact.archived ? `Desarquivar ${contact.name}` : `Arquivar ${contact.name}`}
-                    title={contact.archived ? "Desarquivar" : "Arquivar"}
-                    className="absolute right-2 bottom-1.5 flex size-6 items-center justify-center rounded-full bg-zinc-900/90 text-zinc-400 opacity-0 shadow-sm transition-[opacity,color,background-color] hover:bg-zinc-800 hover:text-zinc-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-white/50 group-hover:opacity-100"
-                  >
-                    <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      {contact.archived ? <path d="M4 7h16v13H4zM3 4h18v3H3zM12 17V10m-3 3 3-3 3 3" /> : <path d="M4 7h16v13H4zM3 4h18v3H3zM10 12h4" />}
-                    </svg>
-                  </button>
                 </div>
               );
             })}
@@ -355,7 +356,6 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
           loading={previewLoading}
           error={previewError}
           panelRef={previewPanelRef}
-          onClose={closePreview}
           onOpenConversation={openConversation}
         />
       </div>

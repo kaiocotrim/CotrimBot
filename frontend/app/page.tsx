@@ -35,7 +35,6 @@ export default function Home() {
         error={chat.contactsError}
         selectedContactId={chat.selectedContact?.id}
         onSelectContact={chat.selectContact}
-        onArchiveContact={chat.archiveContact}
       />
 
       <ChatPanel

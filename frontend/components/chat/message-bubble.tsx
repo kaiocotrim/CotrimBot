@@ -142,7 +142,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
     <time
       dateTime={message.createdAt}
       title={messageDateFormatter.format(createdAt)}
-      className={`shrink-0 select-none text-[9px] leading-none font-normal tabular-nums ${isPrivate ? "text-amber-800/70" : "text-white/55"}`}
+      className={`shrink-0 select-none text-[9px] leading-none font-normal tabular-nums ${isPrivate ? "text-zinc-600" : "text-white/55"}`}
     >
       {messageTimeFormatter.format(createdAt)}
     </time>
@@ -150,11 +150,11 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
 
   const readReceipt = outgoing ? (
     message.deliveryStatus === "failed" ? (
-      <span className="text-red-200" title="Mensagem não enviada" aria-label="Mensagem não enviada">
+      <span className={isPrivate ? "text-red-600" : "text-red-200"} title="Mensagem não enviada" aria-label="Mensagem não enviada">
         <WarningCircle size={12} weight="fill" aria-hidden="true" />
       </span>
     ) : (
-      <span className={message.readAt ? "text-sky-300" : "text-white/50"} title={message.readAt ? "Visualizada" : "Enviada"} aria-label={message.readAt ? "Mensagem visualizada" : "Mensagem enviada"}>
+      <span className={message.readAt ? isPrivate ? "text-sky-600" : "text-sky-300" : isPrivate ? "text-zinc-500" : "text-white/50"} title={message.readAt ? "Visualizada" : "Enviada"} aria-label={message.readAt ? "Mensagem visualizada" : "Mensagem enviada"}>
         <svg className="h-2.5 w-[15px]" viewBox="0 0 18 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="m1 6 3 3 6-7" />
           <path d="m7 8 2 2 8-8" />
@@ -277,9 +277,9 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
         setCopyError(false);
         setActionError(null);
       }}
-      className={`group/message relative min-w-0 max-w-[min(62%,620px)] text-[13.5px] leading-[1.4] font-normal [overflow-wrap:anywhere] ${isPrivate ? "text-amber-950" : "text-white"} ${message.reaction ? "mb-3" : ""} ${
+      className={`group/message relative min-w-0 max-w-[min(62%,620px)] text-[13.5px] leading-[1.4] font-normal [overflow-wrap:anywhere] ${isPrivate ? "text-zinc-900" : "text-white"} ${message.reaction ? "mb-3" : ""} ${
         isPrivate
-          ? "rounded-[24px] bg-amber-100 px-3.5 py-2.5 shadow-[0_4px_16px_rgba(120,83,15,0.12)]"
+          ? "rounded-[24px] bg-zinc-100 px-3.5 py-2.5 shadow-[0_4px_16px_rgba(24,24,27,0.12)]"
           : isSticker
           ? "overflow-visible bg-transparent p-0"
           : isAudio
@@ -334,7 +334,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
       )}
       </AnimatePresence>
       {isPrivate && (
-        <div className="mb-1 flex items-center gap-1 text-[10px] font-semibold tracking-wide text-amber-700">
+        <div className="mb-1 flex items-center gap-1 text-[10px] font-semibold tracking-wide text-zinc-600">
           <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
           <span>Privado</span>
         </div>
@@ -387,7 +387,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
             setCopyError(false);
             setActionError(null);
           }}
-          className={`flex size-5 items-center justify-center rounded-full text-zinc-300 transition-[opacity,transform,color] duration-150 hover:text-white focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-white/50 [@media(hover:none)]:opacity-100 ${actionsOpen ? "opacity-100" : "opacity-0 group-hover/message:opacity-100"}`}
+          className={`flex size-5 items-center justify-center rounded-full transition-[opacity,transform,color] duration-150 focus-visible:opacity-100 focus-visible:outline-2 [@media(hover:none)]:opacity-100 ${isPrivate ? "text-zinc-500 hover:text-zinc-800 focus-visible:outline-zinc-500/60" : "text-zinc-300 hover:text-white focus-visible:outline-white/50"} ${actionsOpen ? "opacity-100" : "opacity-0 group-hover/message:opacity-100"}`}
         >
           <CaretDown size={13} weight="bold" aria-hidden="true" />
         </button>
@@ -465,17 +465,17 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
           type="button"
           disabled={!message.quotedMessageId}
           onClick={() => message.quotedMessageId && void onNavigateToMessage(message.quotedMessageId)}
-          className={`mb-2 block w-full border-l-4 border-emerald-300 bg-black/15 px-2.5 py-2 text-left ${isImage || isVideo ? "rounded-xl" : "rounded-lg"} disabled:cursor-default`}
+          className={`mb-2 block w-full border-l-4 px-2.5 py-2 text-left ${isPrivate ? "border-zinc-400 bg-zinc-200/70" : "border-emerald-300 bg-black/15"} ${isImage || isVideo ? "rounded-xl" : "rounded-lg"} disabled:cursor-default`}
         >
           <span className="flex min-w-0 items-center gap-2">
             {quotedMediaMessage?.type === "IMAGE" && message.quotedMessageId && (
               <Image unoptimized src={`${API_URL}/messages/${message.quotedMessageId}/media`} alt="" width={36} height={36} className="size-9 shrink-0 rounded-md object-cover" />
             )}
             <span className="min-w-0">
-              <span className="block truncate text-[11px] font-semibold text-emerald-200">
+              <span className={`block truncate text-[11px] font-semibold ${isPrivate ? "text-zinc-700" : "text-emerald-200"}`}>
                 {message.quotedSenderName || "Mensagem"}
               </span>
-              <span className="block truncate text-xs text-white/75">{message.quotedContent}</span>
+              <span className={`block truncate text-xs ${isPrivate ? "text-zinc-600" : "text-white/75"}`}>{message.quotedContent}</span>
             </span>
           </span>
         </button>
@@ -483,7 +483,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
       {inlineTime ? (
         <div className="flex min-w-0 items-end gap-2">
           <div className="min-w-0">{content}</div>
-          <span className="-mr-1 -mb-1 flex shrink-0 items-center gap-0.5">{timestamp}{readReceipt}</span>
+          <span className="-mr-1 -mb-1 ml-auto flex shrink-0 items-center gap-0.5">{timestamp}{readReceipt}</span>
         </div>
       ) : (
         content
@@ -494,7 +494,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
           initial={reduceMotion ? false : { opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.24, ease: [0.22, 1, 0.36, 1] }}
-          className={`mt-1.5 flex items-center gap-1.5 text-[11px] italic ${isPrivate ? "text-amber-800/65" : "text-white/55"}`}
+          className={`mt-1.5 flex items-center gap-1.5 text-[11px] italic ${isPrivate ? "text-zinc-600" : "text-white/55"}`}
         >
           <Trash size={12} weight="regular" aria-hidden="true" />
           <span>{message.direction === "INCOMING" ? "Apagada pelo usuário" : "Mensagem apagada"}</span>

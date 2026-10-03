@@ -84,6 +84,7 @@ function ComposerIcon({ name }: { name: ComposerIconName }) {
 // Oculta a barra lateral, mantendo a rolagem por mouse, toque e teclado.
 const textClassName = "resize-none bg-transparent p-0 text-[13.5px] leading-6 font-normal text-white outline-none placeholder:text-zinc-400 [overflow-wrap:anywhere] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 const buttonClassName = "flex items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 disabled:text-zinc-500 motion-reduce:transition-none";
+const privateButtonClassName = "border-zinc-300 bg-zinc-100 !text-zinc-700 hover:bg-zinc-200 hover:!text-zinc-950 focus-visible:!outline-zinc-500/60 disabled:!text-zinc-400";
 
 export function MessageComposer({
   dropZoneContainer,
@@ -765,7 +766,7 @@ export function MessageComposer({
             animate={{ height: fieldHeight, marginRight: isStacked ? 0 : 56, borderTopLeftRadius: emojisOpen && !sending ? 0 : 24, borderTopRightRadius: emojisOpen && !sending ? 0 : 24 }}
             style={emojisOpen && !sending ? { borderTopWidth: 0, boxShadow: "inset 0 -1px 1px rgba(0,0,0,0.12), 0 4px 20px rgba(0,0,0,0.16)" } : undefined}
             transition={transition}
-            className={`relative overflow-hidden rounded-[24px] border bg-gradient-to-b from-white/[0.075] via-white/[0.03] to-white/[0.015] shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.22),0_6px_22px_rgba(0,0,0,0.2)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow] duration-250 motion-reduce:transition-none ${isPrivateMode ? "border-amber-300/35 bg-amber-950/25 ring-2 ring-amber-400/10" : emojisOpen && !sending ? "border-white/15 bg-zinc-900/90" : isFocused ? "border-white/25 bg-zinc-900/65 ring-2 ring-white/[0.06]" : "border-white/12 bg-zinc-950/35"}`}
+            className={`relative overflow-hidden rounded-[24px] border bg-gradient-to-b from-white/[0.075] via-white/[0.03] to-white/[0.015] shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.22),0_6px_22px_rgba(0,0,0,0.2)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow] duration-250 motion-reduce:transition-none ${isPrivateMode ? "border-zinc-200 bg-white ring-2 ring-white/15" : emojisOpen && !sending ? "border-white/15 bg-zinc-900/90" : isFocused ? "border-white/25 bg-zinc-900/65 ring-2 ring-white/[0.06]" : "border-white/12 bg-zinc-950/35"}`}
           >
             <AnimatePresence initial={false}>
               {isLongTextCollapsed && (
@@ -774,13 +775,13 @@ export function MessageComposer({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.98 }}
                   transition={transition}
-                  className="absolute top-2.5 right-2.5 left-2.5 z-10 flex h-[66px] items-center gap-3 rounded-[18px] border border-white/15 bg-zinc-900/95 px-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_5px_18px_rgba(0,0,0,0.2)]"
+                  className={`absolute top-2.5 right-2.5 left-2.5 z-10 flex h-[66px] items-center gap-3 rounded-[18px] border px-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_5px_18px_rgba(0,0,0,0.2)] ${isPrivateMode ? "border-zinc-200 bg-zinc-100" : "border-white/15 bg-zinc-900/95"}`}
                 >
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-zinc-300 text-zinc-300" aria-hidden="true">
+                  <span className={`flex size-7 shrink-0 items-center justify-center rounded-full border-2 ${isPrivateMode ? "border-zinc-400 text-zinc-600" : "border-zinc-300 text-zinc-300"}`} aria-hidden="true">
                     <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3h6l4 4v14H8z" /><path d="M14 3v5h4" /></svg>
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-zinc-100">{longTextPreview(text)}</span>
+                    <span className={`block truncate text-sm font-medium ${isPrivateMode ? "text-zinc-900" : "text-zinc-100"}`}>{longTextPreview(text)}</span>
                     <button
                       ref={longTextTriggerRef}
                       type="button"
@@ -789,7 +790,7 @@ export function MessageComposer({
                         setIsFullscreen(true);
                         requestAnimationFrame(() => textareaRef.current?.focus());
                       }}
-                      className="mt-0.5 inline-flex items-center gap-1 text-xs text-zinc-400 underline decoration-zinc-600 underline-offset-2 transition-colors hover:text-zinc-200"
+                      className={`mt-0.5 inline-flex items-center gap-1 text-xs underline underline-offset-2 transition-colors ${isPrivateMode ? "text-zinc-600 decoration-zinc-400 hover:text-zinc-900" : "text-zinc-400 decoration-zinc-600 hover:text-zinc-200"}`}
                     >
                       Exibir no campo de texto <span aria-hidden="true">›</span>
                     </button>
@@ -805,7 +806,7 @@ export function MessageComposer({
               animate={textLayout}
               transition={transition}
               onAnimationComplete={syncTextScroll}
-              className={`pointer-events-none absolute overflow-hidden p-0 text-[13.5px] leading-6 font-normal whitespace-pre-wrap [overflow-wrap:anywhere] ${isPrivateMode ? "text-amber-100" : "text-white"} ${isLongTextCollapsed ? "invisible" : ""}`}
+              className={`pointer-events-none absolute overflow-hidden p-0 text-[13.5px] leading-6 font-normal whitespace-pre-wrap [overflow-wrap:anywhere] ${isPrivateMode ? "text-zinc-900" : "text-white"} ${isLongTextCollapsed ? "invisible" : ""}`}
             >
               <EmojiText content={text ? `${text}\u200b` : ""} preserveMetrics />
             </motion.div>
@@ -884,7 +885,7 @@ export function MessageComposer({
                 }
               }}
               placeholder={isPrivateMode ? "Digite uma mensagem privada..." : "Digite uma mensagem..."}
-              className={`absolute ${isPrivateMode ? "caret-amber-300 placeholder:[-webkit-text-fill-color:#d6b96f]" : "caret-white placeholder:[-webkit-text-fill-color:#a1a1aa]"} ${textClassName} ${isLongTextCollapsed ? "pointer-events-none invisible" : ""}`}
+              className={`absolute ${isPrivateMode ? "caret-zinc-900 placeholder:[-webkit-text-fill-color:#71717a]" : "caret-white placeholder:[-webkit-text-fill-color:#a1a1aa]"} ${textClassName} ${isLongTextCollapsed ? "pointer-events-none invisible" : ""}`}
               style={{ color: "transparent", WebkitTextFillColor: "transparent", overflowY: isStacked && measurements.stacked > textHeight ? "auto" : "hidden" }}
             />
 
@@ -896,7 +897,7 @@ export function MessageComposer({
                 left: isPrivateMode && showControls ? isFocused ? 84 : 46 : 13,
               }}
               transition={transition}
-              className={`pointer-events-none absolute bottom-3 ${isPrivateMode ? "text-amber-300" : "text-zinc-300"}`}
+              className={`pointer-events-none absolute bottom-3 ${isPrivateMode ? "text-zinc-700" : "text-zinc-300"}`}
             >
               <ComposerIcon name={isPrivateMode ? "lock" : "message"} />
             </motion.span>
@@ -905,7 +906,7 @@ export function MessageComposer({
               type="button"
               initial={false}
               animate={{ opacity: showControls ? 1 : 0, scale: showControls ? attachmentsOpen ? 0.96 : 1 : 0.9, rotate: reduceMotion ? 0 : attachmentsOpen ? 45 : 0, y: 0, bottom: controlBottom, left: 8 }}
-              whileTap={reduceMotion || sending ? undefined : { scale: 0.86, backgroundColor: "rgba(63,63,70,0.8)", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.3)" }}
+              whileTap={reduceMotion || sending ? undefined : { scale: 0.86, backgroundColor: isPrivateMode ? "rgb(228,228,231)" : "rgba(63,63,70,0.8)", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.3)" }}
               transition={{ ...transition, scale: reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 22 } }}
               aria-label="Abrir anexos"
               title="Abrir anexos"
@@ -918,7 +919,7 @@ export function MessageComposer({
                 closeEmojis();
                 setAttachmentsOpen((current) => !current);
               }}
-              className={`absolute size-8 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isPrivateMode ? "border-amber-300/25 bg-amber-400/10 !text-amber-200 hover:bg-amber-400/15 hover:!text-amber-100 focus-visible:!outline-amber-300/60" : "border-white/10 bg-white/[0.035]"}`}
+              className={`absolute size-8 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isPrivateMode ? privateButtonClassName : "border-white/10 bg-white/[0.035]"}`}
               style={{ pointerEvents: showControls ? "auto" : "none", transformOrigin: "center" }}
             >
               <ComposerIcon name="plus" />
@@ -942,7 +943,7 @@ export function MessageComposer({
                 closeAttachments();
                 setEmojisOpen((current) => !current);
               }}
-              className={`absolute size-8 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isPrivateMode ? "border-amber-300/25 bg-amber-400/10 !text-amber-200 hover:bg-amber-400/15 hover:!text-amber-100 focus-visible:!outline-amber-300/60" : "border-white/10 bg-white/[0.035]"}`}
+              className={`absolute size-8 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isPrivateMode ? privateButtonClassName : "border-white/10 bg-white/[0.035]"}`}
               style={{ pointerEvents: isFocused ? "auto" : "none" }}
             >
               <ComposerIcon name="sticker" />
@@ -965,8 +966,8 @@ export function MessageComposer({
               tabIndex={text.trim() ? 0 : -1}
               disabled={!text.trim() || rewriting || sending}
               onClick={() => void handleRewrite()}
-              className={`group absolute flex size-8 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60 ${isPrivateMode ? "text-amber-300 hover:text-amber-200 focus-visible:outline-amber-400" : "text-violet-300 hover:text-violet-200 focus-visible:outline-violet-400"}`}
-              style={{ pointerEvents: text.trim() ? "auto" : "none", filter: text.trim() ? isPrivateMode ? "drop-shadow(0 0 7px rgba(252,211,77,0.65))" : "drop-shadow(0 0 7px rgba(167,139,250,0.7))" : undefined }}
+              className={`group absolute flex size-8 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60 ${isPrivateMode ? "text-zinc-700 hover:text-zinc-800 focus-visible:outline-zinc-500/60" : "text-violet-300 hover:text-violet-200 focus-visible:outline-violet-400"}`}
+              style={{ pointerEvents: text.trim() ? "auto" : "none", filter: text.trim() ? isPrivateMode ? "drop-shadow(0 0 7px rgba(63,63,70,0.18))" : "drop-shadow(0 0 7px rgba(167,139,250,0.7))" : undefined }}
             >
               {rewriting ? (
                 <svg className="size-5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" opacity=".25" /><path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
@@ -974,11 +975,11 @@ export function MessageComposer({
                 <>
                   <span
                     aria-hidden="true"
-                    className={`absolute inset-1 animate-pulse rounded-full blur-sm transition-opacity duration-300 group-hover:opacity-0 motion-reduce:animate-none ${isPrivateMode ? "bg-amber-400/25" : "bg-violet-500/25"}`}
+                    className={`absolute inset-1 animate-pulse rounded-full blur-sm transition-opacity duration-300 group-hover:opacity-0 motion-reduce:animate-none ${isPrivateMode ? "bg-zinc-400/25" : "bg-violet-500/25"}`}
                   />
                   <span
                     aria-hidden="true"
-                    className={`absolute inset-0 scale-75 rounded-full opacity-0 blur-md transition-[transform,opacity] duration-500 ease-out group-hover:scale-110 group-hover:opacity-100 ${isPrivateMode ? "bg-amber-300/35" : "bg-violet-400/40"}`}
+                    className={`absolute inset-0 scale-75 rounded-full opacity-0 blur-md transition-[transform,opacity] duration-500 ease-out group-hover:scale-110 group-hover:opacity-100 ${isPrivateMode ? "bg-zinc-300/35" : "bg-violet-400/40"}`}
                   />
                   <span className="relative transition-transform duration-300 ease-out group-hover:scale-105">
                     <ComposerIcon name="sparkles" />
@@ -1035,9 +1036,9 @@ export function MessageComposer({
                 }
               }}
               className={`absolute border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isRecording
-                  ? "border-red-400/40 bg-red-500/20 text-red-300"
+                  ? isPrivateMode ? "border-red-600/30 bg-red-500/10 !text-red-700 hover:bg-red-500/15 hover:!text-red-800 focus-visible:!outline-red-600/60" : "border-red-400/40 bg-red-500/20 text-red-300"
                   : isPrivateMode
-                    ? "border-amber-300/25 bg-amber-400/10 !text-amber-200 hover:bg-amber-400/15 hover:!text-amber-100 focus-visible:!outline-amber-300/60"
+                    ? privateButtonClassName
                     : "border-white/10 bg-white/[0.035]"
                 }`}
               style={{
@@ -1047,7 +1048,7 @@ export function MessageComposer({
               }}
             >
               {isRecording ? (
-                <span className="flex h-4 items-center gap-[2px] text-red-300" aria-label={`Gravando ${formatRecordingTime(recordingSeconds)}`}>
+                <span className={`flex h-4 items-center gap-[2px] ${isPrivateMode ? "text-red-700" : "text-red-300"}`} aria-label={`Gravando ${formatRecordingTime(recordingSeconds)}`}>
                   {audioLevels.map((level, index) => (
                     <span
                       key={index}
@@ -1055,7 +1056,7 @@ export function MessageComposer({
                       style={{ height: `${Math.max(4, Math.round(level * 16))}px` }}
                     />
                   ))}
-                  <span className="pointer-events-none absolute right-full mr-2 min-w-[31px] text-[10px] font-medium tabular-nums text-red-200">{formatRecordingTime(recordingSeconds)}</span>
+                  <span className={`pointer-events-none absolute right-full mr-2 min-w-[31px] text-[10px] font-medium tabular-nums ${isPrivateMode ? "text-red-700" : "text-red-200"}`}>{formatRecordingTime(recordingSeconds)}</span>
                 </span>
               ) : (
                 <ComposerIcon name="mic" />
@@ -1077,7 +1078,7 @@ export function MessageComposer({
                 setIsFullscreen((current) => !current);
                 textareaRef.current?.focus();
               }}
-              className={`absolute top-2 right-2 size-8 ${buttonClassName} ${isPrivateMode ? "!text-amber-200 hover:!text-amber-100 focus-visible:!outline-amber-300/60" : ""}`}
+              className={`absolute top-2 right-2 size-8 ${buttonClassName} ${isPrivateMode ? "!text-zinc-700 hover:bg-zinc-200 hover:!text-zinc-950 focus-visible:!outline-zinc-500/60" : ""}`}
               style={{ pointerEvents: isStacked ? "auto" : "none" }}
             >
               <ComposerIcon name={isFullscreen ? "collapse" : "expand"} />
@@ -1095,14 +1096,14 @@ export function MessageComposer({
             aria-busy={sending}
             aria-label={sending ? "Enviando mensagem" : "Enviar mensagem"}
             title="Enviar mensagem"
-            className={`absolute flex items-center justify-center overflow-hidden rounded-full border bg-gradient-to-br from-white/[0.12] via-white/[0.03] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.16),0_4px_16px_rgba(0,0,0,0.18)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,color,box-shadow] duration-250 focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none ${isPrivateMode ? `focus-visible:outline-amber-400/50 ${text.trim() || pendingAttachments.length ? "border-amber-200/30 bg-amber-500/60 text-amber-50 enabled:hover:border-amber-100/40 enabled:hover:bg-amber-400/70" : "border-amber-300/20 bg-amber-950/30 text-amber-200/55"}` : `focus-visible:outline-emerald-400/50 ${text.trim() || pendingAttachments.length ? "border-emerald-200/20 bg-emerald-600/60 text-white enabled:hover:bg-emerald-500/70 enabled:hover:border-emerald-100/30" : "border-white/10 bg-emerald-950/25 text-white/45"}`}`}
+            className={`absolute flex items-center justify-center overflow-hidden rounded-full border bg-gradient-to-br from-white/[0.12] via-white/[0.03] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.16),0_4px_16px_rgba(0,0,0,0.18)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,color,box-shadow] duration-250 focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none ${isPrivateMode ? `focus-visible:outline-zinc-500/60 ${text.trim() || pendingAttachments.length ? "border-zinc-500 bg-zinc-500 text-white enabled:hover:border-zinc-600 enabled:hover:bg-zinc-600" : "border-zinc-300 bg-zinc-100 text-zinc-400"}` : `focus-visible:outline-emerald-400/50 ${text.trim() || pendingAttachments.length ? "border-emerald-200/20 bg-emerald-600/60 text-white enabled:hover:bg-emerald-500/70 enabled:hover:border-emerald-100/30" : "border-white/10 bg-emerald-950/25 text-white/45"}`}`}
           >
             {sending ? (
               <svg className="size-5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" opacity=".25" /><path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
             ) : <ComposerIcon name="send" />}
           </motion.button>
           <AttachmentMenu open={attachmentsOpen && !sending} triggerRef={attachmentTriggerRef} onClose={closeAttachments} onSelect={selectAttachment} closing={closing} onCloseWithBot={onCloseWithBot} allowCloseWithBot={allowCloseWithBot} stacked={isStacked} />
-          <EmojiSelector id={emojiSelectorId} open={emojisOpen && !sending} triggerRef={emojiTriggerRef} onClose={closeEmojis} onSelect={selectEmoji} fieldHeight={fieldHeight} rightInset={isStacked ? 0 : 56} />
+          <EmojiSelector id={emojiSelectorId} open={emojisOpen && !sending} isPrivateMode={isPrivateMode} triggerRef={emojiTriggerRef} onClose={closeEmojis} onSelect={selectEmoji} fieldHeight={fieldHeight} rightInset={isStacked ? 0 : 56} />
           {/* Seleciona o arquivo localmente; a integração de envio de mídia é uma etapa separada. */}
           <input
             ref={fileInputRef}
