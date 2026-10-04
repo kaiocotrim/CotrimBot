@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Avatar } from "@/components/chat/avatar";
-import { EmojiText } from "@/components/chat/emoji-text";
+import { MessageText } from "@/components/chat/message-text";
 import type { Contact } from "@/types/chat";
 
 type VideoMessageProps = {
@@ -101,7 +101,7 @@ export function VideoMessage({ messageId, mediaUrl, content, contact, createdAt,
       </button>
 
       {/* Exibe somente legendas reais, nunca o marcador interno "[Vídeo]". */}
-      {hasCaption && <p className="px-2 pb-0.5 pt-2 whitespace-pre-wrap"><EmojiText content={content} /></p>}
+      {hasCaption && <p className="px-2 pb-0.5 pt-2 whitespace-pre-wrap"><MessageText content={content} /></p>}
 
       {/*
         O portal coloca o visualizador diretamente no body para que ele não
@@ -154,7 +154,7 @@ export function VideoMessage({ messageId, mediaUrl, content, contact, createdAt,
                 </>}
               </div>
               {/* Legenda da mídia atualmente selecionada. */}
-              {activeHasCaption && <p className="shrink-0 px-6 py-2 text-center text-xs text-zinc-300"><EmojiText content={activeItem.content} /></p>}
+              {activeHasCaption && <p className="shrink-0 px-6 py-2 text-center text-xs text-zinc-300"><MessageText content={activeItem.content} /></p>}
               {/* Faixa de miniaturas para navegação direta entre imagens e vídeos. */}
               {gallery.length > 1 && <div className="flex h-20 shrink-0 items-center justify-center gap-2 overflow-x-auto border-t border-white/10 px-4 py-2">
                 {gallery.map((item, index) => <button key={item.id} type="button" onClick={() => setActiveIndex(index)} aria-label={`Abrir mídia ${index + 1}`} aria-current={index === activeIndex} className={`relative h-14 w-16 shrink-0 overflow-hidden rounded-md border-2 bg-black/30 p-0.5 ${index === activeIndex ? "border-emerald-400" : "border-transparent hover:border-white/30"}`}>

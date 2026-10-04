@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { Avatar } from "@/components/chat/avatar";
+import { AccountSettings } from "@/components/chat/account-settings";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { QuickConversationPreview } from "@/components/chat/quick-conversation-preview";
 import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
@@ -34,7 +35,6 @@ function formatSidebarDate(value: string) {
 export function ContactSidebar({ contacts, loading, error, selectedContactId, onSelectContact }: ContactSidebarProps) {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "admin";
-  const userName = session?.user?.name?.trim() || "Usuário";
   const userImage = session?.user?.image;
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -172,6 +172,7 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
   useEffect(() => {
     function handleSidebarShortcut(event: KeyboardEvent) {
       if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.isComposing || event.key.toLowerCase() !== "b") return;
+      if (document.activeElement?.closest('[role="dialog"]')) return;
       event.preventDefault();
       if (event.repeat) return;
 
@@ -202,28 +203,34 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
         <header ref={headerRef} hidden={isCollapsed} className="px-4 pt-4 pb-2">
           <h1 className="sr-only">CotrimBot</h1>
           <div className="flex items-center justify-between">
-            <div
-              role="img"
-              aria-label={`Avatar de ${userName}`}
-              title={userName}
-              className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-800 text-zinc-400"
-            >
-              {userImage && userImage !== failedAvatarUrl ? (
-                // A foto da sessão pode vir de uma URL externa e dinâmica.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={userImage}
-                  alt=""
-                  className="size-full object-cover"
-                  onError={() => setFailedAvatarUrl(userImage)}
-                />
-              ) : (
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="size-6">
-                  <circle cx="12" cy="8" r="4" />
-                  <path d="M5 21v-2a7 7 0 0 1 14 0v2" />
-                </svg>
-              )}
-            </div>
+            {session?.user && (
+              <AccountSettings user={session.user} onOpen={() => {
+                setShowMenu(false);
+                cancelPreviewHold();
+                closePreview();
+              }}>
+                <span
+                  aria-hidden="true"
+                  className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-800 text-zinc-400"
+                >
+                  {userImage && userImage !== failedAvatarUrl ? (
+                    // A foto da sessão pode vir de uma URL externa e dinâmica.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={userImage}
+                      alt=""
+                      className="size-full object-cover"
+                      onError={() => setFailedAvatarUrl(userImage)}
+                    />
+                  ) : (
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="size-6">
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M5 21v-2a7 7 0 0 1 14 0v2" />
+                    </svg>
+                  )}
+                </span>
+              </AccountSettings>
+            )}
             <div className="flex items-center gap-1.5">
               <div className="relative">
                 <button

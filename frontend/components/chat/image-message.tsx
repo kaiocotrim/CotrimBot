@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Avatar } from "@/components/chat/avatar";
-import { EmojiText } from "@/components/chat/emoji-text";
+import { MessageText } from "@/components/chat/message-text";
 import type { Contact } from "@/types/chat";
 
 type ImageMessageProps = {
@@ -133,7 +133,7 @@ export function ImageMessage({ messageId, mediaUrl, content, viewOnce, contact, 
             )}
           </div>
 
-          {activeHasCaption && <p className="shrink-0 px-6 py-2 text-center text-xs text-zinc-300"><EmojiText content={activeItem.content} /></p>}
+          {activeHasCaption && <p className="shrink-0 px-6 py-2 text-center text-xs text-zinc-300"><MessageText content={activeItem.content} /></p>}
           {gallery.length > 1 && (
             <div className="flex h-20 shrink-0 items-center justify-center gap-2 overflow-x-auto border-t border-white/10 px-4 py-2">
               <a href={activeItem.mediaUrl} download aria-label="Baixar imagem atual" className={`${viewerButtonClass} shrink-0`}><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 20h14" /></svg></a>
@@ -167,7 +167,7 @@ export function ImageMessage({ messageId, mediaUrl, content, viewOnce, contact, 
           </span>
         )}
       </button>
-      {hasCaption && <p className="px-2 pt-2 pb-0.5 whitespace-pre-wrap"><EmojiText content={content} /></p>}
+      {hasCaption && <p className="px-2 pt-2 pb-0.5 whitespace-pre-wrap"><MessageText content={content} /></p>}
       {typeof document !== "undefined" && createPortal(viewer, document.body)}
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { AnimationItem } from "lottie-web";
-import chatAnimation from "@/components/iconeAN/Chat.json";
+import novaAnimation from "@/components/iconeAN/Nova.json";
 
 export function EmptyChatAnimation() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -23,9 +23,9 @@ export function EmptyChatAnimation() {
       animation = lottie.loadAnimation({
         container: containerRef.current,
         renderer: "svg",
-        loop: false,
+        loop: true,
         autoplay: !reducedMotion.matches,
-        animationData: structuredClone(chatAnimation),
+        animationData: structuredClone(novaAnimation),
       });
       reducedMotion.addEventListener("change", syncMotionPreference);
     });

@@ -1,9 +1,9 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { Pencil } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { Avatar } from "@/components/chat/avatar";
+import { ContactPhoto } from "@/components/chat/contact-photo";
 import type { Contact } from "@/types/chat";
 
 export function ContactInfoPanel({
@@ -56,35 +56,23 @@ export function ContactInfoPanel({
       exit={{ opacity: 0, x: 24 }}
       transition={{ duration: reduceMotion ? 0 : 0.25, ease: [0.22, 1, 0.36, 1] }}
       aria-label="Informações do contato"
-      className="relative flex h-1/2 min-h-0 w-full shrink-0 flex-col overflow-hidden
-        border-t border-white/15
-        @min-[640px]:h-full @min-[640px]:w-[min(24rem,40%)] @min-[640px]:border-t-0 @min-[640px]:border-l
-        bg-zinc-900/40 backdrop-blur-2xl backdrop-saturate-150
-        shadow-[0_0_60px_-10px_rgba(0,0,0,0.6),inset_1px_0_0_0_rgba(255,255,255,0.08)]"
+      className="relative flex h-1/2 min-h-0 w-full shrink-0 flex-col overflow-hidden bg-black
+        @min-[640px]:h-full @min-[640px]:w-[min(24rem,40%)]"
     >
-      {/* Reflexo de luz no topo (highlight do vidro) */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-white/[0.10] to-transparent"
-      />
-
-      <header className="relative flex h-16 shrink-0 items-center gap-3 border-b border-white/10 px-4">
+      <header className="flex h-16 shrink-0 items-center gap-3 px-4">
         <button
           type="button"
           onClick={onClose}
           aria-label="Fechar informações"
-          className="flex size-9 items-center justify-center rounded-full text-zinc-200 transition hover:bg-white/15 active:scale-95"
+          className="flex size-9 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 active:scale-95"
         >
-          ✕
+          <X className="size-4" aria-hidden="true" />
         </button>
         <h2 className="text-sm font-medium text-white">Informações do contato</h2>
       </header>
 
       <div className="relative flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-8">
-        <Avatar
-          contact={contact}
-          className="size-28 ring-1 ring-white/25 shadow-xl shadow-black/30"
-        />
+        <ContactPhoto contact={contact} />
         <h3 className="mt-4 max-w-full text-center text-xl font-semibold break-words text-white">{contact.name}</h3>
         <p className="mt-1 text-sm text-zinc-300/80">
           {contact.isGroup ? "Grupo do WhatsApp" : contact.phone}
@@ -95,7 +83,7 @@ export function ContactInfoPanel({
             onSubmit={saveName}
             aria-label="Editar contato"
             aria-busy={saving}
-            className="mt-4 w-full space-y-4 rounded-2xl border border-white/15 bg-white/[0.07] p-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)] backdrop-blur-md"
+            className="mt-4 w-full space-y-4 py-4"
           >
             <label className="block text-xs text-zinc-300/80">
               Nome
@@ -106,7 +94,7 @@ export function ContactInfoPanel({
                 value={firstName}
                 onChange={(event) => setFirstName(event.target.value)}
                 disabled={saving}
-                className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-white/30 focus:ring-2 focus:ring-white/[0.05] disabled:opacity-50"
+                className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50"
               />
             </label>
             <label className="block text-xs text-zinc-300/80">
@@ -116,7 +104,7 @@ export function ContactInfoPanel({
                 value={lastName}
                 onChange={(event) => setLastName(event.target.value)}
                 disabled={saving}
-                className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-white/30 focus:ring-2 focus:ring-white/[0.05] disabled:opacity-50"
+                className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50"
               />
             </label>
             {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
@@ -132,7 +120,7 @@ export function ContactInfoPanel({
               <button
                 type="submit"
                 disabled={saving || !firstName.trim()}
-                className="rounded-xl border border-white/15 bg-white/[0.08] px-3 py-2 text-sm text-white transition hover:bg-white/[0.14] focus-visible:outline-2 focus-visible:outline-white/50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl bg-zinc-900 px-3 py-2 text-sm text-white transition hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-white/50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving ? "Salvando..." : "Salvar"}
               </button>
@@ -149,30 +137,29 @@ export function ContactInfoPanel({
           </button>
         )}
 
-        {/* Card de vidro interno */}
-        <div className="mt-7 w-full shrink-0 overflow-hidden rounded-2xl border border-white/15 bg-white/[0.07] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)] backdrop-blur-md">
-          <div className="border-b border-white/10 px-4 py-3">
-            <span className="block text-xs text-zinc-300/60">Tipo</span>
-            <span className="mt-1 block text-sm text-white">
+        <dl className="mt-8 w-full shrink-0 space-y-5 px-1">
+          <div>
+            <dt className="text-xs text-zinc-400">Tipo</dt>
+            <dd className="mt-1 text-sm text-white">
               {contact.isGroup ? "Grupo" : "Contato"}
-            </span>
+            </dd>
           </div>
-          <div className="border-b border-white/10 px-4 py-3">
-            <span className="block text-xs text-zinc-300/60">Telefone</span>
-            <span className="mt-1 block text-sm text-white">{contact.phone}</span>
+          <div>
+            <dt className="text-xs text-zinc-400">Telefone</dt>
+            <dd className="mt-1 break-words text-sm text-white">{contact.phone}</dd>
           </div>
-          <div className="px-4 py-3">
-            <span className="block text-xs text-zinc-300/60">Status</span>
-            <span className="mt-1 block text-sm text-white">
+          <div>
+            <dt className="text-xs text-zinc-400">Status</dt>
+            <dd className="mt-1 text-sm text-white">
               {contact.archived ? "Arquivado" : "Ativo"}
-            </span>
+            </dd>
           </div>
-        </div>
+        </dl>
 
         <button
           type="button"
           onClick={onSearch}
-          className="mt-4 w-full rounded-xl border border-white/15 bg-white/[0.08] px-4 py-3 text-sm text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)] backdrop-blur-md transition hover:bg-white/[0.14] active:scale-[0.99]"
+          className="mt-7 w-full shrink-0 rounded-xl bg-zinc-900 px-4 py-3 text-sm text-white transition hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-white/50 active:scale-[0.99]"
         >
           Localizar mensagem nesta conversa
         </button>
