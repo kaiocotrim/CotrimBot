@@ -118,80 +118,84 @@ export function ChatPanel({
   }
 
   return (
-    <section ref={setConversationPanel} className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      {/* Papel de parede fornecido pelo usuário via Unsplash. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/mesh-gradient2.png')" }}
-      />
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-zinc-950/50" />
-
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20">
-        <ChatHeader
-          contact={contact}
-          isTyping={isTyping}
-          searchOpen={searchOpen}
-          searchQuery={searchQuery}
-          currentResult={normalizedSearchIndex}
-          resultCount={searchResults.length}
-          onOpenSearch={() => { setContactInfoOpen(false); setSearchOpen(true); }}
-          onOpenContactInfo={() => setContactInfoOpen(true)}
-          onSearchQueryChange={(value) => { setSearchQuery(value); setSearchIndex(0); }}
-          onPreviousResult={() => setSearchIndex((current) => searchResults.length ? (current - 1 + searchResults.length) % searchResults.length : 0)}
-          onNextResult={() => setSearchIndex((current) => searchResults.length ? (current + 1) % searchResults.length : 0)}
-          onCloseSearch={() => { setSearchOpen(false); setSearchQuery(""); }}
-        />
-      </div>
-
-      <MessageList
-        contact={contact}
-        contacts={contacts}
-        messages={messages}
-        hasOlderMessages={hasOlderMessages}
-        loadingOlderMessages={loadingOlderMessages}
-        newMessageId={newMessageId}
-        highlightedMessageId={highlightedMessageId}
-        onLoadOlderMessages={onLoadOlderMessages}
-        onReactToMessage={onReactToMessage}
-        onUpdateMessageFlags={onUpdateMessageFlags}
-        onForwardMessage={onForwardMessage}
-        onReplyToMessage={replyToMessage}
-        onEnsureMessageLoaded={onEnsureMessageLoaded}
-      />
-
-      <MessageComposer
-        dropZoneContainer={conversationPanel}
-        text={text}
-        sending={sending}
-        closing={closing}
-        onTextChange={onTextChange}
-        onSend={(options) => {
-          onSend({ ...options, replyToMessageId: activeReply?.id });
-          setReplyingTo(null);
-        }}
-        onSendMedia={async (files, caption) => {
-          await onSendMedia(files, caption, activeReply?.id);
-          setReplyingTo(null);
-        }}
-        onCloseWithBot={onCloseWithBot}
-        allowCloseWithBot={!contact.isGroup}
-        focusRequestKey={composerFocusKey}
-        replyingTo={activeReply}
-        onCancelReply={() => setReplyingTo(null)}
-      />
-
-      <AnimatePresence>
-        {contactInfoOpen && (
-          <ContactInfoPanel
-            key={contact.id}
-            contact={contact}
-            onRenameContact={onRenameContact}
-            onClose={() => setContactInfoOpen(false)}
-            onSearch={() => { setContactInfoOpen(false); setSearchOpen(true); }}
+    <section className="@container flex min-h-0 min-w-0 flex-1 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col @min-[640px]:flex-row">
+        <div ref={setConversationPanel} className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {/* Papel de parede fornecido pelo usuário via Unsplash. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{ backgroundImage: "url('/mesh-gradient2.png')" }}
           />
-        )}
-      </AnimatePresence>
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-zinc-950/50" />
+
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20">
+            <ChatHeader
+              contact={contact}
+              isTyping={isTyping}
+              searchOpen={searchOpen}
+              searchQuery={searchQuery}
+              currentResult={normalizedSearchIndex}
+              resultCount={searchResults.length}
+              onOpenSearch={() => { setContactInfoOpen(false); setSearchOpen(true); }}
+              onOpenContactInfo={() => setContactInfoOpen(true)}
+              onSearchQueryChange={(value) => { setSearchQuery(value); setSearchIndex(0); }}
+              onPreviousResult={() => setSearchIndex((current) => searchResults.length ? (current - 1 + searchResults.length) % searchResults.length : 0)}
+              onNextResult={() => setSearchIndex((current) => searchResults.length ? (current + 1) % searchResults.length : 0)}
+              onCloseSearch={() => { setSearchOpen(false); setSearchQuery(""); }}
+            />
+          </div>
+
+          <MessageList
+            contact={contact}
+            contacts={contacts}
+            messages={messages}
+            hasOlderMessages={hasOlderMessages}
+            loadingOlderMessages={loadingOlderMessages}
+            newMessageId={newMessageId}
+            highlightedMessageId={highlightedMessageId}
+            onLoadOlderMessages={onLoadOlderMessages}
+            onReactToMessage={onReactToMessage}
+            onUpdateMessageFlags={onUpdateMessageFlags}
+            onForwardMessage={onForwardMessage}
+            onReplyToMessage={replyToMessage}
+            onEnsureMessageLoaded={onEnsureMessageLoaded}
+          />
+
+          <MessageComposer
+            dropZoneContainer={conversationPanel}
+            text={text}
+            sending={sending}
+            closing={closing}
+            onTextChange={onTextChange}
+            onSend={(options) => {
+              onSend({ ...options, replyToMessageId: activeReply?.id });
+              setReplyingTo(null);
+            }}
+            onSendMedia={async (files, caption) => {
+              await onSendMedia(files, caption, activeReply?.id);
+              setReplyingTo(null);
+            }}
+            onCloseWithBot={onCloseWithBot}
+            allowCloseWithBot={!contact.isGroup}
+            focusRequestKey={composerFocusKey}
+            replyingTo={activeReply}
+            onCancelReply={() => setReplyingTo(null)}
+          />
+        </div>
+
+        <AnimatePresence mode="wait">
+          {contactInfoOpen && (
+            <ContactInfoPanel
+              key={contact.id}
+              contact={contact}
+              onRenameContact={onRenameContact}
+              onClose={() => setContactInfoOpen(false)}
+              onSearch={() => { setContactInfoOpen(false); setSearchOpen(true); }}
+            />
+          )}
+        </AnimatePresence>
+      </div>
     </section>
   );
 }

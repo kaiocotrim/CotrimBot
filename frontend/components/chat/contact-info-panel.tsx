@@ -56,8 +56,9 @@ export function ContactInfoPanel({
       exit={{ opacity: 0, x: 24 }}
       transition={{ duration: reduceMotion ? 0 : 0.25, ease: [0.22, 1, 0.36, 1] }}
       aria-label="Informações do contato"
-      className="absolute inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col overflow-hidden
-        border-l border-white/15
+      className="relative flex h-1/2 min-h-0 w-full shrink-0 flex-col overflow-hidden
+        border-t border-white/15
+        @min-[640px]:h-full @min-[640px]:w-[min(24rem,40%)] @min-[640px]:border-t-0 @min-[640px]:border-l
         bg-zinc-900/40 backdrop-blur-2xl backdrop-saturate-150
         shadow-[0_0_60px_-10px_rgba(0,0,0,0.6),inset_1px_0_0_0_rgba(255,255,255,0.08)]"
     >
@@ -67,7 +68,7 @@ export function ContactInfoPanel({
         className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-white/[0.10] to-transparent"
       />
 
-      <header className="relative flex h-16 items-center gap-3 border-b border-white/10 px-4">
+      <header className="relative flex h-16 shrink-0 items-center gap-3 border-b border-white/10 px-4">
         <button
           type="button"
           onClick={onClose}
@@ -79,12 +80,12 @@ export function ContactInfoPanel({
         <h2 className="text-sm font-medium text-white">Informações do contato</h2>
       </header>
 
-      <div className="relative flex flex-1 flex-col items-center overflow-y-auto px-6 py-8">
+      <div className="relative flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-8">
         <Avatar
           contact={contact}
           className="size-28 ring-1 ring-white/25 shadow-xl shadow-black/30"
         />
-        <h3 className="mt-4 text-xl font-semibold text-white">{contact.name}</h3>
+        <h3 className="mt-4 max-w-full text-center text-xl font-semibold break-words text-white">{contact.name}</h3>
         <p className="mt-1 text-sm text-zinc-300/80">
           {contact.isGroup ? "Grupo do WhatsApp" : contact.phone}
         </p>
@@ -149,7 +150,7 @@ export function ContactInfoPanel({
         )}
 
         {/* Card de vidro interno */}
-        <div className="mt-7 w-full overflow-hidden rounded-2xl border border-white/15 bg-white/[0.07] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)] backdrop-blur-md">
+        <div className="mt-7 w-full shrink-0 overflow-hidden rounded-2xl border border-white/15 bg-white/[0.07] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)] backdrop-blur-md">
           <div className="border-b border-white/10 px-4 py-3">
             <span className="block text-xs text-zinc-300/60">Tipo</span>
             <span className="mt-1 block text-sm text-white">

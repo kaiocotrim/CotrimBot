@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { Avatar } from "@/components/chat/avatar";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { QuickConversationPreview } from "@/components/chat/quick-conversation-preview";
@@ -12,7 +12,7 @@ import type { Contact, Message } from "@/types/chat";
 
 type ContactSidebarProps = { contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void };
 type ConversationFilter = "conversations" | "groups";
-const LONG_PRESS_DURATION = 1_000;
+const PREVIEW_HOLD_DURATION = 2_000;
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
 const dayKeyFormatter = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: CHAT_TIME_ZONE });
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: CHAT_TIME_ZONE });
@@ -34,23 +34,24 @@ function formatSidebarDate(value: string) {
 export function ContactSidebar({ contacts, loading, error, selectedContactId, onSelectContact }: ContactSidebarProps) {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "admin";
+  const userName = session?.user?.name?.trim() || "Usuário";
+  const userImage = session?.user?.image;
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [query, setQuery] = useState("");
   const [conversationFilter, setConversationFilter] = useState<ConversationFilter>("conversations");
   const [showArchived, setShowArchived] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [holdingContactId, setHoldingContactId] = useState<number | null>(null);
-  const [completedContactId, setCompletedContactId] = useState<number | null>(null);
   const [previewContact, setPreviewContact] = useState<Contact | null>(null);
   const [previewMessages, setPreviewMessages] = useState<Message[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const suppressClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressContactIdRef = useRef<number | null>(null);
-  const suppressClickContactIdRef = useRef<number | null>(null);
+  const holdingContactIdRef = useRef<number | null>(null);
   const previewRequestRef = useRef(0);
   const previewPanelRef = useRef<HTMLElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
   const archivedCount = contacts.filter((contact) => contact.archived).length;
   const visibleContacts = useMemo(() => {
     const search = query.trim().toLocaleLowerCase("pt-BR");
@@ -94,52 +95,32 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
       });
   }, []);
 
-  const cancelLongPress = useCallback((contactId?: number) => {
-    if (contactId !== undefined && longPressContactIdRef.current !== contactId) return;
-    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = null;
-    longPressContactIdRef.current = null;
+  const cancelPreviewHold = useCallback((contactId?: number) => {
+    if (contactId !== undefined && holdingContactIdRef.current !== contactId) return;
+    holdingContactIdRef.current = null;
     setHoldingContactId(null);
   }, []);
 
-  function startLongPress(contact: Contact, event: ReactPointerEvent<HTMLButtonElement>) {
-    if (event.pointerType !== "mouse" || event.button !== 0) return;
-    cancelLongPress();
-    if (suppressClickTimerRef.current) clearTimeout(suppressClickTimerRef.current);
-    suppressClickContactIdRef.current = null;
-    longPressContactIdRef.current = contact.id;
+  function startPreviewHold(contact: Contact, event: ReactMouseEvent<HTMLButtonElement>) {
+    if (event.button !== 2) return;
+    cancelPreviewHold();
+    holdingContactIdRef.current = contact.id;
     setHoldingContactId(contact.id);
-    longPressTimerRef.current = setTimeout(() => {
-      longPressTimerRef.current = null;
-      longPressContactIdRef.current = null;
-      suppressClickContactIdRef.current = contact.id;
-      setHoldingContactId(null);
-      setCompletedContactId(contact.id);
-      openPreview(contact);
-
-      if (completionTimerRef.current) clearTimeout(completionTimerRef.current);
-      completionTimerRef.current = setTimeout(() => setCompletedContactId(null), 180);
-    }, LONG_PRESS_DURATION);
   }
 
-  function releaseLongPress(contactId: number) {
-    cancelLongPress(contactId);
-    if (suppressClickContactIdRef.current !== contactId) return;
-    if (suppressClickTimerRef.current) clearTimeout(suppressClickTimerRef.current);
-    suppressClickTimerRef.current = setTimeout(() => {
-      if (suppressClickContactIdRef.current === contactId) suppressClickContactIdRef.current = null;
-    }, 0);
+  function completePreviewHold(contact: Contact) {
+    if (holdingContactIdRef.current !== contact.id) return;
+    // A própria animação controla a espera e mantém o círculo completo até soltar.
+    openPreview(contact);
   }
 
-  function selectContactFromClick(contact: Contact) {
-    if (suppressClickContactIdRef.current === contact.id) {
-      suppressClickContactIdRef.current = null;
-      return;
-    }
-    onSelectContact(contact);
+  function selectContactFromClick(contact: Contact, event: ReactMouseEvent<HTMLButtonElement>) {
+    if (event.detail > 1) return;
+    openConversation(contact);
   }
 
   function openConversation(contact: Contact) {
+    cancelPreviewHold();
     closePreview();
     onSelectContact(contact);
   }
@@ -163,31 +144,86 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
     };
   }, [closePreview, previewContact]);
 
-  useEffect(() => () => {
-    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-    if (completionTimerRef.current) clearTimeout(completionTimerRef.current);
-    if (suppressClickTimerRef.current) clearTimeout(suppressClickTimerRef.current);
-    previewRequestRef.current += 1;
-  }, []);
+  useEffect(() => {
+    function handleMouseUp(event: MouseEvent) {
+      if (event.button === 2) cancelPreviewHold();
+    }
+
+    function handleBlur() {
+      cancelPreviewHold();
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") cancelPreviewHold();
+    }
+
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("blur", handleBlur);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("blur", handleBlur);
+      document.removeEventListener("keydown", handleKeyDown);
+      holdingContactIdRef.current = null;
+      previewRequestRef.current += 1;
+    };
+  }, [cancelPreviewHold]);
+
+  useEffect(() => {
+    function handleSidebarShortcut(event: KeyboardEvent) {
+      if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.isComposing || event.key.toLowerCase() !== "b") return;
+      event.preventDefault();
+      if (event.repeat) return;
+
+      if (headerRef.current?.contains(document.activeElement)) sidebarRef.current?.focus();
+      cancelPreviewHold();
+      closePreview();
+      setShowMenu(false);
+      setIsCollapsed((current) => !current);
+    }
+
+    window.addEventListener("keydown", handleSidebarShortcut);
+    return () => window.removeEventListener("keydown", handleSidebarShortcut);
+  }, [cancelPreviewHold, closePreview]);
+
+  const emptyMessage = conversationFilter === "groups"
+    ? showArchived ? "Nenhum grupo arquivado" : "Nenhum grupo encontrado"
+    : showArchived ? "Nenhuma conversa arquivada" : "Nenhuma conversa encontrada";
 
   return (
 
-      <div className="relative flex h-full min-h-0 w-[320px] min-w-[280px] max-w-[42vw] shrink-0 flex-col border-r border-white/[0.08]">
-        <header className="px-4 pt-4 pb-2">
+      <aside
+        ref={sidebarRef}
+        tabIndex={-1}
+        aria-label="Barra lateral de conversas"
+        aria-keyshortcuts="Control+b"
+        className={`relative flex h-full min-h-0 shrink-0 flex-col border-r border-white/[0.08] outline-none transition-[width,min-width,max-width] duration-200 motion-reduce:transition-none ${isCollapsed ? "w-20 min-w-20 max-w-20" : "w-[320px] min-w-[280px] max-w-[42vw]"}`}
+      >
+        <header ref={headerRef} hidden={isCollapsed} className="px-4 pt-4 pb-2">
+          <h1 className="sr-only">CotrimBot</h1>
           <div className="flex items-center justify-between">
-            <h1 className="shrink-0">
-              <span className="sr-only">CotrimBot</span>
-              <svg
-                aria-hidden="true"
-                focusable="false"
-                viewBox="380 380 492 536"
-                fill="currentColor"
-                className="block size-9 text-white"
-              >
-                <path d="M686 385C518 385 386 507 386 660C386 799 500 909 655 909V754C608 749 573 711 573 661C573 604 623 557 686 557Z" />
-                <ellipse cx="776" cy="792" rx="91" ry="93" />
-              </svg>
-            </h1>
+            <div
+              role="img"
+              aria-label={`Avatar de ${userName}`}
+              title={userName}
+              className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-800 text-zinc-400"
+            >
+              {userImage && userImage !== failedAvatarUrl ? (
+                // A foto da sessão pode vir de uma URL externa e dinâmica.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={userImage}
+                  alt=""
+                  className="size-full object-cover"
+                  onError={() => setFailedAvatarUrl(userImage)}
+                />
+              ) : (
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="size-6">
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M5 21v-2a7 7 0 0 1 14 0v2" />
+                </svg>
+              )}
+            </div>
             <div className="flex items-center gap-1.5">
               <div className="relative">
                 <button
@@ -223,7 +259,7 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
               <button
                 type="button"
                 aria-label="Nova conversa"
-                className="flex size-8 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 transition-colors hover:bg-emerald-500/25 active:scale-95"
+                className="flex size-8 items-center justify-center rounded-full bg-zinc-950 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 active:scale-95"
               >
                 <svg className="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
                   <path d="M12 5v14M5 12h14" />
@@ -282,7 +318,7 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
         </header>
 
         <CompactScrollArea className="flex-1" label="Lista de conversas">
-          <div className="px-2 pb-2">
+          <div className={isCollapsed ? "space-y-1 py-3 pr-1 pl-3" : "px-2 pb-2"}>
             {visibleContacts.map((contact) => {
               const lastMessage = contact.messages?.[0];
               const selected = selectedContactId === contact.id;
@@ -291,30 +327,45 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
                 <div key={contact.id} className={`group relative rounded-xl transition-colors ${selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"}`}>
                   <button
                     type="button"
-                    onPointerDown={(event) => startLongPress(contact, event)}
-                    onPointerUp={() => releaseLongPress(contact.id)}
-                    onPointerLeave={() => releaseLongPress(contact.id)}
-                    onPointerCancel={() => releaseLongPress(contact.id)}
+                    onMouseDown={(event) => startPreviewHold(contact, event)}
+                    onMouseLeave={() => cancelPreviewHold(contact.id)}
+                    onPointerCancel={() => cancelPreviewHold(contact.id)}
                     onContextMenu={(event) => {
-                      if (longPressContactIdRef.current === contact.id || suppressClickContactIdRef.current === contact.id) event.preventDefault();
+                      if (event.button !== 2) return;
+                      event.preventDefault();
                     }}
                     onDragStart={(event) => event.preventDefault()}
-                    onClick={() => selectContactFromClick(contact)}
-                    className="block w-full select-none px-2 text-left"
+                    onClick={(event) => selectContactFromClick(contact, event)}
+                    aria-label={`${contact.name}${unread ? `, ${contact.unreadCount} mensagens não lidas` : ""}`}
+                    aria-current={selected ? "true" : undefined}
+                    title={`${contact.name} — Clique para abrir a conversa; segure o botão direito por 2 segundos para ver a prévia`}
+                    className={`block w-full select-none text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 ${isCollapsed ? "rounded-xl py-2" : "px-2"}`}
                   >
-                  <div className="flex items-center gap-2.5">
-                    <span className={`relative shrink-0 transition-transform duration-150 ${completedContactId === contact.id ? "scale-[1.04]" : ""}`}>
+                  <div className={`flex items-center ${isCollapsed ? "justify-center" : "gap-2.5"}`}>
+                    <span className="relative shrink-0">
                       <Avatar contact={contact} />
                       {holdingContactId === contact.id && (
                         <svg className="pointer-events-none absolute -inset-1 size-12 -rotate-90" viewBox="0 0 48 48" aria-hidden="true">
-                          <circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/[0.08]" />
-                          <circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="138.23" strokeDashoffset="138.23" className="text-emerald-400/75">
-                            <animate attributeName="stroke-dashoffset" from="138.23" to="0" dur={`${LONG_PRESS_DURATION / 1_000}s`} fill="freeze" />
-                          </circle>
+                          <circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/20" />
+                          <circle
+                            cx="24"
+                            cy="24"
+                            r="22"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            pathLength="100"
+                            strokeDasharray="100"
+                            strokeDashoffset="100"
+                            className="text-white"
+                            style={{ animation: `conversation-preview-hold ${PREVIEW_HOLD_DURATION}ms linear forwards` }}
+                            onAnimationEnd={() => completePreviewHold(contact)}
+                          />
                         </svg>
                       )}
                     </span>
-                    <div className="min-w-0 flex-1 py-2">
+                    <div className={isCollapsed ? "hidden" : "min-w-0 flex-1 py-2"}>
                       <div className="flex items-baseline justify-between gap-3">
                         <p className="truncate text-[14px] leading-tight font-medium tracking-[-0.01em] text-zinc-50">{contact.name}</p>
                         {lastMessage && (
@@ -339,13 +390,26 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
                 </div>
               );
             })}
-            {loading && <p className="px-4 py-10 text-center text-[13px] text-zinc-500">Carregando conversas...</p>}
-            {!loading && error && <p role="alert" className="px-4 py-10 text-center text-[13px] text-red-300">{error}</p>}
+            {loading && (
+              <p role="status" title="Carregando conversas..." className={`py-10 text-center text-[13px] text-zinc-500 ${isCollapsed ? "flex justify-center" : "px-4"}`}>
+                {isCollapsed && <span aria-hidden="true" className="size-5 animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-300 motion-reduce:animate-none" />}
+                <span className={isCollapsed ? "sr-only" : undefined}>Carregando conversas...</span>
+              </p>
+            )}
+            {!loading && error && (
+              <p role="alert" title={error} className={`py-10 text-center text-[13px] text-red-300 ${isCollapsed ? "flex justify-center" : "px-4"}`}>
+                {isCollapsed && <span aria-hidden="true" className="flex size-5 items-center justify-center rounded-full border border-current">!</span>}
+                <span className={isCollapsed ? "sr-only" : undefined}>{error}</span>
+              </p>
+            )}
             {!loading && !error && visibleContacts.length === 0 && (
-              <p className="px-4 py-10 text-center text-[13px] text-zinc-500">
-                {conversationFilter === "groups"
-                  ? showArchived ? "Nenhum grupo arquivado" : "Nenhum grupo encontrado"
-                  : showArchived ? "Nenhuma conversa arquivada" : "Nenhuma conversa encontrada"}
+              <p title={emptyMessage} className={`py-10 text-center text-[13px] text-zinc-500 ${isCollapsed ? "flex justify-center" : "px-4"}`}>
+                {isCollapsed && (
+                  <svg aria-hidden="true" className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z" />
+                  </svg>
+                )}
+                <span className={isCollapsed ? "sr-only" : undefined}>{emptyMessage}</span>
               </p>
             )}
           </div>
@@ -358,6 +422,6 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
           panelRef={previewPanelRef}
           onOpenConversation={openConversation}
         />
-      </div>
+      </aside>
   );
 }

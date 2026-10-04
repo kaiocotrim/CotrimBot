@@ -40,14 +40,11 @@ export function QuickConversationPreview({ contact, messages, loading, error, pa
               </h2>
             </header>
 
-            <div className="min-h-52 px-4 py-3.5">
+            <div className="min-h-52 px-4 py-3.5" aria-busy={loading}>
               {loading && (
-                <div className="space-y-3" aria-label="Carregando prévia">
-                  {[0, 1, 2, 3].map((item) => (
-                    <div key={item} className={`animate-pulse ${item % 2 ? "ml-10" : "mr-10"}`}>
-                      <div className="h-8 rounded-lg bg-white/[0.045]" />
-                    </div>
-                  ))}
+                <div role="status" className="flex min-h-44 items-center justify-center gap-2 text-white">
+                  <span aria-hidden="true" className="size-5 animate-spin rounded-full border-2 border-white/20 border-t-white motion-reduce:animate-none" />
+                  <span className="text-[12px]">Carregando prévia...</span>
                 </div>
               )}
               {!loading && error && (

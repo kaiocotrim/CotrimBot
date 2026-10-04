@@ -202,6 +202,11 @@ html[data-loading-cursor="true"] *::after {
   to { transform: rotate(360deg); }
 }
 
+@keyframes conversation-preview-hold {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+
 @keyframes audio-frequency {
   0%, 100% { transform: scaleY(0.35); opacity: 0.65; }
   50% { transform: scaleY(1); opacity: 1; }
