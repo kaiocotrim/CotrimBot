@@ -103,6 +103,34 @@ export async function deleteWhatsAppMessage(input: {
   return response.json();
 }
 
+async function requestEvolutionInstance(path: string, method = "GET") {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE;
+  if (!apiUrl || !apiKey || !instance) throw new Error("Configuração da Evolution API incompleta");
+
+  const response = await fetch(`${apiUrl.replace(/\/$/, "")}${path}/${encodeURIComponent(instance)}`, {
+    method,
+    headers: { apikey: apiKey },
+  });
+  if (!response.ok) {
+    throw new Error(`Evolution respondeu ${response.status}: ${await response.text()}`);
+  }
+  return { instance, data: await response.json() as unknown };
+}
+
+export function getWhatsAppConnectionState() {
+  return requestEvolutionInstance("/instance/connectionState");
+}
+
+export function getWhatsAppQrCode() {
+  return requestEvolutionInstance("/instance/connect");
+}
+
+export function logoutWhatsAppInstance() {
+  return requestEvolutionInstance("/instance/logout", "DELETE");
+}
+
 export async function archiveWhatsAppChat(input: {
   chat: string;
   archive: boolean;

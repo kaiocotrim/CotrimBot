@@ -3,10 +3,11 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
-import { BadgeCheck, Bell, Building2, UserRound, X } from "lucide-react";
+import { BadgeCheck, Bell, Building2, QrCode, UserRound, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { TeamManagement } from "@/components/admin/team-management";
+import { EvolutionConnectionSettings } from "@/components/chat/evolution-connection-settings";
 import { authClient } from "@/lib/auth-client";
 import styles from "./account-settings.module.css";
 
@@ -21,6 +22,7 @@ const sections = [
   { value: "account", label: "Conta", icon: UserRound },
   { value: "notifications", label: "Notificações", icon: Bell },
   { value: "pro", label: "Conta Pro", icon: BadgeCheck },
+  { value: "whatsapp", label: "WhatsApp", icon: QrCode },
   { value: "business", label: "Empresa", icon: Building2 },
 ] as const;
 
@@ -67,6 +69,9 @@ function SettingsContent({ user }: { user: SettingsUser }) {
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const nameChanged = name.trim() !== savedName;
+  const availableSections = user.role === "admin"
+    ? sections
+    : sections.filter((item) => item.value !== "whatsapp");
 
   function changeSection(value: Section) {
     setSection(value);
@@ -112,7 +117,7 @@ function SettingsContent({ user }: { user: SettingsUser }) {
       <aside className={styles.sidebar}>
         <Dialog.Title className={styles.title}>Configurações</Dialog.Title>
         <Tabs.List aria-label="Seções de configurações" className={styles.navigation}>
-          {sections.map(({ value, label, icon: Icon }) => (
+          {availableSections.map(({ value, label, icon: Icon }) => (
             <Tabs.Tab key={value} value={value} className={styles.navItem}>
               <Icon size={21} strokeWidth={1.8} aria-hidden="true" />
               <span>{label}</span>
@@ -130,7 +135,7 @@ function SettingsContent({ user }: { user: SettingsUser }) {
 
       <div className={styles.main}>
         <header className={styles.header}>
-          <h2 className={styles.title}>{sections.find((item) => item.value === section)?.label}</h2>
+          <h2 className={styles.title}>{availableSections.find((item) => item.value === section)?.label}</h2>
           <Dialog.Close aria-label="Fechar configurações" title="Fechar" className={styles.closeButton}>
             <X size={24} strokeWidth={1.8} aria-hidden="true" />
           </Dialog.Close>
@@ -194,6 +199,12 @@ function SettingsContent({ user }: { user: SettingsUser }) {
               <button type="button" className={styles.primaryButton} disabled>Em breve</button>
             </section>
           </Tabs.Panel>
+
+          {user.role === "admin" && (
+            <Tabs.Panel value="whatsapp" className={styles.panel}>
+              <EvolutionConnectionSettings />
+            </Tabs.Panel>
+          )}
 
           <Tabs.Panel value="business" className={styles.panel}>
             <TeamManagement currentUserId={user.id} currentUserName={user.name} currentUserEmail={user.email} canCreateCompany={user.role === "admin"} />

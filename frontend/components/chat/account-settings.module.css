@@ -202,7 +202,7 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 48px;
   padding: 28px 34px 32px 32px;
   outline: none;
 }
@@ -213,10 +213,10 @@
 
 .card {
   min-width: 0;
-  padding: 32px;
-  border: 1px solid #191919;
-  border-radius: 17px;
-  background: #0a0a0a;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .card h3 {
@@ -233,7 +233,7 @@
 }
 
 .subscription {
-  margin-bottom: 8px;
+  margin-bottom: 0;
 }
 
 .primaryButton {
@@ -416,7 +416,7 @@
   }
 
   .card {
-    padding: 24px;
+    padding: 0;
   }
 }
 
@@ -470,8 +470,8 @@
   }
 
   .card {
-    padding: 22px 20px;
-    border-radius: 16px;
+    padding: 0;
+    border-radius: 0;
   }
 
   .subscription {

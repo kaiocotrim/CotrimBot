@@ -19,6 +19,7 @@ import webhookRoutes from "./routes/webhook.routes.js";
 import { aiRouter } from "./routes/ai.routes.js";
 import { invitationRouter } from "./routes/invitation.routes.js";
 import { organizationRouter } from "./routes/organization.routes.js";
+import { evolutionRouter } from "./routes/evolution.routes.js";
 
 // Cria a aplicação Express.
 export const app = express();
@@ -41,6 +42,7 @@ app.use(express.json({ limit: "250mb" }));
 app.use("/api", webhookRoutes);
 app.use("/api", invitationRouter);
 app.use("/api", requireAuth, organizationRouter);
+app.use("/api", requireAuth, evolutionRouter);
 app.use("/api", requireAuth, contactRouter);
 app.use("/api", requireAuth, messageRouter);
 app.use("/api", requireAuth, transcriptionRouter);

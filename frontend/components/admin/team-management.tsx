@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { Plus, Trash2, X } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
@@ -70,6 +71,8 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
   const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
   const [inviting, setInviting] = useState(false);
   const [inviteMessage, setInviteMessage] = useState<string | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
   const currentMembership = members.find((member) => member.userId === currentUserId);
   const canManage = currentMembership?.role === "owner" || currentMembership?.role === "admin";
 
@@ -177,6 +180,7 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
       setInviteJobTitle("");
       setInviteRole("member");
       setInviteMessage("Usuário adicionado à empresa e convite criado.");
+      setInviteOpen(false);
       await loadOrganization();
     } catch {
       setInviteMessage("Não foi possível adicionar o usuário.");
@@ -264,20 +268,66 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
 
   return (
     <div className="flex min-w-0 flex-col gap-6">
-      <section className="rounded-2xl border border-white/10 bg-[#0a0a0a] p-6"><p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Empresa</p><h3 className="mt-2 text-xl font-semibold text-zinc-100">{organization.name}</h3><p className="mt-1 text-sm text-zinc-400">{members.length} {members.length === 1 ? "usuário vinculado" : "usuários vinculados"}</p></section>
-
-      {canManage && <section className="rounded-2xl border border-white/10 bg-[#0a0a0a] p-5">
-        <h3 className="mb-4 text-sm font-semibold text-zinc-200">Adicionar usuário</h3>
-        <div className="grid gap-3 sm:grid-cols-2"><input value={inviteName} onChange={(event) => setInviteName(event.target.value)} placeholder="Nome" className={inputClass} /><input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="E-mail" className={inputClass} /><input value={inviteJobTitle} onChange={(event) => setInviteJobTitle(event.target.value)} placeholder="Cargo / função" className={inputClass} /><select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as "member" | "admin")} className={inputClass}><option value="member">Usuário</option><option value="admin">Administrador</option></select></div>
-        <button type="button" disabled={inviting} onClick={() => void handleInvite()} className="mt-4 rounded-full bg-white px-5 py-2 text-sm font-semibold text-black hover:bg-zinc-200 disabled:opacity-50">{inviting ? "Adicionando..." : "Adicionar usuário"}</button>
-        {inviteMessage && <p className="mt-3 text-sm text-zinc-400">{inviteMessage}</p>}
-      </section>}
+      <section className="px-1 py-2"><p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Empresa</p><h3 className="mt-2 text-xl font-semibold text-zinc-100">{organization.name}</h3><p className="mt-1 text-sm text-zinc-400">{members.length} {members.length === 1 ? "usuário vinculado" : "usuários vinculados"}</p></section>
 
       <section className="min-w-0">
-        <h3 className="mb-3 text-sm font-semibold text-zinc-200">Usuários da empresa</h3>
-        <div className="overflow-x-auto rounded-xl border border-white/10"><table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-white/[0.04] text-zinc-400"><tr><th className="px-4 py-3 font-medium">Nome</th><th className="px-4 py-3 font-medium">E-mail</th><th className="px-4 py-3 font-medium">Cargo</th><th className="px-4 py-3 font-medium">Permissão</th><th className="px-4 py-3 font-medium">Ações</th></tr></thead><tbody className="divide-y divide-white/5">
-          {members.map((member) => <tr key={member.id}><td className="px-4 py-3 text-zinc-100">{member.user.name}</td><td className="px-4 py-3 text-zinc-400">{member.user.email}</td><td className="px-4 py-3 text-zinc-400">{member.jobTitle || "—"}</td><td className="px-4 py-3"><span className={`rounded-full px-2 py-0.5 text-xs ${member.role === "owner" ? "bg-emerald-500/15 text-emerald-400" : "bg-white/[0.06] text-zinc-400"}`}>{roleLabel(member.role)}</span></td><td className="px-4 py-3"><div className="flex gap-2">{canManage && member.role !== "owner" && <><button type="button" disabled={busyId === member.id} onClick={() => void updateRole(member)} className="whitespace-nowrap rounded-md border border-white/10 px-2 py-1 text-xs text-zinc-300 hover:bg-white/[0.06] disabled:opacity-50">{member.role === "admin" ? "Remover admin" : "Tornar admin"}</button><button type="button" disabled={busyId === member.id} onClick={() => void removeMember(member)} className="rounded-md border border-red-500/20 px-2 py-1 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50">Remover</button></>}</div></td></tr>)}
-        </tbody></table></div>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold text-zinc-200">Usuários da empresa</h3>
+          {canManage && (
+            <motion.button
+              type="button"
+              aria-label={inviteOpen ? "Fechar formulário" : "Adicionar usuário"}
+              title={inviteOpen ? "Fechar" : "Adicionar usuário"}
+              aria-expanded={inviteOpen}
+              whileTap={reduceMotion ? undefined : { scale: 0.9 }}
+              onClick={() => { setInviteOpen((current) => !current); setInviteMessage(null); }}
+              className="flex size-9 items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-zinc-200"
+            >
+              {inviteOpen ? <X size={17} /> : <Plus size={18} />}
+            </motion.button>
+          )}
+        </div>
+
+        <AnimatePresence initial={false}>
+          {canManage && inviteOpen && (
+            <motion.div
+              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10, scale: 0.985 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.985 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              className="mb-4 origin-top rounded-2xl bg-white/[0.035] p-5"
+            >
+              <h4 className="mb-4 text-sm font-semibold text-zinc-100">Novo usuário</h4>
+              <div className="grid gap-3 sm:grid-cols-2"><input autoFocus value={inviteName} onChange={(event) => setInviteName(event.target.value)} placeholder="Nome" className={inputClass} /><input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="E-mail" className={inputClass} /><input value={inviteJobTitle} onChange={(event) => setInviteJobTitle(event.target.value)} placeholder="Cargo / função" className={inputClass} /><select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as "member" | "admin")} className={inputClass}><option value="member">Usuário</option><option value="admin">Administrador</option></select></div>
+              <div className="mt-4 flex items-center gap-3"><button type="button" disabled={inviting} onClick={() => void handleInvite()} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-zinc-200 disabled:opacity-50">{inviting ? "Adicionando..." : "Adicionar usuário"}</button><button type="button" disabled={inviting} onClick={() => setInviteOpen(false)} className="px-2 py-2 text-sm text-zinc-500 transition-colors hover:text-zinc-200 disabled:opacity-50">Cancelar</button></div>
+              {inviteMessage && <p className="mt-3 text-sm text-red-400">{inviteMessage}</p>}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="flex flex-col gap-2">
+          {members.map((member) => (
+            <article key={member.id} className="group flex flex-wrap items-center gap-3 rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-4 transition-colors hover:border-white/[0.14] hover:bg-white/[0.025]">
+              <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/[0.07] text-sm font-semibold text-zinc-200">
+                {(member.user.name.trim()[0] || member.user.email[0] || "?").toUpperCase()}
+              </span>
+              <div className="min-w-[180px] flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate text-sm font-medium text-zinc-100">{member.user.name}</p>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${member.role === "owner" ? "bg-emerald-500/15 text-emerald-400" : member.role === "admin" ? "bg-sky-500/15 text-sky-300" : "bg-white/[0.06] text-zinc-400"}`}>{roleLabel(member.role)}</span>
+                </div>
+                <p className="mt-0.5 truncate text-xs text-zinc-500">{member.user.email}</p>
+                {member.jobTitle && <p className="mt-1 text-xs text-zinc-400">{member.jobTitle}</p>}
+              </div>
+              {canManage && member.role !== "owner" && (
+                <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                  <button type="button" disabled={busyId === member.id} onClick={() => void updateRole(member)} className="whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100 disabled:opacity-50">{member.role === "admin" ? "Remover admin" : "Tornar admin"}</button>
+                  <button type="button" aria-label={`Remover ${member.user.name}`} title="Remover da empresa" disabled={busyId === member.id} onClick={() => void removeMember(member)} className="rounded-lg p-2 text-zinc-600 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"><Trash2 size={15} /></button>
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
       </section>
 
       {invitations.length > 0 && <section><h3 className="mb-3 text-sm font-semibold text-zinc-200">Aguardando entrada</h3><div className="divide-y divide-white/5 rounded-xl border border-white/10">{invitations.map((invitation) => <div key={invitation.id} className="flex items-center justify-between gap-4 p-4"><div className="min-w-0"><p className="truncate text-sm text-zinc-100">{invitation.name || invitation.email}</p><p className="truncate text-xs text-zinc-500">{invitation.email}{invitation.jobTitle ? ` · ${invitation.jobTitle}` : ""} · {roleLabel(invitation.role)}</p></div>{canManage && <button type="button" disabled={busyId === invitation.id} onClick={() => void cancelInvitation(invitation.id)} className="rounded-md border border-white/10 px-2 py-1 text-xs text-zinc-300 hover:bg-white/5 disabled:opacity-50">Cancelar</button>}</div>)}</div></section>}
