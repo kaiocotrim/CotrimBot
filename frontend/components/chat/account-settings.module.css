@@ -2,11 +2,15 @@
   display: block;
   flex-shrink: 0;
   border-radius: 50%;
-  transition: box-shadow 150ms ease;
+  transition: transform 150ms ease, box-shadow 150ms ease;
 }
 
 .avatarTrigger:hover {
   box-shadow: 0 0 0 3px rgb(255 255 255 / 8%);
+}
+
+.avatarTrigger:active {
+  transform: scale(0.94);
 }
 
 .avatarTrigger:focus-visible,
@@ -22,6 +26,13 @@
   z-index: 100;
   background: rgb(0 0 0 / 90%);
   backdrop-filter: blur(8px);
+  opacity: 1;
+  transition: opacity 220ms ease;
+}
+
+.backdrop[data-starting-style],
+.backdrop[data-ending-style] {
+  opacity: 0;
 }
 
 .dialog {
@@ -33,6 +44,7 @@
   height: min(860px, calc(100dvh - 78px));
   overflow: hidden;
   transform: translate(-50%, -50%);
+  transform-origin: center;
   border: 1px solid #1c1c1c;
   border-radius: 28px;
   outline: none;
@@ -43,6 +55,22 @@
   font-size: 14px;
   line-height: 20px;
   color-scheme: dark;
+  opacity: 1;
+  transition:
+    opacity 220ms ease,
+    transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dialog[data-starting-style] {
+  transform: translate(-50%, calc(-50% + 16px)) scale(0.975);
+  opacity: 0;
+}
+
+.dialog[data-ending-style] {
+  transform: translate(-50%, calc(-50% + 8px)) scale(0.985);
+  opacity: 0;
+  transition-duration: 170ms;
+  transition-timing-function: ease-in;
 }
 
 .layout {
@@ -453,7 +481,14 @@
 
 @media (prefers-reduced-motion: reduce) {
   .avatarTrigger,
-  .navItem {
+  .navItem,
+  .backdrop,
+  .dialog {
     transition: none;
+  }
+
+  .dialog[data-starting-style],
+  .dialog[data-ending-style] {
+    transform: translate(-50%, -50%);
   }
 }

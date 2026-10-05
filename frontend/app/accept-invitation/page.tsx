@@ -9,6 +9,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 type InvitationInfo = {
   email: string;
+  name?: string | null;
+  jobTitle?: string | null;
   organizationName: string;
   userExists: boolean;
 };
@@ -25,7 +27,7 @@ function AcceptInvitationForm() {
   const { data: session } = useSession();
 
   const [invitation, setInvitation] = useState<InvitationInfo | null>(null);
-  const [loadingInvitation, setLoadingInvitation] = useState(true);
+  const [loadingInvitation, setLoadingInvitation] = useState(Boolean(invitationId));
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -35,7 +37,6 @@ function AcceptInvitationForm() {
 
   useEffect(() => {
     if (!invitationId) {
-      setLoadingInvitation(false);
       return;
     }
 
@@ -47,6 +48,7 @@ function AcceptInvitationForm() {
       .then((data) => {
         if (cancelled) return;
         setInvitation(data);
+        if (data?.name) setName(data.name);
         setLoadingInvitation(false);
       });
 

@@ -53,6 +53,7 @@ model Message {
   quotedMessage           Message?         @relation("MessageToMessage", fields: [quotedMessageId], references: [id])
   quotedByMessages        Message[]        @relation("MessageToMessage")
   cachedMedia             MessageMedia?
+  deletions               MessageDeletion[]
 
   @@index([contactId], map: "Message_contactId_fkey")
   @@index([quotedExternalId])
@@ -65,6 +66,17 @@ model MessageMedia {
   mimetype  String  @db.VarChar(255)
   fileName  String? @db.VarChar(512)
   message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
+model MessageDeletion {
+  messageId Int
+  userId    String
+  deletedAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@index([userId])
 }
 
 enum MessageDirection {
@@ -101,6 +113,7 @@ model User {
   accounts    Account[]
   members     Member[]
   invitations Invitation[]
+  messageDeletions MessageDeletion[]
 }
 
 model Session {
@@ -167,6 +180,7 @@ model Member {
   organizationId String
   userId         String
   role           String   @default("member")
+  jobTitle       String?
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -180,6 +194,8 @@ model Invitation {
   id             String   @id @default(cuid())
   organizationId String
   email          String
+  name           String?
+  jobTitle       String?
   role           String?
   status         String   @default("pending")
   expiresAt      DateTime

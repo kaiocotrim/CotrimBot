@@ -8,11 +8,13 @@ import {
 } from "../services/evolution.service.js";
 
 // GET /contacts - Retorna todos os contatos
-export async function getContacts(_req: Request, res: Response) {
+export async function getContacts(req: Request, res: Response) {
+  const userId = req.user?.id;
   const contacts = await prisma.contact.findMany({
     include: {
       // Traz somente a mensagem mais recente de cada contato
       messages: {
+        ...(userId ? { where: { deletions: { none: { userId } } } } : {}),
         orderBy: {
           createdAt: "desc",
         },
@@ -26,6 +28,7 @@ export async function getContacts(_req: Request, res: Response) {
             where: {
               direction: "INCOMING",
               readAt: null,
+              ...(userId ? { deletions: { none: { userId } } } : {}),
             },
           },
         },

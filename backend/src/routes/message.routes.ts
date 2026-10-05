@@ -8,6 +8,7 @@ import { upload } from "../middlewares/upload.js";
 // A extensão .js nos imports é necessária para os módulos ESM/NodeNext do projeto.
 import {
   closeConversationWithBot,
+  deleteMessage,
   getMessageMedia,
   getGroupSenderAvatar,
   getMessages,
@@ -61,6 +62,7 @@ messageRouter.get("/messages/:id/media", getMessageMedia);
 messageRouter.get("/messages/:id/sender-avatar", getGroupSenderAvatar);
 messageRouter.put("/messages/:id/reaction", reactToMessage);
 messageRouter.patch("/messages/:id/flags", updateMessageFlags);
+messageRouter.delete("/messages/:id", deleteMessage);
 
 /**
  * POST /messages/:id/transcribe

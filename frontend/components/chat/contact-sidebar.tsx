@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { Avatar } from "@/components/chat/avatar";
 import { AccountSettings } from "@/components/chat/account-settings";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { QuickConversationPreview } from "@/components/chat/quick-conversation-preview";
 import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
-import { authClient, useSession } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
 import { getMessages } from "@/lib/chat-api";
 import type { Contact, Message } from "@/types/chat";
 
@@ -34,14 +33,12 @@ function formatSidebarDate(value: string) {
 
 export function ContactSidebar({ contacts, loading, error, selectedContactId, onSelectContact }: ContactSidebarProps) {
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "admin";
   const userImage = session?.user?.image;
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [query, setQuery] = useState("");
   const [conversationFilter, setConversationFilter] = useState<ConversationFilter>("conversations");
   const [showArchived, setShowArchived] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
   const [holdingContactId, setHoldingContactId] = useState<number | null>(null);
   const [previewContact, setPreviewContact] = useState<Contact | null>(null);
   const [previewMessages, setPreviewMessages] = useState<Message[]>([]);
@@ -179,7 +176,6 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
       if (headerRef.current?.contains(document.activeElement)) sidebarRef.current?.focus();
       cancelPreviewHold();
       closePreview();
-      setShowMenu(false);
       setIsCollapsed((current) => !current);
     }
 
@@ -205,7 +201,6 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
           <div className="flex items-center justify-between">
             {session?.user && (
               <AccountSettings user={session.user} onOpen={() => {
-                setShowMenu(false);
                 cancelPreviewHold();
                 closePreview();
               }}>
@@ -232,37 +227,6 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
               </AccountSettings>
             )}
             <div className="flex items-center gap-1.5">
-              <div className="relative">
-                <button
-                  type="button"
-                  aria-label="Mais opções"
-                  onClick={() => setShowMenu((current) => !current)}
-                  className="flex size-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100 active:scale-95"
-                >
-                  <svg className="size-[18px]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" />
-                  </svg>
-                </button>
-                {showMenu && (
-                  <div className="absolute top-full left-0 z-10 mt-1 w-40 overflow-hidden rounded-lg border border-white/10 bg-zinc-900 py-1 shadow-xl">
-                    {isAdmin && (
-                      <Link
-                        href="/admin"
-                        className="flex w-full items-center px-3 py-2 text-left text-[13px] text-zinc-200 transition-colors hover:bg-white/[0.06]"
-                      >
-                        Usuários
-                      </Link>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => authClient.signOut({ fetchOptions: { onSuccess: () => { window.location.href = "/login"; } } })}
-                      className="flex w-full items-center px-3 py-2 text-left text-[13px] text-zinc-200 transition-colors hover:bg-white/[0.06]"
-                    >
-                      Sair
-                    </button>
-                  </div>
-                )}
-              </div>
               <button
                 type="button"
                 aria-label="Nova conversa"
@@ -383,7 +347,7 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
                       </div>
                       <div className="mt-0.5 flex items-center gap-2">
                         <p className="min-w-0 flex-1 truncate text-[12px] leading-tight font-normal text-zinc-500">
-                          <EmojiText content={lastMessage ? `${lastMessage.direction === "OUTGOING" ? "✓✓ " : ""}${lastMessage.content}` : "Nenhuma mensagem"} />
+                          <EmojiText content={lastMessage ? lastMessage.deletedAt ? "Mensagem apagada" : `${lastMessage.direction === "OUTGOING" ? "✓✓ " : ""}${lastMessage.content}` : "Nenhuma mensagem"} />
                         </p>
                          {unread && (
                           <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-semibold text-zinc-950">

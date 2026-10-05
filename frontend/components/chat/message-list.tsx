@@ -18,6 +18,7 @@ type MessageListProps = {
   onLoadOlderMessages: () => Promise<void>;
   onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
   onUpdateMessageFlags: (messageId: number, flags: { pinned?: boolean; favorited?: boolean }) => Promise<void>;
+  onDeleteMessage: (messageId: number, scope: "me" | "everyone") => Promise<void>;
   onForwardMessage: (message: Message, target: Contact) => void;
   onReplyToMessage: (message: Message) => void;
   onEnsureMessageLoaded: (messageId: number) => Promise<boolean>;
@@ -58,7 +59,7 @@ function dateLabel(value: string) {
 }
 
 // Posiciona mensagens recebidas à esquerda e enviadas à direita.
-export function MessageList({ contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onForwardMessage, onReplyToMessage, onEnsureMessageLoaded }: MessageListProps) {
+export function MessageList({ contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onDeleteMessage, onForwardMessage, onReplyToMessage, onEnsureMessageLoaded }: MessageListProps) {
   const reduceMotion = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -237,7 +238,7 @@ export function MessageList({ contact, contacts, messages, hasOlderMessages, loa
                 : <Avatar contact={contact} />)}
 
               {/* O balão escolhe entre player de áudio e conteúdo textual. */}
-              <MessageBubble message={message} contact={contact} contacts={contacts} mediaMessages={mediaMessages} onReact={onReactToMessage} onUpdateFlags={onUpdateMessageFlags} onForwardMessage={onForwardMessage} onReply={onReplyToMessage} onNavigateToMessage={navigateToMessage} />
+              <MessageBubble message={message} contact={contact} contacts={contacts} mediaMessages={mediaMessages} onReact={onReactToMessage} onUpdateFlags={onUpdateMessageFlags} onDelete={onDeleteMessage} onForwardMessage={onForwardMessage} onReply={onReplyToMessage} onNavigateToMessage={navigateToMessage} />
             </div>
           </motion.div>
         );

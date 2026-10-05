@@ -81,6 +81,28 @@ export async function sendWhatsAppReaction(input: {
   return response.json();
 }
 
+export async function deleteWhatsAppMessage(input: {
+  remoteJid: string;
+  fromMe: boolean;
+  id: string;
+  participant?: string;
+}) {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE;
+  if (!apiUrl || !apiKey || !instance) throw new Error("Configuração da Evolution API incompleta");
+
+  const response = await fetch(`${apiUrl}/chat/deleteMessageForEveryone/${instance}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", apikey: apiKey },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw new Error(`Erro ao apagar mensagem pela Evolution: ${response.status} - ${await response.text()}`);
+  }
+  return response.json();
+}
+
 export async function archiveWhatsAppChat(input: {
   chat: string;
   archive: boolean;

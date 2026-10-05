@@ -54,6 +54,7 @@ export default function Home() {
         onEnsureMessageLoaded={chat.ensureMessageLoaded}
         onReactToMessage={chat.reactToMessage}
         onUpdateMessageFlags={chat.updateMessageFlags}
+        onDeleteMessage={chat.deleteMessage}
         onForwardMessage={chat.forwardMessage}
         onSendMedia={chat.sendMediaMessage}
         onCloseWithBot={chat.closeWithBot}

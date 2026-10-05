@@ -10,6 +10,7 @@ import { getSocketServer } from "../lib/socket.js";
 
 // Importa o service que concentra toda a comunicação HTTP com a Evolution API.
 import {
+  deleteWhatsAppMessage,
   getMediaMessage,
   getProfilePicture,
   sendWhatsAppReaction,
@@ -92,6 +93,7 @@ export async function getMessages(req: Request, res: Response) {
   const messages = await prisma.message.findMany({
     where: {
       contactId,
+      ...(req.user?.id ? { deletions: { none: { userId: req.user.id } } } : {}),
       ...(before ? { id: { lt: before } } : {}),
     },
     orderBy: { id: "desc" },
@@ -162,6 +164,61 @@ export async function updateMessageFlags(req: Request, res: Response) {
     favorited: message.favorited,
   });
   return res.json(message);
+}
+
+export async function deleteMessage(req: Request, res: Response) {
+  const messageId = Number(req.params.id);
+  const scope = req.query.scope;
+  const userId = req.user?.id;
+  if (!Number.isInteger(messageId) || messageId <= 0 || (scope !== "me" && scope !== "everyone")) {
+    return res.status(400).json({ message: "Exclusão de mensagem inválida" });
+  }
+  if (!userId) return res.status(401).json({ message: "Não autenticado" });
+
+  const message = await prisma.message.findUnique({ where: { id: messageId }, include: { contact: true } });
+  if (!message) return res.status(404).json({ message: "Mensagem não encontrada" });
+
+  if (scope === "me") {
+    await prisma.messageDeletion.upsert({
+      where: { messageId_userId: { messageId, userId } },
+      update: { deletedAt: new Date() },
+      create: { messageId, userId },
+    });
+    return res.json({ messageId, scope: "me" });
+  }
+
+  if (!message.deletedAt) {
+    const isPrivate = message.externalId.startsWith("private:");
+    if (!isPrivate) {
+      const remoteJid = message.contact.isGroup
+        ? message.contact.phone
+        : message.contact.whatsappLid ?? `${message.contact.phone.replace(/\D/g, "")}@s.whatsapp.net`;
+      const participant = message.contact.isGroup && message.direction === "INCOMING" && message.senderPhone
+        ? message.senderPhone.includes("@") ? message.senderPhone : `${message.senderPhone}@s.whatsapp.net`
+        : undefined;
+      try {
+        await deleteWhatsAppMessage({
+          remoteJid,
+          fromMe: message.direction === "OUTGOING",
+          id: message.externalId,
+          ...(participant ? { participant } : {}),
+        });
+      } catch (error) {
+        console.error("Erro ao apagar mensagem para todos:", error);
+        return res.status(502).json({
+          message: message.direction === "INCOMING"
+            ? "O WhatsApp não permitiu apagar esta mensagem recebida para todos. Use “Apagar para mim”."
+            : "Não foi possível apagar a mensagem para todos.",
+        });
+      }
+    }
+
+    const updated = await prisma.message.update({ where: { id: messageId }, data: { deletedAt: new Date() } });
+    getSocketServer().emit("message_deleted", { messageId, deletedAt: updated.deletedAt });
+    return res.json({ messageId, scope: "everyone", deletedAt: updated.deletedAt });
+  }
+
+  return res.json({ messageId, scope: "everyone", deletedAt: message.deletedAt });
 }
 
 // POST /contacts/:id/send-media

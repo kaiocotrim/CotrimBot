@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   closeConversationWithBot,
+  deleteMessage as deleteMessageRequest,
   getContactAvatar,
   getContacts,
   getMessages,
@@ -895,6 +896,27 @@ export function useChat() {
     }
   }
 
+  async function deleteMessage(messageId: number, scope: "me" | "everyone") {
+    const result = await deleteMessageRequest(messageId, scope);
+    if (scope === "me") {
+      setMessages((current) => current.filter((message) => message.id !== messageId));
+      try {
+        setContacts(await getContacts());
+      } catch (error) {
+        console.error("Erro ao atualizar a lista após apagar mensagem:", error);
+      }
+      return;
+    }
+    const deletedAt = result.deletedAt ?? new Date().toISOString();
+    setMessages((current) => current.map((message) =>
+      message.id === messageId ? { ...message, deletedAt } : message
+    ));
+    setContacts((current) => current.map((contact) => ({
+      ...contact,
+      messages: contact.messages?.map((message) => message.id === messageId ? { ...message, deletedAt } : message),
+    })));
+  }
+
 
   // =========================================================
   // ENCERRAR CHAMADO COM O BOT
@@ -964,6 +986,7 @@ export function useChat() {
     // Envio de arquivo
     sendMediaMessage,
     updateMessageFlags,
+    deleteMessage,
 
     // Encerramento
     closeWithBot,

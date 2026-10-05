@@ -76,6 +76,14 @@ export async function updateMessageFlags(
   return parseResponse<Message>(response, "Erro ao atualizar mensagem");
 }
 
+export async function deleteMessage(messageId: number, scope: "me" | "everyone") {
+  const response = await fetch(`${API_URL}/messages/${messageId}?scope=${scope}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  return parseResponse<{ messageId: number; scope: "me" | "everyone"; deletedAt?: string }>(response, "Erro ao apagar mensagem");
+}
+
 // Marca como lidas todas as mensagens recebidas do contato.
 export async function markMessagesAsRead(contactId: number): Promise<void> {
   const response = await fetch(

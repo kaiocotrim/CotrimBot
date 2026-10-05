@@ -32,6 +32,7 @@ type MessageBubbleProps = {
   mediaMessages: Message[];
   onReact: (messageId: number, reaction: string) => Promise<void>;
   onUpdateFlags: (messageId: number, flags: { pinned?: boolean; favorited?: boolean }) => Promise<void>;
+  onDelete: (messageId: number, scope: "me" | "everyone") => Promise<void>;
   onForwardMessage: (message: Message, target: Contact) => void;
   onReply: (message: Message) => void;
   onNavigateToMessage: (messageId: number) => Promise<void>;
@@ -57,11 +58,13 @@ const messageDateFormatter = new Intl.DateTimeFormat("pt-BR", {
 });
 
 // Mantém o estilo do balão e delega o conteúdo ao componente de cada tipo.
-export function MessageBubble({ message, contact, contacts, mediaMessages, onReact, onUpdateFlags, onForwardMessage, onReply, onNavigateToMessage }: MessageBubbleProps) {
+export function MessageBubble({ message, contact, contacts, mediaMessages, onReact, onUpdateFlags, onDelete, onForwardMessage, onReply, onNavigateToMessage }: MessageBubbleProps) {
   const [reacting, setReacting] = useState(false);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [choosingContact, setChoosingContact] = useState(false);
+  const [choosingDelete, setChoosingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [updatingFlags, setUpdatingFlags] = useState(false);
@@ -246,6 +249,22 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
     }
   }
 
+  async function deleteSelected(scope: "me" | "everyone") {
+    if (deleting) return;
+    if (scope === "everyone" && !window.confirm("Apagar esta mensagem para todos?")) return;
+    setDeleting(true);
+    setActionError(null);
+    try {
+      await onDelete(message.id, scope);
+      setActionsOpen(false);
+      setChoosingDelete(false);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Não foi possível apagar a mensagem");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const quickReactionBar = (
     <div className="mb-1.5 flex w-max items-center gap-0.5 rounded-full border border-white/10 bg-zinc-900/95 px-1.5 py-1 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-xl">
       {QUICK_REACTIONS.map((reaction) => (
@@ -274,6 +293,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
         setActionsOpen(true);
         setReactionPickerOpen(false);
         setChoosingContact(false);
+        setChoosingDelete(false);
         setCopyError(false);
         setActionError(null);
       }}
@@ -384,6 +404,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
             setActionsOpen((open) => !open);
             setReactionPickerOpen(false);
             setChoosingContact(false);
+            setChoosingDelete(false);
             setCopyError(false);
             setActionError(null);
           }}
@@ -409,6 +430,23 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
                       <button key={target.id} type="button" role="menuitem" onClick={() => { onForwardMessage(message, target); setActionsOpen(false); }} className="block w-full truncate rounded-md px-3 py-2 text-left hover:bg-white/[0.08] focus-visible:bg-white/[0.08] focus-visible:outline-none">{target.name}</button>
                     ))}
                   </div>
+                </>
+              ) : choosingDelete ? (
+                <>
+                  <button type="button" role="menuitem" disabled={deleting} onClick={() => void deleteSelected("me")} className={`${menuButtonClass} disabled:opacity-50`}>
+                    <Trash size={15} weight="bold" className="shrink-0 text-zinc-200" />
+                    <span>Apagar para mim</span>
+                  </button>
+                  {!message.deletedAt && (
+                    <button type="button" role="menuitem" disabled={deleting} onClick={() => void deleteSelected("everyone")} className={`${menuButtonClass} text-red-300 disabled:opacity-50`}>
+                      <Trash size={15} weight="bold" className="shrink-0" />
+                      <span>Apagar para todos</span>
+                    </button>
+                  )}
+                  <button type="button" role="menuitem" disabled={deleting} onClick={() => setChoosingDelete(false)} className={`${menuButtonClass} text-zinc-400 disabled:opacity-50`}>
+                    <span>Voltar</span>
+                  </button>
+                  {actionError && <p role="alert" className="px-3 py-1 text-[11px] text-red-300">{actionError}</p>}
                 </>
               ) : (
                 <>
@@ -447,7 +485,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
                     <WarningCircle size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Denunciar</span>
                   </button>
-                  <button type="button" role="menuitem" disabled className={`${menuButtonClass} cursor-not-allowed opacity-40`} title="Em breve">
+                  <button type="button" role="menuitem" onClick={() => setChoosingDelete(true)} className={menuButtonClass}>
                     <Trash size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Apagar</span>
                   </button>
@@ -460,7 +498,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
         )}
         </AnimatePresence>
       </div>
-      {message.quotedContent && (
+      {!message.deletedAt && message.quotedContent && (
         <button
           type="button"
           disabled={!message.quotedMessageId}
@@ -480,7 +518,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
           </span>
         </button>
       )}
-      {inlineTime ? (
+      {message.deletedAt ? null : inlineTime ? (
         <div className="flex min-w-0 items-end gap-2">
           <div className="min-w-0">{content}</div>
           <span className="-mr-1 -mb-1 ml-auto flex shrink-0 items-center gap-0.5">{timestamp}{readReceipt}</span>

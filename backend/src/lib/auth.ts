@@ -65,8 +65,32 @@ export const auth = betterAuth({
   plugins: [
     admin(),
     organization({
-      // Organizações são criadas apenas pelo seed; usuários comuns não criam novas.
-      allowUserToCreateOrganization: false,
+      allowUserToCreateOrganization: (user) => user.role === "admin",
+      organizationLimit: 1,
+      creatorRole: "owner",
+      schema: {
+        member: {
+          additionalFields: {
+            jobTitle: { type: "string", required: false },
+          },
+        },
+        invitation: {
+          additionalFields: {
+            name: { type: "string", required: false },
+            jobTitle: { type: "string", required: false },
+          },
+        },
+      },
+      organizationHooks: {
+        async afterAcceptInvitation({ invitation, member }) {
+          if (invitation.jobTitle) {
+            await prisma.member.update({
+              where: { id: member.id },
+              data: { jobTitle: invitation.jobTitle },
+            });
+          }
+        },
+      },
       async sendInvitationEmail(data) {
         const frontendUrl = (process.env.FRONTEND_URL ?? "http://localhost:3000").replace(/\/$/, "");
         const inviteLink = `${frontendUrl}/accept-invitation?id=${encodeURIComponent(data.id)}`;

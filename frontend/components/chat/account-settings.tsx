@@ -4,9 +4,9 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
 import { BadgeCheck, Bell, Building2, UserRound, X } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { TeamManagement } from "@/components/admin/team-management";
 import { authClient } from "@/lib/auth-client";
 import styles from "./account-settings.module.css";
 
@@ -196,11 +196,7 @@ function SettingsContent({ user }: { user: SettingsUser }) {
           </Tabs.Panel>
 
           <Tabs.Panel value="business" className={styles.panel}>
-            <section className={styles.card}>
-              <h3>Sua equipe</h3>
-              <p>{user.role === "admin" ? "Gerencie os usuários e convites da sua equipe no painel de administração." : "Seu acesso ao CotrimBot é gerenciado pela sua equipe. Para alterar suas permissões ou convidar alguém, fale com o administrador."}</p>
-              {user.role === "admin" && <Link href="/admin" className={styles.primaryButton}>Gerenciar usuários</Link>}
-            </section>
+            <TeamManagement currentUserId={user.id} currentUserName={user.name} currentUserEmail={user.email} canCreateCompany={user.role === "admin"} />
           </Tabs.Panel>
         </div>
       </div>

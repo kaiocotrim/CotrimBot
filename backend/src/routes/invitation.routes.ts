@@ -31,6 +31,8 @@ invitationRouter.get("/invitations/:id", async (request, response) => {
 
     response.json({
       email: invitation.email,
+      name: invitation.name,
+      jobTitle: invitation.jobTitle,
       organizationName: invitation.organization.name,
       userExists: Boolean(existingUser),
     });
@@ -85,7 +87,7 @@ invitationRouter.post("/invitations/:id/accept", async (request, response) => {
       }
 
       const user = await tx.user.create({
-        data: { name, email, emailVerified: true, role: "user" },
+        data: { name: invitation.name || name, email, emailVerified: true, role: "user" },
       });
 
       await tx.account.create({
@@ -93,7 +95,12 @@ invitationRouter.post("/invitations/:id/accept", async (request, response) => {
       });
 
       await tx.member.create({
-        data: { organizationId: invitation.organizationId, userId: user.id, role: invitation.role ?? "member" },
+        data: {
+          organizationId: invitation.organizationId,
+          userId: user.id,
+          role: invitation.role ?? "member",
+          jobTitle: invitation.jobTitle,
+        },
       });
     });
 
