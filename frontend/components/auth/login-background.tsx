@@ -1,27 +1,25 @@
 import Image from "next/image";
 import styles from "./login-background.module.css";
 
-// Referência: https://on.design/login. Imagens otimizadas e servidas pelo próprio app.
 const columns = [
   [
-    { src: "/login/collage-01.webp", height: 535 },
-    { src: "/login/collage-02.webp", height: 480 },
-    { src: "/login/collage-03.webp", height: 480 },
+    { src: "/login2/collage-02.png", height: 480 },
+    { src: "/login2/collage-03.webp", height: 480 },
+    { src: "/login2/collage-04.png", height: 480 },
   ],
   [
-    { src: "/login/collage-04.webp", height: 480 },
-    { src: "/login/collage-05.webp", height: 480 },
-    { src: "/login/collage-06.webp", height: 480 },
+    { src: "/login2/collage-05.png", height: 480 },
+    { src: "/login2/collage-06.png", height: 480 },
+    { src: "/login2/collage-07.png", height: 480 },
   ],
   [
-    { src: "/login/collage-07.webp", height: 455 },
-    { src: "/login/collage-08.webp", height: 480 },
-    { src: "/login/collage-09.webp", height: 480 },
+    { src: "/login2/collage-08.png", height: 480 },
+    { src: "/login2/collage-09.png", height: 480 },
+    { src: "/login2/collage-10.png", height: 480 },
   ],
   [
-    { src: "/login/collage-10.webp", height: 360 },
-    { src: "/login/collage-11.webp", height: 360 },
-    { src: "/login/collage-12.webp", height: 480 },
+    { src: "/login2/collage-11.png", height: 480 },
+    { src: "/login2/collage-12.png", height: 480 },
   ],
 ] as const;
 
