@@ -16,6 +16,11 @@
   "devDependencies": {
     "turbo": "^2.5.8"
   },
+  "overrides": {
+    "mysql2": "^3.24.5",
+    "deepmerge-ts": "^8.0.2",
+    "mariadb": "3.5.4"
+  },
   "engines": {
     "node": ">=22"
   },
