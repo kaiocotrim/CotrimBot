@@ -26,6 +26,10 @@ export function getCompanyWorkspace(organizationId: string): Promise<CompanyWork
   return apiRequest(`${organizationPath(organizationId)}/workspace`);
 }
 
+export function updateCompanyLogo(organizationId: string, logo: string | null): Promise<{ logo: string | null }> {
+  return apiRequest(`${organizationPath(organizationId)}/profile`, { method: "PATCH", body: JSON.stringify({ logo }) });
+}
+
 export function createCompanyGroup(organizationId: string, input: GroupInput): Promise<{ id: string }> {
   return apiRequest(`${organizationPath(organizationId)}/groups`, { method: "POST", body: JSON.stringify(input) });
 }

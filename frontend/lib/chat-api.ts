@@ -23,6 +23,11 @@ export async function getContacts(): Promise<Contact[]> {
   return parseResponse<Contact[]>(response, "Erro ao buscar contatos");
 }
 
+export async function deleteAllConversations(): Promise<{ success: true; messages: number; contacts: number }> {
+  const response = await fetch(`${API_URL}/contacts`, { method: "DELETE", credentials: "include" });
+  return parseResponse(response, "Não foi possível apagar todas as conversas");
+}
+
 export async function getMessages(contactId: number, before?: number, limit = 30): Promise<MessagesPage> {
   const params = new URLSearchParams({ limit: String(limit) });
   if (before) params.set("before", String(before));

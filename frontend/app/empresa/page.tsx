@@ -26,13 +26,13 @@ export default function CompanyPage() {
   }
 
   return (
-    <motion.main
-      initial={{ opacity: reduceMotion ? 1 : 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: reduceMotion ? 0 : 0.18, ease: "easeOut" }}
-      className="min-h-dvh bg-black text-white"
-    >
-      <header className="sticky top-0 z-30 border-b border-white/[0.07] bg-black/90 backdrop-blur-xl">
+    <main className="min-h-dvh bg-black text-white">
+      <motion.header
+        initial={reduceMotion ? false : { opacity: 0, y: -4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={reduceMotion ? { duration: 0 } : { duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        className="sticky top-0 z-30 border-b border-white/[0.07] bg-black/90 backdrop-blur-xl"
+      >
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
           <div>
             <h1 className="text-base font-semibold text-zinc-100">Empresa</h1>
@@ -42,16 +42,21 @@ export default function CompanyPage() {
             <ArrowLeft size={15} /> Voltar para o chat
           </Link>
         </div>
-      </header>
+      </motion.header>
 
-      <div className="mx-auto w-full max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
+      <motion.div
+        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={reduceMotion ? { duration: 0 } : { duration: 0.38, delay: 0.03, ease: [0.22, 1, 0.36, 1] }}
+        className="mx-auto w-full max-w-7xl px-5 py-8 sm:px-8 sm:py-10"
+      >
         <TeamManagement
           currentUserId={session.user.id}
           currentUserName={session.user.name}
           currentUserEmail={session.user.email}
           canCreateCompany={session.user.role === "admin"}
         />
-      </div>
-    </motion.main>
+      </motion.div>
+    </main>
   );
 }

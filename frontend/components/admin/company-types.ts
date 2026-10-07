@@ -47,7 +47,7 @@ export const permissionLabels = Object.fromEntries(
   permissionSections.flatMap<readonly [PermissionKey, string]>((section) => section.permissions),
 ) as Record<PermissionKey, string>;
 
-export type OrganizationSummary = { id: string; name: string; slug: string };
+export type OrganizationSummary = { id: string; name: string; slug: string; logo?: string | null };
 
 export type OrganizationMember = {
   id: string;

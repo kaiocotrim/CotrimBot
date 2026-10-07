@@ -67,10 +67,10 @@ export function CompanyMemberDialog({ organizationId, member, canEdit, open, onO
 
           <section className="border-b border-white/[0.07] pb-8">
             <h3 className="text-sm font-semibold">Assinatura</h3>
-            <p className="mt-1 text-xs text-zinc-500">Será usada futuramente no envio de mensagens deste usuário.</p>
-            <label className="mt-5 block text-xs text-zinc-400">Assinatura<input disabled={!canEdit} maxLength={255} value={signature} onChange={(event) => setSignature(event.target.value)} placeholder="Ex.: João | Suporte" className={inputClass} /></label>
+            <p className="mt-1 text-xs text-zinc-500">Identifica automaticamente quem enviou a mensagem.</p>
+            <label className="mt-5 block text-xs text-zinc-400">Assinatura<input disabled={!canEdit} maxLength={255} value={signature} onChange={(event) => setSignature(event.target.value)} placeholder="Ex.: Felipe" className={inputClass} /></label>
             <label className="mt-5 flex items-center justify-between gap-4 border-y border-white/[0.07] py-4">
-              <span><span className="block text-sm text-zinc-300">Adicionar automaticamente</span><span className="block text-xs text-zinc-600">Anexa “— assinatura” ao texto enviado.</span></span>
+              <span><span className="block text-sm text-zinc-300">Adicionar automaticamente</span><span className="block text-xs text-zinc-600">Envia no formato “Felipe: mensagem”.</span></span>
               <input type="checkbox" disabled={!canEdit || !signature.trim()} className="peer sr-only" checked={signatureEnabled} onChange={(event) => setSignatureEnabled(event.target.checked)} />
               <span className="relative h-5 w-9 shrink-0 rounded-full bg-zinc-800 peer-checked:bg-zinc-100 after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-zinc-500 after:transition-transform peer-checked:after:translate-x-4 peer-checked:after:bg-black" />
             </label>

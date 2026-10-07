@@ -24,6 +24,20 @@ import {
 
 import { getSatisfactionSurvey } from "../services/bot.service.js";
 
+async function addUserSignature(userId: string | undefined, content: string): Promise<string> {
+  if (!userId || !content.trim()) return content.trim();
+
+  const membership = await prisma.member.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+    select: { signature: true, signatureEnabled: true },
+  });
+  const signature = membership?.signature?.trim();
+  if (!membership?.signatureEnabled || !signature) return content.trim();
+
+  return `${signature}: ${content.trim()}`;
+}
+
 export async function getGroupSenderAvatar(req: Request, res: Response) {
   const messageId = Number(req.params.id);
   if (!Number.isInteger(messageId) || messageId <= 0) {
@@ -303,6 +317,10 @@ export async function sendMediaToContact(
   }
 
   try {
+    const outgoingCaption = caption.trim()
+      ? await addUserSignature(req.user?.id, caption)
+      : "";
+
     // O arquivo está em bytes dentro da RAM.
     // Convertemos esses bytes para Base64
     // para enviar dentro do JSON da Evolution.
@@ -316,7 +334,7 @@ export async function sendMediaToContact(
         mimetype: file.mimetype,
         media: base64,
         fileName: file.originalname,
-        caption,
+        caption: outgoingCaption,
         ...(quotedMessage && !quotedMessage.private ? {
           quoted: {
             externalId: quotedMessage.externalId,
@@ -339,8 +357,8 @@ export async function sendMediaToContact(
     // Define o texto que aparecerá na sidebar/chat.
     let content: string;
 
-    if (caption?.trim()) {
-      content = caption.trim();
+    if (outgoingCaption) {
+      content = outgoingCaption;
     } else if (messageType === "IMAGE") {
       content = "[Imagem]";
     } else if (messageType === "VIDEO") {
@@ -355,6 +373,7 @@ export async function sendMediaToContact(
     const message = await prisma.message.upsert({
       where: { externalId },
       update: {
+        content,
         quotedExternalId: quotedMessage?.externalId ?? null,
         quotedMessageId: quotedMessage?.id ?? null,
         quotedContent: quotedMessage?.content ?? null,
@@ -533,11 +552,13 @@ export async function sendMessageToContact(req: Request, res: Response) {
       return res.status(201).json({ message: responseMessage, evolution: null });
     }
 
+    const outgoingText = await addUserSignature(req.user?.id, text);
+
     // O service recebe apenas telefone e texto e cuida de toda a comunicação HTTP
     // com a Evolution API, mantendo esse detalhe fora do controller.
     const evolutionResponse = await sendWhatsAppMessage(
       contact.phone,
-      text,
+      outgoingText,
       quotedMessage && !quotedMessage.private ? {
         externalId: quotedMessage.externalId,
         content: quotedMessage.content,
@@ -560,6 +581,7 @@ export async function sendMessageToContact(req: Request, res: Response) {
     const message = await prisma.message.upsert({
       where: { externalId },
       update: {
+        content: outgoingText,
         quotedExternalId: quotedMessage?.externalId ?? null,
         quotedMessageId: quotedMessage?.id ?? null,
         quotedContent: quotedMessage?.content ?? null,
@@ -567,7 +589,7 @@ export async function sendMessageToContact(req: Request, res: Response) {
       },
       create: {
         externalId,
-        content: text,
+        content: outgoingText,
         direction: "OUTGOING",
         contactId: contact.id,
         quotedExternalId: quotedMessage?.externalId ?? null,

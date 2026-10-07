@@ -164,6 +164,59 @@ organizationRouter.get("/organizations/:organizationId/workspace", async (reques
   }
 });
 
+organizationRouter.patch("/organizations/:organizationId/profile", async (request, response) => {
+  const organizationId = request.params.organizationId;
+  const userId = request.user?.id;
+  const logo = request.body?.logo;
+
+  if (!userId) {
+    response.status(401).json({ error: "Não autenticado." });
+    return;
+  }
+
+  if (logo !== null && typeof logo !== "string") {
+    response.status(400).json({ error: "Logo inválida." });
+    return;
+  }
+
+  if (typeof logo === "string") {
+    const match = logo.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/);
+    if (!match || logo.length > 60_000) {
+      response.status(400).json({ error: "Use uma imagem PNG, JPG ou WebP de até 45 KB." });
+      return;
+    }
+
+    try {
+      const base64Payload = match[2];
+      if (!base64Payload || Buffer.from(base64Payload, "base64").byteLength > 45_000) {
+        response.status(400).json({ error: "A logo processada ficou muito grande." });
+        return;
+      }
+    } catch {
+      response.status(400).json({ error: "Logo inválida." });
+      return;
+    }
+  }
+
+  try {
+    const membership = await findMembership(organizationId, userId);
+    if (!membership || !canManageCompany(membership)) {
+      response.status(403).json({ error: "Você não tem permissão para alterar esta empresa." });
+      return;
+    }
+
+    const organization = await prisma.organization.update({
+      where: { id: organizationId },
+      data: { logo },
+      select: { logo: true },
+    });
+    response.json(organization);
+  } catch (error) {
+    console.error("Falha ao atualizar logo da empresa:", error);
+    response.status(500).json({ error: "Não foi possível atualizar a logo da empresa." });
+  }
+});
+
 organizationRouter.post("/organizations/:organizationId/groups", async (request, response) => {
   const organizationId = request.params.organizationId;
   const userId = request.user?.id;

@@ -2,12 +2,12 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import { motion, useReducedMotion } from "framer-motion";
-import { Check, Trash2, UsersRound, X } from "lucide-react";
+import { Check, Trash2, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { createCompanyGroup, deleteCompanyGroup, updateCompanyGroup } from "@/lib/company-api";
 import { permissionSections, type CompanyGroup, type OrganizationMember, type PermissionKey } from "./company-types";
 
-const inputClass = "min-h-11 w-full rounded-xl border border-white/10 bg-black px-3.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-white/25";
+const inputClass = "min-h-10 w-full rounded-lg border border-white/[0.09] bg-white/[0.025] px-3 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-700 focus:border-white/20 focus:bg-white/[0.04]";
 const MotionDialogBackdrop = motion.create(Dialog.Backdrop);
 const MotionDialogPopup = motion.create(Dialog.Popup);
 
@@ -72,63 +72,65 @@ export function CompanyGroupDialog({ organizationId, group, members, open, onOpe
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <MotionDialogBackdrop initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduceMotion ? 0 : 0.2 }} className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-sm" />
-        <MotionDialogPopup initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 36 }} animate={{ opacity: 1, x: 0 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.16, 1, 0.3, 1] }} className="fixed right-0 top-0 z-[201] flex h-dvh w-full max-w-xl flex-col border-l border-white/10 bg-[#070707] text-zinc-100 shadow-2xl outline-none">
-          <header className="flex h-18 shrink-0 items-center justify-between border-b border-white/[0.07] px-6">
+        <MotionDialogBackdrop initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduceMotion ? 0 : 0.2 }} className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-[2px]" />
+        <MotionDialogPopup initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.16, 1, 0.3, 1] }} className="fixed right-0 top-0 z-[201] flex h-dvh w-full max-w-[520px] flex-col border-l border-white/[0.07] bg-[#090909] text-zinc-100 shadow-2xl outline-none">
+          <header className="flex shrink-0 items-start justify-between px-7 pb-5 pt-6">
             <div>
-              <Dialog.Title className="text-base font-semibold">{group ? "Editar grupo" : "Novo grupo"}</Dialog.Title>
-              <Dialog.Description className="mt-0.5 text-xs text-zinc-500">Membros e permissões podem ser alterados depois.</Dialog.Description>
+              <Dialog.Title className="text-lg font-medium tracking-[-0.02em]">{group ? "Editar grupo" : "Novo grupo"}</Dialog.Title>
+              <Dialog.Description className="mt-1 text-xs text-zinc-600">Organize membros e defina o que este grupo pode acessar.</Dialog.Description>
             </div>
-            <Dialog.Close aria-label="Fechar" className="rounded-full p-2 text-zinc-500 hover:bg-white/[0.06] hover:text-white"><X size={20} /></Dialog.Close>
+            <Dialog.Close aria-label="Fechar" className="-mr-2 rounded-lg p-2 text-zinc-600 transition-colors hover:bg-white/[0.05] hover:text-zinc-200"><X size={18} /></Dialog.Close>
           </header>
 
           <form onSubmit={(event) => void save(event)} className="flex min-h-0 flex-1 flex-col">
-            <div className="flex-1 space-y-7 overflow-y-auto px-6 py-6">
-              <section className="space-y-3">
-                <label className="block text-xs font-medium text-zinc-400">Nome do grupo<input autoFocus required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Atendimento" className={`${inputClass} mt-2`} /></label>
-                <label className="block text-xs font-medium text-zinc-400">Descrição <span className="text-zinc-600">(opcional)</span><textarea maxLength={500} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Descreva a responsabilidade desta equipe." rows={3} className={`${inputClass} mt-2 resize-none py-3`} /></label>
+            <div className="flex-1 space-y-9 overflow-y-auto px-7 pb-8 pt-2">
+              <section className="space-y-4">
+                <label className="block text-xs font-medium text-zinc-500">Nome<input autoFocus required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Atendimento" className={`${inputClass} mt-1.5`} /></label>
+                <label className="block text-xs font-medium text-zinc-500">Descrição <span className="font-normal text-zinc-700">· opcional</span><textarea maxLength={500} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Qual é a função deste grupo?" rows={2} className={`${inputClass} mt-1.5 resize-none py-2.5`} /></label>
               </section>
 
               <section>
-                <div className="mb-3 flex items-center gap-2"><UsersRound size={16} className="text-zinc-500" /><h3 className="text-sm font-semibold">Usuários do grupo</h3><span className="ml-auto text-xs text-zinc-500">{memberIds.length} selecionado(s)</span></div>
-                <div className="space-y-2">
+                <div className="mb-2 flex items-center justify-between"><h3 className="text-sm font-medium text-zinc-200">Membros</h3><span className="text-xs tabular-nums text-zinc-600">{memberIds.length} de {members.length}</span></div>
+                <div className="divide-y divide-white/[0.06] border-y border-white/[0.06]">
                   {members.map((member) => {
                     const selected = memberIds.includes(member.id);
-                    return <label key={member.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 hover:border-white/[0.14]">
+                    return <label key={member.id} className="flex cursor-pointer items-center gap-3 py-3 transition-colors hover:bg-white/[0.02]">
                       <input type="checkbox" className="sr-only" checked={selected} onChange={() => toggleMember(member.id)} />
-                      <span className={`flex size-5 items-center justify-center rounded-md border ${selected ? "border-white bg-white text-black" : "border-white/20 text-transparent"}`}><Check size={13} strokeWidth={3} /></span>
-                      <span className="min-w-0"><span className="block truncate text-sm text-zinc-200">{member.displayName || member.user.name}</span><span className="block truncate text-xs text-zinc-500">{member.user.email}</span></span>
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/[0.05] text-xs font-medium text-zinc-400">{(member.displayName || member.user.name || "?")[0]?.toUpperCase()}</span>
+                      <span className="min-w-0 flex-1"><span className="block truncate text-sm text-zinc-300">{member.displayName || member.user.name}</span><span className="mt-0.5 block truncate text-xs text-zinc-600">{member.user.email}</span></span>
+                      <span className={`flex size-[18px] items-center justify-center rounded-[5px] border transition-colors ${selected ? "border-zinc-200 bg-zinc-200 text-zinc-950" : "border-white/15 text-transparent"}`}><Check size={12} strokeWidth={3} /></span>
                     </label>;
                   })}
+                  {!members.length && <p className="py-5 text-center text-xs text-zinc-600">Nenhum membro disponível.</p>}
                 </div>
               </section>
 
               <section>
-                <h3 className="mb-1 text-sm font-semibold">Permissões do grupo</h3>
-                <p className="mb-4 text-xs text-zinc-500">O dono sempre mantém acesso total, independentemente destas opções.</p>
-                <div className="space-y-5">
+                <h3 className="text-sm font-medium text-zinc-200">Permissões</h3>
+                <p className="mb-5 mt-1 text-xs leading-5 text-zinc-600">O dono da empresa sempre mantém acesso total.</p>
+                <div className="space-y-6">
                   {permissionSections.map((section) => <div key={section.label}>
-                    <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">{section.label}</p>
-                    <div className="overflow-hidden rounded-xl border border-white/[0.07]">
+                    <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-600">{section.label}</p>
+                    <div className="divide-y divide-white/[0.055] border-y border-white/[0.055]">
                       {section.permissions.map(([permission, label]) => {
                         const enabled = permissions.includes(permission);
-                        return <label key={permission} className="flex cursor-pointer items-center justify-between gap-4 border-b border-white/[0.06] px-3.5 py-3 last:border-b-0 hover:bg-white/[0.025]">
-                          <span className="text-sm text-zinc-300">{label}</span>
+                        return <label key={permission} className="flex cursor-pointer items-center justify-between gap-4 py-2.5 transition-colors hover:bg-white/[0.02]">
+                          <span className="text-sm text-zinc-400">{label}</span>
                           <input type="checkbox" className="peer sr-only" checked={enabled} onChange={() => togglePermission(permission)} />
-                          <span className="relative h-5 w-9 shrink-0 rounded-full bg-zinc-800 transition-colors peer-checked:bg-zinc-100 after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-zinc-500 after:transition-transform peer-checked:after:translate-x-4 peer-checked:after:bg-black" />
+                          <span className="relative h-[18px] w-8 shrink-0 rounded-full bg-zinc-800 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-white/30 peer-checked:bg-zinc-200 after:absolute after:left-0.5 after:top-0.5 after:size-3.5 after:rounded-full after:bg-zinc-500 after:transition-transform peer-checked:after:translate-x-3.5 peer-checked:after:bg-zinc-950" />
                         </label>;
                       })}
                     </div>
                   </div>)}
                 </div>
               </section>
-              {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+              {error && <p role="alert" className="rounded-lg bg-red-400/[0.07] px-3 py-2 text-xs text-red-300">{error}</p>}
             </div>
 
-            <footer className="flex shrink-0 items-center gap-3 border-t border-white/[0.07] px-6 py-4">
-              {group && <button type="button" disabled={saving || deleting} onClick={() => void remove()} className="mr-auto flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-zinc-500 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"><Trash2 size={15} />{deleting ? "Excluindo…" : "Excluir"}</button>}
-              <Dialog.Close className="rounded-full px-4 py-2 text-sm text-zinc-400 hover:text-white">Cancelar</Dialog.Close>
-              <button type="submit" disabled={saving || deleting || !name.trim()} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black hover:bg-zinc-200 disabled:opacity-50">{saving ? "Salvando…" : "Salvar grupo"}</button>
+            <footer className="flex shrink-0 items-center gap-2 border-t border-white/[0.06] bg-[#090909]/95 px-7 py-3.5 backdrop-blur">
+              {group && <button type="button" disabled={saving || deleting} onClick={() => void remove()} className="mr-auto flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-zinc-600 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"><Trash2 size={14} />{deleting ? "Excluindo…" : "Excluir"}</button>}
+              <Dialog.Close className={`${group ? "" : "ml-auto"} rounded-lg px-3.5 py-2 text-sm text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-200`}>Cancelar</Dialog.Close>
+              <button type="submit" disabled={saving || deleting || !name.trim()} className="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-white disabled:bg-zinc-800 disabled:text-zinc-500">{saving ? "Salvando…" : "Salvar"}</button>
             </footer>
           </form>
         </MotionDialogPopup>

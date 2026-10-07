@@ -305,6 +305,17 @@ export function useChat() {
       setContactTyping(data.contactId, data.isTyping);
     }
 
+    function handleConversationsCleared() {
+      setContacts([]);
+      setSelectedContact(null);
+      selectedContactIdRef.current = null;
+      setMessages([]);
+      setHasOlderMessages(false);
+      setNewMessageId(null);
+      setTypingContactIds(new Set());
+      avatarRequestsRef.current.clear();
+    }
+
 
     // Começa a ouvir o evento
     // enviado pelo backend.
@@ -320,6 +331,8 @@ export function useChat() {
     socket.on("message_flags_updated", handleMessageFlagsUpdated);
     socket.on("contact_updated", handleContactUpdated);
     socket.on("contact_presence", handleContactPresence);
+    socket.on("conversations_cleared", handleConversationsCleared);
+    window.addEventListener("cotrimbot:conversations-cleared", handleConversationsCleared);
 
 
     // Remove o listener quando
@@ -337,6 +350,8 @@ export function useChat() {
       socket.off("message_flags_updated", handleMessageFlagsUpdated);
       socket.off("contact_updated", handleContactUpdated);
       socket.off("contact_presence", handleContactPresence);
+      socket.off("conversations_cleared", handleConversationsCleared);
+      window.removeEventListener("cotrimbot:conversations-cleared", handleConversationsCleared);
     };
   }, [selectedContact]);
 

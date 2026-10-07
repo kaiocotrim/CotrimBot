@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Building2, MoreHorizontal, Plus, Search, Shield, Trash2, UsersRound, X } from "lucide-react";
+import { Building2, Check, Copy, MoreHorizontal, Pencil, Plus, Search, Shield, Trash2, UsersRound, X } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
-import { getCompanyWorkspace } from "@/lib/company-api";
+import { getCompanyWorkspace, updateCompanyLogo } from "@/lib/company-api";
 import { CompanyGroupDialog } from "./company-group-dialog";
 import { CompanyMemberDialog } from "./company-member-dialog";
 import { permissionSections, type CompanyGroup, type OrganizationMember, type OrganizationSummary } from "./company-types";
@@ -47,6 +48,54 @@ function roleLabel(role?: string | null) {
   return "Usuário";
 }
 
+function renderLogoFile(file: File, size: number, quality: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new window.Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        reject(new Error("Não foi possível processar a imagem."));
+        return;
+      }
+
+      const padding = Math.round(size * 0.08);
+      const available = size - padding * 2;
+      const scale = Math.min(available / image.naturalWidth, available / image.naturalHeight);
+      const width = image.naturalWidth * scale;
+      const height = image.naturalHeight * scale;
+      context.clearRect(0, 0, size, size);
+      context.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
+      resolve(canvas.toDataURL("image/webp", quality));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Não foi possível abrir a imagem."));
+    };
+    image.src = objectUrl;
+  });
+}
+
+async function prepareCompanyLogo(file: File): Promise<string> {
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+    throw new Error("Escolha uma imagem PNG, JPG ou WebP.");
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("A imagem original deve ter no máximo 5 MB.");
+  }
+
+  const primary = await renderLogoFile(file, 256, 0.82);
+  if (primary.length <= 60_000) return primary;
+  const compact = await renderLogoFile(file, 192, 0.68);
+  if (compact.length <= 60_000) return compact;
+  throw new Error("Não foi possível reduzir a imagem. Escolha outro arquivo.");
+}
+
 export function TeamManagement({ currentUserId, currentUserName, currentUserEmail, canCreateCompany = false }: {
   currentUserId: string;
   currentUserName?: string;
@@ -70,6 +119,8 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
   const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
   const [inviting, setInviting] = useState(false);
   const [inviteMessage, setInviteMessage] = useState<string | null>(null);
+  const [createdInvitation, setCreatedInvitation] = useState<{ id: string; email: string } | null>(null);
+  const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<CompanyGroup | null>(null);
@@ -77,6 +128,9 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<CompanyTab>("overview");
   const [memberSearch, setMemberSearch] = useState("");
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [logoMessage, setLogoMessage] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const reduceMotion = useReducedMotion();
   const currentMembership = members.find((member) => member.userId === currentUserId);
   const canManage = currentMembership?.role === "owner" || currentMembership?.role === "admin";
@@ -135,6 +189,40 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
     });
     if (invitationError || !data?.id) throw new Error(invitationError?.message ?? "invite");
     await annotateInvitation(organizationId, data.id, user.name.trim(), user.jobTitle.trim());
+    return data.id;
+  }
+
+  async function copyInvitationLink(invitationId: string) {
+    const invitationLink = `${window.location.origin}/accept-invitation?id=${encodeURIComponent(invitationId)}`;
+
+    try {
+      await navigator.clipboard.writeText(invitationLink);
+      setCopiedInvitationId(invitationId);
+      window.setTimeout(() => {
+        setCopiedInvitationId((current) => current === invitationId ? null : current);
+      }, 2000);
+    } catch {
+      setInviteMessage("Não foi possível copiar o link. Tente novamente.");
+    }
+  }
+
+  async function handleLogoFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!organization || !file || logoBusy) return;
+
+    setLogoBusy(true);
+    setLogoMessage(null);
+    try {
+      const logo = await prepareCompanyLogo(file);
+      await updateCompanyLogo(organization.id, logo);
+      setOrganization((current) => current ? { ...current, logo } : current);
+      setLogoMessage("Logo atualizada.");
+    } catch (logoError) {
+      setLogoMessage(logoError instanceof Error ? logoError.message : "Não foi possível atualizar a logo.");
+    } finally {
+      setLogoBusy(false);
+    }
   }
 
   function continueToUsers() {
@@ -163,6 +251,7 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
       const { data, error: creationError } = await authClient.organization.create({ name: companyName.trim(), slug });
       if (creationError || !data?.id) throw new Error(creationError?.message ?? "create");
       for (const user of populatedUsers) await inviteUser(data.id, user);
+      if (populatedUsers.length) setActiveTab("invites");
       setStep("overview");
       setCompanyName("");
       setDraftUsers([emptyDraft()]);
@@ -181,14 +270,15 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
     }
     setInviting(true);
     setInviteMessage(null);
+    setCreatedInvitation(null);
     try {
-      await inviteUser(organization.id, { name: inviteName, email: inviteEmail, jobTitle: inviteJobTitle, permission: inviteRole });
+      const invitedEmail = inviteEmail.trim().toLowerCase();
+      const invitationId = await inviteUser(organization.id, { name: inviteName, email: inviteEmail, jobTitle: inviteJobTitle, permission: inviteRole });
       setInviteName("");
       setInviteEmail("");
       setInviteJobTitle("");
       setInviteRole("member");
-      setInviteMessage("Usuário adicionado à empresa e convite criado.");
-      setInviteOpen(false);
+      setCreatedInvitation({ id: invitationId, email: invitedEmail });
       await loadOrganization();
     } catch {
       setInviteMessage("Não foi possível adicionar o usuário.");
@@ -309,10 +399,31 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
       <section className="border-b border-white/[0.07] pb-7">
         <div className="flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
           <div className="flex min-w-0 items-center gap-4">
-            <span className="flex size-10 shrink-0 items-center justify-center text-zinc-500"><Building2 size={20} /></span>
+            <div className="relative shrink-0">
+              {canManage ? (
+                <>
+                  <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => void handleLogoFile(event)} />
+                  <button type="button" disabled={logoBusy} onClick={() => logoInputRef.current?.click()} aria-label={organization.logo ? "Trocar logo da empresa" : "Adicionar logo da empresa"} title={organization.logo ? "Trocar logo" : "Adicionar logo"} className="group relative flex size-11 items-center justify-center overflow-visible rounded-xl border border-white/[0.08] bg-white/[0.035] text-zinc-500 transition-colors hover:border-white/20 hover:bg-white/[0.055] disabled:opacity-50">
+                    <span className="flex size-full items-center justify-center overflow-hidden rounded-xl">
+                      {organization.logo
+                        ? <Image src={organization.logo} alt={`Logo de ${organization.name}`} width={44} height={44} unoptimized className="size-full object-contain p-1.5" />
+                        : <Building2 size={19} />}
+                    </span>
+                    <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full border-2 border-[#090909] bg-zinc-100 text-zinc-950 shadow-sm transition-transform group-hover:scale-110"><Pencil size={9} strokeWidth={2.5} /></span>
+                  </button>
+                </>
+              ) : (
+                <span className="flex size-11 items-center justify-center overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.035] text-zinc-500">
+                  {organization.logo
+                    ? <Image src={organization.logo} alt={`Logo de ${organization.name}`} width={44} height={44} unoptimized className="size-full object-contain p-1.5" />
+                    : <Building2 size={19} />}
+                </span>
+              )}
+            </div>
             <div className="min-w-0">
               <h3 className="truncate text-lg font-semibold text-zinc-100">{organization.name}</h3>
               <p className="mt-1 text-sm text-zinc-500">{members.length} {members.length === 1 ? "membro" : "membros"} <span className="px-1 text-zinc-700">•</span> {groups.length} {groups.length === 1 ? "grupo" : "grupos"}</p>
+              {logoMessage && <p className="mt-1 text-xs text-zinc-600">{logoMessage}</p>}
             </div>
           </div>
           {canManage && <button type="button" onClick={() => setActiveTab("members")} className="text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-200">Gerenciar empresa</button>}
@@ -352,7 +463,14 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
           </div>
           <div>
             <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-medium text-zinc-200">Grupos recentes</h3><button type="button" onClick={() => setActiveTab("groups")} className="text-xs text-zinc-600 hover:text-zinc-300">Ver todos</button></div>
-            {groups.length ? <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">{groups.slice(0, 3).map((group) => <button key={group.id} type="button" disabled={!canManage} onClick={() => openGroup(group)} className="flex w-full items-center justify-between gap-3 py-3 text-left disabled:cursor-default"><span className="truncate text-sm text-zinc-300">{group.name}</span><span className="shrink-0 text-xs text-zinc-600">{group.memberIds.length} {group.memberIds.length === 1 ? "membro" : "membros"}</span></button>)}</div> : <p className="border-y border-white/[0.07] py-5 text-sm text-zinc-600">Nenhum grupo criado.</p>}
+            {groups.length ? <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">{groups.slice(0, 3).map((group) => {
+              const hasFullAccess = group.permissions.length === permissionCount;
+              return <motion.button key={group.id} type="button" disabled={!canManage} onClick={() => openGroup(group)} whileHover={canManage && !reduceMotion ? { y: -2 } : undefined} className="flex aspect-square min-w-0 flex-col rounded-xl border border-white/[0.08] bg-white/[0.018] p-3 text-left transition-colors hover:border-white/[0.16] hover:bg-white/[0.035] disabled:cursor-default">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-white/[0.05] text-zinc-500">{hasFullAccess ? <Shield size={15} /> : <UsersRound size={15} />}</span>
+                <span className="mt-auto block w-full truncate text-sm font-medium text-zinc-200">{group.name}</span>
+                <span className="mt-1 text-[11px] text-zinc-600">{group.memberIds.length} {group.memberIds.length === 1 ? "membro" : "membros"}</span>
+              </motion.button>;
+            })}</div> : <p className="border-y border-white/[0.07] py-5 text-sm text-zinc-600">Nenhum grupo criado.</p>}
           </div>
         </div>
       </section>}
@@ -366,7 +484,7 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
               aria-label={inviteOpen ? "Fechar formulário" : "Convidar membro"}
               aria-expanded={inviteOpen}
               whileTap={reduceMotion ? undefined : { scale: 0.9 }}
-              onClick={() => { setInviteOpen((current) => !current); setInviteMessage(null); }}
+              onClick={() => { setInviteOpen((current) => !current); setInviteMessage(null); setCreatedInvitation(null); }}
               className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-2 text-xs font-medium text-zinc-300 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
             >
               {inviteOpen ? <X size={15} /> : <Plus size={15} />} {inviteOpen ? "Fechar" : "Convidar"}
@@ -384,6 +502,20 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
               className="mb-4 origin-top rounded-2xl bg-white/[0.035] p-5"
             >
               <h4 className="mb-4 text-sm font-semibold text-zinc-100">Novo usuário</h4>
+              {createdInvitation && (
+                <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] p-4">
+                  <p className="text-sm font-medium text-emerald-300">Convite criado com sucesso</p>
+                  <p className="mt-1 truncate text-xs text-zinc-400">Envie o link de acesso para {createdInvitation.email}.</p>
+                  <button
+                    type="button"
+                    onClick={() => void copyInvitationLink(createdInvitation.id)}
+                    className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 px-3.5 py-2 text-xs font-medium text-emerald-200 transition-colors hover:bg-emerald-400/10"
+                  >
+                    {copiedInvitationId === createdInvitation.id ? <Check size={14} /> : <Copy size={14} />}
+                    {copiedInvitationId === createdInvitation.id ? "Link copiado" : "Copiar link de acesso"}
+                  </button>
+                </div>
+              )}
               <div className="grid gap-3 sm:grid-cols-2"><input autoFocus value={inviteName} onChange={(event) => setInviteName(event.target.value)} placeholder="Nome" className={inputClass} /><input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="E-mail" className={inputClass} /><input value={inviteJobTitle} onChange={(event) => setInviteJobTitle(event.target.value)} placeholder="Cargo / função" className={inputClass} /><select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as "member" | "admin")} className={inputClass}><option value="member">Usuário</option><option value="admin">Administrador</option></select></div>
               <div className="mt-4 flex items-center gap-3"><button type="button" disabled={inviting} onClick={() => void handleInvite()} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-zinc-200 disabled:opacity-50">{inviting ? "Adicionando..." : "Adicionar usuário"}</button><button type="button" disabled={inviting} onClick={() => setInviteOpen(false)} className="px-2 py-2 text-sm text-zinc-500 transition-colors hover:text-zinc-200 disabled:opacity-50">Cancelar</button></div>
               {inviteMessage && <p className="mt-3 text-sm text-red-400">{inviteMessage}</p>}
@@ -434,26 +566,18 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
         </div>
 
         {groups.length ? (
-          <div className="grid gap-2.5 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {groups.map((group) => {
-              const groupMembers = group.memberIds.map((memberId) => members.find((member) => member.id === memberId)).filter((member): member is OrganizationMember => Boolean(member));
               const hasFullAccess = group.permissions.length === permissionCount;
-              return <motion.button key={group.id} type="button" disabled={!canManage} onClick={() => openGroup(group)} whileHover={canManage && !reduceMotion ? { y: -2 } : undefined} whileTap={canManage && !reduceMotion ? { scale: 0.99 } : undefined} transition={{ duration: 0.18 }} className="rounded-2xl border border-white/[0.08] bg-white/[0.015] p-5 text-left transition-colors hover:border-white/[0.15] hover:bg-white/[0.025] disabled:cursor-default disabled:hover:border-white/[0.08]">
-                <span className="flex items-start gap-3">
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.07] bg-white/[0.05] text-zinc-400">{hasFullAccess ? <Shield size={18} /> : <UsersRound size={18} />}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-zinc-100">{group.name}</span>
-                    {group.description && <span className="mt-1 block line-clamp-2 text-xs leading-5 text-zinc-600">{group.description}</span>}
-                  </span>
+              return <motion.button key={group.id} type="button" disabled={!canManage} onClick={() => openGroup(group)} whileHover={canManage && !reduceMotion ? { y: -3 } : undefined} whileTap={canManage && !reduceMotion ? { scale: 0.98 } : undefined} transition={{ duration: 0.18 }} className="flex aspect-square min-w-0 flex-col rounded-2xl border border-white/[0.08] bg-white/[0.015] p-4 text-left transition-colors hover:border-white/[0.16] hover:bg-white/[0.03] disabled:cursor-default disabled:hover:border-white/[0.08]">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.07] bg-white/[0.045] text-zinc-500">{hasFullAccess ? <Shield size={17} /> : <UsersRound size={17} />}</span>
+                <span className="mt-auto min-w-0">
+                  <span className="block truncate text-sm font-medium text-zinc-100">{group.name}</span>
+                  {group.description && <span className="mt-1 block line-clamp-2 text-[11px] leading-4 text-zinc-600">{group.description}</span>}
                 </span>
-                <span className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500">
+                <span className="mt-3 flex items-center justify-between gap-2 text-[10px] text-zinc-600">
                   <span>{group.memberIds.length} {group.memberIds.length === 1 ? "membro" : "membros"}</span>
-                  <span>{hasFullAccess ? "Acesso completo" : `${group.permissions.length} ${group.permissions.length === 1 ? "permissão" : "permissões"}`}</span>
-                </span>
-                <span className="mt-4 flex min-h-6 flex-wrap items-center gap-1.5">
-                  {groupMembers.slice(0, 2).map((member) => <span key={member.id} className="rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1 text-[11px] text-zinc-400">{(member.displayName || member.user.name).split(" ")[0]}</span>)}
-                  {groupMembers.length > 2 && <span className="rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1 text-[11px] text-zinc-500">+{groupMembers.length - 2}</span>}
-                  {!groupMembers.length && <span className="text-[11px] text-zinc-700">Nenhum membro</span>}
+                  <span className="truncate">{hasFullAccess ? "Acesso total" : `${group.permissions.length} permissões`}</span>
                 </span>
               </motion.button>;
             })}
@@ -469,7 +593,7 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
 
       {activeTab === "invites" && <section>
         <h3 className="mb-3 text-sm font-semibold text-zinc-200">Convites pendentes</h3>
-        {invitations.length ? <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">{invitations.map((invitation) => <article key={invitation.id} className="flex items-center gap-3 px-1 py-4"><span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/[0.055] text-sm font-semibold text-zinc-300">{(invitation.name || invitation.email).trim()[0]?.toUpperCase()}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-zinc-100">{invitation.name || invitation.email}</p><p className="mt-0.5 truncate text-xs text-zinc-500">{invitation.email}</p><p className="mt-1 text-xs text-zinc-400">{invitation.jobTitle ? `${invitation.jobTitle} • ` : ""}{roleLabel(invitation.role)}</p></div>{canManage && <button type="button" disabled={busyId === invitation.id} onClick={() => void cancelInvitation(invitation.id)} className="rounded-full px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50">Cancelar</button>}</article>)}</div> : <div className="border-y border-white/[0.07] py-8 text-center"><p className="text-sm text-zinc-500">Nenhum convite pendente</p><p className="mt-1 text-xs text-zinc-700">Novos convites aparecerão aqui.</p></div>}
+        {invitations.length ? <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">{invitations.map((invitation) => <article key={invitation.id} className="flex flex-wrap items-center gap-3 px-1 py-4"><span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/[0.055] text-sm font-semibold text-zinc-300">{(invitation.name || invitation.email).trim()[0]?.toUpperCase()}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-zinc-100">{invitation.name || invitation.email}</p><p className="mt-0.5 truncate text-xs text-zinc-500">{invitation.email}</p><p className="mt-1 text-xs text-zinc-400">{invitation.jobTitle ? `${invitation.jobTitle} • ` : ""}{roleLabel(invitation.role)}</p></div>{canManage && <div className="flex items-center gap-1"><button type="button" onClick={() => void copyInvitationLink(invitation.id)} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100">{copiedInvitationId === invitation.id ? <Check size={13} /> : <Copy size={13} />}{copiedInvitationId === invitation.id ? "Copiado" : "Copiar link"}</button><button type="button" disabled={busyId === invitation.id} onClick={() => void cancelInvitation(invitation.id)} className="rounded-full px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50">Cancelar</button></div>}</article>)}</div> : <div className="border-y border-white/[0.07] py-8 text-center"><p className="text-sm text-zinc-500">Nenhum convite pendente</p><p className="mt-1 text-xs text-zinc-700">Novos convites aparecerão aqui.</p></div>}
       </section>}
           </motion.div>
         </AnimatePresence>
