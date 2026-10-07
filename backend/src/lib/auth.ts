@@ -72,6 +72,9 @@ export const auth = betterAuth({
         member: {
           additionalFields: {
             jobTitle: { type: "string", required: false },
+            displayName: { type: "string", required: false },
+            signature: { type: "string", required: false },
+            signatureEnabled: { type: "boolean", required: false, defaultValue: false },
           },
         },
         invitation: {

@@ -6,7 +6,6 @@ import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
 import { BadgeCheck, Bell, Building2, QrCode, UserRound, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { TeamManagement } from "@/components/admin/team-management";
 import { EvolutionConnectionSettings } from "@/components/chat/evolution-connection-settings";
 import { authClient } from "@/lib/auth-client";
 import styles from "./account-settings.module.css";
@@ -74,6 +73,10 @@ function SettingsContent({ user }: { user: SettingsUser }) {
     : sections.filter((item) => item.value !== "whatsapp");
 
   function changeSection(value: Section) {
+    if (value === "business") {
+      router.push("/empresa");
+      return;
+    }
     setSection(value);
     scrollRef.current?.scrollTo({ top: 0 });
   }
@@ -206,9 +209,6 @@ function SettingsContent({ user }: { user: SettingsUser }) {
             </Tabs.Panel>
           )}
 
-          <Tabs.Panel value="business" className={styles.panel}>
-            <TeamManagement currentUserId={user.id} currentUserName={user.name} currentUserEmail={user.email} canCreateCompany={user.role === "admin"} />
-          </Tabs.Panel>
         </div>
       </div>
     </Tabs.Root>

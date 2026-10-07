@@ -173,6 +173,7 @@ model Organization {
 
   members     Member[]
   invitations Invitation[]
+  groups      OrganizationGroup[]
 }
 
 model Member {
@@ -181,13 +182,55 @@ model Member {
   userId         String
   role           String   @default("member")
   jobTitle       String?
+  displayName    String?
+  signature      String?  @db.VarChar(255)
+  signatureEnabled Boolean @default(false)
   createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupMemberships OrganizationGroupMember[]
 
   @@index([organizationId])
   @@index([userId])
+}
+
+model OrganizationGroup {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String   @db.VarChar(100)
+  description    String?  @db.VarChar(500)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members      OrganizationGroupMember[]
+  permissions  GroupPermission[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model OrganizationGroupMember {
+  groupId  String
+  memberId String
+  createdAt DateTime @default(now())
+
+  group  OrganizationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  member Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, memberId])
+  @@index([memberId])
+}
+
+model GroupPermission {
+  groupId    String
+  permission GroupPermissionKey
+
+  group OrganizationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, permission])
 }
 
 model Invitation {
@@ -207,4 +250,27 @@ model Invitation {
 
   @@index([organizationId])
   @@index([email])
+}
+
+enum GroupPermissionKey {
+  CONVERSATIONS_VIEW
+  CONVERSATIONS_REPLY
+  CONVERSATIONS_START
+  CONVERSATIONS_CLOSE
+  CONVERSATIONS_REOPEN
+  CONVERSATIONS_FORWARD
+  MESSAGES_DELETE
+  CONTACTS_VIEW
+  CONTACTS_CREATE
+  CONTACTS_EDIT
+  CONTACTS_DELETE
+  COMPANY_MEMBERS_VIEW
+  COMPANY_MEMBERS_INVITE
+  COMPANY_MEMBERS_EDIT
+  COMPANY_GROUPS_CREATE
+  COMPANY_GROUPS_EDIT
+  COMPANY_GROUPS_DELETE
+  SETTINGS_ACCESS
+  SETTINGS_WHATSAPP_MANAGE
+  SETTINGS_COMPANY_MANAGE
 }
