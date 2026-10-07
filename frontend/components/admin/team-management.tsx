@@ -8,6 +8,7 @@ import { getCompanyWorkspace } from "@/lib/company-api";
 import { CompanyGroupDialog } from "./company-group-dialog";
 import { CompanyMemberDialog } from "./company-member-dialog";
 import { permissionSections, type CompanyGroup, type OrganizationMember, type OrganizationSummary } from "./company-types";
+import { v4 as uuidv4 } from "uuid";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
@@ -33,7 +34,7 @@ type CompanyTab = "overview" | "members" | "groups" | "invites";
 const inputClass = "h-10 w-full min-w-0 rounded-lg border border-white/10 bg-black px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-white/25";
 
 function emptyDraft(): DraftUser {
-  return { id: crypto.randomUUID(), name: "", email: "", jobTitle: "", permission: "member" };
+  return { id: uuidv4(), name: "", email: "", jobTitle: "", permission: "member" };
 }
 
 function slugify(value: string) {
