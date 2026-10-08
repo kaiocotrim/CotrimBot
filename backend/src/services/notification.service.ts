@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
+import { sendPushToUser } from "./push.service.js";
 
 export type NotificationType = "CONVERSATION_ASSIGNED" | "NEW_MESSAGE";
 
@@ -18,6 +19,14 @@ type NewNotification = {
 async function createNotification(data: NewNotification) {
   const notification = await prisma.notification.create({ data });
   getSocketServer().to(userRoom(data.userId)).emit("notification_created", notification);
+  // O push chega ao sistema operacional mesmo com o app fechado (PWA).
+  safely(sendPushToUser(data.userId, {
+    id: notification.id,
+    type: notification.type,
+    title: notification.title,
+    body: notification.body,
+    contactId: notification.contactId,
+  }));
   return notification;
 }
 

@@ -9,7 +9,9 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import { EvolutionConnectionSettings } from "@/components/chat/evolution-connection-settings";
 import { authClient } from "@/lib/auth-client";
 import { readNotificationPermission } from "@/hooks/use-notifications";
+import { usePushSubscription } from "@/hooks/use-push-subscription";
 import { isNotificationSoundEnabled, playNotificationSound, setNotificationSoundEnabled } from "@/lib/notification-sound";
+import { PWA_ENABLED, removePushSubscription } from "@/lib/pwa";
 import styles from "./account-settings.module.css";
 
 type SettingsUser = {
@@ -175,6 +177,8 @@ function SettingsContent({ user }: { user: SettingsUser }) {
     setSigningOut(true);
     setSignOutError(null);
     try {
+      // Este dispositivo deixa de receber push da conta que está saindo.
+      await removePushSubscription().catch((error) => console.error(error));
       const { error } = await authClient.signOut();
       if (error) throw new Error("sign-out");
       router.replace("/login");
@@ -333,9 +337,16 @@ function NotificationSettings() {
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(readNotificationPermission);
   const [soundEnabled, setSoundEnabled] = useState(isNotificationSoundEnabled);
 
+  async function requestPermission() {
+    if (!("Notification" in window)) return "unsupported" as const;
+    const result = await window.Notification.requestPermission();
+    setPermission(result);
+    return result;
+  }
+  const push = usePushSubscription({ requestPermission });
+
   async function enableDesktop() {
-    if (!("Notification" in window)) return;
-    setPermission(await window.Notification.requestPermission());
+    await requestPermission();
   }
 
   function toggleSound() {
@@ -360,6 +371,26 @@ function NotificationSettings() {
         {permission === "granted" && <span className={styles.badge}>Ativadas</span>}
         {permission === "default" && <button type="button" className={styles.primaryButton} onClick={() => void enableDesktop()}>Ativar notificações</button>}
         {permission === "granted" && <button type="button" className={styles.primaryButton} onClick={sendTest}>Enviar teste</button>}
+      </section>
+      <section className={styles.card}>
+        <h3>Notificações push</h3>
+        <p>Receba as notificações neste dispositivo mesmo com o CotrimBot fechado ou em segundo plano. Instale o app (PWA) para uma experiência melhor no celular.</p>
+        {!PWA_ENABLED && <p>As notificações push ficam disponíveis apenas na versão de produção do app.</p>}
+        {PWA_ENABLED && !push.supported && <p>Este navegador não oferece suporte a notificações push.</p>}
+        {push.error && <p role="alert" className={styles.error}>{push.error}</p>}
+        {push.supported && push.subscribed && <span className={styles.badge}>Ativadas neste dispositivo</span>}
+        {push.supported && permission !== "denied" && (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={push.subscribed}
+            className={styles.primaryButton}
+            disabled={push.loading}
+            onClick={() => void (push.subscribed ? push.unsubscribe() : push.subscribe())}
+          >
+            {push.loading ? "Aguarde..." : push.subscribed ? "Desativar notificações push" : "Ativar notificações push"}
+          </button>
+        )}
       </section>
       <section className={styles.card}>
         <h3>Som</h3>

@@ -15,6 +15,7 @@ import { userRoom } from "./services/notification.service.js";
 
 import { contactRouter } from "./routes/contact.routes.js";
 import { notificationRouter } from "./routes/notification.routes.js";
+import { pushRouter } from "./routes/push.routes.js";
 import { messageRouter } from "./routes/message.routes.js";
 import { transcriptionRouter } from "./routes/transcription.routes.js";
 import webhookRoutes from "./routes/webhook.routes.js";
@@ -47,6 +48,7 @@ app.use("/api", requireAuth, organizationRouter);
 app.use("/api", requireAuth, evolutionRouter);
 app.use("/api", requireAuth, contactRouter);
 app.use("/api", requireAuth, notificationRouter);
+app.use("/api", requireAuth, pushRouter);
 app.use("/api", requireAuth, messageRouter);
 app.use("/api", requireAuth, transcriptionRouter);
 app.use("/api", requireAuth, aiRouter);

@@ -29,13 +29,22 @@ export function useNotifications({ selectedContactId, onOpenContact }: Options) 
   // Os listeners do socket são registrados uma vez; os valores atuais ficam em refs.
   const selectedContactIdRef = useRef(selectedContactId);
   const onOpenContactRef = useRef(onOpenContact);
+  const notificationsRef = useRef(notifications);
   useEffect(() => {
     selectedContactIdRef.current = selectedContactId;
     onOpenContactRef.current = onOpenContact;
+    notificationsRef.current = notifications;
   });
 
   useEffect(() => {
-    getNotifications()
+    // O app aberto por um clique em notificação push chega com ?notificationId=.
+    const openedId = Number(new URLSearchParams(window.location.search).get("notificationId"));
+    const markOpened = Number.isInteger(openedId) && openedId > 0
+      ? markNotificationRead(openedId).catch((error) => console.error(error))
+      : Promise.resolve();
+
+    markOpened
+      .then(() => getNotifications())
       .then((result) => {
         setNotifications(result.notifications);
         setUnreadCount(result.unreadCount);
@@ -84,6 +93,22 @@ export function useNotifications({ selectedContactId, onOpenContact }: Options) 
     return () => {
       socket.off("notification_created", handleCreated);
     };
+  }, [markRead]);
+
+  // Cliques em notificações push (service worker) com o app já aberto abrem a conversa.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    function handleMessage(event: MessageEvent) {
+      const data = event.data as { type?: string; notificationId?: unknown; contactId?: unknown } | null;
+      if (data?.type !== "cotrimbot:notification-click") return;
+      if (typeof data.contactId === "number") onOpenContactRef.current(data.contactId);
+      if (typeof data.notificationId === "number") {
+        const item = notificationsRef.current.find((notification) => notification.id === data.notificationId);
+        if (item && !item.readAt) markRead(item.id);
+      }
+    }
+    navigator.serviceWorker.addEventListener("message", handleMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", handleMessage);
   }, [markRead]);
 
   const requestPermission = useCallback(async () => {

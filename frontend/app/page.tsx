@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ContactSidebar } from "@/components/chat/contact-sidebar";
 import { NotificationsPopover } from "@/components/chat/notifications-popover";
@@ -24,6 +24,19 @@ export default function Home() {
     selectedContactId: chat.selectedContact?.id,
     onOpenContact: openContactById,
   });
+
+  // O app aberto por um clique em notificação push chega com ?contactId=; abre a conversa
+  // assim que os contatos carregarem e limpa a URL.
+  const handledLaunchParamsRef = useRef(false);
+  useEffect(() => {
+    if (handledLaunchParamsRef.current || !chat.contacts.length) return;
+    handledLaunchParamsRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("contactId") && !params.has("notificationId")) return;
+    const contact = chat.contacts.find((item) => item.id === Number(params.get("contactId")));
+    if (contact) chat.selectContact(contact);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [chat]);
   useEffect(() => {
     if (!isPending && !session) {
       router.replace("/login");
