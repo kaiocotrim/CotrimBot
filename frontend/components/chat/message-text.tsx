@@ -24,8 +24,9 @@ function trimUrlPunctuation(value: string) {
   return url;
 }
 
-// Interpreta apenas o prefixo de assinatura enviado pelo backend, sem alterar o texto salvo.
-export function MessageText({ content, showSignature = false, linkify = true, lightBackground = false }: { content: string; showSignature?: boolean; linkify?: boolean; lightBackground?: boolean }) {
+// O prefixo continua salvo e é enviado ao WhatsApp, mas no CotrimBot a foto do
+// atendente identifica a autoria. Por isso, mensagens de saída exibem só o corpo.
+export function MessageText({ content, showSignature = false, linkify = true }: { content: string; showSignature?: boolean; linkify?: boolean }) {
   const signed = showSignature ? splitMessageSignatures(content) : null;
   const body = signed?.body ?? content;
   const parts = [];
@@ -57,11 +58,5 @@ export function MessageText({ content, showSignature = false, linkify = true, li
     offset = match.index + value.length;
   }
 
-  return <>
-    {signed?.signatures.map(({ name, separator }, index) => <Fragment key={index}>
-      <strong className={`rounded-md px-1 py-px font-semibold [box-decoration-break:clone] ${lightBackground ? "bg-zinc-900/10 text-zinc-800" : "bg-white/10 text-zinc-100"}`}><EmojiText content={`${name}:`} /></strong>
-      {separator}
-    </Fragment>)}
-    {parts}<EmojiText content={body.slice(offset)} />
-  </>;
+  return <>{parts}<EmojiText content={body.slice(offset)} /></>;
 }

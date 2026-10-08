@@ -1,6 +1,6 @@
 "use client";
 
-import { Info, UserRoundCheck, UserRoundPlus, UserRoundX } from "lucide-react";
+import { Info, UserRoundCheck, UserRoundPlus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Contact } from "@/types/chat";
 import { Avatar } from "@/components/chat/avatar";
@@ -9,7 +9,7 @@ import styles from "./chat-header.module.css";
 type ChatHeaderProps = {
   contact: Contact;
   currentUserId: string;
-  onSetContactAssignment: (contactId: number, assignedUserId: string | null) => Promise<void>;
+  onSetContactAssignment: (contactId: number, assignedUserIds: string[]) => Promise<void>;
   isTyping: boolean;
   searchOpen: boolean;
   searchQuery: string;
@@ -29,15 +29,20 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
   const searchRef = useRef<HTMLInputElement>(null);
   const [assigning, setAssigning] = useState(false);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
-  const assignedToMe = contact.assignedUserId === currentUserId;
-  const assignedToOther = Boolean(contact.assignedUserId && !assignedToMe);
+  const assignedUserIds = contact.assignedUserIds ?? [];
+  const assignedToMe = assignedUserIds.includes(currentUserId);
 
   async function toggleAssignment() {
-    if (assigning || assignedToOther) return;
+    if (assigning) return;
     setAssigning(true);
     setAssignmentError(null);
     try {
-      await onSetContactAssignment(contact.id, assignedToMe ? null : currentUserId);
+      await onSetContactAssignment(
+        contact.id,
+        assignedToMe
+          ? assignedUserIds.filter((assignedUserId) => assignedUserId !== currentUserId)
+          : [...assignedUserIds, currentUserId],
+      );
     } catch (error) {
       setAssignmentError(error instanceof Error ? error.message : "Não foi possível alterar o responsável.");
     } finally {
@@ -82,12 +87,12 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
             {!contact.isGroup && <button
               type="button"
               onClick={() => void toggleAssignment()}
-              disabled={assigning || assignedToOther}
-              aria-label={assignedToMe ? "Liberar conversa" : assignedToOther ? "Conversa atribuída a outro atendente" : "Assumir conversa"}
-              title={assignedToMe ? "Conversa atribuída a você · clique para liberar" : assignedToOther ? "Conversa atribuída a outro atendente" : "Assumir conversa para aparecer em Minhas"}
-              className={`${actionClass} ${assignedToMe ? "text-emerald-300" : assignedToOther ? "text-zinc-600" : "text-zinc-300"}`}
+              disabled={assigning}
+              aria-label={assignedToMe ? "Deixar de acompanhar conversa" : "Acompanhar conversa"}
+              title={assignedToMe ? "Você acompanha esta conversa · clique para sair" : assignedUserIds.length ? "Acompanhar junto com os outros responsáveis" : "Assumir conversa para aparecer em Minhas"}
+              className={`${actionClass} ${assignedToMe ? "text-emerald-300" : "text-zinc-300"}`}
             >
-              {assignedToMe ? <UserRoundCheck className="size-5" aria-hidden="true" /> : assignedToOther ? <UserRoundX className="size-5" aria-hidden="true" /> : <UserRoundPlus className="size-5" aria-hidden="true" />}
+              {assignedToMe ? <UserRoundCheck className="size-5" aria-hidden="true" /> : <UserRoundPlus className="size-5" aria-hidden="true" />}
             </button>}
             <button type="button" onClick={onOpenSearch} aria-label="Localizar mensagens" title="Localizar mensagens" className={actionClass}><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg></button>
             <button

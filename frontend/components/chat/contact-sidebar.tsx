@@ -55,7 +55,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
     return contacts.filter((contact) => {
       if (contact.archived !== showArchived) return false;
       if (contact.isGroup !== (conversationFilter === "groups")) return false;
-      if (conversationFilter === "mine" && contact.assignedUserId !== userId) return false;
+      if (conversationFilter === "mine" && !contact.assignedUserIds?.includes(userId)) return false;
       if (!search) return true;
       return contact.name.toLocaleLowerCase("pt-BR").includes(search)
         || contact.phone.includes(search)

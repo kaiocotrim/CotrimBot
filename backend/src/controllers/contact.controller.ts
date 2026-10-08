@@ -12,6 +12,7 @@ export async function getContacts(req: Request, res: Response) {
   const userId = req.user?.id;
   const contacts = await prisma.contact.findMany({
     include: {
+      assignments: { select: { userId: true } },
       // Traz somente a mensagem mais recente de cada contato
       messages: {
         ...(userId ? { where: { deletions: { none: { userId } } } } : {}),
@@ -38,8 +39,9 @@ export async function getContacts(req: Request, res: Response) {
 
   // Adiciona a contagem de mensagens não lidas e ordena os contatos pela data da última mensagem
   const result = contacts
-    .map(({ _count, ...contact }) => ({
+    .map(({ _count, assignments, ...contact }) => ({
       ...contact,
+      assignedUserIds: assignments.map((assignment) => assignment.userId),
       unreadCount: _count.messages,
     }))
     .sort((a, b) => {
@@ -63,13 +65,15 @@ export async function getContactById(req: Request, res: Response) {
 
   const contact = await prisma.contact.findUnique({
     where: { id },
+    include: { assignments: { select: { userId: true } } },
   });
 
   if (!contact) {
     return res.status(404).json({ message: "Contato não encontrado" });
   }
 
-  res.json(contact);
+  const { assignments, ...result } = contact;
+  res.json({ ...result, assignedUserIds: assignments.map((assignment) => assignment.userId) });
 }
 
 // GET /contacts/:id/avatar - Busca a foto do contato na Evolution API
@@ -166,7 +170,7 @@ export async function createContact(req: Request, res: Response) {
     },
   });
 
-  res.status(201).json(newContact);
+  res.status(201).json({ ...newContact, assignedUserIds: [] });
 }
 
 // PATCH /contacts/:id - Atualiza um contato especifico pelo ID
@@ -244,28 +248,47 @@ export async function getContactAssignees(req: Request, res: Response) {
 export async function setContactAssignment(req: Request, res: Response) {
   const id = Number(req.params.id);
   const userId = req.user?.id;
-  const requestedUserId = req.body?.assignedUserId;
-  const legacyAssigned = req.body?.assigned;
-  const assigneeId = requestedUserId === undefined && typeof legacyAssigned === "boolean"
-    ? legacyAssigned ? userId : null
-    : requestedUserId;
-  if (!Number.isInteger(id) || id <= 0 || !userId || (assigneeId !== null && (typeof assigneeId !== "string" || !assigneeId.trim()))) {
+  const requestedUserIds = req.body?.assignedUserIds;
+  if (!Number.isInteger(id) || id <= 0 || !userId || !Array.isArray(requestedUserIds)
+    || requestedUserIds.some((value) => typeof value !== "string" || !value.trim())) {
     return res.status(400).json({ message: "Dados de atribuição inválidos" });
   }
+  const assigneeIds = [...new Set(requestedUserIds.map((value: string) => value.trim()))];
 
-  if (assigneeId) {
-    const target = await prisma.user.findUnique({ where: { id: assigneeId }, select: { id: true } });
-    if (!target) return res.status(400).json({ message: "Usuário não encontrado" });
+  if (assigneeIds.length) {
+    const users = await prisma.user.findMany({ where: { id: { in: assigneeIds } }, select: { id: true } });
+    if (users.length !== assigneeIds.length) return res.status(400).json({ message: "Um ou mais usuários não foram encontrados" });
   }
 
-  const contact = await prisma.contact.findUnique({ where: { id } });
+  const contact = await prisma.contact.findUnique({
+    where: { id },
+    include: { assignments: { select: { userId: true } } },
+  });
   if (!contact) return res.status(404).json({ message: "Contato não encontrado" });
   if (contact.isGroup) return res.status(400).json({ message: "Grupos não podem ser atribuídos" });
-  if (contact.assignedUserId === assigneeId) return res.json(contact);
+  const currentIds = contact.assignments.map((assignment) => assignment.userId).sort();
+  const nextIds = [...assigneeIds].sort();
+  if (currentIds.length === nextIds.length && currentIds.every((value, index) => value === nextIds[index])) {
+    const { assignments, ...unchanged } = contact;
+    return res.json({ ...unchanged, assignedUserIds: assignments.map((assignment) => assignment.userId) });
+  }
 
-  const updated = await prisma.contact.update({ where: { id }, data: { assignedUserId: assigneeId } });
-  getSocketServer().emit("contact_updated", updated);
-  return res.json(updated);
+  const updated = await prisma.$transaction(async (transaction) => {
+    await transaction.contactAssignment.deleteMany({ where: { contactId: id } });
+    if (assigneeIds.length) {
+      await transaction.contactAssignment.createMany({
+        data: assigneeIds.map((assignedUserId) => ({ contactId: id, userId: assignedUserId })),
+      });
+    }
+    return transaction.contact.findUniqueOrThrow({
+      where: { id },
+      include: { assignments: { select: { userId: true } } },
+    });
+  });
+  const { assignments, ...updatedContact } = updated;
+  const response = { ...updatedContact, assignedUserIds: assignments.map((assignment) => assignment.userId) };
+  getSocketServer().emit("contact_updated", response);
+  return res.json(response);
 }
 
 export async function setContactPriority(req: Request, res: Response) {

@@ -42,7 +42,7 @@ type ChatPanelProps = {
 
   onCloseWithBot: () => void;
   onRenameContact: (contactId: number, name: string) => Promise<void>;
-  onSetContactAssignment: (contactId: number, assignedUserId: string | null) => Promise<void>;
+  onSetContactAssignment: (contactId: number, assignedUserIds: string[]) => Promise<void>;
   onSetContactPriority: (contactId: number, priority: NonNullable<Contact["priority"]>) => Promise<void>;
 };
 

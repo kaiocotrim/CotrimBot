@@ -25,11 +25,20 @@ model Contact {
   advancedPrivacy   Boolean   @default(false)
   chatTheme         String    @default("default") @db.VarChar(32)
   listName          String?   @db.VarChar(64)
-  assignedUserId    String?
-  assignedUser      User?     @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+  assignments       ContactAssignment[]
   messages          Message[]
 
-  @@index([assignedUserId])
+}
+
+model ContactAssignment {
+  contactId  Int
+  userId     String
+  assignedAt DateTime @default(now())
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([contactId, userId])
+  @@index([userId])
 }
 
 model Message {
@@ -129,7 +138,7 @@ model User {
   invitations Invitation[]
   messageDeletions MessageDeletion[]
   sentMessages     Message[]
-  assignedContacts Contact[]
+  contactAssignments ContactAssignment[]
 }
 
 model Session {

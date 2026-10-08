@@ -19,6 +19,7 @@ import {
 } from "@phosphor-icons/react";
 import { AudioMessage } from "@/components/chat/audio-message";
 import { DocumentMessage } from "@/components/chat/document-message";
+import { DeleteMessageAnimation } from "@/components/chat/delete-message-animation";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { ImageMessage } from "@/components/chat/image-message";
 import { MessageText } from "@/components/chat/message-text";
@@ -494,25 +495,34 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
           if (!open) setActionError(null);
         }}>
           <Dialog.Portal>
-            <Dialog.Backdrop className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-[2px]" />
+            <Dialog.Backdrop className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-md transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
             <div className="pointer-events-none fixed inset-0 z-[201] flex items-center justify-center p-4">
-              <Dialog.Popup className="pointer-events-auto w-full max-w-[300px] rounded-xl bg-zinc-900 p-4 text-zinc-100 shadow-[0_18px_50px_rgba(0,0,0,0.45)] outline-none">
-                <Dialog.Title className="px-2 text-sm font-semibold">Apagar mensagem</Dialog.Title>
-                <Dialog.Description className="sr-only">Escolha se a mensagem será apagada apenas para você ou para todos.</Dialog.Description>
-                <div className="mt-3 space-y-0.5">
-                  <button type="button" disabled={deleting} onClick={() => void deleteSelected("me")} className="block w-full rounded-lg px-3 py-2 text-left text-[13px] text-zinc-200 transition-colors hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-white/60 disabled:opacity-50">
-                    Apagar para mim
+              <Dialog.Popup className="pointer-events-auto w-full max-w-[380px] overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-b from-zinc-900 to-[#111113] p-5 text-zinc-100 shadow-[0_28px_90px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition-[opacity,transform] duration-200 data-[ending-style]:translate-y-2 data-[ending-style]:scale-[0.97] data-[ending-style]:opacity-0 data-[starting-style]:translate-y-3 data-[starting-style]:scale-[0.96] data-[starting-style]:opacity-0">
+                <div className="flex flex-col items-center text-center">
+                  <div className="flex h-24 items-center justify-center">
+                    <DeleteMessageAnimation />
+                  </div>
+                  <Dialog.Title className="mt-2 text-lg font-semibold tracking-[-0.01em]">Apagar mensagem?</Dialog.Title>
+                  <Dialog.Description className="mt-1 max-w-[290px] text-xs leading-5 text-zinc-400">
+                    Escolha onde esta mensagem deve ser removida. Essa ação não poderá ser desfeita.
+                  </Dialog.Description>
+                </div>
+                <div className="mt-5 space-y-2">
+                  <button type="button" disabled={deleting} onClick={() => void deleteSelected("me")} className="group flex w-full items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3.5 py-3 text-left transition-[background-color,border-color,transform] hover:border-white/[0.14] hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 active:scale-[0.985] disabled:pointer-events-none disabled:opacity-50">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-zinc-300"><Trash size={17} weight="regular" aria-hidden="true" /></span>
+                    <span><strong className="block text-[13px] font-medium text-zinc-100">Apagar para mim</strong><span className="mt-0.5 block text-[11px] text-zinc-500">Remove somente do seu histórico</span></span>
                   </button>
                   {!message.deletedAt && (
-                    <button type="button" disabled={deleting} onClick={() => void deleteSelected("everyone")} className="block w-full rounded-lg px-3 py-2 text-left text-[13px] text-red-300 transition-colors hover:bg-red-400/10 focus-visible:outline-2 focus-visible:outline-red-300 disabled:opacity-50">
-                      Apagar para todos
+                    <button type="button" disabled={deleting} onClick={() => void deleteSelected("everyone")} className="group flex w-full items-center gap-3 rounded-2xl border border-red-400/15 bg-red-500/[0.055] px-3.5 py-3 text-left transition-[background-color,border-color,transform] hover:border-red-400/30 hover:bg-red-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-300/70 active:scale-[0.985] disabled:pointer-events-none disabled:opacity-50">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-300"><Trash size={17} weight="fill" aria-hidden="true" /></span>
+                      <span><strong className="block text-[13px] font-medium text-red-200">Apagar para todos</strong><span className="mt-0.5 block text-[11px] text-red-200/45">Tenta remover também no WhatsApp</span></span>
                     </button>
                   )}
                 </div>
-                {deleting && <p role="status" className="mt-2 px-2 text-xs text-zinc-400">Apagando…</p>}
-                {actionError && <p role="alert" className="mt-2 px-2 text-xs text-red-300">{actionError}</p>}
-                <div className="mt-2 flex justify-end">
-                  <Dialog.Close autoFocus disabled={deleting} className="rounded-lg px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-white/60 disabled:opacity-50">Cancelar</Dialog.Close>
+                {deleting && <p role="status" className="mt-3 text-center text-xs text-zinc-400">Apagando mensagem…</p>}
+                {actionError && <p role="alert" className="mt-3 rounded-xl border border-red-400/15 bg-red-500/[0.06] px-3 py-2 text-center text-xs text-red-300">{actionError}</p>}
+                <div className="mt-3 flex justify-center">
+                  <Dialog.Close autoFocus disabled={deleting} className="rounded-full px-5 py-2 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 disabled:opacity-50">Cancelar</Dialog.Close>
                 </div>
               </Dialog.Popup>
             </div>
@@ -534,7 +544,7 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
               <span className={`block truncate text-[11px] font-semibold ${isPrivate ? "text-zinc-700" : "text-emerald-200"}`}>
                 {message.quotedSenderName || "Mensagem"}
               </span>
-              <span className={`block truncate text-xs ${isPrivate ? "text-zinc-600" : "text-white/75"}`}><MessageText content={message.quotedContent} showSignature={showQuotedSignature} linkify={false} lightBackground={isPrivate} /></span>
+              <span className={`block truncate text-xs ${isPrivate ? "text-zinc-600" : "text-white/75"}`}><MessageText content={message.quotedContent} showSignature={showQuotedSignature} linkify={false} /></span>
             </span>
           </span>
         </button>

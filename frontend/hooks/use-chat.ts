@@ -633,13 +633,13 @@ export function useChat() {
     );
   }
 
-  async function setContactAssignment(contactId: number, assignedUserId: string | null) {
-    const updated = await setContactAssignmentRequest(contactId, assignedUserId);
+  async function setContactAssignment(contactId: number, assignedUserIds: string[]) {
+    const updated = await setContactAssignmentRequest(contactId, assignedUserIds);
     setContacts((current) => current.map((contact) =>
-      contact.id === updated.id ? { ...contact, assignedUserId: updated.assignedUserId } : contact
+      contact.id === updated.id ? { ...contact, assignedUserIds: updated.assignedUserIds } : contact
     ));
     setSelectedContact((current) =>
-      current?.id === updated.id ? { ...current, assignedUserId: updated.assignedUserId } : current
+      current?.id === updated.id ? { ...current, assignedUserIds: updated.assignedUserIds } : current
     );
   }
 

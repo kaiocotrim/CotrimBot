@@ -38,7 +38,7 @@ export function ContactInfoPanel({
   onClose: () => void;
   onSearch: () => void;
   onRenameContact: (contactId: number, name: string) => Promise<void>;
-  onSetContactAssignment: (contactId: number, assignedUserId: string | null) => Promise<void>;
+  onSetContactAssignment: (contactId: number, assignedUserIds: string[]) => Promise<void>;
   onSetContactPriority: (contactId: number, priority: NonNullable<Contact["priority"]>) => Promise<void>;
 }) {
   const reduceMotion = useReducedMotion();
@@ -56,7 +56,13 @@ export function ContactInfoPanel({
   const [priorityError, setPriorityError] = useState<string | null>(null);
   const assigneeMenuRef = useRef<HTMLDivElement>(null);
   const assigneeTriggerRef = useRef<HTMLButtonElement>(null);
-  const selectedAssignee = assignees.find((user) => user.id === contact.assignedUserId);
+  const assignedUserIds = contact.assignedUserIds ?? [];
+  const selectedAssignees = assignees.filter((user) => assignedUserIds.includes(user.id));
+  const assigneeSummary = selectedAssignees.length === 0
+    ? "Não atribuído"
+    : selectedAssignees.length <= 2
+      ? selectedAssignees.map((user) => user.name).join(" e ")
+      : `${selectedAssignees[0]?.name}, ${selectedAssignees[1]?.name} e mais ${selectedAssignees.length - 2}`;
 
   useEffect(() => {
     if (contact.isGroup) return;
@@ -95,18 +101,25 @@ export function ContactInfoPanel({
     };
   }, [assigneeOpen]);
 
-  async function changeAssignee(assignedUserId: string | null) {
+  async function changeAssignees(nextAssignedUserIds: string[]) {
     if (assignmentSaving) return;
-    setAssigneeOpen(false);
     setAssignmentSaving(true);
     setAssignmentError(null);
     try {
-      await onSetContactAssignment(contact.id, assignedUserId);
+      await onSetContactAssignment(contact.id, nextAssignedUserIds);
     } catch (requestError) {
       setAssignmentError(requestError instanceof Error ? requestError.message : "Não foi possível atribuir a conversa.");
     } finally {
       setAssignmentSaving(false);
     }
+  }
+
+  function toggleAssignee(assignedUserId: string) {
+    void changeAssignees(
+      assignedUserIds.includes(assignedUserId)
+        ? assignedUserIds.filter((userId) => userId !== assignedUserId)
+        : [...assignedUserIds, assignedUserId],
+    );
   }
 
   async function changePriority(priority: NonNullable<Contact["priority"]>) {
@@ -247,26 +260,30 @@ export function ContactInfoPanel({
             <dd className="mt-1 break-words text-sm text-white">{contact.phone}</dd>
           </div>
           {!contact.isGroup && <div>
-            <dt className="text-xs text-zinc-400">Atribuído</dt>
+            <dt className="text-xs text-zinc-400">Responsáveis</dt>
             <dd className="mt-1">
               <button
                 ref={assigneeTriggerRef}
                 type="button"
-                aria-label={`Atribuído: ${selectedAssignee?.name ?? (contact.assignedUserId ? "Usuário indisponível" : "Não atribuído")}`}
+                aria-label={`Responsáveis: ${assigneeSummary}`}
                 aria-haspopup="menu"
                 aria-expanded={assigneeOpen}
                 disabled={assigneesLoading || assignmentSaving || Boolean(assignmentError && assignees.length === 0)}
                 onClick={() => setAssigneeOpen((open) => !open)}
                 className="flex min-h-11 w-full items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-left text-sm text-zinc-100 transition-colors hover:bg-white/[0.075] focus-visible:outline-2 focus-visible:outline-white/40 disabled:opacity-60"
               >
-                <UserAvatar name={selectedAssignee?.name ?? ""} image={selectedAssignee?.image} />
-                <span className="min-w-0 flex-1 truncate">{assigneesLoading ? "Carregando usuários..." : selectedAssignee?.name ?? (contact.assignedUserId ? "Usuário indisponível" : "Não atribuído")}</span>
+                {selectedAssignees.length ? (
+                  <span aria-hidden="true" className="flex shrink-0 -space-x-2">
+                    {selectedAssignees.slice(0, 3).map((user) => <UserAvatar key={user.id} name={user.name} image={user.image} />)}
+                  </span>
+                ) : <UserAvatar name="" />}
+                <span className="min-w-0 flex-1 truncate">{assigneesLoading ? "Carregando usuários..." : assigneeSummary}</span>
                 <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-zinc-500 transition-transform ${assigneeOpen ? "rotate-180" : ""}`} />
               </button>
               {assigneeOpen && <div
                 ref={assigneeMenuRef}
                 role="menu"
-                aria-label="Escolher responsável"
+                aria-label="Escolher responsáveis"
                 onKeyDown={(event) => {
                   if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
                   event.preventDefault();
@@ -277,18 +294,18 @@ export function ContactInfoPanel({
                 }}
                 className="mt-2 max-h-60 space-y-0.5 overflow-y-auto rounded-2xl border border-white/10 bg-zinc-900 p-1.5 shadow-[0_14px_36px_rgba(0,0,0,0.35)]"
               >
-                <button type="button" role="menuitemradio" aria-checked={!contact.assignedUserId} onClick={() => void changeAssignee(null)} className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.08] focus-visible:outline-none">
+                <button type="button" role="menuitemcheckbox" aria-checked={assignedUserIds.length === 0} onClick={() => void changeAssignees([])} className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.08] focus-visible:outline-none">
                   <UserAvatar name="" />
                   <span className="min-w-0 flex-1 truncate">Não atribuído</span>
-                  {!contact.assignedUserId && <Check aria-hidden="true" className="size-4 text-emerald-400" />}
+                  {assignedUserIds.length === 0 && <Check aria-hidden="true" className="size-4 text-emerald-400" />}
                 </button>
-                {assignees.map((user) => <button key={user.id} type="button" role="menuitemradio" aria-checked={contact.assignedUserId === user.id} onClick={() => void changeAssignee(user.id)} className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.08] focus-visible:outline-none">
+                {assignees.map((user) => <button key={user.id} type="button" role="menuitemcheckbox" aria-checked={assignedUserIds.includes(user.id)} onClick={() => toggleAssignee(user.id)} className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.08] focus-visible:outline-none">
                   <UserAvatar name={user.name} image={user.image} />
                   <span className="min-w-0 flex-1 truncate">{user.name}</span>
-                  {contact.assignedUserId === user.id && <Check aria-hidden="true" className="size-4 text-emerald-400" />}
+                  {assignedUserIds.includes(user.id) && <Check aria-hidden="true" className="size-4 text-emerald-400" />}
                 </button>)}
               </div>}
-              {assignmentSaving && <p role="status" className="mt-1 text-xs text-zinc-400">Salvando responsável...</p>}
+              {assignmentSaving && <p role="status" className="mt-1 text-xs text-zinc-400">Salvando responsáveis...</p>}
               {assignmentError && <p role="alert" className="mt-1 text-xs text-red-300">{assignmentError}</p>}
             </dd>
           </div>}

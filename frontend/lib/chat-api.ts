@@ -30,11 +30,11 @@ export async function getContactAssignees(): Promise<ContactAssignee[]> {
   return parseResponse<ContactAssignee[]>(response, "Não foi possível buscar os usuários");
 }
 
-export async function setContactAssignment(contactId: number, assignedUserId: string | null): Promise<Contact> {
+export async function setContactAssignment(contactId: number, assignedUserIds: string[]): Promise<Contact> {
   const response = await fetch(`${API_URL}/contacts/${contactId}/assignment`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ assignedUserId }),
+    body: JSON.stringify({ assignedUserIds }),
     credentials: "include",
   });
   return parseResponse<Contact>(response, "Não foi possível alterar o responsável pela conversa");
