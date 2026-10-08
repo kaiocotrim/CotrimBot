@@ -9,7 +9,8 @@
     "start": "node dist/src/server.js",
     "prisma:generate": "prisma generate --config prisma.config.ts",
     "prisma:migrate": "prisma migrate dev --config prisma.config.ts",
-    "prisma:seed": "tsx prisma/seed.ts"
+    "prisma:seed": "tsx prisma/seed.ts",
+    "push:generate-vapid-keys": "tsx scripts/generate-vapid-keys.ts"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -17,6 +18,7 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^26.5.1",
     "@types/nodemailer": "^8.0.2",
+    "@types/web-push": "^3.6.4",
     "prisma": "^7.10.0",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
@@ -31,6 +33,7 @@
     "lucide-react": "^1.48.0",
     "multer": "^2.4.0",
     "nodemailer": "^10.0.12",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "web-push": "^3.6.7"
   }
 }

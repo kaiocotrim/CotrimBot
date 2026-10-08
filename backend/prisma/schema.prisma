@@ -47,6 +47,19 @@ model Notification {
   @@index([userId, createdAt])
 }
 
+// Assinaturas Web Push (PWA) de cada navegador/dispositivo do usuário.
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  endpoint  String   @unique @db.VarChar(512)
+  p256dh    String   @db.VarChar(255)
+  auth      String   @db.VarChar(255)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 model ContactAssignment {
   contactId  Int
   userId     String
@@ -157,6 +170,7 @@ model User {
   sentMessages     Message[]
   contactAssignments ContactAssignment[]
   notifications      Notification[]
+  pushSubscriptions  PushSubscription[]
 }
 
 model Session {
