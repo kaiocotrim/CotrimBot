@@ -27,7 +27,24 @@ model Contact {
   listName          String?   @db.VarChar(64)
   assignments       ContactAssignment[]
   messages          Message[]
+  notifications     Notification[]
 
+}
+
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    String
+  type      String    @db.VarChar(32)
+  title     String
+  body      String    @db.Text
+  contactId Int?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contact   Contact?  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
 }
 
 model ContactAssignment {
@@ -139,6 +156,7 @@ model User {
   messageDeletions MessageDeletion[]
   sentMessages     Message[]
   contactAssignments ContactAssignment[]
+  notifications      Notification[]
 }
 
 model Session {

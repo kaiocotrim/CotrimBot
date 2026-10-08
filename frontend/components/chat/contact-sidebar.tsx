@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { Avatar } from "@/components/chat/avatar";
 import { AccountSettings } from "@/components/chat/account-settings";
 import { MessageText } from "@/components/chat/message-text";
@@ -10,7 +10,7 @@ import { useSession } from "@/lib/auth-client";
 import { getMessages } from "@/lib/chat-api";
 import type { Contact, Message } from "@/types/chat";
 
-type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void };
+type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; headerActions?: ReactNode };
 type ConversationFilter = "conversations" | "groups" | "mine";
 const PREVIEW_HOLD_DURATION = 1_000;
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
@@ -31,7 +31,7 @@ function formatSidebarDate(value: string) {
   return dateFormatter.format(date);
 }
 
-export function ContactSidebar({ userId, contacts, loading, error, selectedContactId, onSelectContact }: ContactSidebarProps) {
+export function ContactSidebar({ userId, contacts, loading, error, selectedContactId, onSelectContact, headerActions }: ContactSidebarProps) {
   const { data: session } = useSession();
   const userImage = session?.user?.image;
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
@@ -230,6 +230,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
               </AccountSettings>
             )}
             <div className="flex items-center gap-1.5">
+              {headerActions}
               <button
                 type="button"
                 aria-label="Nova conversa"

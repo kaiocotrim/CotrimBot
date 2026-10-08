@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
+import { notifyIncomingMessage } from "../services/notification.service.js";
 import { getGroupInfo, getMediaMessage } from "../services/evolution.service.js";
 import {
   findReplyContextInfo,
@@ -525,6 +526,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
     message: incomingMessage,
     contact,
   });
+  if (!contact.isGroup && !fromMe) notifyIncomingMessage(contact, incomingMessage);
   for (const reply of waitingReplies) {
     io.emit("message_reply_resolved", { messageId: reply.id, quotedMessageId: incomingMessage.id });
   }

@@ -4,15 +4,17 @@ import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "path";
-import { toNodeHandler } from "better-auth/node";
+import { toNodeHandler, fromNodeHeaders } from "better-auth/node";
 
 import { setSocketServer } from "./lib/socket.js";
 import { prisma } from "./lib/prisma.js";
 import { auth } from "./lib/auth.js";
 import { requireAuth } from "./middlewares/auth.middleware.js";
 import { getAllGroups } from "./services/evolution.service.js";
+import { userRoom } from "./services/notification.service.js";
 
 import { contactRouter } from "./routes/contact.routes.js";
+import { notificationRouter } from "./routes/notification.routes.js";
 import { messageRouter } from "./routes/message.routes.js";
 import { transcriptionRouter } from "./routes/transcription.routes.js";
 import webhookRoutes from "./routes/webhook.routes.js";
@@ -44,6 +46,7 @@ app.use("/api", invitationRouter);
 app.use("/api", requireAuth, organizationRouter);
 app.use("/api", requireAuth, evolutionRouter);
 app.use("/api", requireAuth, contactRouter);
+app.use("/api", requireAuth, notificationRouter);
 app.use("/api", requireAuth, messageRouter);
 app.use("/api", requireAuth, transcriptionRouter);
 app.use("/api", requireAuth, aiRouter);
@@ -59,8 +62,22 @@ const httpServer = createServer(app);
 // usando o mesmo servidor HTTP do Express.
 export const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: process.env.FRONTEND_URL ?? "http://localhost:3000",
+    credentials: true,
   },
+});
+
+// Identifica o usuário pelo cookie de sessão para entregar notificações só a ele.
+io.use(async (socket, next) => {
+  try {
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(socket.handshake.headers),
+    });
+    if (session) socket.data.userId = session.user.id;
+  } catch (error) {
+    console.error("Erro ao autenticar o WebSocket:", error);
+  }
+  next();
 });
 
 // Disponibiliza essa instância do Socket.IO
@@ -69,6 +86,8 @@ setSocketServer(io);
 
 // Detecta quando um frontend se conecta.
 io.on("connection", (socket) => {
+  if (socket.data.userId) void socket.join(userRoom(socket.data.userId));
+
   console.log(
     "Cliente conectado ao WebSocket:",
     socket.id

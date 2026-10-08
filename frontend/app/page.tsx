@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ContactSidebar } from "@/components/chat/contact-sidebar";
+import { NotificationsPopover } from "@/components/chat/notifications-popover";
 import { useChat } from "@/hooks/use-chat";
+import { useNotifications } from "@/hooks/use-notifications";
 import { useSession } from "@/lib/auth-client";
 
 // A página apenas conecta o estado da conversa aos componentes visuais.
@@ -13,6 +15,15 @@ export default function Home() {
   const { data: session, isPending } = useSession();
   const chat = useChat();
 
+  function openContactById(contactId: number) {
+    const contact = chat.contacts.find((item) => item.id === contactId);
+    if (contact) chat.selectContact(contact);
+  }
+
+  const notifications = useNotifications({
+    selectedContactId: chat.selectedContact?.id,
+    onOpenContact: openContactById,
+  });
   useEffect(() => {
     if (!isPending && !session) {
       router.replace("/login");
@@ -36,6 +47,20 @@ export default function Home() {
         error={chat.contactsError}
         selectedContactId={chat.selectedContact?.id}
         onSelectContact={chat.selectContact}
+        headerActions={
+          <NotificationsPopover
+            notifications={notifications.notifications}
+            unreadCount={notifications.unreadCount}
+            permission={notifications.permission}
+            onRequestPermission={() => void notifications.requestPermission()}
+            onMarkAllRead={notifications.markAllRead}
+            onClear={notifications.clearAll}
+            onOpenNotification={(notification) => {
+              if (!notification.readAt) notifications.markRead(notification.id);
+              if (notification.contactId) openContactById(notification.contactId);
+            }}
+          />
+        }
       />
 
       <ChatPanel

@@ -8,6 +8,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { EvolutionConnectionSettings } from "@/components/chat/evolution-connection-settings";
 import { authClient } from "@/lib/auth-client";
+import { readNotificationPermission } from "@/hooks/use-notifications";
+import { isNotificationSoundEnabled, playNotificationSound, setNotificationSoundEnabled } from "@/lib/notification-sound";
 import styles from "./account-settings.module.css";
 
 type SettingsUser = {
@@ -304,11 +306,7 @@ function SettingsContent({ user }: { user: SettingsUser }) {
           </Tabs.Panel>
 
           <Tabs.Panel value="notifications" className={styles.panel}>
-            <section className={styles.card}>
-              <h3>Notificações</h3>
-              <p>Suas mensagens e os indicadores de conversas não lidas continuam disponíveis no chat. As preferências de notificações ainda não estão disponíveis.</p>
-              <span className={styles.badge}>Em breve</span>
-            </section>
+            <NotificationSettings />
           </Tabs.Panel>
 
           <Tabs.Panel value="pro" className={styles.panel}>
@@ -328,6 +326,49 @@ function SettingsContent({ user }: { user: SettingsUser }) {
         </div>
       </div>
     </Tabs.Root>
+  );
+}
+
+function NotificationSettings() {
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(readNotificationPermission);
+  const [soundEnabled, setSoundEnabled] = useState(isNotificationSoundEnabled);
+
+  async function enableDesktop() {
+    if (!("Notification" in window)) return;
+    setPermission(await window.Notification.requestPermission());
+  }
+
+  function toggleSound() {
+    const next = !soundEnabled;
+    setNotificationSoundEnabled(next);
+    setSoundEnabled(next);
+    if (next) playNotificationSound();
+  }
+
+  function sendTest() {
+    new window.Notification("CotrimBot", { body: "As notificações do sistema estão funcionando.", icon: "/favicon.ico" });
+    if (soundEnabled) playNotificationSound();
+  }
+
+  return (
+    <>
+      <section className={styles.card}>
+        <h3>Notificações do sistema</h3>
+        <p>Receba um aviso no sistema operacional quando uma conversa for atribuída a você ou uma conversa sua receber mensagem.</p>
+        {permission === "unsupported" && <p>Este navegador não oferece suporte a notificações.</p>}
+        {permission === "denied" && <p role="alert" className={styles.error}>As notificações estão bloqueadas. Libere-as nas configurações do site no navegador.</p>}
+        {permission === "granted" && <span className={styles.badge}>Ativadas</span>}
+        {permission === "default" && <button type="button" className={styles.primaryButton} onClick={() => void enableDesktop()}>Ativar notificações</button>}
+        {permission === "granted" && <button type="button" className={styles.primaryButton} onClick={sendTest}>Enviar teste</button>}
+      </section>
+      <section className={styles.card}>
+        <h3>Som</h3>
+        <p>Toca um aviso sonoro ao receber uma nova notificação.</p>
+        <button type="button" role="switch" aria-checked={soundEnabled} className={styles.primaryButton} onClick={toggleSound}>
+          {soundEnabled ? "Desativar som" : "Ativar som"}
+        </button>
+      </section>
+    </>
   );
 }
 

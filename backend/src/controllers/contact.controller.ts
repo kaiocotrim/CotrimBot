@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
+import { notifyAssignment } from "../services/notification.service.js";
 import {
   archiveWhatsAppChat,
   getProfilePicture,
@@ -288,6 +289,11 @@ export async function setContactAssignment(req: Request, res: Response) {
   const { assignments, ...updatedContact } = updated;
   const response = { ...updatedContact, assignedUserIds: assignments.map((assignment) => assignment.userId) };
   getSocketServer().emit("contact_updated", response);
+  notifyAssignment(
+    contact,
+    assigneeIds.filter((assigneeId) => !currentIds.includes(assigneeId)),
+    { id: userId, name: req.user!.name },
+  );
   return res.json(response);
 }
 
