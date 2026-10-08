@@ -4,9 +4,11 @@ import { prisma } from "../lib/prisma.js";
 // GET /notifications - Últimas notificações do usuário e total de não lidas
 export async function getNotifications(req: Request, res: Response) {
   const userId = req.user!.id;
+  // Registros antigos de mensagem não aparecem mais; mensagens agora são só push.
+  const where = { userId, type: { not: "NEW_MESSAGE" as const } };
   const [notifications, unreadCount] = await Promise.all([
-    prisma.notification.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 50 }),
-    prisma.notification.count({ where: { userId, readAt: null } }),
+    prisma.notification.findMany({ where, orderBy: { createdAt: "desc" }, take: 50 }),
+    prisma.notification.count({ where: { ...where, readAt: null } }),
   ]);
   return res.json({ notifications, unreadCount });
 }

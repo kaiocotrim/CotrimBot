@@ -9,6 +9,7 @@
     "start": "node dist/src/server.js",
     "prisma:generate": "prisma generate --config prisma.config.ts",
     "prisma:migrate": "prisma migrate dev --config prisma.config.ts",
+    "prisma:deploy": "prisma migrate deploy --config prisma.config.ts",
     "prisma:seed": "tsx prisma/seed.ts",
     "push:generate-vapid-keys": "tsx scripts/generate-vapid-keys.ts"
   },

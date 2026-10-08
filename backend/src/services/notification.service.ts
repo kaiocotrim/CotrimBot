@@ -10,7 +10,7 @@ export function userRoom(userId: string) {
 
 type NewNotification = {
   userId: string;
-  type: NotificationType;
+  type: "CONVERSATION_ASSIGNED";
   title: string;
   body: string;
   contactId?: number;
@@ -65,8 +65,9 @@ export function notifyIncomingMessage(
 
     const preview = message.content.trim() || `[${message.type.toLowerCase()}]`;
     const body = preview.length > 140 ? `${preview.slice(0, 137)}...` : preview;
-    await Promise.all(assignments.map(({ userId }) => createNotification({
-      userId,
+    // Mensagens são apenas push: não entram na central de notificações.
+    await Promise.all(assignments.map(({ userId }) => sendPushToUser(userId, {
+      id: null,
       type: "NEW_MESSAGE",
       title: contact.name,
       body,

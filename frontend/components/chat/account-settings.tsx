@@ -346,7 +346,8 @@ function NotificationSettings() {
   const push = usePushSubscription({ requestPermission });
 
   async function enableDesktop() {
-    await requestPermission();
+    if (push.supported) await push.subscribe();
+    else await requestPermission();
   }
 
   function toggleSound() {

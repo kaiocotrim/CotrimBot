@@ -1,4 +1,4 @@
-import { unsubscribeFromPush } from "@/lib/push-api";
+import { getPushPublicKey, subscribeToPush, unsubscribeFromPush } from "@/lib/push-api";
 
 // Em desenvolvimento o service worker atrapalharia o recarregamento do Next com o cache.
 export const PWA_ENABLED = process.env.NODE_ENV === "production";
@@ -29,6 +29,19 @@ export function urlBase64ToUint8Array(base64String: string) {
   const output = new Uint8Array(new ArrayBuffer(raw.length));
   for (let index = 0; index < raw.length; index += 1) output[index] = raw.charCodeAt(index);
   return output;
+}
+
+// Cria (se preciso) a assinatura push do navegador e a salva para o usuário atual.
+export async function ensurePushSubscription() {
+  if (!isPushSupported() || window.Notification.permission !== "granted") return false;
+  const registration = await getServiceWorkerRegistration();
+  const subscription = (await registration.pushManager.getSubscription())
+    ?? await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(await getPushPublicKey()),
+    });
+  await subscribeToPush(subscription.toJSON());
+  return true;
 }
 
 // Usado ao sair da conta: este dispositivo deixa de receber push do usuário atual.

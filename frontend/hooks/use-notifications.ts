@@ -10,6 +10,7 @@ import {
   type AppNotification,
 } from "@/lib/notification-api";
 import { isNotificationSoundEnabled, playNotificationSound } from "@/lib/notification-sound";
+import { ensurePushSubscription } from "@/lib/pwa";
 
 type Options = {
   selectedContactId?: number;
@@ -52,6 +53,11 @@ export function useNotifications({ selectedContactId, onOpenContact }: Options) 
       .catch((error) => console.error(error));
   }, []);
 
+  // Quem já autorizou as notificações antes do push existir também precisa ter a assinatura salva.
+  useEffect(() => {
+    ensurePushSubscription().catch((error) => console.error(error));
+  }, []);
+
   const markRead = useCallback((id: number) => {
     setNotifications((current) => current.map((item) => item.id === id && !item.readAt ? { ...item, readAt: new Date().toISOString() } : item));
     setUnreadCount((current) => Math.max(0, current - 1));
@@ -60,16 +66,6 @@ export function useNotifications({ selectedContactId, onOpenContact }: Options) 
 
   useEffect(() => {
     function handleCreated(notification: AppNotification) {
-      const viewingConversation = notification.type === "NEW_MESSAGE"
-        && notification.contactId === selectedContactIdRef.current
-        && document.hasFocus();
-
-      if (viewingConversation) {
-        setNotifications((current) => [{ ...notification, readAt: new Date().toISOString() }, ...current]);
-        void markNotificationRead(notification.id).catch((error) => console.error(error));
-        return;
-      }
-
       setNotifications((current) => [notification, ...current].slice(0, 50));
       setUnreadCount((current) => current + 1);
       if (isNotificationSoundEnabled()) playNotificationSound();
@@ -115,6 +111,7 @@ export function useNotifications({ selectedContactId, onOpenContact }: Options) 
     if (!("Notification" in window)) return "unsupported" as const;
     const result = await window.Notification.requestPermission();
     setPermission(result);
+    if (result === "granted") ensurePushSubscription().catch((error) => console.error(error));
     return result;
   }, []);
 

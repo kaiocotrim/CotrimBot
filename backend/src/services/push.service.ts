@@ -2,7 +2,7 @@ import webpush from "web-push";
 import { prisma } from "../lib/prisma.js";
 
 export type PushPayload = {
-  id: number;
+  id: number | null;
   type: string;
   title: string;
   body: string;

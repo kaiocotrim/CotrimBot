@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getPushPublicKey, subscribeToPush, unsubscribeFromPush } from "@/lib/push-api";
-import { getServiceWorkerRegistration, isPushSupported, urlBase64ToUint8Array } from "@/lib/pwa";
+import { subscribeToPush, unsubscribeFromPush } from "@/lib/push-api";
+import { ensurePushSubscription, isPushSupported } from "@/lib/pwa";
 
 type Options = {
   // Permite reaproveitar o fluxo de permissão já usado pelas notificações do navegador.
@@ -52,13 +52,7 @@ export function usePushSubscription({ requestPermission }: Options = {}) {
         return false;
       }
 
-      const registration = await getServiceWorkerRegistration();
-      const subscription = (await registration.pushManager.getSubscription())
-        ?? await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(await getPushPublicKey()),
-        });
-      await subscribeToPush(subscription.toJSON());
+      await ensurePushSubscription();
       setSubscribed(true);
       return true;
     } catch (reason) {
