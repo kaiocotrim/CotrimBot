@@ -1,4 +1,4 @@
-'from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from faster_whisper import WhisperModel
 from pydantic import BaseModel
 
