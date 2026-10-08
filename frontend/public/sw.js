@@ -145,8 +145,8 @@ self.addEventListener("notificationclick", (event) => {
     const client = windows.find((item) => new URL(item.url).origin === self.location.origin);
 
     if (client) {
-      await client.focus();
       client.postMessage({ type: "cotrimbot:notification-click", notificationId: id ?? null, contactId: contactId ?? null });
+      await client.focus().catch(() => undefined);
       return;
     }
 

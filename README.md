@@ -65,6 +65,7 @@ Dockerfile                 # Build da imagem única do frontend + backend
 - Transcrição automática de áudios recebidos (microserviço Python com faster-whisper).
 - Reformulação de texto com IA (Gemini) antes de enviar uma mensagem.
 - Encerrar uma conversa devolvendo o atendimento ao bot.
+- PWA instalável (celular e desktop) com notificações push, que chegam mesmo com o app fechado.
 
 ## Pré-requisitos
 
@@ -92,6 +93,9 @@ reais — senhas, chaves de API — não devem ser commitados nem compartilhados
 | `EVOLUTION_INSTANCE` | Nome da instância do WhatsApp na Evolution API. |
 | `GEMINI_API_KEY` | Chave da API do Gemini usada para reformular texto. |
 | `TRANSCRIPTION_SERVICE_URL` | URL do microserviço de transcrição. |
+| `VAPID_PUBLIC_KEY` | Chave pública VAPID das notificações push (ver abaixo). |
+| `VAPID_PRIVATE_KEY` | Chave privada VAPID das notificações push. Não compartilhe. |
+| `VAPID_SUBJECT` | Contato do responsável pelo servidor de push, ex.: `mailto:suporte@exemplo.com`. |
 
 Variáveis adicionais usadas apenas pelo `docker-compose.yml` (bancos internos
 da Evolution API e portas expostas):
@@ -103,6 +107,32 @@ da Evolution API e portas expostas):
 | `POSTGRES_PORT` | Porta publicada do Postgres. |
 | `REDIS_PORT` | Porta publicada do Redis. |
 | `EVOLUTION_PORT` | Porta publicada da Evolution API. |
+
+## PWA e notificações push
+
+O frontend é um PWA instalável: `frontend/public/manifest.json` define nome,
+ícones (`frontend/public/icons/`) e cores, e `frontend/public/sw.js` é o
+service worker que faz um cache básico para uso offline e recebe as
+notificações push. O service worker só é registrado no build de produção
+(`npm run build`), para não interferir no recarregamento do `next dev`.
+
+As notificações push complementam as notificações in-app (Socket.IO): sempre
+que uma conversa é atribuída ao usuário ou uma conversa dele recebe mensagem,
+o backend também envia um push (Web Push/VAPID) para cada dispositivo inscrito.
+Cada usuário ativa o push em **Configurações → Notificações → Ativar
+notificações push**. O navegador exige HTTPS (ou `localhost`) para isso.
+
+Para gerar as chaves VAPID (uma única vez por ambiente):
+
+```powershell
+npm run push:generate-vapid-keys --workspace=@cotrimbot/backend
+```
+
+Copie as três linhas exibidas (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` e
+`VAPID_SUBJECT`, ajustando o e-mail) para o `.env` da raiz e reinicie o
+backend. Sem essas variáveis o push fica desativado e o restante das
+notificações continua funcionando. Trocar as chaves invalida as assinaturas
+existentes: os usuários precisam ativar o push novamente.
 
 ## Rodando em desenvolvimento (sem Docker)
 
@@ -170,6 +200,9 @@ Todas as rotas abaixo são servidas pelo backend sob o prefixo `/api`.
 | GET | `/transcription/settings` | Consulta as configurações do Whisper. |
 | PUT | `/transcription/settings` | Atualiza as configurações do Whisper. |
 | POST | `/ai/rewrite` | Reformula um texto com o Gemini. |
+| GET | `/push/public-key` | Chave pública VAPID para assinar o push. |
+| POST | `/push/subscribe` | Salva a assinatura push do navegador (`{ endpoint, keys: { p256dh, auth } }`). |
+| POST | `/push/unsubscribe` | Remove a assinatura push do navegador (`{ endpoint }`). |
 | POST | `/webhook/whatsapp` | Webhook de eventos da Evolution API. |
 
 O Socket.IO roda na mesma porta do backend, com CORS liberado para o frontend.
