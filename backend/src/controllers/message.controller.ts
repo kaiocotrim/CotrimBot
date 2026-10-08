@@ -25,6 +25,10 @@ import {
 import { getSatisfactionSurvey } from "../services/bot.service.js";
 import { getSignedOutgoingText, SignatureMembershipError } from "../services/user-signature.service.js";
 
+const sentByUserInclude = {
+  sentByUser: { select: { id: true, name: true, image: true } },
+} as const;
+
 export async function getGroupSenderAvatar(req: Request, res: Response) {
   const messageId = Number(req.params.id);
   if (!Number.isInteger(messageId) || messageId <= 0) {
@@ -99,6 +103,7 @@ export async function getMessages(req: Request, res: Response) {
     },
     orderBy: { id: "desc" },
     take: limit + 1,
+    include: sentByUserInclude,
   });
 
   const hasMore = messages.length > limit;
@@ -364,6 +369,7 @@ export async function sendMediaToContact(
       where: { externalId },
       update: {
         content,
+        sentByUserId: req.user!.id,
         quotedExternalId: quotedMessage?.externalId ?? null,
         quotedMessageId: quotedMessage?.id ?? null,
         quotedContent: quotedMessage?.content ?? null,
@@ -375,11 +381,13 @@ export async function sendMediaToContact(
         direction: "OUTGOING",
         type: messageType,
         contactId: contact.id,
+        sentByUserId: req.user!.id,
         quotedExternalId: quotedMessage?.externalId ?? null,
         quotedMessageId: quotedMessage?.id ?? null,
         quotedContent: quotedMessage?.content ?? null,
         quotedSenderName,
       },
+      include: sentByUserInclude,
     });
 
     // Atualiza o frontend em tempo real.
@@ -534,11 +542,13 @@ export async function sendMessageToContact(req: Request, res: Response) {
           direction: "OUTGOING",
           type: "TEXT",
           contactId: contact.id,
+          sentByUserId: req.user!.id,
           quotedExternalId: quotedMessage?.externalId ?? null,
           quotedMessageId: quotedMessage?.id ?? null,
           quotedContent: quotedMessage?.content ?? null,
           quotedSenderName,
         },
+        include: sentByUserInclude,
       });
       const responseMessage = {
         ...privateMessage,
@@ -579,6 +589,7 @@ export async function sendMessageToContact(req: Request, res: Response) {
       where: { externalId },
       update: {
         content: outgoingText,
+        sentByUserId: req.user!.id,
         quotedExternalId: quotedMessage?.externalId ?? null,
         quotedMessageId: quotedMessage?.id ?? null,
         quotedContent: quotedMessage?.content ?? null,
@@ -589,11 +600,13 @@ export async function sendMessageToContact(req: Request, res: Response) {
         content: outgoingText,
         direction: "OUTGOING",
         contactId: contact.id,
+        sentByUserId: req.user!.id,
         quotedExternalId: quotedMessage?.externalId ?? null,
         quotedMessageId: quotedMessage?.id ?? null,
         quotedContent: quotedMessage?.content ?? null,
         quotedSenderName,
       },
+      include: sentByUserInclude,
     });
 
     // Avisa os frontends conectados que uma nova
@@ -652,7 +665,9 @@ export async function closeConversationWithBot(req: Request, res: Response) {
         content: survey,
         direction: "OUTGOING",
         contactId,
+        sentByUserId: req.user!.id,
       },
+      include: sentByUserInclude,
     });
 
     // Avisa os frontends conectados que uma nova

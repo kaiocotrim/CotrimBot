@@ -274,6 +274,105 @@
   margin-top: 0;
 }
 
+.profilePhotoRow {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.profilePhoto {
+  display: flex;
+  width: 76px;
+  height: 76px;
+  flex: 0 0 76px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid #292929;
+  border-radius: 50%;
+  background: #18181b;
+  color: #c8c8c8;
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.profilePhoto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profilePhotoActions {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.profilePhotoActions strong {
+  color: #e6e6e6;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.profilePhotoActions > span {
+  color: #888;
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.profilePhotoActions > div {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+.photoButton {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 1px solid #343434;
+  border-radius: 999px;
+  color: #e6e6e6;
+  font-size: 13px;
+  font-weight: 500;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.photoButton:hover:not(:disabled) {
+  border-color: #565656;
+  background: #171717;
+}
+
+.removePhotoButton {
+  color: #aaa;
+  font-size: 13px;
+}
+
+.removePhotoButton:hover:not(:disabled) {
+  color: #fca5a5;
+}
+
+.photoButton:disabled,
+.removePhotoButton:disabled {
+  opacity: .5;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .field {
   display: flex;
   min-width: 0;
@@ -478,6 +577,15 @@
     margin-bottom: 0;
   }
 
+  .profilePhotoRow {
+    align-items: flex-start;
+  }
+
+  .profilePhoto {
+    width: 64px;
+    height: 64px;
+    flex-basis: 64px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

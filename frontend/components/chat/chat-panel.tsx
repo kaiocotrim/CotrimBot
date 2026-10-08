@@ -11,6 +11,7 @@ import type { Contact, Message } from "@/types/chat";
 
 type ChatPanelProps = {
   userId: string;
+  currentUser: { id: string; name: string; image?: string | null };
   contact: Contact | null;
   contacts: Contact[];
   messages: Message[];
@@ -48,6 +49,7 @@ type ChatPanelProps = {
 // Agrupa todas as partes visuais da conversa selecionada.
 export function ChatPanel({
   userId,
+  currentUser,
   contact,
   contacts,
   messages,
@@ -159,6 +161,7 @@ export function ChatPanel({
           </div>
 
           <MessageList
+            currentUser={currentUser}
             contact={contact}
             contacts={contacts}
             messages={messages}

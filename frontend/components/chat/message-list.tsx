@@ -5,9 +5,11 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Avatar } from "@/components/chat/avatar";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { MessageSenderAvatar } from "@/components/chat/message-sender-avatar";
+import { OutgoingMessageAvatar } from "@/components/chat/outgoing-message-avatar";
 import type { Contact, Message } from "@/types/chat";
 
 type MessageListProps = {
+  currentUser: { id: string; name: string; image?: string | null };
   contact: Contact;
   contacts: Contact[];
   messages: Message[];
@@ -59,7 +61,7 @@ function dateLabel(value: string) {
 }
 
 // Posiciona mensagens recebidas à esquerda e enviadas à direita.
-export function MessageList({ contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onDeleteMessage, onForwardMessage, onReplyToMessage, onEnsureMessageLoaded }: MessageListProps) {
+export function MessageList({ currentUser, contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onDeleteMessage, onForwardMessage, onReplyToMessage, onEnsureMessageLoaded }: MessageListProps) {
   const reduceMotion = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -240,6 +242,12 @@ export function MessageList({ contact, contacts, messages, hasOlderMessages, loa
 
               {/* O balão escolhe entre player de áudio e conteúdo textual. */}
               <MessageBubble message={message} quotedMessage={message.quotedMessageId ? messagesById.get(message.quotedMessageId) : undefined} contact={contact} contacts={contacts} mediaMessages={mediaMessages} onReact={onReactToMessage} onUpdateFlags={onUpdateMessageFlags} onDelete={onDeleteMessage} onForwardMessage={onForwardMessage} onReply={onReplyToMessage} onNavigateToMessage={navigateToMessage} />
+
+              {outgoing && (
+                <OutgoingMessageAvatar
+                  user={message.sentByUser ?? (message.id < 0 ? currentUser : null)}
+                />
+              )}
             </div>
           </motion.div>
         );

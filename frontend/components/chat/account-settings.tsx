@@ -3,7 +3,7 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
-import { BadgeCheck, Bell, Building2, QrCode, UserRound, X } from "lucide-react";
+import { BadgeCheck, Bell, Building2, Camera, QrCode, UserRound, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { EvolutionConnectionSettings } from "@/components/chat/evolution-connection-settings";
@@ -14,8 +14,53 @@ type SettingsUser = {
   id: string;
   name: string;
   email: string;
+  image?: string | null;
   role?: string | null;
 };
+
+const AVATAR_MAX_FILE_SIZE = 5 * 1024 * 1024;
+const AVATAR_MAX_DATA_URL_LENGTH = 56_000;
+
+async function prepareAvatar(file: File): Promise<string> {
+  if (!file.type.match(/^image\/(jpeg|png|webp)$/)) {
+    throw new Error("Escolha uma imagem JPG, PNG ou WebP.");
+  }
+  if (file.size > AVATAR_MAX_FILE_SIZE) {
+    throw new Error("A imagem deve ter no máximo 5 MB.");
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new window.Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error("Não foi possível abrir essa imagem."));
+      element.src = objectUrl;
+    });
+    const sourceSize = Math.min(image.naturalWidth, image.naturalHeight);
+    const sourceX = (image.naturalWidth - sourceSize) / 2;
+    const sourceY = (image.naturalHeight - sourceSize) / 2;
+
+    for (const outputSize of [320, 256, 192]) {
+      const canvas = document.createElement("canvas");
+      canvas.width = outputSize;
+      canvas.height = outputSize;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Não foi possível processar essa imagem.");
+      context.fillStyle = "#18181b";
+      context.fillRect(0, 0, outputSize, outputSize);
+      context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, outputSize, outputSize);
+
+      for (const quality of [0.82, 0.68, 0.54, 0.42]) {
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        if (dataUrl.length <= AVATAR_MAX_DATA_URL_LENGTH) return dataUrl;
+      }
+    }
+    throw new Error("Não foi possível reduzir a imagem. Escolha outra foto.");
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
 
 const sections = [
   { value: "account", label: "Conta", icon: UserRound },
@@ -61,13 +106,19 @@ function SettingsContent({ user }: { user: SettingsUser }) {
   const [section, setSection] = useState<Section>("account");
   const [name, setName] = useState(user.name);
   const [savedName, setSavedName] = useState(user.name);
+  const [avatar, setAvatar] = useState<string | null>(user.image ?? null);
+  const [savedAvatar, setSavedAvatar] = useState<string | null>(user.image ?? null);
+  const [processingAvatar, setProcessingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
   const [accountMessage, setAccountMessage] = useState<string | null>(null);
   const [accountError, setAccountError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const nameChanged = name.trim() !== savedName;
+  const avatarChanged = avatar !== savedAvatar;
+  const accountChanged = nameChanged || avatarChanged;
   const availableSections = user.role === "admin"
     ? sections
     : sections.filter((item) => item.value !== "whatsapp");
@@ -84,20 +135,36 @@ function SettingsContent({ user }: { user: SettingsUser }) {
   async function saveAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextName = name.trim();
-    if (saving || !nextName || !nameChanged) return;
+    if (saving || processingAvatar || !nextName || !accountChanged) return;
     setSaving(true);
     setAccountError(null);
     setAccountMessage(null);
     try {
-      const { error } = await authClient.updateUser({ name: nextName });
-      if (error) throw new Error("Não foi possível salvar seu nome. Tente novamente.");
+      const { error } = await authClient.updateUser({ name: nextName, image: avatar });
+      if (error) throw new Error("Não foi possível salvar sua conta. Tente novamente.");
       setSavedName(nextName);
+      setSavedAvatar(avatar);
       setName(nextName);
-      setAccountMessage("Nome atualizado.");
+      setAccountMessage("Conta atualizada.");
     } catch {
-      setAccountError("Não foi possível salvar seu nome. Tente novamente.");
+      setAccountError("Não foi possível salvar sua conta. Tente novamente.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function selectAvatar(file: File | undefined) {
+    if (!file || processingAvatar || saving) return;
+    setProcessingAvatar(true);
+    setAccountError(null);
+    setAccountMessage(null);
+    try {
+      setAvatar(await prepareAvatar(file));
+    } catch (error) {
+      setAccountError(error instanceof Error ? error.message : "Não foi possível processar essa imagem.");
+    } finally {
+      setProcessingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
     }
   }
 
@@ -155,6 +222,54 @@ function SettingsContent({ user }: { user: SettingsUser }) {
             <section className={styles.card} aria-labelledby="account-title">
               <h3 id="account-title">Conta</h3>
               <form className={styles.accountForm} onSubmit={(event) => void saveAccount(event)}>
+                <div className={styles.profilePhotoRow}>
+                  <div className={styles.profilePhoto} aria-hidden="true">
+                    {avatar ? (
+                      // A imagem pode vir de um provedor externo ou do upload do usuário.
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={avatar} alt="" />
+                    ) : (
+                      <span>{name.trim().charAt(0).toUpperCase() || <UserRound size={28} />}</span>
+                    )}
+                  </div>
+                  <div className={styles.profilePhotoActions}>
+                    <strong>Foto de perfil</strong>
+                    <span>JPG, PNG ou WebP. A foto será recortada em formato quadrado.</span>
+                    <div>
+                      <button
+                        type="button"
+                        className={styles.photoButton}
+                        disabled={saving || processingAvatar}
+                        onClick={() => avatarInputRef.current?.click()}
+                      >
+                        <Camera size={16} aria-hidden="true" />
+                        {processingAvatar ? "Processando…" : avatar ? "Trocar foto" : "Adicionar foto"}
+                      </button>
+                      {avatar && (
+                        <button
+                          type="button"
+                          className={styles.removePhotoButton}
+                          disabled={saving || processingAvatar}
+                          onClick={() => {
+                            setAvatar(null);
+                            setAccountMessage(null);
+                            setAccountError(null);
+                          }}
+                        >
+                          Remover
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      ref={avatarInputRef}
+                      className={styles.visuallyHidden}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      aria-label="Escolher foto de perfil"
+                      onChange={(event) => void selectAvatar(event.target.files?.[0])}
+                    />
+                  </div>
+                </div>
                 <label className={styles.field}>
                   <span>E-mail</span>
                   <input type="email" value={user.email} readOnly autoComplete="email" />
@@ -178,7 +293,7 @@ function SettingsContent({ user }: { user: SettingsUser }) {
                     />
                   </span>
                 </label>
-                {nameChanged && <button type="submit" className={styles.primaryButton} disabled={saving || !name.trim()}>{saving ? "Salvando…" : "Salvar alterações"}</button>}
+                {accountChanged && <button type="submit" className={styles.primaryButton} disabled={saving || processingAvatar || !name.trim()}>{saving ? "Salvando…" : "Salvar alterações"}</button>}
                 {accountMessage && <p role="status" className={styles.feedback}>{accountMessage}</p>}
                 {accountError && <p role="alert" className={styles.error}>{accountError}</p>}
               </form>

@@ -61,6 +61,8 @@ export type Message = {
   senderName: string | null;
   senderPhone: string | null;
   senderProfilePictureUrl: string | null;
+  sentByUserId?: string | null;
+  sentByUser?: { id: string; name: string; image: string | null } | null;
   quotedExternalId?: string | null;
   quotedMessageId?: number | null;
   quotedContent?: string | null;

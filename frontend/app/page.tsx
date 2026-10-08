@@ -40,6 +40,7 @@ export default function Home() {
 
       <ChatPanel
         userId={session.user.id}
+        currentUser={session.user}
         contact={chat.selectedContact}
         contacts={chat.contacts}
         messages={chat.messages}

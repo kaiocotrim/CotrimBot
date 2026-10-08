@@ -45,6 +45,7 @@ model Message {
   senderName              String?
   senderPhone             String?          @db.VarChar(64)
   senderProfilePictureUrl String?          @db.Text
+  sentByUserId            String?
   private                 Boolean          @default(false)
   pinned                  Boolean          @default(false)
   favorited               Boolean          @default(false)
@@ -55,12 +56,14 @@ model Message {
   quotedContent           String?          @db.Text
   quotedSenderName        String?
   contact                 Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  sentByUser              User?            @relation(fields: [sentByUserId], references: [id], onDelete: SetNull)
   quotedMessage           Message?         @relation("MessageToMessage", fields: [quotedMessageId], references: [id])
   quotedByMessages        Message[]        @relation("MessageToMessage")
   cachedMedia             MessageMedia?
   deletions               MessageDeletion[]
 
   @@index([contactId], map: "Message_contactId_fkey")
+  @@index([sentByUserId])
   @@index([quotedExternalId])
   @@index([quotedMessageId])
 }
@@ -125,6 +128,7 @@ model User {
   members     Member[]
   invitations Invitation[]
   messageDeletions MessageDeletion[]
+  sentMessages     Message[]
   assignedContacts Contact[]
 }
 
