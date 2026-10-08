@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Avatar } from "@/components/chat/avatar";
 import { AccountSettings } from "@/components/chat/account-settings";
 import { MessageText } from "@/components/chat/message-text";
@@ -32,6 +33,7 @@ function formatSidebarDate(value: string) {
 }
 
 export function ContactSidebar({ userId, contacts, loading, error, selectedContactId, onSelectContact, headerActions }: ContactSidebarProps) {
+  const reduceMotion = useReducedMotion();
   const { data: session } = useSession();
   const userImage = session?.user?.image;
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
@@ -257,30 +259,36 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
           </label>
 
           <div className="mt-1.5 grid grid-cols-3 gap-1" role="group" aria-label="Filtrar conversas">
-            <button
+            <motion.button
               type="button"
               onClick={() => setConversationFilter("conversations")}
               aria-pressed={conversationFilter === "conversations"}
-              className={`h-8 rounded-[10px] px-2 text-[13px] font-medium transition-colors ${conversationFilter === "conversations" ? "bg-white/[0.07] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-300"}`}
+              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+              className={`relative h-8 px-2 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 ${conversationFilter === "conversations" ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
             >
               Conversas
-            </button>
-            <button
+              {conversationFilter === "conversations" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)]" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
+            </motion.button>
+            <motion.button
               type="button"
               onClick={() => setConversationFilter("groups")}
               aria-pressed={conversationFilter === "groups"}
-              className={`h-8 rounded-[10px] px-2 text-[13px] font-medium transition-colors ${conversationFilter === "groups" ? "bg-white/[0.07] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-300"}`}
+              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+              className={`relative h-8 px-2 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 ${conversationFilter === "groups" ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
             >
               Grupos
-            </button>
-            <button
+              {conversationFilter === "groups" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)]" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
+            </motion.button>
+            <motion.button
               type="button"
               onClick={() => setConversationFilter("mine")}
               aria-pressed={conversationFilter === "mine"}
-              className={`h-8 rounded-[10px] px-2 text-[13px] font-medium transition-colors ${conversationFilter === "mine" ? "bg-white/[0.07] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-300"}`}
+              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+              className={`relative h-8 px-2 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 ${conversationFilter === "mine" ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
             >
               Minhas
-            </button>
+              {conversationFilter === "mine" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)]" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
+            </motion.button>
           </div>
 
           <button
@@ -302,12 +310,22 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
 
         <CompactScrollArea className="flex-1" label="Lista de conversas">
           <div className={isCollapsed ? "space-y-1 py-3 pr-1 pl-3" : "px-2 pb-2"}>
-            {visibleContacts.map((contact) => {
+            <AnimatePresence initial={false} mode="popLayout">
+            {visibleContacts.map((contact, index) => {
               const lastMessage = contact.messages?.[0];
               const selected = selectedContactId === contact.id;
               const unread = contact.unreadCount > 0;
               return (
-                <div key={contact.id} className={`group relative rounded-xl transition-colors ${selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"}`}>
+                <motion.div
+                  layout="position"
+                  key={contact.id}
+                  initial={reduceMotion ? false : { opacity: 0, y: 6, scale: 0.985 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.985 }}
+                  whileHover={reduceMotion ? undefined : { x: 2 }}
+                  transition={reduceMotion ? { duration: 0 } : { duration: 0.2, delay: Math.min(index, 6) * 0.018, ease: [0.22, 1, 0.36, 1], layout: { type: "spring", stiffness: 460, damping: 38 } }}
+                  className={`group relative rounded-xl transition-colors ${selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"}`}
+                >
                   <button
                     type="button"
                     onMouseDown={(event) => startPreviewHold(contact, event)}
@@ -327,6 +345,16 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                   <div className={`flex items-center ${isCollapsed ? "justify-center" : "gap-2.5"}`}>
                     <span className="relative shrink-0">
                       <Avatar contact={contact} />
+                      {isCollapsed && unread && (
+                        <motion.span
+                          aria-hidden="true"
+                          initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-[#09090b] bg-emerald-400 px-1 text-[9px] font-bold leading-none text-zinc-950"
+                        >
+                          {contact.unreadCount > 99 ? "99+" : contact.unreadCount}
+                        </motion.span>
+                      )}
                       {holdingContactId === contact.id && (
                         <svg className="pointer-events-none absolute -inset-1 size-12 -rotate-90" viewBox="0 0 48 48" aria-hidden="true">
                           <circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/20" />
@@ -371,9 +399,10 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                     </div>
                   </div>
                   </button>
-                </div>
+                </motion.div>
               );
             })}
+            </AnimatePresence>
             {loading && (
               <p role="status" title="Carregando conversas..." className={`py-10 text-center text-[13px] text-zinc-500 ${isCollapsed ? "flex justify-center" : "px-4"}`}>
                 {isCollapsed && <span aria-hidden="true" className="size-5 animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-300 motion-reduce:animate-none" />}
@@ -398,6 +427,39 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
             )}
           </div>
         </CompactScrollArea>
+        {isCollapsed && session?.user && (
+          <motion.footer
+            initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex shrink-0 justify-center bg-[#09090b]/95 py-3"
+          >
+            <AccountSettings user={session.user} onOpen={() => {
+              cancelPreviewHold();
+              closePreview();
+            }}>
+              <span
+                aria-hidden="true"
+                className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-zinc-800 text-zinc-300 shadow-[0_4px_14px_rgba(0,0,0,0.28)]"
+              >
+                {userImage && userImage !== failedAvatarUrl ? (
+                  // A foto da sessão pode vir de uma URL externa e dinâmica.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={userImage}
+                    alt=""
+                    className="size-full object-cover"
+                    onError={() => setFailedAvatarUrl(userImage)}
+                  />
+                ) : (
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="size-6">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M5 21v-2a7 7 0 0 1 14 0v2" />
+                  </svg>
+                )}
+              </span>
+            </AccountSettings>
+          </motion.footer>
+        )}
         <QuickConversationPreview
           contact={previewContact}
           messages={previewMessages}

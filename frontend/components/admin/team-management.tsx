@@ -8,6 +8,7 @@ import { Building2, Check, Copy, MoreHorizontal, Pencil, Plus, Search, Shield, T
 import { authClient } from "@/lib/auth-client";
 import { getCompanyWorkspace, updateCompanyLogo } from "@/lib/company-api";
 import { CompanyGroupDialog } from "./company-group-dialog";
+import { CompanyMemberAvatar } from "./company-member-avatar";
 import { CompanyMemberDialog } from "./company-member-dialog";
 import { CompanyContentSkeleton } from "./company-skeleton";
 import { InvitationSuccessAnimation } from "./invitation-success-animation";
@@ -464,7 +465,7 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
         <div className="grid gap-8 lg:grid-cols-2">
           <div>
             <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-medium text-zinc-200">Membros recentes</h3><button type="button" onClick={() => setActiveTab("members")} className="text-xs text-zinc-600 hover:text-zinc-300">Ver todos</button></div>
-            <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">{members.slice(0, 3).map((member) => <button key={member.id} type="button" onClick={() => openMember(member)} className="flex w-full items-center gap-3 py-3 text-left"><span className="flex size-8 items-center justify-center rounded-full bg-white/[0.05] text-xs text-zinc-300">{((member.displayName || member.user.name)[0] || "?").toUpperCase()}</span><span className="min-w-0"><span className="block truncate text-sm text-zinc-300">{member.displayName || member.user.name}</span><span className="block truncate text-xs text-zinc-600">{member.user.email}</span></span></button>)}</div>
+            <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">{members.slice(0, 3).map((member) => <button key={member.id} type="button" onClick={() => openMember(member)} className="flex w-full items-center gap-3 py-3 text-left"><CompanyMemberAvatar member={member} size="small" /><span className="min-w-0"><span className="block truncate text-sm text-zinc-300">{member.displayName || member.user.name}</span><span className="block truncate text-xs text-zinc-600">{member.user.email}</span></span></button>)}</div>
           </div>
           <div>
             <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-medium text-zinc-200">Grupos recentes</h3><button type="button" onClick={() => setActiveTab("groups")} className="text-xs text-zinc-600 hover:text-zinc-300">Ver todos</button></div>
@@ -506,7 +507,7 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
           {filteredMembers.map((member) => (
             <motion.article key={member.id} whileHover={reduceMotion ? undefined : { x: 2 }} transition={{ duration: 0.18 }} className="relative flex items-center gap-3 px-1 py-4 transition-colors hover:bg-white/[0.015]">
               <button type="button" onClick={() => openMember(member)} className="flex min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline-none">
-                <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/[0.07] bg-white/[0.055] text-sm font-semibold text-zinc-200">{((member.displayName || member.user.name).trim()[0] || member.user.email[0] || "?").toUpperCase()}</span>
+                <CompanyMemberAvatar member={member} />
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="truncate text-sm font-medium text-zinc-100">{member.displayName || member.user.name}</span>

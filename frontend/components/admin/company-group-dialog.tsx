@@ -6,6 +6,7 @@ import { Check, Trash2, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { createCompanyGroup, deleteCompanyGroup, updateCompanyGroup } from "@/lib/company-api";
 import { permissionSections, type CompanyGroup, type OrganizationMember, type PermissionKey } from "./company-types";
+import { CompanyMemberAvatar } from "./company-member-avatar";
 
 const inputClass = "min-h-10 w-full rounded-lg border border-white/[0.09] bg-white/[0.025] px-3 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-700 focus:border-white/20 focus:bg-white/[0.04]";
 const allPermissions: PermissionKey[] = permissionSections.flatMap((section) => section.permissions.map(([permission]) => permission));
@@ -98,7 +99,7 @@ export function CompanyGroupDialog({ organizationId, group, members, open, onOpe
                     const selected = memberIds.includes(member.id);
                     return <label key={member.id} className="flex cursor-pointer items-center gap-3 py-3 transition-colors hover:bg-white/[0.02]">
                       <input type="checkbox" className="sr-only" checked={selected} onChange={() => toggleMember(member.id)} />
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/[0.05] text-xs font-medium text-zinc-400">{(member.displayName || member.user.name || "?")[0]?.toUpperCase()}</span>
+                      <CompanyMemberAvatar member={member} size="small" />
                       <span className="min-w-0 flex-1"><span className="block truncate text-sm text-zinc-300">{member.displayName || member.user.name}</span><span className="mt-0.5 block truncate text-xs text-zinc-600">{member.user.email}</span></span>
                       <span className={`flex size-[18px] items-center justify-center rounded-[5px] border transition-colors ${selected ? "border-zinc-200 bg-zinc-200 text-zinc-950" : "border-white/15 text-transparent"}`}><Check size={12} strokeWidth={3} /></span>
                     </label>;

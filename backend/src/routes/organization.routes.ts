@@ -125,7 +125,7 @@ organizationRouter.get("/organizations/:organizationId/workspace", async (reques
           displayName: true,
           signature: true,
           signatureEnabled: true,
-          user: { select: { id: true, name: true, email: true } },
+          user: { select: { id: true, name: true, email: true, image: true } },
           groupMemberships: {
             select: { group: { select: { id: true, name: true, permissions: { select: { permission: true } } } } },
           },

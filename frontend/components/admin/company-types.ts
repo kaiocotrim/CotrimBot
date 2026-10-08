@@ -57,7 +57,7 @@ export type OrganizationMember = {
   displayName?: string | null;
   signature?: string | null;
   signatureEnabled: boolean;
-  user: { id: string; name: string; email: string };
+  user: { id: string; name: string; email: string; image?: string | null };
   groups: { id: string; name: string }[];
   effectivePermissions: PermissionKey[];
 };
