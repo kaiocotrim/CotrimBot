@@ -23,6 +23,33 @@ export async function getContacts(): Promise<Contact[]> {
   return parseResponse<Contact[]>(response, "Erro ao buscar contatos");
 }
 
+export type ContactAssignee = { id: string; name: string; image: string | null };
+
+export async function getContactAssignees(): Promise<ContactAssignee[]> {
+  const response = await fetch(`${API_URL}/contacts/assignees`, { credentials: "include" });
+  return parseResponse<ContactAssignee[]>(response, "Não foi possível buscar os usuários");
+}
+
+export async function setContactAssignment(contactId: number, assignedUserId: string | null): Promise<Contact> {
+  const response = await fetch(`${API_URL}/contacts/${contactId}/assignment`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ assignedUserId }),
+    credentials: "include",
+  });
+  return parseResponse<Contact>(response, "Não foi possível alterar o responsável pela conversa");
+}
+
+export async function setContactPriority(contactId: number, priority: NonNullable<Contact["priority"]>): Promise<Contact> {
+  const response = await fetch(`${API_URL}/contacts/${contactId}/priority`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ priority }),
+    credentials: "include",
+  });
+  return parseResponse<Contact>(response, "Não foi possível alterar a prioridade");
+}
+
 export async function getMessages(contactId: number, before?: number, limit = 30): Promise<MessagesPage> {
   const params = new URLSearchParams({ limit: String(limit) });
   if (before) params.set("before", String(before));

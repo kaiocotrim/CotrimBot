@@ -1,13 +1,15 @@
 "use client";
 
-import { Info } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { Info, UserRoundCheck, UserRoundPlus, UserRoundX } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { Contact } from "@/types/chat";
 import { Avatar } from "@/components/chat/avatar";
 import styles from "./chat-header.module.css";
 
 type ChatHeaderProps = {
   contact: Contact;
+  currentUserId: string;
+  onSetContactAssignment: (contactId: number, assignedUserId: string | null) => Promise<void>;
   isTyping: boolean;
   searchOpen: boolean;
   searchQuery: string;
@@ -23,8 +25,26 @@ type ChatHeaderProps = {
 
 const actionClass = "flex size-9 items-center justify-center rounded-full transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-35";
 
-export function ChatHeader({ contact, isTyping, searchOpen, searchQuery, currentResult, resultCount, onOpenSearch, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch }: ChatHeaderProps) {
+export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isTyping, searchOpen, searchQuery, currentResult, resultCount, onOpenSearch, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch }: ChatHeaderProps) {
   const searchRef = useRef<HTMLInputElement>(null);
+  const [assigning, setAssigning] = useState(false);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const assignedToMe = contact.assignedUserId === currentUserId;
+  const assignedToOther = Boolean(contact.assignedUserId && !assignedToMe);
+
+  async function toggleAssignment() {
+    if (assigning || assignedToOther) return;
+    setAssigning(true);
+    setAssignmentError(null);
+    try {
+      await onSetContactAssignment(contact.id, assignedToMe ? null : currentUserId);
+    } catch (error) {
+      setAssignmentError(error instanceof Error ? error.message : "Não foi possível alterar o responsável.");
+    } finally {
+      setAssigning(false);
+    }
+  }
+
   useEffect(() => { if (searchOpen) searchRef.current?.focus(); }, [searchOpen]);
 
   return (
@@ -59,6 +79,16 @@ export function ChatHeader({ contact, isTyping, searchOpen, searchQuery, current
             </span>
           </button>
           <div className="ml-auto flex h-11 items-center rounded-full border border-white/10 bg-white/[0.035] px-1">
+            {!contact.isGroup && <button
+              type="button"
+              onClick={() => void toggleAssignment()}
+              disabled={assigning || assignedToOther}
+              aria-label={assignedToMe ? "Liberar conversa" : assignedToOther ? "Conversa atribuída a outro atendente" : "Assumir conversa"}
+              title={assignedToMe ? "Conversa atribuída a você · clique para liberar" : assignedToOther ? "Conversa atribuída a outro atendente" : "Assumir conversa para aparecer em Minhas"}
+              className={`${actionClass} ${assignedToMe ? "text-emerald-300" : assignedToOther ? "text-zinc-600" : "text-zinc-300"}`}
+            >
+              {assignedToMe ? <UserRoundCheck className="size-5" aria-hidden="true" /> : assignedToOther ? <UserRoundX className="size-5" aria-hidden="true" /> : <UserRoundPlus className="size-5" aria-hidden="true" />}
+            </button>}
             <button type="button" onClick={onOpenSearch} aria-label="Localizar mensagens" title="Localizar mensagens" className={actionClass}><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg></button>
             <button
               type="button"
@@ -70,6 +100,7 @@ export function ChatHeader({ contact, isTyping, searchOpen, searchQuery, current
               <Info className="size-5" strokeWidth={2} aria-hidden="true" />
             </button>
           </div>
+          {assignmentError && <span role="alert" className="absolute top-14 right-4 z-30 max-w-64 rounded-lg border border-red-400/25 bg-zinc-950 px-3 py-2 text-xs text-red-300 shadow-xl">{assignmentError}</span>}
         </>
       )}
     </header>

@@ -3,9 +3,12 @@ import {
   createContact,
   deleteContact,
   getContactAvatar,
+  getContactAssignees,
   getContactById,
   getContacts,
   setContactArchived,
+  setContactAssignment,
+  setContactPriority,
   subscribeContactPresence,
   updateContact,
 } from "../controllers/contact.controller.js";
@@ -14,6 +17,7 @@ export const contactRouter = Router();
 
 // GET /contacts - Retorna todos os contatos
 contactRouter.get("/contacts", getContacts);
+contactRouter.get("/contacts/assignees", getContactAssignees);
 
 // GET /contacts/:id/avatar - Busca a foto do contato na Evolution API
 contactRouter.get("/contacts/:id/avatar", getContactAvatar);
@@ -30,6 +34,8 @@ contactRouter.post("/contacts", createContact);
 // PATCH /contacts/:id - Atualiza um contato especifico pelo ID
 contactRouter.patch("/contacts/:id", updateContact);
 contactRouter.patch("/contacts/:id/archived", setContactArchived);
+contactRouter.patch("/contacts/:id/assignment", setContactAssignment);
+contactRouter.patch("/contacts/:id/priority", setContactPriority);
 
 // DELETE /contacts/:id - Exclui um contato especifico pelo ID
 contactRouter.delete("/contacts/:id", deleteContact);

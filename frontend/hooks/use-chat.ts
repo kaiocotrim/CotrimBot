@@ -13,6 +13,8 @@ import {
   postMessage,
   reactToMessage as reactToMessageRequest,
   sendMedia as sendMediaRequest,
+  setContactAssignment as setContactAssignmentRequest,
+  setContactPriority as setContactPriorityRequest,
   setContactArchived as setContactArchivedRequest,
   subscribeToContactPresence,
   updateContactName as updateContactNameRequest,
@@ -631,6 +633,26 @@ export function useChat() {
     );
   }
 
+  async function setContactAssignment(contactId: number, assignedUserId: string | null) {
+    const updated = await setContactAssignmentRequest(contactId, assignedUserId);
+    setContacts((current) => current.map((contact) =>
+      contact.id === updated.id ? { ...contact, assignedUserId: updated.assignedUserId } : contact
+    ));
+    setSelectedContact((current) =>
+      current?.id === updated.id ? { ...current, assignedUserId: updated.assignedUserId } : current
+    );
+  }
+
+  async function setContactPriority(contactId: number, priority: NonNullable<Contact["priority"]>) {
+    const updated = await setContactPriorityRequest(contactId, priority);
+    setContacts((current) => current.map((contact) =>
+      contact.id === updated.id ? { ...contact, priority: updated.priority } : contact
+    ));
+    setSelectedContact((current) =>
+      current?.id === updated.id ? { ...current, priority: updated.priority } : current
+    );
+  }
+
 
   // =========================================================
   // ENVIAR MENSAGEM DE TEXTO
@@ -975,6 +997,8 @@ export function useChat() {
     selectContact,
     archiveContact,
     renameContact,
+    setContactAssignment,
+    setContactPriority,
 
     // Envio de texto
     sendMessage,

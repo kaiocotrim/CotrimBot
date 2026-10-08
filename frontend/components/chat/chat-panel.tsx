@@ -41,6 +41,8 @@ type ChatPanelProps = {
 
   onCloseWithBot: () => void;
   onRenameContact: (contactId: number, name: string) => Promise<void>;
+  onSetContactAssignment: (contactId: number, assignedUserId: string | null) => Promise<void>;
+  onSetContactPriority: (contactId: number, priority: NonNullable<Contact["priority"]>) => Promise<void>;
 };
 
 // Agrupa todas as partes visuais da conversa selecionada.
@@ -67,6 +69,8 @@ export function ChatPanel({
   onSendMedia,
   onCloseWithBot,
   onRenameContact,
+  onSetContactAssignment,
+  onSetContactPriority,
 }: ChatPanelProps) {
   const [conversationPanel, setConversationPanel] = useState<HTMLElement | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -136,7 +140,10 @@ export function ChatPanel({
 
           <div className="pointer-events-none absolute inset-x-0 top-0 z-20">
             <ChatHeader
+              key={contact.id}
               contact={contact}
+              currentUserId={userId}
+              onSetContactAssignment={onSetContactAssignment}
               isTyping={isTyping}
               searchOpen={searchOpen}
               searchQuery={searchQuery}
@@ -197,6 +204,8 @@ export function ChatPanel({
             <ContactInfoPanel
               key={contact.id}
               contact={contact}
+              onSetContactAssignment={onSetContactAssignment}
+              onSetContactPriority={onSetContactPriority}
               onRenameContact={onRenameContact}
               onClose={() => setContactInfoOpen(false)}
               onSearch={() => { setContactInfoOpen(false); setSearchOpen(true); }}

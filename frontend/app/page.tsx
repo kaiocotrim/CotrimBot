@@ -30,6 +30,7 @@ export default function Home() {
   return (
     <main className="flex h-dvh overflow-hidden bg-zinc-950 text-white">
       <ContactSidebar
+        userId={session.user.id}
         contacts={chat.contacts}
         loading={chat.loadingContacts}
         error={chat.contactsError}
@@ -60,6 +61,8 @@ export default function Home() {
         onSendMedia={chat.sendMediaMessage}
         onCloseWithBot={chat.closeWithBot}
         onRenameContact={chat.renameContact}
+        onSetContactAssignment={chat.setContactAssignment}
+        onSetContactPriority={chat.setContactPriority}
       />
     </main>
   );

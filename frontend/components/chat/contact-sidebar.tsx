@@ -10,8 +10,8 @@ import { useSession } from "@/lib/auth-client";
 import { getMessages } from "@/lib/chat-api";
 import type { Contact, Message } from "@/types/chat";
 
-type ContactSidebarProps = { contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void };
-type ConversationFilter = "conversations" | "groups";
+type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void };
+type ConversationFilter = "conversations" | "groups" | "mine";
 const PREVIEW_HOLD_DURATION = 1_000;
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
 const dayKeyFormatter = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: CHAT_TIME_ZONE });
@@ -31,7 +31,7 @@ function formatSidebarDate(value: string) {
   return dateFormatter.format(date);
 }
 
-export function ContactSidebar({ contacts, loading, error, selectedContactId, onSelectContact }: ContactSidebarProps) {
+export function ContactSidebar({ userId, contacts, loading, error, selectedContactId, onSelectContact }: ContactSidebarProps) {
   const { data: session } = useSession();
   const userImage = session?.user?.image;
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
@@ -55,12 +55,13 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
     return contacts.filter((contact) => {
       if (contact.archived !== showArchived) return false;
       if (contact.isGroup !== (conversationFilter === "groups")) return false;
+      if (conversationFilter === "mine" && contact.assignedUserId !== userId) return false;
       if (!search) return true;
       return contact.name.toLocaleLowerCase("pt-BR").includes(search)
         || contact.phone.includes(search)
         || Boolean(contact.messages?.[0]?.content.toLocaleLowerCase("pt-BR").includes(search));
     });
-  }, [contacts, conversationFilter, query, showArchived]);
+  }, [contacts, conversationFilter, query, showArchived, userId]);
 
   const closePreview = useCallback(() => {
     previewRequestRef.current += 1;
@@ -185,7 +186,9 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
 
   const emptyMessage = conversationFilter === "groups"
     ? showArchived ? "Nenhum grupo arquivado" : "Nenhum grupo encontrado"
-    : showArchived ? "Nenhuma conversa arquivada" : "Nenhuma conversa encontrada";
+    : conversationFilter === "mine"
+      ? showArchived ? "Nenhuma conversa sua arquivada" : "Nenhuma conversa atribuída a você. Assuma uma conversa na aba Conversas."
+      : showArchived ? "Nenhuma conversa arquivada" : "Nenhuma conversa encontrada";
 
   return (
 
@@ -252,12 +255,12 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
             />
           </label>
 
-          <div className="mt-1.5 grid grid-cols-2 gap-1" role="group" aria-label="Filtrar conversas">
+          <div className="mt-1.5 grid grid-cols-3 gap-1" role="group" aria-label="Filtrar conversas">
             <button
               type="button"
               onClick={() => setConversationFilter("conversations")}
               aria-pressed={conversationFilter === "conversations"}
-              className={`h-8 rounded-[10px] px-3 text-[13px] font-medium transition-colors ${conversationFilter === "conversations" ? "bg-white/[0.07] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-300"}`}
+              className={`h-8 rounded-[10px] px-2 text-[13px] font-medium transition-colors ${conversationFilter === "conversations" ? "bg-white/[0.07] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-300"}`}
             >
               Conversas
             </button>
@@ -265,9 +268,17 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
               type="button"
               onClick={() => setConversationFilter("groups")}
               aria-pressed={conversationFilter === "groups"}
-              className={`h-8 rounded-[10px] px-3 text-[13px] font-medium transition-colors ${conversationFilter === "groups" ? "bg-white/[0.07] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-300"}`}
+              className={`h-8 rounded-[10px] px-2 text-[13px] font-medium transition-colors ${conversationFilter === "groups" ? "bg-white/[0.07] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-300"}`}
             >
               Grupos
+            </button>
+            <button
+              type="button"
+              onClick={() => setConversationFilter("mine")}
+              aria-pressed={conversationFilter === "mine"}
+              className={`h-8 rounded-[10px] px-2 text-[13px] font-medium transition-colors ${conversationFilter === "mine" ? "bg-white/[0.07] text-zinc-100" : "text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-300"}`}
+            >
+              Minhas
             </button>
           </div>
 

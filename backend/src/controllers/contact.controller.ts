@@ -232,6 +232,58 @@ export async function setContactArchived(req: Request, res: Response) {
   }
 }
 
+export async function getContactAssignees(req: Request, res: Response) {
+  if (!req.user?.id) return res.status(401).json({ message: "Não autenticado" });
+  const users = await prisma.user.findMany({
+    select: { id: true, name: true, image: true },
+    orderBy: { name: "asc" },
+  });
+  return res.json(users);
+}
+
+export async function setContactAssignment(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const userId = req.user?.id;
+  const requestedUserId = req.body?.assignedUserId;
+  const legacyAssigned = req.body?.assigned;
+  const assigneeId = requestedUserId === undefined && typeof legacyAssigned === "boolean"
+    ? legacyAssigned ? userId : null
+    : requestedUserId;
+  if (!Number.isInteger(id) || id <= 0 || !userId || (assigneeId !== null && (typeof assigneeId !== "string" || !assigneeId.trim()))) {
+    return res.status(400).json({ message: "Dados de atribuição inválidos" });
+  }
+
+  if (assigneeId) {
+    const target = await prisma.user.findUnique({ where: { id: assigneeId }, select: { id: true } });
+    if (!target) return res.status(400).json({ message: "Usuário não encontrado" });
+  }
+
+  const contact = await prisma.contact.findUnique({ where: { id } });
+  if (!contact) return res.status(404).json({ message: "Contato não encontrado" });
+  if (contact.isGroup) return res.status(400).json({ message: "Grupos não podem ser atribuídos" });
+  if (contact.assignedUserId === assigneeId) return res.json(contact);
+
+  const updated = await prisma.contact.update({ where: { id }, data: { assignedUserId: assigneeId } });
+  getSocketServer().emit("contact_updated", updated);
+  return res.json(updated);
+}
+
+export async function setContactPriority(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const priority = req.body?.priority;
+  if (!Number.isInteger(id) || id <= 0 || !["LOW", "MEDIUM", "HIGH"].includes(priority)) {
+    return res.status(400).json({ message: "Prioridade inválida" });
+  }
+
+  const contact = await prisma.contact.findUnique({ where: { id } });
+  if (!contact) return res.status(404).json({ message: "Contato não encontrado" });
+  if (contact.priority === priority) return res.json(contact);
+
+  const updated = await prisma.contact.update({ where: { id }, data: { priority } });
+  getSocketServer().emit("contact_updated", updated);
+  return res.json(updated);
+}
+
 // DELETE /contacts/:id - Exclui um contato especifico pelo ID
 export async function deleteContact(req: Request, res: Response) {
   const id = Number(req.params.id);

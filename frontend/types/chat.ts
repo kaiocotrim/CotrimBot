@@ -7,6 +7,8 @@ export type Contact = {
   phone: string;
   isGroup: boolean;
   archived: boolean;
+  assignedUserId?: string | null;
+  priority?: "LOW" | "MEDIUM" | "HIGH";
 
   // Pode existir uma URL de foto,
   // ou null caso o WhatsApp não forneça.

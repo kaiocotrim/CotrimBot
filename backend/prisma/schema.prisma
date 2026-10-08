@@ -15,6 +15,7 @@ model Contact {
   updatedAt         DateTime  @updatedAt
   isGroup           Boolean   @default(false)
   archived          Boolean   @default(false)
+  priority          ContactPriority @default(MEDIUM)
   profilePictureUrl String?   @db.Text
   whatsappLid       String?   @unique
   muted             Boolean   @default(false)
@@ -24,7 +25,11 @@ model Contact {
   advancedPrivacy   Boolean   @default(false)
   chatTheme         String    @default("default") @db.VarChar(32)
   listName          String?   @db.VarChar(64)
+  assignedUserId    String?
+  assignedUser      User?     @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
   messages          Message[]
+
+  @@index([assignedUserId])
 }
 
 model Message {
@@ -93,6 +98,12 @@ enum MessageType {
   DOCUMENT
 }
 
+enum ContactPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
 // Tabelas exigidas pelo Better Auth (https://www.better-auth.com/docs/adapters/prisma).
 model User {
   id            String    @id @default(cuid())
@@ -114,6 +125,7 @@ model User {
   members     Member[]
   invitations Invitation[]
   messageDeletions MessageDeletion[]
+  assignedContacts Contact[]
 }
 
 model Session {
