@@ -7,19 +7,21 @@ import { createPortal } from "react-dom";
 import { AttachmentMenu, type AttachmentKind } from "@/components/chat/attachment-menu";
 import { EmojiSelector } from "@/components/chat/emoji-selector";
 import { EmojiText } from "@/components/chat/emoji-text";
+import { MessageText } from "@/components/chat/message-text";
 import { insertEmojiAtSelection } from "@/lib/emoji-text";
 import { rewriteMessage } from "@/lib/chat-api";
 import type { Message } from "@/types/chat";
 
 
 type MessageComposerProps = {
+  userId: string;
   dropZoneContainer: HTMLElement | null;
   text: string;
   sending: boolean;
   closing: boolean;
 
   onTextChange: (text: string) => void;
-  onSend: (options: { private: boolean }) => void;
+  onSend: (options: { private: boolean; includeSignature: boolean }) => void;
   onCloseWithBot: () => void;
   allowCloseWithBot?: boolean;
   focusRequestKey: number;
@@ -28,7 +30,8 @@ type MessageComposerProps = {
 
   onSendMedia: (
     files: File[],
-    caption?: string
+    caption?: string,
+    includeSignature?: boolean,
   ) => Promise<void>;
 };
 type PendingAttachment = {
@@ -61,7 +64,11 @@ function replyPreview(message: Message) {
     STICKER: "Figurinha",
   };
   const label = labels[message.type];
-  return label && !message.content.startsWith("[") ? `${label} · ${message.content}` : label ?? message.content;
+  if (label && message.content.startsWith("[")) return label;
+  return <>
+    {label && `${label} · `}
+    <MessageText content={message.content} showSignature={message.direction === "OUTGOING" && !message.private} linkify={false} />
+  </>;
 }
 
 // Os controles compartilham tamanho e espessura de traço.
@@ -87,6 +94,7 @@ const buttonClassName = "flex items-center justify-center rounded-full text-zinc
 const privateButtonClassName = "border-zinc-300 bg-zinc-100 !text-zinc-700 hover:bg-zinc-200 hover:!text-zinc-950 focus-visible:!outline-zinc-500/60 disabled:!text-zinc-400";
 
 export function MessageComposer({
+  userId,
   dropZoneContainer,
   text,
   sending,
@@ -112,6 +120,15 @@ export function MessageComposer({
   const nextAttachmentIdRef = useRef(1);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [isPrivateMode, setIsPrivateMode] = useState(false);
+  const signaturePreferenceKey = `cotrimbot:include-signature:${userId}`;
+  const [includeSignature, setIncludeSignature] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      return window.localStorage.getItem(signaturePreferenceKey) !== "false";
+    } catch {
+      return true;
+    }
+  });
   // =========================================================
   // GRAVAÇÃO DE ÁUDIO
   // =========================================================
@@ -157,6 +174,16 @@ export function MessageComposer({
   const showControls = isFocused || text.length > 0 || isFullscreen;
   const isStacked = measurements.compact > 24 || isFullscreen || isLongTextCollapsed;
   const transition = { duration: reduceMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
+
+  function toggleSignature() {
+    const next = !includeSignature;
+    setIncludeSignature(next);
+    try {
+      window.localStorage.setItem(signaturePreferenceKey, String(next));
+    } catch {
+      // O controle continua funcionando nesta sessão se o armazenamento estiver bloqueado.
+    }
+  }
 
   useEffect(() => {
     function togglePrivateMode(event: KeyboardEvent) {
@@ -318,7 +345,7 @@ export function MessageComposer({
     if (!pendingAttachments.length || sending) return;
     setAttachmentError(null);
     try {
-      await onSendMedia(pendingAttachments.map((attachment) => attachment.file), text.trim() || undefined);
+      await onSendMedia(pendingAttachments.map((attachment) => attachment.file), text.trim() || undefined, includeSignature);
       clearPendingAttachments();
       onTextChange("");
     } catch (error) {
@@ -638,7 +665,7 @@ export function MessageComposer({
                   ease: "easeInOut",
                 });
               }
-              onSend({ private: isPrivateMode });
+              onSend({ private: isPrivateMode, includeSignature });
             }
           }}
         >
@@ -1102,7 +1129,7 @@ export function MessageComposer({
               <svg className="size-5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" opacity=".25" /><path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
             ) : <ComposerIcon name="send" />}
           </motion.button>
-          <AttachmentMenu open={attachmentsOpen && !sending} triggerRef={attachmentTriggerRef} onClose={closeAttachments} onSelect={selectAttachment} closing={closing} onCloseWithBot={onCloseWithBot} allowCloseWithBot={allowCloseWithBot} stacked={isStacked} />
+          <AttachmentMenu open={attachmentsOpen && !sending} triggerRef={attachmentTriggerRef} onClose={closeAttachments} onSelect={selectAttachment} closing={closing} onCloseWithBot={onCloseWithBot} allowCloseWithBot={allowCloseWithBot} signatureEnabled={includeSignature} onToggleSignature={toggleSignature} stacked={isStacked} />
           <EmojiSelector id={emojiSelectorId} open={emojisOpen && !sending} isPrivateMode={isPrivateMode} triggerRef={emojiTriggerRef} onClose={closeEmojis} onSelect={selectEmoji} fieldHeight={fieldHeight} rightInset={isStacked ? 0 : 56} />
           {/* Seleciona o arquivo localmente; a integração de envio de mídia é uma etapa separada. */}
           <input

@@ -16,11 +16,12 @@ type VideoMessageProps = {
   mediaUrl: string;
   // Legenda do vídeo ou o marcador padrão "[Vídeo]".
   content: string;
+  showSignature: boolean;
   // Dados exibidos no cabeçalho do visualizador.
   contact: Contact;
   createdAt: string;
   // Imagens e vídeos disponíveis para navegação no visualizador.
-  gallery: Array<{ id: number; type: "IMAGE" | "VIDEO"; mediaUrl: string; content: string; createdAt: string }>;
+  gallery: Array<{ id: number; type: "IMAGE" | "VIDEO"; mediaUrl: string; content: string; showSignature: boolean; createdAt: string }>;
 };
 
 // Mantém a data do visualizador consistente com o fuso usado no restante do chat.
@@ -33,7 +34,7 @@ const viewerDateFormatter = new Intl.DateTimeFormat("pt-BR", {
 // Estilo compartilhado pelos botões de download e fechamento.
 const controlClass = "flex size-8 shrink-0 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-white/70";
 
-export function VideoMessage({ messageId, mediaUrl, content, contact, createdAt, gallery }: VideoMessageProps) {
+export function VideoMessage({ messageId, mediaUrl, content, showSignature, contact, createdAt, gallery }: VideoMessageProps) {
   // Controla a abertura do modal e qual mídia da galeria está selecionada.
   const [viewerOpen, setViewerOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -45,7 +46,7 @@ export function VideoMessage({ messageId, mediaUrl, content, contact, createdAt,
   const hasCaption = content !== "[Vídeo]";
 
   // Garante que o vídeo clicado continue disponível mesmo se a galeria estiver vazia.
-  const fallbackItem = { id: messageId, type: "VIDEO" as const, mediaUrl, content, createdAt };
+  const fallbackItem = { id: messageId, type: "VIDEO" as const, mediaUrl, content, showSignature, createdAt };
   const activeItem = gallery[activeIndex] ?? fallbackItem;
   const activeHasCaption = activeItem.content !== (activeItem.type === "VIDEO" ? "[Vídeo]" : "[Imagem]");
 
@@ -101,7 +102,7 @@ export function VideoMessage({ messageId, mediaUrl, content, contact, createdAt,
       </button>
 
       {/* Exibe somente legendas reais, nunca o marcador interno "[Vídeo]". */}
-      {hasCaption && <p className="px-2 pb-0.5 pt-2 whitespace-pre-wrap"><MessageText content={content} /></p>}
+      {hasCaption && <p className="px-2 pb-0.5 pt-2 whitespace-pre-wrap"><MessageText content={content} showSignature={showSignature} /></p>}
 
       {/*
         O portal coloca o visualizador diretamente no body para que ele não
@@ -154,7 +155,7 @@ export function VideoMessage({ messageId, mediaUrl, content, contact, createdAt,
                 </>}
               </div>
               {/* Legenda da mídia atualmente selecionada. */}
-              {activeHasCaption && <p className="shrink-0 px-6 py-2 text-center text-xs text-zinc-300"><MessageText content={activeItem.content} /></p>}
+              {activeHasCaption && <p className="shrink-0 px-6 py-2 text-center text-xs text-zinc-300"><MessageText content={activeItem.content} showSignature={activeItem.showSignature} /></p>}
               {/* Faixa de miniaturas para navegação direta entre imagens e vídeos. */}
               {gallery.length > 1 && <div className="flex h-20 shrink-0 items-center justify-center gap-2 overflow-x-auto border-t border-white/10 px-4 py-2">
                 {gallery.map((item, index) => <button key={item.id} type="button" onClick={() => setActiveIndex(index)} aria-label={`Abrir mídia ${index + 1}`} aria-current={index === activeIndex} className={`relative h-14 w-16 shrink-0 overflow-hidden rounded-md border-2 bg-black/30 p-0.5 ${index === activeIndex ? "border-emerald-400" : "border-transparent hover:border-white/30"}`}>

@@ -10,6 +10,7 @@ import { MessageList } from "@/components/chat/message-list";
 import type { Contact, Message } from "@/types/chat";
 
 type ChatPanelProps = {
+  userId: string;
   contact: Contact | null;
   contacts: Contact[];
   messages: Message[];
@@ -22,7 +23,7 @@ type ChatPanelProps = {
   isTyping: boolean;
 
   onTextChange: (text: string) => void;
-  onSend: (options: { private: boolean; replyToMessageId?: number }) => void;
+  onSend: (options: { private: boolean; includeSignature: boolean; replyToMessageId?: number }) => void;
   onLoadOlderMessages: () => Promise<void>;
   onEnsureMessageLoaded: (messageId: number) => Promise<boolean>;
   onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
@@ -35,6 +36,7 @@ type ChatPanelProps = {
     files: File[],
     caption?: string,
     replyToMessageId?: number,
+    includeSignature?: boolean,
   ) => Promise<void>;
 
   onCloseWithBot: () => void;
@@ -43,6 +45,7 @@ type ChatPanelProps = {
 
 // Agrupa todas as partes visuais da conversa selecionada.
 export function ChatPanel({
+  userId,
   contact,
   contacts,
   messages,
@@ -166,6 +169,8 @@ export function ChatPanel({
           />
 
           <MessageComposer
+            key={userId}
+            userId={userId}
             dropZoneContainer={conversationPanel}
             text={text}
             sending={sending}
@@ -175,8 +180,8 @@ export function ChatPanel({
               onSend({ ...options, replyToMessageId: activeReply?.id });
               setReplyingTo(null);
             }}
-            onSendMedia={async (files, caption) => {
-              await onSendMedia(files, caption, activeReply?.id);
+            onSendMedia={async (files, caption, includeSignature) => {
+              await onSendMedia(files, caption, activeReply?.id, includeSignature);
               setReplyingTo(null);
             }}
             onCloseWithBot={onCloseWithBot}

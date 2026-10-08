@@ -38,6 +38,7 @@ export default function Home() {
       />
 
       <ChatPanel
+        userId={session.user.id}
         contact={chat.selectedContact}
         contacts={chat.contacts}
         messages={chat.messages}
@@ -63,4 +64,3 @@ export default function Home() {
     </main>
   );
 }
-

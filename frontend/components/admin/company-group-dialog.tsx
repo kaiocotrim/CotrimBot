@@ -8,6 +8,7 @@ import { createCompanyGroup, deleteCompanyGroup, updateCompanyGroup } from "@/li
 import { permissionSections, type CompanyGroup, type OrganizationMember, type PermissionKey } from "./company-types";
 
 const inputClass = "min-h-10 w-full rounded-lg border border-white/[0.09] bg-white/[0.025] px-3 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-700 focus:border-white/20 focus:bg-white/[0.04]";
+const allPermissions: PermissionKey[] = permissionSections.flatMap((section) => section.permissions.map(([permission]) => permission));
 const MotionDialogBackdrop = motion.create(Dialog.Backdrop);
 const MotionDialogPopup = motion.create(Dialog.Popup);
 
@@ -27,6 +28,7 @@ export function CompanyGroupDialog({ organizationId, group, members, open, onOpe
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
+  const allPermissionsSelected = allPermissions.every((permission) => permissions.includes(permission));
 
   function toggleMember(memberId: string) {
     setMemberIds((current) => current.includes(memberId) ? current.filter((id) => id !== memberId) : [...current, memberId]);
@@ -106,7 +108,12 @@ export function CompanyGroupDialog({ organizationId, group, members, open, onOpe
               </section>
 
               <section>
-                <h3 className="text-sm font-medium text-zinc-200">Permissões</h3>
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-medium text-zinc-200">Permissões</h3>
+                  <button type="button" onClick={() => setPermissions(allPermissionsSelected ? [] : allPermissions)} className="rounded-md px-2 py-1 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-300">
+                    {allPermissionsSelected ? "Desmarcar tudo" : "Marcar tudo"}
+                  </button>
+                </div>
                 <p className="mb-5 mt-1 text-xs leading-5 text-zinc-600">O dono da empresa sempre mantém acesso total.</p>
                 <div className="space-y-6">
                   {permissionSections.map((section) => <div key={section.label}>

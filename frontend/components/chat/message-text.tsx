@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import { EmojiText } from "@/components/chat/emoji-text";
+import { splitMessageSignatures } from "@/lib/message-signature";
 
 const URL_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"'`“”‘’]+/gi;
 
@@ -23,12 +24,14 @@ function trimUrlPunctuation(value: string) {
   return url;
 }
 
-// Detecta links apenas no conteúdo das mensagens, preservando texto e emojis.
-export function MessageText({ content }: { content: string }) {
+// Interpreta apenas o prefixo de assinatura enviado pelo backend, sem alterar o texto salvo.
+export function MessageText({ content, showSignature = false, linkify = true, lightBackground = false }: { content: string; showSignature?: boolean; linkify?: boolean; lightBackground?: boolean }) {
+  const signed = showSignature ? splitMessageSignatures(content) : null;
+  const body = signed?.body ?? content;
   const parts = [];
   let offset = 0;
 
-  for (const match of content.matchAll(URL_PATTERN)) {
+  for (const match of linkify ? body.matchAll(URL_PATTERN) : []) {
     const value = trimUrlPunctuation(match[0]);
     const href = /^https?:\/\//i.test(value) ? value : `https://${value}`;
     try {
@@ -40,7 +43,7 @@ export function MessageText({ content }: { content: string }) {
 
     parts.push(
       <Fragment key={match.index}>
-        <EmojiText content={content.slice(offset, match.index)} />
+        <EmojiText content={body.slice(offset, match.index)} />
         <a
           href={href}
           target="_blank"
@@ -54,5 +57,11 @@ export function MessageText({ content }: { content: string }) {
     offset = match.index + value.length;
   }
 
-  return <>{parts}<EmojiText content={content.slice(offset)} /></>;
+  return <>
+    {signed?.signatures.map(({ name, separator }, index) => <Fragment key={index}>
+      <strong className={`rounded-md px-1 py-px font-semibold [box-decoration-break:clone] ${lightBackground ? "bg-zinc-900/10 text-zinc-800" : "bg-white/10 text-zinc-100"}`}><EmojiText content={`${name}:`} /></strong>
+      {separator}
+    </Fragment>)}
+    {parts}<EmojiText content={body.slice(offset)} />
+  </>;
 }

@@ -1,13 +1,18 @@
+import { MessageText } from "@/components/chat/message-text";
+import { splitMessageSignatures } from "@/lib/message-signature";
+
 type DocumentMessageProps = {
   mediaUrl: string;
   content: string;
+  showSignature: boolean;
 };
 
 function withDownloadParameter(mediaUrl: string) {
   return `${mediaUrl}${mediaUrl.includes("?") ? "&" : "?"}download=1`;
 }
 
-export function DocumentMessage({ mediaUrl, content }: DocumentMessageProps) {
+export function DocumentMessage({ mediaUrl, content, showSignature }: DocumentMessageProps) {
+  const signedDocument = showSignature && splitMessageSignatures(content).signatures.length > 0;
   const fileName = content !== "[Documento]" ? content : "Documento";
 
   return (
@@ -19,9 +24,10 @@ export function DocumentMessage({ mediaUrl, content }: DocumentMessageProps) {
         </svg>
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold" title={fileName}>
-          {fileName}
+        <p className="truncate text-sm font-semibold" title={signedDocument ? "Documento" : fileName}>
+          {signedDocument ? "Documento" : fileName}
         </p>
+        {signedDocument && <p className="mt-1 break-words whitespace-pre-wrap text-xs text-white/75 [overflow-wrap:anywhere]"><MessageText content={content} showSignature /></p>}
         <a
           href={mediaUrl}
           target="_blank"
@@ -33,8 +39,8 @@ export function DocumentMessage({ mediaUrl, content }: DocumentMessageProps) {
       </div>
       <a
         href={withDownloadParameter(mediaUrl)}
-        download={fileName}
-        aria-label={`Baixar ${fileName}`}
+        download={signedDocument ? undefined : fileName}
+        aria-label={signedDocument ? "Baixar documento" : `Baixar ${fileName}`}
         title="Baixar arquivo"
         className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/[0.08] text-white/85 shadow-sm transition-[background-color,color,transform] hover:scale-105 hover:bg-white/[0.14] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 active:scale-95 motion-reduce:transition-none"
       >

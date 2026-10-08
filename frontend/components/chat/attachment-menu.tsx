@@ -20,11 +20,13 @@ type AttachmentMenuProps = {
   closing: boolean;
   onCloseWithBot: () => void;
   allowCloseWithBot: boolean;
+  signatureEnabled: boolean;
+  onToggleSignature: () => void;
   stacked: boolean;
 };
 
 // Fica fora do campo com overflow-hidden para o menu não ser cortado.
-export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, onCloseWithBot, allowCloseWithBot, stacked }: AttachmentMenuProps) {
+export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, onCloseWithBot, allowCloseWithBot, signatureEnabled, onToggleSignature, stacked }: AttachmentMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
 
@@ -109,6 +111,27 @@ export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, o
             )}
             <span className="sr-only">{closing ? "Encerrando..." : "Encerrar chamado com Bot"}</span>
           </motion.button>}
+          <motion.button
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={signatureEnabled}
+            aria-label="Assinar mensagens"
+            title={signatureEnabled ? "Assinatura ativada · clique para desativar" : "Assinatura desativada · clique para ativar"}
+            variants={{ closed: { opacity: 0, scale: 0.4, x: 0, y: 0 }, open: { opacity: 1, scale: 1, x: allowCloseWithBot ? 272 : 222, y: -60 } }}
+            transition={{ duration: reduceMotion ? 0 : 0.45, delay: reduceMotion ? 0 : allowCloseWithBot ? 0.175 : 0.14, ease: [0.22, 1, 0.36, 1] }}
+            whileHover={reduceMotion ? undefined : { scale: 1.08 }}
+            whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={onToggleSignature}
+            className={`pointer-events-auto absolute bottom-0 left-0 flex size-9 items-center justify-center rounded-full border bg-zinc-900/95 bg-gradient-to-br from-white/10 to-transparent shadow-[inset_0_1px_2px_rgba(255,255,255,0.12),0_6px_20px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-400 ${signatureEnabled ? "border-emerald-400/40 text-emerald-300 hover:bg-emerald-950" : "border-white/15 text-zinc-400 hover:bg-zinc-800"}`}
+          >
+            <svg className="size-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m4 20 4.5-1 11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" />
+              <path d="m14.5 6.5 3 3" />
+              {!signatureEnabled && <path d="M3 3 21 21" />}
+            </svg>
+            <span className="sr-only">{signatureEnabled ? "Assinatura ativada" : "Assinatura desativada"}</span>
+          </motion.button>
         </motion.div>
       )}
     </AnimatePresence>

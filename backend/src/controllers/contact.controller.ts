@@ -250,27 +250,3 @@ export async function deleteContact(req: Request, res: Response) {
 
   res.status(204).send();
 }
-
-// DELETE /contacts - Limpa todo o histórico local antes de conectar outro WhatsApp.
-export async function deleteAllConversations(req: Request, res: Response) {
-  if (req.user?.role !== "admin") {
-    return res.status(403).json({ message: "Somente administradores podem apagar todas as conversas." });
-  }
-
-  try {
-    const result = await prisma.$transaction(async (tx) => {
-      await tx.messageDeletion.deleteMany();
-      await tx.messageMedia.deleteMany();
-      await tx.message.updateMany({ data: { quotedMessageId: null } });
-      const deletedMessages = await tx.message.deleteMany();
-      const deletedContacts = await tx.contact.deleteMany();
-      return { messages: deletedMessages.count, contacts: deletedContacts.count };
-    });
-
-    getSocketServer().emit("conversations_cleared");
-    return res.json({ success: true, ...result });
-  } catch (error) {
-    console.error("Erro ao apagar todas as conversas:", error);
-    return res.status(500).json({ message: "Não foi possível apagar todas as conversas." });
-  }
-}

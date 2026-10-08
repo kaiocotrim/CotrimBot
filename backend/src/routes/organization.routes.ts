@@ -365,7 +365,8 @@ organizationRouter.patch("/organizations/:organizationId/members/:memberId/profi
   const jobTitle = readString(input.jobTitle ?? "", 100);
   const signature = readString(input.signature ?? "", 255);
   const signatureEnabled = input.signatureEnabled;
-  if (displayName === null || jobTitle === null || signature === null || typeof signatureEnabled !== "boolean") {
+  if (displayName === null || jobTitle === null || signature === null || typeof signatureEnabled !== "boolean"
+    || /[\r\n*]/.test(signature)) {
     response.status(400).json({ error: "Confira os campos de nome, cargo e assinatura." });
     return;
   }
@@ -373,14 +374,16 @@ organizationRouter.patch("/organizations/:organizationId/members/:memberId/profi
   try {
     const [requester, target] = await Promise.all([
       findMembership(organizationId, userId),
-      prisma.member.findFirst({ where: { id: memberId, organizationId }, select: { id: true, userId: true, role: true } }),
+      prisma.member.findFirst({ where: { id: memberId, organizationId }, select: { id: true, userId: true, role: true, displayName: true, jobTitle: true, signature: true, signatureEnabled: true } }),
     ]);
     if (!requester || !target) {
       response.status(404).json({ error: "Usuário da empresa não encontrado." });
       return;
     }
     const editingSelf = requester.id === target.id;
-    if (!editingSelf && !canEditCompanyMembers(requester)) {
+    if (!editingSelf && !canEditCompanyMembers(requester)
+      && (!canManageCompany(requester)
+        || target.displayName !== (displayName || null) || target.jobTitle !== (jobTitle || null))) {
       response.status(403).json({ error: "Você não tem permissão para editar este usuário." });
       return;
     }
@@ -388,9 +391,14 @@ organizationRouter.patch("/organizations/:organizationId/members/:memberId/profi
       response.status(403).json({ error: "Somente o dono pode alterar o próprio perfil na empresa." });
       return;
     }
+    if (!canManageCompany(requester)
+      && (target.signature !== (signature || null) || target.signatureEnabled !== (signature ? signatureEnabled : false))) {
+      response.status(403).json({ error: "Somente administradores podem configurar assinaturas." });
+      return;
+    }
 
     await prisma.member.update({
-      where: { id: memberId },
+      where: { id: memberId, organizationId },
       data: {
         displayName: displayName || null,
         jobTitle: jobTitle || null,

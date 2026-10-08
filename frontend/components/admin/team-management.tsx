@@ -1,5 +1,6 @@
 "use client";
 
+import { Dialog } from "@base-ui/react/dialog";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -8,6 +9,8 @@ import { authClient } from "@/lib/auth-client";
 import { getCompanyWorkspace, updateCompanyLogo } from "@/lib/company-api";
 import { CompanyGroupDialog } from "./company-group-dialog";
 import { CompanyMemberDialog } from "./company-member-dialog";
+import { CompanyContentSkeleton } from "./company-skeleton";
+import { InvitationSuccessAnimation } from "./invitation-success-animation";
 import { permissionSections, type CompanyGroup, type OrganizationMember, type OrganizationSummary } from "./company-types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -33,6 +36,8 @@ type Step = "overview" | "company" | "users";
 type CompanyTab = "overview" | "members" | "groups" | "invites";
 
 const inputClass = "h-10 w-full min-w-0 rounded-lg border border-white/10 bg-black px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-white/25";
+const MotionDialogBackdrop = motion.create(Dialog.Backdrop);
+const MotionDialogPopup = motion.create(Dialog.Popup);
 
 function emptyDraft(): DraftUser {
   return { id: uuidv4(), name: "", email: "", jobTitle: "", permission: "member" };
@@ -137,8 +142,8 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
   const canEditMembers = currentMembership?.role === "owner"
     || (currentMembership?.role === "admin" && currentMembership.effectivePermissions.includes("COMPANY_MEMBERS_EDIT"));
 
-  const loadOrganization = useCallback(async () => {
-    setLoading(true);
+  const loadOrganization = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     setError(null);
     try {
       const { data, error: organizationError } = await authClient.organization.list();
@@ -161,7 +166,7 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
     } catch {
       setError("Não foi possível carregar os dados da empresa.");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, []);
 
@@ -279,7 +284,7 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
       setInviteJobTitle("");
       setInviteRole("member");
       setCreatedInvitation({ id: invitationId, email: invitedEmail });
-      await loadOrganization();
+      await loadOrganization(false);
     } catch {
       setInviteMessage("Não foi possível adicionar o usuário.");
     } finally {
@@ -312,7 +317,7 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
     setBusyId(null);
   }
 
-  if (loading) return <p className="text-sm text-zinc-400">Carregando empresa...</p>;
+  if (loading) return <CompanyContentSkeleton />;
 
   if (!organization && step === "overview") {
     if (!canCreateCompany) {
@@ -396,7 +401,7 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
 
   return (
     <div className="flex min-w-0 flex-col gap-9">
-      <section className="border-b border-white/[0.07] pb-7">
+      <section className="pb-7">
         <div className="flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
           <div className="flex min-w-0 items-center gap-4">
             <div className="relative shrink-0">
@@ -431,7 +436,7 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
       </section>
 
       <div id="company-management" className="scroll-mt-6">
-        <nav aria-label="Navegação da empresa" className="mb-8 overflow-x-auto border-b border-white/[0.07]">
+        <nav aria-label="Navegação da empresa" className="company-tab-nav mb-8 overflow-x-auto border-b border-white/[0.07]">
           <div className="flex min-w-max gap-7">
             {tabs.map((tab) => {
               const selected = activeTab === tab.id;
@@ -481,47 +486,15 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
           {canManage && (
             <motion.button
               type="button"
-              aria-label={inviteOpen ? "Fechar formulário" : "Convidar membro"}
-              aria-expanded={inviteOpen}
+              aria-label="Convidar membro"
               whileTap={reduceMotion ? undefined : { scale: 0.9 }}
-              onClick={() => { setInviteOpen((current) => !current); setInviteMessage(null); setCreatedInvitation(null); }}
+              onClick={() => { setInviteOpen(true); setInviteMessage(null); setCreatedInvitation(null); }}
               className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-2 text-xs font-medium text-zinc-300 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
             >
-              {inviteOpen ? <X size={15} /> : <Plus size={15} />} {inviteOpen ? "Fechar" : "Convidar"}
+              <Plus size={15} /> Convidar
             </motion.button>
           )}
         </div>
-
-        <AnimatePresence initial={false}>
-          {canManage && inviteOpen && (
-            <motion.div
-              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10, scale: 0.985 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.985 }}
-              transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="mb-4 origin-top rounded-2xl bg-white/[0.035] p-5"
-            >
-              <h4 className="mb-4 text-sm font-semibold text-zinc-100">Novo usuário</h4>
-              {createdInvitation && (
-                <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] p-4">
-                  <p className="text-sm font-medium text-emerald-300">Convite criado com sucesso</p>
-                  <p className="mt-1 truncate text-xs text-zinc-400">Envie o link de acesso para {createdInvitation.email}.</p>
-                  <button
-                    type="button"
-                    onClick={() => void copyInvitationLink(createdInvitation.id)}
-                    className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 px-3.5 py-2 text-xs font-medium text-emerald-200 transition-colors hover:bg-emerald-400/10"
-                  >
-                    {copiedInvitationId === createdInvitation.id ? <Check size={14} /> : <Copy size={14} />}
-                    {copiedInvitationId === createdInvitation.id ? "Link copiado" : "Copiar link de acesso"}
-                  </button>
-                </div>
-              )}
-              <div className="grid gap-3 sm:grid-cols-2"><input autoFocus value={inviteName} onChange={(event) => setInviteName(event.target.value)} placeholder="Nome" className={inputClass} /><input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="E-mail" className={inputClass} /><input value={inviteJobTitle} onChange={(event) => setInviteJobTitle(event.target.value)} placeholder="Cargo / função" className={inputClass} /><select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as "member" | "admin")} className={inputClass}><option value="member">Usuário</option><option value="admin">Administrador</option></select></div>
-              <div className="mt-4 flex items-center gap-3"><button type="button" disabled={inviting} onClick={() => void handleInvite()} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-zinc-200 disabled:opacity-50">{inviting ? "Adicionando..." : "Adicionar usuário"}</button><button type="button" disabled={inviting} onClick={() => setInviteOpen(false)} className="px-2 py-2 text-sm text-zinc-500 transition-colors hover:text-zinc-200 disabled:opacity-50">Cancelar</button></div>
-              {inviteMessage && <p className="mt-3 text-sm text-red-400">{inviteMessage}</p>}
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <label className="relative mb-4 block max-w-sm">
           <Search size={15} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
@@ -600,8 +573,54 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
       </div>
       {error && <p className="text-sm text-red-400">{error}</p>}
 
+      {canManage && inviteOpen && <Dialog.Root open onOpenChange={(open) => { if (!inviting) setInviteOpen(open); }}>
+        <Dialog.Portal>
+          <MotionDialogBackdrop initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduceMotion ? 0 : 0.2 }} className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-sm" />
+          <div className="pointer-events-none fixed inset-0 z-[201] flex items-center justify-center p-4">
+            <MotionDialogPopup initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: [0.16, 1, 0.3, 1] }} className="pointer-events-auto flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/[0.1] bg-[#090909] text-zinc-100 shadow-2xl outline-none">
+            <header className="flex items-start justify-between gap-4 border-b border-white/[0.07] px-6 py-5">
+              <div>
+                <Dialog.Title className="text-lg font-semibold">{createdInvitation ? "Convite enviado" : "Novo usuário"}</Dialog.Title>
+                <Dialog.Description className="mt-1 text-sm text-zinc-500">{createdInvitation ? "O novo usuário já pode acessar o convite." : "Envie um convite para acessar a empresa."}</Dialog.Description>
+              </div>
+              <Dialog.Close disabled={inviting} aria-label="Fechar" className="rounded-lg p-1 text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-white disabled:opacity-50"><X size={20} /></Dialog.Close>
+            </header>
+            {createdInvitation ? <motion.div initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : 0.25 }} className="min-h-0 overflow-y-auto">
+              <div role="status" className="flex flex-col items-center px-6 pb-8 pt-5 text-center">
+                <InvitationSuccessAnimation />
+                <h3 className="mt-1 text-lg font-semibold text-zinc-100">Convite encaminhado!</h3>
+                <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-400">Enviamos o convite para <span className="break-all font-medium text-zinc-200">{createdInvitation.email}</span>.</p>
+                <button type="button" onClick={() => void copyInvitationLink(createdInvitation.id)} className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:border-white/30 hover:bg-white/[0.05]">
+                  {copiedInvitationId === createdInvitation.id ? <Check size={16} /> : <Copy size={16} />}
+                  {copiedInvitationId === createdInvitation.id ? "Link copiado" : "Copiar link de acesso"}
+                </button>
+                {inviteMessage && <p role="alert" className="mt-3 text-sm text-red-400">{inviteMessage}</p>}
+              </div>
+              <footer className="flex justify-end gap-3 border-t border-white/[0.07] px-6 py-4">
+                <button type="button" onClick={() => { setCreatedInvitation(null); setInviteMessage(null); }} className="rounded-lg px-3 py-2 text-sm text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200">Convidar outro</button>
+                <Dialog.Close className="rounded-lg bg-white px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-zinc-200">Concluir</Dialog.Close>
+              </footer>
+            </motion.div> : <form onSubmit={(event) => { event.preventDefault(); void handleInvite(); }} className="min-h-0 overflow-y-auto">
+              <div className="space-y-5 px-6 py-6">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="text-xs text-zinc-400">Nome<input autoFocus required value={inviteName} onChange={(event) => setInviteName(event.target.value)} placeholder="Nome" className={`${inputClass} mt-2`} /></label>
+                  <label className="text-xs text-zinc-400">E-mail<input type="email" required value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="E-mail" className={`${inputClass} mt-2`} /></label>
+                  <label className="text-xs text-zinc-400">Cargo / função<input value={inviteJobTitle} onChange={(event) => setInviteJobTitle(event.target.value)} placeholder="Opcional" className={`${inputClass} mt-2`} /></label>
+                  <label className="text-xs text-zinc-400">Permissão<select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as "member" | "admin")} className={`${inputClass} mt-2`}><option value="member">Usuário</option><option value="admin">Administrador</option></select></label>
+                </div>
+                {inviteMessage && <p role="alert" className="text-sm text-red-400">{inviteMessage}</p>}
+              </div>
+              <footer className="flex justify-end gap-3 border-t border-white/[0.07] px-6 py-4">
+                <Dialog.Close disabled={inviting} className="rounded-lg px-3 py-2 text-sm text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200 disabled:opacity-50">Cancelar</Dialog.Close>
+                <button type="submit" disabled={inviting} className="rounded-lg bg-white px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-zinc-200 disabled:opacity-50">{inviting ? "Adicionando..." : "Adicionar usuário"}</button>
+              </footer>
+            </form>}
+            </MotionDialogPopup>
+          </div>
+        </Dialog.Portal>
+      </Dialog.Root>}
       {groupDialogOpen && <CompanyGroupDialog organizationId={organization.id} group={selectedGroup} members={members} open onOpenChange={setGroupDialogOpen} onSaved={loadOrganization} />}
-      {memberDialogOpen && selectedMember && <CompanyMemberDialog organizationId={organization.id} member={selectedMember} open onOpenChange={setMemberDialogOpen} onSaved={loadOrganization} canEdit={selectedMember.userId === currentUserId || Boolean(canEditMembers && (selectedMember.role !== "owner" || currentMembership?.role === "owner"))} />}
+      {memberDialogOpen && selectedMember && <CompanyMemberDialog organizationId={organization.id} member={selectedMember} open onOpenChange={setMemberDialogOpen} onSaved={loadOrganization} canEdit={selectedMember.userId === currentUserId || Boolean(canEditMembers && (selectedMember.role !== "owner" || currentMembership?.role === "owner"))} canEditSignature={Boolean(canManage && (selectedMember.role !== "owner" || currentMembership?.role === "owner"))} />}
     </div>
   );
 }

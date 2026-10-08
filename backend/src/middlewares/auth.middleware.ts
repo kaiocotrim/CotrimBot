@@ -8,6 +8,7 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthSession["user"];
+      activeOrganizationId: string | undefined;
     }
   }
 }
@@ -24,5 +25,6 @@ export async function requireAuth(request: Request, response: Response, next: Ne
   }
 
   request.user = session.user;
+  request.activeOrganizationId = session.session.activeOrganizationId ?? undefined;
   next();
 }

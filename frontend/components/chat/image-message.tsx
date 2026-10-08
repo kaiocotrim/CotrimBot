@@ -11,10 +11,11 @@ type ImageMessageProps = {
   messageId: number;
   mediaUrl: string;
   content: string;
+  showSignature: boolean;
   viewOnce: boolean;
   contact: Contact;
   createdAt: string;
-  gallery: Array<{ id: number; mediaUrl: string; content: string; createdAt: string; viewOnce: boolean }>;
+  gallery: Array<{ id: number; mediaUrl: string; content: string; showSignature: boolean; createdAt: string; viewOnce: boolean }>;
 };
 
 const viewerDateFormatter = new Intl.DateTimeFormat("pt-BR", {
@@ -27,13 +28,13 @@ const viewerButtonClass = "flex size-10 items-center justify-center rounded-full
 const viewerIconButtonClass = "flex size-9 items-center justify-center rounded-full transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-white/50";
 const sideButtonClass = "absolute flex size-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.035] text-zinc-100 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_8px_22px_rgba(0,0,0,0.24)] backdrop-blur-xl transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-white/50";
 
-export function ImageMessage({ messageId, mediaUrl, content, viewOnce, contact, createdAt, gallery }: ImageMessageProps) {
+export function ImageMessage({ messageId, mediaUrl, content, showSignature, viewOnce, contact, createdAt, gallery }: ImageMessageProps) {
   const [open, setOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [activeIndex, setActiveIndex] = useState(0);
   const reduceMotion = useReducedMotion();
   const hasCaption = content !== "[Imagem]";
-  const fallbackItem = { id: messageId, mediaUrl, content, createdAt, viewOnce };
+  const fallbackItem = { id: messageId, mediaUrl, content, showSignature, createdAt, viewOnce };
   const activeItem = gallery[activeIndex] ?? fallbackItem;
   const activeHasCaption = activeItem.content !== "[Imagem]";
 
@@ -133,7 +134,7 @@ export function ImageMessage({ messageId, mediaUrl, content, viewOnce, contact, 
             )}
           </div>
 
-          {activeHasCaption && <p className="shrink-0 px-6 py-2 text-center text-xs text-zinc-300"><MessageText content={activeItem.content} /></p>}
+          {activeHasCaption && <p className="shrink-0 px-6 py-2 text-center text-xs text-zinc-300"><MessageText content={activeItem.content} showSignature={activeItem.showSignature} /></p>}
           {gallery.length > 1 && (
             <div className="flex h-20 shrink-0 items-center justify-center gap-2 overflow-x-auto border-t border-white/10 px-4 py-2">
               <a href={activeItem.mediaUrl} download aria-label="Baixar imagem atual" className={`${viewerButtonClass} shrink-0`}><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 20h14" /></svg></a>
@@ -167,7 +168,7 @@ export function ImageMessage({ messageId, mediaUrl, content, viewOnce, contact, 
           </span>
         )}
       </button>
-      {hasCaption && <p className="px-2 pt-2 pb-0.5 whitespace-pre-wrap"><MessageText content={content} /></p>}
+      {hasCaption && <p className="px-2 pt-2 pb-0.5 whitespace-pre-wrap"><MessageText content={content} showSignature={showSignature} /></p>}
       {typeof document !== "undefined" && createPortal(viewer, document.body)}
     </div>
   );

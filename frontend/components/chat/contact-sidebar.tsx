@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { Avatar } from "@/components/chat/avatar";
 import { AccountSettings } from "@/components/chat/account-settings";
-import { EmojiText } from "@/components/chat/emoji-text";
+import { MessageText } from "@/components/chat/message-text";
 import { QuickConversationPreview } from "@/components/chat/quick-conversation-preview";
 import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
 import { useSession } from "@/lib/auth-client";
@@ -12,7 +12,7 @@ import type { Contact, Message } from "@/types/chat";
 
 type ContactSidebarProps = { contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void };
 type ConversationFilter = "conversations" | "groups";
-const PREVIEW_HOLD_DURATION = 2_000;
+const PREVIEW_HOLD_DURATION = 1_000;
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
 const dayKeyFormatter = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: CHAT_TIME_ZONE });
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: CHAT_TIME_ZONE });
@@ -309,7 +309,7 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
                     onClick={(event) => selectContactFromClick(contact, event)}
                     aria-label={`${contact.name}${unread ? `, ${contact.unreadCount} mensagens não lidas` : ""}`}
                     aria-current={selected ? "true" : undefined}
-                    title={`${contact.name} — Clique para abrir a conversa; segure o botão direito por 2 segundos para ver a prévia`}
+                    title={`${contact.name} — Clique para abrir a conversa; segure o botão direito por 1 segundo para ver a prévia`}
                     className={`block w-full select-none text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 ${isCollapsed ? "rounded-xl py-2" : "px-2"}`}
                   >
                   <div className={`flex items-center ${isCollapsed ? "justify-center" : "gap-2.5"}`}>
@@ -347,7 +347,8 @@ export function ContactSidebar({ contacts, loading, error, selectedContactId, on
                       </div>
                       <div className="mt-0.5 flex items-center gap-2">
                         <p className="min-w-0 flex-1 truncate text-[12px] leading-tight font-normal text-zinc-500">
-                          <EmojiText content={lastMessage ? lastMessage.deletedAt ? "Mensagem apagada" : `${lastMessage.direction === "OUTGOING" ? "✓✓ " : ""}${lastMessage.content}` : "Nenhuma mensagem"} />
+                          {lastMessage && !lastMessage.deletedAt && lastMessage.direction === "OUTGOING" && "✓✓ "}
+                          <MessageText content={lastMessage ? lastMessage.deletedAt ? "Mensagem apagada" : lastMessage.content : "Nenhuma mensagem"} showSignature={Boolean(lastMessage && !lastMessage.deletedAt && !lastMessage.private && lastMessage.direction === "OUTGOING")} linkify={false} />
                         </p>
                          {unread && (
                           <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-semibold text-zinc-950">

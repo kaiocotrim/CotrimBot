@@ -1,7 +1,6 @@
 import { Router } from "express";
 import {
   createContact,
-  deleteAllConversations,
   deleteContact,
   getContactAvatar,
   getContactById,
@@ -27,9 +26,6 @@ contactRouter.get("/contacts/:id", getContactById);
 
 // POST /contacts - Cria um novo contato
 contactRouter.post("/contacts", createContact);
-
-// DELETE /contacts - Exclui todos os contatos, mensagens e mídias locais
-contactRouter.delete("/contacts", deleteAllConversations);
 
 // PATCH /contacts/:id - Atualiza um contato especifico pelo ID
 contactRouter.patch("/contacts/:id", updateContact);

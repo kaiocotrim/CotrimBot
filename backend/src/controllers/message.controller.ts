@@ -23,20 +23,7 @@ import {
 } from "../services/transcription.service.js";
 
 import { getSatisfactionSurvey } from "../services/bot.service.js";
-
-async function addUserSignature(userId: string | undefined, content: string): Promise<string> {
-  if (!userId || !content.trim()) return content.trim();
-
-  const membership = await prisma.member.findFirst({
-    where: { userId },
-    orderBy: { createdAt: "asc" },
-    select: { signature: true, signatureEnabled: true },
-  });
-  const signature = membership?.signature?.trim();
-  if (!membership?.signatureEnabled || !signature) return content.trim();
-
-  return `${signature}: ${content.trim()}`;
-}
+import { getSignedOutgoingText, SignatureMembershipError } from "../services/user-signature.service.js";
 
 export async function getGroupSenderAvatar(req: Request, res: Response) {
   const messageId = Number(req.params.id);
@@ -249,6 +236,11 @@ export async function sendMediaToContact(
 
   // Legenda opcional enviada no form-data.
   const caption = typeof req.body.caption === "string" ? req.body.caption : "";
+  const rawIncludeSignature = req.body.includeSignature;
+  if (rawIncludeSignature !== undefined && rawIncludeSignature !== "true" && rawIncludeSignature !== "false") {
+    return res.status(400).json({ message: "Opção de assinatura inválida" });
+  }
+  const includeSignature = rawIncludeSignature !== "false";
   const rawReplyToMessageId = req.body.replyToMessageId;
   const replyToMessageId = rawReplyToMessageId === undefined || rawReplyToMessageId === ""
     ? undefined
@@ -317,9 +309,7 @@ export async function sendMediaToContact(
   }
 
   try {
-    const outgoingCaption = caption.trim()
-      ? await addUserSignature(req.user?.id, caption)
-      : "";
+    const outgoingCaption = await getSignedOutgoingText(req.user!.id, req.activeOrganizationId, caption, undefined, includeSignature);
 
     // O arquivo está em bytes dentro da RAM.
     // Convertemos esses bytes para Base64
@@ -406,6 +396,9 @@ export async function sendMediaToContact(
     });
 
   } catch (error) {
+    if (error instanceof SignatureMembershipError) {
+      return res.status(403).json({ message: error.message });
+    }
     console.error(
       "Erro ao enviar mídia:",
       error
@@ -486,7 +479,7 @@ export async function sendMessageToContact(req: Request, res: Response) {
   const contactId = Number(req.params.id);
 
   // O texto enviado pelo cliente da API é recebido no corpo JSON da requisição.
-  const { text, clientId, private: isPrivate = false, replyToMessageId } = req.body;
+  const { text, clientId, private: isPrivate = false, replyToMessageId, includeSignature = true } = req.body;
 
   // Procuramos o contato antes do envio porque precisamos do telefone cadastrado.
   // Isso também impede uma chamada desnecessária à Evolution para um contato
@@ -512,6 +505,10 @@ export async function sendMessageToContact(req: Request, res: Response) {
 
   if (typeof isPrivate !== "boolean") {
     return res.status(400).json({ message: "Indicador de mensagem privada inválido" });
+  }
+
+  if (typeof includeSignature !== "boolean") {
+    return res.status(400).json({ message: "Opção de assinatura inválida" });
   }
 
   if (replyToMessageId !== undefined && (!Number.isInteger(replyToMessageId) || replyToMessageId <= 0)) {
@@ -552,7 +549,7 @@ export async function sendMessageToContact(req: Request, res: Response) {
       return res.status(201).json({ message: responseMessage, evolution: null });
     }
 
-    const outgoingText = await addUserSignature(req.user?.id, text);
+    const outgoingText = await getSignedOutgoingText(req.user!.id, req.activeOrganizationId, text, undefined, includeSignature);
 
     // O service recebe apenas telefone e texto e cuida de toda a comunicação HTTP
     // com a Evolution API, mantendo esse detalhe fora do controller.
@@ -618,6 +615,9 @@ export async function sendMessageToContact(req: Request, res: Response) {
       evolution: evolutionResponse,
     });
   } catch (error) {
+    if (error instanceof SignatureMembershipError) {
+      return res.status(403).json({ message: error.message });
+    }
     // Registra o erro técnico no backend, mas devolve ao cliente uma mensagem
     // estável sem expor detalhes internos da Evolution API ou do banco.
     console.error(error);

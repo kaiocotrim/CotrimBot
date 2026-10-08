@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Dialog } from "@base-ui/react/dialog";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import {
@@ -20,6 +21,7 @@ import { AudioMessage } from "@/components/chat/audio-message";
 import { DocumentMessage } from "@/components/chat/document-message";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { ImageMessage } from "@/components/chat/image-message";
+import { MessageText } from "@/components/chat/message-text";
 import { StickerMessage } from "@/components/chat/sticker-message";
 import { TextMessage } from "@/components/chat/text-message";
 import { VideoMessage } from "@/components/chat/video-message";
@@ -27,6 +29,7 @@ import type { Contact, Message } from "@/types/chat";
 
 type MessageBubbleProps = {
   message: Message;
+  quotedMessage?: Message;
   contact: Contact;
   contacts: Contact[];
   mediaMessages: Message[];
@@ -58,12 +61,12 @@ const messageDateFormatter = new Intl.DateTimeFormat("pt-BR", {
 });
 
 // Mantém o estilo do balão e delega o conteúdo ao componente de cada tipo.
-export function MessageBubble({ message, contact, contacts, mediaMessages, onReact, onUpdateFlags, onDelete, onForwardMessage, onReply, onNavigateToMessage }: MessageBubbleProps) {
+export function MessageBubble({ message, quotedMessage, contact, contacts, mediaMessages, onReact, onUpdateFlags, onDelete, onForwardMessage, onReply, onNavigateToMessage }: MessageBubbleProps) {
   const [reacting, setReacting] = useState(false);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [choosingContact, setChoosingContact] = useState(false);
-  const [choosingDelete, setChoosingDelete] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -73,10 +76,10 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
   const reactionControlsRef = useRef<HTMLDivElement>(null);
   const reactionPickerRef = useRef<HTMLDivElement>(null);
   const reactionTriggerRef = useRef<HTMLButtonElement>(null);
-  const bubbleRef = useRef<HTMLDivElement>(null);
   const [reactionPosition, setReactionPosition] = useState({ top: 0, left: 0 });
   const outgoing = message.direction === "OUTGOING";
   const isPrivate = Boolean(message.private);
+  const showSignature = outgoing && !isPrivate;
   const isAudio = message.type === "AUDIO";
   const isImage = message.type === "IMAGE";
   const isVideo = message.type === "VIDEO";
@@ -86,6 +89,9 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
   const quotedMediaMessage = message.quotedMessageId
     ? mediaMessages.find((media) => media.id === message.quotedMessageId)
     : undefined;
+  const showQuotedSignature = quotedMessage
+    ? quotedMessage.direction === "OUTGOING" && !quotedMessage.private
+    : message.quotedSenderName === "Você";
   const createdAt = new Date(message.createdAt);
   const hasValidDate = !Number.isNaN(createdAt.getTime());
   const inlineTime = message.type === "TEXT" && !/[\r\n]/.test(message.content) && !message.deletedAt;
@@ -95,7 +101,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
   const content = (() => {
     switch (message.type) {
       case "TEXT":
-        return <TextMessage content={message.content} />;
+        return <TextMessage content={message.content} showSignature={showSignature} />;
       case "AUDIO":
         return <AudioMessage
           mediaUrl={mediaUrl}
@@ -106,6 +112,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
           messageId={message.id}
           mediaUrl={mediaUrl}
           content={message.content}
+          showSignature={showSignature}
           viewOnce={Boolean(message.viewOnce)}
           contact={contact}
           createdAt={message.createdAt}
@@ -113,6 +120,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
             id: image.id,
             mediaUrl: `${API_URL}/messages/${image.id}/media`,
             content: image.content,
+            showSignature: image.direction === "OUTGOING" && !image.private,
             createdAt: image.createdAt,
             viewOnce: Boolean(image.viewOnce),
           }))}
@@ -122,6 +130,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
           messageId={message.id}
           mediaUrl={mediaUrl}
           content={message.content}
+          showSignature={showSignature}
           contact={contact}
           createdAt={message.createdAt}
           gallery={mediaMessages.map((media) => ({
@@ -129,15 +138,16 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
             type: media.type as "IMAGE" | "VIDEO",
             mediaUrl: `${API_URL}/messages/${media.id}/media`,
             content: media.content,
+            showSignature: media.direction === "OUTGOING" && !media.private,
             createdAt: media.createdAt,
           }))}
         />;
       case "STICKER":
         return <StickerMessage mediaUrl={mediaUrl} />;
       case "DOCUMENT":
-        return <DocumentMessage mediaUrl={mediaUrl} content={message.content} />;
+        return <DocumentMessage mediaUrl={mediaUrl} content={message.content} showSignature={showSignature} />;
       default:
-        return <TextMessage content={message.content} />;
+        return <TextMessage content={message.content} showSignature={showSignature} />;
     }
   })();
 
@@ -195,16 +205,16 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
 
   function openReactionPicker() {
     const trigger = reactionTriggerRef.current?.getBoundingClientRect();
-    const bubble = bubbleRef.current?.getBoundingClientRect();
-    if (!trigger || !bubble) return;
-    const pickerWidth = 248;
-    const pickerHeight = 44;
+    if (!trigger) return;
+    const pickerWidth = 250;
+    const pickerHeight = 42;
+    const gap = 4;
     const left = outgoing ? trigger.left : trigger.right - pickerWidth;
     setReactionPosition({
       left: Math.max(8, Math.min(left, window.innerWidth - pickerWidth - 8)),
-      top: bubble.top >= pickerHeight + 8
-        ? bubble.top - pickerHeight - 8
-        : Math.min(bubble.bottom + 8, window.innerHeight - pickerHeight - 8),
+      top: trigger.top >= pickerHeight + gap + 8
+        ? trigger.top - pickerHeight - gap
+        : Math.max(8, Math.min(trigger.bottom + gap, window.innerHeight - pickerHeight - 8)),
     });
     setActionsOpen(false);
     setReactionPickerOpen(true);
@@ -251,13 +261,12 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
 
   async function deleteSelected(scope: "me" | "everyone") {
     if (deleting) return;
-    if (scope === "everyone" && !window.confirm("Apagar esta mensagem para todos?")) return;
     setDeleting(true);
     setActionError(null);
     try {
       await onDelete(message.id, scope);
       setActionsOpen(false);
-      setChoosingDelete(false);
+      setDeleteDialogOpen(false);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Não foi possível apagar a mensagem");
     } finally {
@@ -266,7 +275,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
   }
 
   const quickReactionBar = (
-    <div className="mb-1.5 flex w-max items-center gap-0.5 rounded-full border border-white/10 bg-zinc-900/95 px-1.5 py-1 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+    <div className="flex w-max items-center gap-0.5 rounded-full border border-white/10 bg-zinc-900/80 px-1.5 py-1 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-xl">
       {QUICK_REACTIONS.map((reaction) => (
         <button
           key={reaction}
@@ -287,13 +296,11 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
 
   return (
     <div
-      ref={bubbleRef}
       onContextMenu={(event) => {
         event.preventDefault();
         setActionsOpen(true);
         setReactionPickerOpen(false);
         setChoosingContact(false);
-        setChoosingDelete(false);
         setCopyError(false);
         setActionError(null);
       }}
@@ -385,7 +392,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 5, scale: 0.96 }}
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-              className="fixed z-[100] origin-bottom-left"
+              className={`fixed z-[100] ${outgoing ? "origin-bottom-left" : "origin-bottom-right"}`}
               style={reactionPosition}
             >
               {quickReactionBar}
@@ -404,7 +411,6 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
             setActionsOpen((open) => !open);
             setReactionPickerOpen(false);
             setChoosingContact(false);
-            setChoosingDelete(false);
             setCopyError(false);
             setActionError(null);
           }}
@@ -430,23 +436,6 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
                       <button key={target.id} type="button" role="menuitem" onClick={() => { onForwardMessage(message, target); setActionsOpen(false); }} className="block w-full truncate rounded-md px-3 py-2 text-left hover:bg-white/[0.08] focus-visible:bg-white/[0.08] focus-visible:outline-none">{target.name}</button>
                     ))}
                   </div>
-                </>
-              ) : choosingDelete ? (
-                <>
-                  <button type="button" role="menuitem" disabled={deleting} onClick={() => void deleteSelected("me")} className={`${menuButtonClass} disabled:opacity-50`}>
-                    <Trash size={15} weight="bold" className="shrink-0 text-zinc-200" />
-                    <span>Apagar para mim</span>
-                  </button>
-                  {!message.deletedAt && (
-                    <button type="button" role="menuitem" disabled={deleting} onClick={() => void deleteSelected("everyone")} className={`${menuButtonClass} text-red-300 disabled:opacity-50`}>
-                      <Trash size={15} weight="bold" className="shrink-0" />
-                      <span>Apagar para todos</span>
-                    </button>
-                  )}
-                  <button type="button" role="menuitem" disabled={deleting} onClick={() => setChoosingDelete(false)} className={`${menuButtonClass} text-zinc-400 disabled:opacity-50`}>
-                    <span>Voltar</span>
-                  </button>
-                  {actionError && <p role="alert" className="px-3 py-1 text-[11px] text-red-300">{actionError}</p>}
                 </>
               ) : (
                 <>
@@ -485,7 +474,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
                     <WarningCircle size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Denunciar</span>
                   </button>
-                  <button type="button" role="menuitem" onClick={() => setChoosingDelete(true)} className={menuButtonClass}>
+                  <button type="button" role="menuitem" aria-haspopup="dialog" onClick={() => { setActionsOpen(false); setActionError(null); setDeleteDialogOpen(true); }} className={menuButtonClass}>
                     <Trash size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Apagar</span>
                   </button>
@@ -498,6 +487,38 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
         )}
         </AnimatePresence>
       </div>
+      {deleteDialogOpen && (
+        <Dialog.Root open onOpenChange={(open) => {
+          if (deleting) return;
+          setDeleteDialogOpen(open);
+          if (!open) setActionError(null);
+        }}>
+          <Dialog.Portal>
+            <Dialog.Backdrop className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-[2px]" />
+            <div className="pointer-events-none fixed inset-0 z-[201] flex items-center justify-center p-4">
+              <Dialog.Popup className="pointer-events-auto w-full max-w-[300px] rounded-xl bg-zinc-900 p-4 text-zinc-100 shadow-[0_18px_50px_rgba(0,0,0,0.45)] outline-none">
+                <Dialog.Title className="px-2 text-sm font-semibold">Apagar mensagem</Dialog.Title>
+                <Dialog.Description className="sr-only">Escolha se a mensagem será apagada apenas para você ou para todos.</Dialog.Description>
+                <div className="mt-3 space-y-0.5">
+                  <button type="button" disabled={deleting} onClick={() => void deleteSelected("me")} className="block w-full rounded-lg px-3 py-2 text-left text-[13px] text-zinc-200 transition-colors hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-white/60 disabled:opacity-50">
+                    Apagar para mim
+                  </button>
+                  {!message.deletedAt && (
+                    <button type="button" disabled={deleting} onClick={() => void deleteSelected("everyone")} className="block w-full rounded-lg px-3 py-2 text-left text-[13px] text-red-300 transition-colors hover:bg-red-400/10 focus-visible:outline-2 focus-visible:outline-red-300 disabled:opacity-50">
+                      Apagar para todos
+                    </button>
+                  )}
+                </div>
+                {deleting && <p role="status" className="mt-2 px-2 text-xs text-zinc-400">Apagando…</p>}
+                {actionError && <p role="alert" className="mt-2 px-2 text-xs text-red-300">{actionError}</p>}
+                <div className="mt-2 flex justify-end">
+                  <Dialog.Close autoFocus disabled={deleting} className="rounded-lg px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-white/60 disabled:opacity-50">Cancelar</Dialog.Close>
+                </div>
+              </Dialog.Popup>
+            </div>
+          </Dialog.Portal>
+        </Dialog.Root>
+      )}
       {!message.deletedAt && message.quotedContent && (
         <button
           type="button"
@@ -513,7 +534,7 @@ export function MessageBubble({ message, contact, contacts, mediaMessages, onRea
               <span className={`block truncate text-[11px] font-semibold ${isPrivate ? "text-zinc-700" : "text-emerald-200"}`}>
                 {message.quotedSenderName || "Mensagem"}
               </span>
-              <span className={`block truncate text-xs ${isPrivate ? "text-zinc-600" : "text-white/75"}`}>{message.quotedContent}</span>
+              <span className={`block truncate text-xs ${isPrivate ? "text-zinc-600" : "text-white/75"}`}><MessageText content={message.quotedContent} showSignature={showQuotedSignature} linkify={false} lightBackground={isPrivate} /></span>
             </span>
           </span>
         </button>

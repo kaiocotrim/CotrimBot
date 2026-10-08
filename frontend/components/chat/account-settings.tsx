@@ -3,12 +3,11 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
-import { BadgeCheck, Bell, Building2, QrCode, Trash2, UserRound, X } from "lucide-react";
+import { BadgeCheck, Bell, Building2, QrCode, UserRound, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { EvolutionConnectionSettings } from "@/components/chat/evolution-connection-settings";
 import { authClient } from "@/lib/auth-client";
-import { deleteAllConversations } from "@/lib/chat-api";
 import styles from "./account-settings.module.css";
 
 type SettingsUser = {
@@ -67,9 +66,6 @@ function SettingsContent({ user }: { user: SettingsUser }) {
   const [accountError, setAccountError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
-  const [deletingConversations, setDeletingConversations] = useState(false);
-  const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const nameChanged = name.trim() !== savedName;
   const availableSections = user.role === "admin"
@@ -116,30 +112,6 @@ function SettingsContent({ user }: { user: SettingsUser }) {
     } catch {
       setSignOutError("Não foi possível sair. Tente novamente.");
       setSigningOut(false);
-    }
-  }
-
-  async function clearConversations() {
-    if (deletingConversations) return;
-    const confirmed = window.confirm("Apagar todas as conversas, contatos e mídias salvas? Esta ação não pode ser desfeita.");
-    if (!confirmed) return;
-    const confirmation = window.prompt('Para confirmar, digite "APAGAR".');
-    if (confirmation !== "APAGAR") {
-      if (confirmation !== null) setDeleteError('Confirmação incorreta. Digite "APAGAR".');
-      return;
-    }
-
-    setDeletingConversations(true);
-    setDeleteMessage(null);
-    setDeleteError(null);
-    try {
-      const result = await deleteAllConversations();
-      window.dispatchEvent(new Event("cotrimbot:conversations-cleared"));
-      setDeleteMessage(`${result.contacts} ${result.contacts === 1 ? "conversa apagada" : "conversas apagadas"}.`);
-    } catch (clearError) {
-      setDeleteError(clearError instanceof Error ? clearError.message : "Não foi possível apagar as conversas.");
-    } finally {
-      setDeletingConversations(false);
     }
   }
 
@@ -214,20 +186,6 @@ function SettingsContent({ user }: { user: SettingsUser }) {
 
             <ConnectedAccounts />
 
-            {user.role === "admin" && (
-              <section className={`${styles.card} ${styles.dangerZone}`} aria-labelledby="danger-zone-title">
-                <div>
-                  <h3 id="danger-zone-title">Apagar conversas</h3>
-                  <p>Remove permanentemente todas as conversas, contatos e mídias salvas no CotrimBot. Use antes de conectar um número novo.</p>
-                </div>
-                <button type="button" className={styles.dangerButton} disabled={deletingConversations} onClick={() => void clearConversations()}>
-                  <Trash2 size={16} aria-hidden="true" />
-                  {deletingConversations ? "Apagando tudo…" : "Apagar todas as conversas"}
-                </button>
-                {deleteMessage && <p role="status" className={styles.feedback}>{deleteMessage}</p>}
-                {deleteError && <p role="alert" className={styles.error}>{deleteError}</p>}
-              </section>
-            )}
           </Tabs.Panel>
 
           <Tabs.Panel value="notifications" className={styles.panel}>

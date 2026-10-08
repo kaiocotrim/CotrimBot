@@ -23,11 +23,6 @@ export async function getContacts(): Promise<Contact[]> {
   return parseResponse<Contact[]>(response, "Erro ao buscar contatos");
 }
 
-export async function deleteAllConversations(): Promise<{ success: true; messages: number; contacts: number }> {
-  const response = await fetch(`${API_URL}/contacts`, { method: "DELETE", credentials: "include" });
-  return parseResponse(response, "Não foi possível apagar todas as conversas");
-}
-
 export async function getMessages(contactId: number, before?: number, limit = 30): Promise<MessagesPage> {
   const params = new URLSearchParams({ limit: String(limit) });
   if (before) params.set("before", String(before));
@@ -121,11 +116,11 @@ export async function updateContactName(contactId: number, name: string) {
   return parseResponse<Pick<Contact, "id" | "name">>(response, "Erro ao editar contato");
 }
 
-export async function postMessage(contactId: number, text: string, clientId?: string, isPrivate = false, replyToMessageId?: number): Promise<{ message: Message }> {
+export async function postMessage(contactId: number, text: string, clientId?: string, isPrivate = false, replyToMessageId?: number, includeSignature = true): Promise<{ message: Message }> {
   const response = await fetch(`${API_URL}/contacts/${contactId}/send`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, clientId, private: isPrivate, replyToMessageId }),
+    body: JSON.stringify({ text, clientId, private: isPrivate, replyToMessageId, includeSignature }),
     credentials: "include",
   });
 
@@ -161,6 +156,7 @@ export async function sendMedia(
   file: File,
   caption?: string,
   replyToMessageId?: number,
+  includeSignature = true,
 ) {
   const formData = new FormData();
 
@@ -176,6 +172,8 @@ export async function sendMedia(
   if (replyToMessageId) {
     formData.append("replyToMessageId", String(replyToMessageId));
   }
+
+  formData.append("includeSignature", String(includeSignature));
 
   const response = await fetch(
     `${API_URL}/contacts/${contactId}/send-media`,

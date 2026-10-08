@@ -305,18 +305,6 @@ export function useChat() {
       setContactTyping(data.contactId, data.isTyping);
     }
 
-    function handleConversationsCleared() {
-      setContacts([]);
-      setSelectedContact(null);
-      selectedContactIdRef.current = null;
-      setMessages([]);
-      setHasOlderMessages(false);
-      setNewMessageId(null);
-      setTypingContactIds(new Set());
-      avatarRequestsRef.current.clear();
-    }
-
-
     // Começa a ouvir o evento
     // enviado pelo backend.
     socket.on(
@@ -331,8 +319,6 @@ export function useChat() {
     socket.on("message_flags_updated", handleMessageFlagsUpdated);
     socket.on("contact_updated", handleContactUpdated);
     socket.on("contact_presence", handleContactPresence);
-    socket.on("conversations_cleared", handleConversationsCleared);
-    window.addEventListener("cotrimbot:conversations-cleared", handleConversationsCleared);
 
 
     // Remove o listener quando
@@ -350,8 +336,6 @@ export function useChat() {
       socket.off("message_flags_updated", handleMessageFlagsUpdated);
       socket.off("contact_updated", handleContactUpdated);
       socket.off("contact_presence", handleContactPresence);
-      socket.off("conversations_cleared", handleConversationsCleared);
-      window.removeEventListener("cotrimbot:conversations-cleared", handleConversationsCleared);
     };
   }, [selectedContact]);
 
@@ -652,7 +636,7 @@ export function useChat() {
   // ENVIAR MENSAGEM DE TEXTO
   // =========================================================
 
-  function sendMessage(options: { private: boolean; replyToMessageId?: number } = { private: false }) {
+  function sendMessage(options: { private: boolean; includeSignature?: boolean; replyToMessageId?: number } = { private: false }) {
     const content =
       text.trim();
     const contact = selectedContact;
@@ -704,7 +688,7 @@ export function useChat() {
       return [updatedContact, ...current.filter((item) => item.id !== contact.id)];
     });
 
-    void postMessage(contact.id, content, optimisticMessage.clientId, options.private, options.replyToMessageId)
+    void postMessage(contact.id, content, optimisticMessage.clientId, options.private, options.replyToMessageId, options.includeSignature)
       .then(({ message }) => {
         const confirmedMessage = { ...message, clientId: optimisticMessage.clientId };
         const replaceOptimistic = (items: Message[]) => {
@@ -840,6 +824,7 @@ export function useChat() {
     files: File[],
     caption?: string,
     replyToMessageId?: number,
+    includeSignature = true,
   ) {
     if (
       !selectedContact ||
@@ -867,6 +852,7 @@ export function useChat() {
           file,
           index === 0 ? caption : undefined,
           index === 0 ? replyToMessageId : undefined,
+          includeSignature,
         );
       }
 

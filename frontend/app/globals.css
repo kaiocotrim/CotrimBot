@@ -89,6 +89,15 @@ html {
   display: none;
 }
 
+/* Mantém as abas da empresa roláveis em telas estreitas sem mostrar a barra. */
+.company-tab-nav {
+  scrollbar-width: none;
+}
+
+.company-tab-nav::-webkit-scrollbar {
+  display: none;
+}
+
 .cursor-pointer,
 a[href],
 button:not(:disabled),

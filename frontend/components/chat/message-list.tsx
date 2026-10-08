@@ -74,6 +74,7 @@ export function MessageList({ contact, contacts, messages, hasOlderMessages, loa
     () => messages.filter((message) => message.type === "IMAGE" || message.type === "VIDEO"),
     [messages],
   );
+  const messagesById = useMemo(() => new Map(messages.map((message) => [message.id, message])), [messages]);
 
   function updateScrollState() {
     const element = scrollRef.current;
@@ -238,7 +239,7 @@ export function MessageList({ contact, contacts, messages, hasOlderMessages, loa
                 : <Avatar contact={contact} />)}
 
               {/* O balão escolhe entre player de áudio e conteúdo textual. */}
-              <MessageBubble message={message} contact={contact} contacts={contacts} mediaMessages={mediaMessages} onReact={onReactToMessage} onUpdateFlags={onUpdateMessageFlags} onDelete={onDeleteMessage} onForwardMessage={onForwardMessage} onReply={onReplyToMessage} onNavigateToMessage={navigateToMessage} />
+              <MessageBubble message={message} quotedMessage={message.quotedMessageId ? messagesById.get(message.quotedMessageId) : undefined} contact={contact} contacts={contacts} mediaMessages={mediaMessages} onReact={onReactToMessage} onUpdateFlags={onUpdateMessageFlags} onDelete={onDeleteMessage} onForwardMessage={onForwardMessage} onReply={onReplyToMessage} onNavigateToMessage={navigateToMessage} />
             </div>
           </motion.div>
         );
