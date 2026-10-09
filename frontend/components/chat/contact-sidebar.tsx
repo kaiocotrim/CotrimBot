@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, Building2, Phone, Search, UserRound, UserRoundPlus } from "lucide-react";
+import { ArrowLeft, Building2, PanelLeftClose, PanelLeftOpen, Phone, Search, UserRound, UserRoundPlus, X } from "lucide-react";
 import { getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/min";
 import { Avatar } from "@/components/chat/avatar";
 import { ChatNavigationRail, type ChatRailSection } from "@/components/chat/chat-navigation-rail";
@@ -14,7 +14,7 @@ import { useSession } from "@/lib/auth-client";
 import { getMessages } from "@/lib/chat-api";
 import type { Contact, Message } from "@/types/chat";
 
-type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string) => Promise<Contact[]>; headerActions?: ReactNode };
+type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string) => Promise<Contact[]>; headerActions?: ReactNode; mobileOpen: boolean; onMobileOpenChange: (open: boolean) => void };
 type ConversationFilter = "conversations" | "groups" | "mine";
 const PREVIEW_HOLD_DURATION = 1_000;
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
@@ -22,6 +22,18 @@ const dayKeyFormatter = new Intl.DateTimeFormat("en-CA", { year: "numeric", mont
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: CHAT_TIME_ZONE });
 const weekdayFormatter = new Intl.DateTimeFormat("pt-BR", { weekday: "long", timeZone: CHAT_TIME_ZONE });
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: CHAT_TIME_ZONE });
+// Mesmo breakpoint "lg" do Tailwind: abaixo dele a barra lateral vira um painel sobreposto.
+const DESKTOP_QUERY = "(min-width: 1024px)";
+
+function subscribeToDesktopQuery(callback: () => void) {
+  const query = window.matchMedia(DESKTOP_QUERY);
+  query.addEventListener("change", callback);
+  return () => query.removeEventListener("change", callback);
+}
+
+function useIsDesktop() {
+  return useSyncExternalStore(subscribeToDesktopQuery, () => window.matchMedia(DESKTOP_QUERY).matches, () => true);
+}
 
 function formatSidebarDate(value: string) {
   const date = new Date(value);
@@ -35,10 +47,13 @@ function formatSidebarDate(value: string) {
   return dateFormatter.format(date);
 }
 
-export function ContactSidebar({ userId, contacts, loading, error, selectedContactId, onSelectContact, onLoadSavedContacts, onSaveContact, headerActions }: ContactSidebarProps) {
+export function ContactSidebar({ userId, contacts, loading, error, selectedContactId, onSelectContact, onLoadSavedContacts, onSaveContact, headerActions, mobileOpen, onMobileOpenChange }: ContactSidebarProps) {
   const reduceMotion = useReducedMotion();
   const { data: session } = useSession();
+  const isDesktop = useIsDesktop();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  // O modo recolhido só existe no desktop; no mobile o painel abre sempre completo.
+  const collapsed = isCollapsed && isDesktop;
   const [query, setQuery] = useState("");
   const [conversationFilter, setConversationFilter] = useState<ConversationFilter>("conversations");
   const [showArchived, setShowArchived] = useState(false);
@@ -65,6 +80,10 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   const previewPanelRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const headerRef = useRef<HTMLElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const collapsedButtonRef = useRef<HTMLButtonElement>(null);
+  const expandedButtonRef = useRef<HTMLButtonElement>(null);
+  const restoreCollapseFocusRef = useRef(false);
   const archivedCount = contacts.filter((contact) => contact.archived).length;
   const visibleContacts = useMemo(() => {
     const search = query.trim().toLocaleLowerCase("pt-BR");
@@ -296,17 +315,71 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
       event.preventDefault();
       if (event.repeat) return;
 
-      if (headerRef.current?.contains(document.activeElement)) sidebarRef.current?.focus();
+      const headerHasFocus = Boolean(headerRef.current?.contains(document.activeElement));
+      const collapseButtonHasFocus = document.activeElement === collapsedButtonRef.current
+        || document.activeElement === expandedButtonRef.current;
+      if (headerHasFocus) sidebarRef.current?.focus();
       cancelPreviewHold();
       closePreview();
       setShowNewContact(false);
       setShowSavedContacts(false);
-      setIsCollapsed((current) => !current);
+      if (isDesktop) {
+        restoreCollapseFocusRef.current = !headerHasFocus && collapseButtonHasFocus;
+        setIsCollapsed((current) => !current);
+      }
+      else onMobileOpenChange(!mobileOpen);
     }
 
     window.addEventListener("keydown", handleSidebarShortcut);
     return () => window.removeEventListener("keydown", handleSidebarShortcut);
-  }, [cancelPreviewHold, closePreview]);
+  }, [cancelPreviewHold, closePreview, isDesktop, mobileOpen, onMobileOpenChange]);
+
+  useEffect(() => {
+    if (isDesktop || !mobileOpen || previewContact) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (
+        event.key !== "Escape"
+        || event.defaultPrevented
+        || (event.target instanceof Element && event.target.closest("[data-country-code-popup]"))
+        || document.activeElement?.closest('[role="dialog"]')
+      ) return;
+      onMobileOpenChange(false);
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [isDesktop, mobileOpen, onMobileOpenChange, previewContact]);
+
+  useEffect(() => {
+    if (!restoreCollapseFocusRef.current) return;
+    restoreCollapseFocusRef.current = false;
+    (collapsed ? collapsedButtonRef : expandedButtonRef).current?.focus();
+  }, [collapsed]);
+
+  // Ao passar para o desktop o painel sobreposto deixa de existir; evita que reapareça ao reduzir a tela.
+  useEffect(() => {
+    if (isDesktop && mobileOpen) onMobileOpenChange(false);
+  }, [isDesktop, mobileOpen, onMobileOpenChange]);
+
+  // No mobile o painel funciona como uma gaveta: recebe o foco ao abrir e devolve ao fechar.
+  useEffect(() => {
+    if (isDesktop || !mobileOpen) return;
+    const drawer = drawerRef.current;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    drawer?.focus({ preventScroll: true });
+    return () => {
+      if (!drawer?.contains(document.activeElement) && document.activeElement !== document.body) return;
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+      else if (document.activeElement instanceof HTMLElement && drawer?.contains(document.activeElement)) document.activeElement.blur();
+    };
+  }, [isDesktop, mobileOpen]);
+
+  function toggleCollapsed() {
+    cancelPreviewHold();
+    closePreview();
+    restoreCollapseFocusRef.current = document.activeElement === collapsedButtonRef.current
+      || document.activeElement === expandedButtonRef.current;
+    setIsCollapsed((current) => !current);
+  }
 
   const emptyMessage = conversationFilter === "groups"
     ? showArchived ? "Nenhum grupo arquivado" : "Nenhum grupo encontrado"
@@ -316,7 +389,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   const activeRailSection: ChatRailSection = showSavedContacts ? "contacts" : showArchived ? "archived" : conversationFilter;
   const navigationRail = (
     <AnimatePresence initial={false}>
-      {!isCollapsed && (
+      {!collapsed && (
         <motion.div
           key="navigation-rail"
           initial={reduceMotion ? false : { width: 0, opacity: 0 }}
@@ -337,23 +410,55 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
     </AnimatePresence>
   );
 
+  // Desktop: barra fixa ao lado do chat. Mobile/tablet: painel deslizante com fundo escurecido.
+  const renderShell = (content: ReactNode) => (
+    <>
+      <div
+        aria-hidden="true"
+        onClick={() => onMobileOpenChange(false)}
+        className={`fixed inset-0 z-30 bg-black/60 backdrop-blur-[2px] transition-opacity duration-300 motion-reduce:transition-none lg:hidden ${mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+      />
+      <div
+        ref={drawerRef}
+        id="chat-sidebar"
+        tabIndex={-1}
+        data-sidebar-open={mobileOpen ? "true" : "false"}
+        className={`fixed inset-y-0 left-0 z-40 flex h-dvh outline-none max-w-[calc(100vw-2rem)] bg-zinc-950 shadow-[12px_0_40px_rgba(0,0,0,0.5)] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none lg:visible lg:static lg:z-auto lg:h-full lg:max-w-none lg:shrink-0 lg:translate-none lg:bg-transparent lg:shadow-none lg:transition-none ${mobileOpen ? "visible translate-x-0 transition-[translate]" : "invisible -translate-x-full transition-[translate,visibility]"}`}
+      >
+        {navigationRail}
+        {content}
+      </div>
+    </>
+  );
+  const panelWidthClass = "w-[320px] min-w-0 max-w-[calc(100vw-60px-2rem)] lg:min-w-[280px] lg:max-w-[42vw]";
+  const closeDrawerButton = (
+    <button
+      type="button"
+      aria-label="Fechar menu de conversas"
+      title="Fechar menu"
+      onClick={() => onMobileOpenChange(false)}
+      className="flex size-10 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-white lg:hidden"
+    >
+      <X aria-hidden="true" className="size-5" strokeWidth={1.8} />
+    </button>
+  );
+
   if (showSavedContacts && showNewContact) {
-    return (
-      <>
-      {navigationRail}
+    return renderShell(
       <motion.aside
         key="new-contact"
         aria-label="Novo contato"
         initial={reduceMotion ? false : { opacity: 0, x: 24 }}
         animate={{ opacity: 1, x: 0 }}
         transition={reduceMotion ? { duration: 0 } : { duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-        className="flex h-full min-h-0 w-[320px] min-w-[280px] max-w-[42vw] shrink-0 flex-col border-r border-white/[0.08] bg-[#111111] text-white"
+        className={`flex h-full min-h-0 ${panelWidthClass} shrink-0 flex-col border-r border-white/[0.08] bg-[#111111] text-white`}
       >
         <header className="flex h-16 shrink-0 items-center gap-3 px-4">
-          <button type="button" aria-label="Voltar aos contatos" onClick={() => { setSavedActionError(null); setShowNewContact(false); }} className="flex size-8 items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-white">
+          <button type="button" aria-label="Voltar aos contatos" onClick={() => { setSavedActionError(null); setShowNewContact(false); }} className="flex size-10 items-center justify-center rounded-full text-zinc-300 transition-colors lg:size-8 hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-white">
             <ArrowLeft aria-hidden="true" className="size-5" strokeWidth={1.8} />
           </button>
-          <h2 className="text-[16px] font-medium">Novo contato</h2>
+          <h2 className="min-w-0 flex-1 truncate text-[16px] font-medium">Novo contato</h2>
+          {closeDrawerButton}
         </header>
         <form onSubmit={(event) => void handleSaveContact(event)} className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-9 pb-8">
@@ -398,29 +503,27 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
             </button>
           </div>
         </form>
-      </motion.aside>
-      </>
+      </motion.aside>,
     );
   }
 
   if (showSavedContacts) {
     let previousLetter = "";
-    return (
-      <>
-      {navigationRail}
+    return renderShell(
       <motion.aside
         key="saved-contacts"
         aria-label="Nova conversa"
         initial={reduceMotion ? false : { opacity: 0, x: 24 }}
         animate={{ opacity: 1, x: 0 }}
         transition={reduceMotion ? { duration: 0 } : { duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-        className="flex h-full min-h-0 w-[320px] min-w-[280px] max-w-[42vw] shrink-0 flex-col border-r border-white/[0.08] bg-[#111111] text-zinc-100"
+        className={`flex h-full min-h-0 ${panelWidthClass} shrink-0 flex-col border-r border-white/[0.08] bg-[#111111] text-zinc-100`}
       >
         <header className="flex h-16 shrink-0 items-center gap-3 px-4">
-          <button type="button" aria-label="Voltar às conversas" onClick={() => setShowSavedContacts(false)} className="flex size-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-white">
+          <button type="button" aria-label="Voltar às conversas" onClick={() => setShowSavedContacts(false)} className="flex size-10 items-center justify-center rounded-full text-zinc-400 transition-colors lg:size-8 hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-white">
             <ArrowLeft aria-hidden="true" className="size-5" strokeWidth={1.8} />
           </button>
-          <h2 className="text-[16px] font-semibold tracking-tight">Nova conversa</h2>
+          <h2 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-tight">Nova conversa</h2>
+          {closeDrawerButton}
         </header>
         <label className="mx-4 mb-3 flex h-10 shrink-0 items-center gap-2.5 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 text-zinc-500 transition-colors focus-within:border-white/40 focus-within:text-zinc-300">
           <Search aria-hidden="true" className="size-4 shrink-0" strokeWidth={1.8} />
@@ -468,41 +571,65 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
             );
           })}
         </CompactScrollArea>
-      </motion.aside>
-      </>
+      </motion.aside>,
     );
   }
 
-  return (
-      <>
-      {navigationRail}
+  return renderShell(
       <aside
         ref={sidebarRef}
         tabIndex={-1}
         aria-label="Barra lateral de conversas"
         aria-keyshortcuts="Control+b"
-        className={`relative flex h-full min-h-0 shrink-0 flex-col border-r border-white/[0.08] outline-none transition-[width,min-width,max-width] duration-200 motion-reduce:transition-none ${isCollapsed ? "w-20 min-w-20 max-w-20" : "w-[320px] min-w-[280px] max-w-[42vw]"}`}
+        className={`relative flex h-full min-h-0 shrink-0 flex-col border-r border-white/[0.08] outline-none transition-[width,min-width,max-width] duration-200 motion-reduce:transition-none ${collapsed ? "w-20 min-w-20 max-w-20" : panelWidthClass}`}
       >
-        <header ref={headerRef} hidden={isCollapsed} className="px-4 pt-4 pb-2">
-          <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold tracking-tight text-zinc-100">CotrimBot</h1>
-            <div className="flex items-center gap-1.5">
+        {collapsed && (
+          <div className="flex justify-center pt-4">
+            <button
+              ref={collapsedButtonRef}
+              type="button"
+              onClick={toggleCollapsed}
+              aria-label="Expandir menu de conversas"
+              aria-expanded={false}
+              title="Expandir menu (Ctrl+B)"
+              className="flex size-10 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-white/50"
+            >
+              <PanelLeftOpen aria-hidden="true" className="size-5" strokeWidth={1.8} />
+            </button>
+          </div>
+        )}
+        <header ref={headerRef} hidden={collapsed} className="px-3 pt-4 pb-2 sm:px-4">
+          <div className="flex items-center justify-between gap-2">
+            <h1 className="min-w-0 truncate text-lg font-semibold tracking-tight text-zinc-100">CotrimBot</h1>
+            <div className="flex shrink-0 items-center gap-1.5">
               {headerActions}
               <motion.button
                 type="button"
                 aria-label="Nova conversa"
                 onClick={openSavedContacts}
                 whileTap={reduceMotion ? undefined : { scale: 0.9 }}
-                className="flex size-8 items-center justify-center rounded-full bg-zinc-950 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                className="flex size-10 items-center justify-center rounded-full bg-zinc-950 text-zinc-400 lg:size-8 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
               >
                 <svg className="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
                   <path d="M12 5v14M5 12h14" />
                 </svg>
               </motion.button>
+              <button
+                ref={expandedButtonRef}
+                type="button"
+                onClick={toggleCollapsed}
+                aria-label="Recolher menu de conversas"
+                aria-expanded={true}
+                title="Recolher menu (Ctrl+B)"
+                className="hidden size-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 focus-visible:outline-2 focus-visible:outline-white/50 lg:flex"
+              >
+                <PanelLeftClose aria-hidden="true" className="size-[18px]" strokeWidth={1.8} />
+              </button>
+              {closeDrawerButton}
             </div>
           </div>
 
-          <label className="mt-3 flex h-9 items-center gap-2 rounded-full border border-white/10 bg-gradient-to-b from-white/[0.075] via-white/[0.035] to-white/[0.015] px-3 text-zinc-500 shadow-[inset_0_1px_1px_rgba(255,255,255,0.16),inset_0_-1px_1px_rgba(0,0,0,0.2),0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow,color] focus-within:border-white/20 focus-within:bg-zinc-900/65 focus-within:text-zinc-300 focus-within:ring-2 focus-within:ring-white/[0.05]">
+          <label className="mt-3 flex h-10 items-center gap-2 rounded-full lg:h-9 border border-white/10 bg-gradient-to-b from-white/[0.075] via-white/[0.035] to-white/[0.015] px-3 text-zinc-500 shadow-[inset_0_1px_1px_rgba(255,255,255,0.16),inset_0_-1px_1px_rgba(0,0,0,0.2),0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow,color] focus-within:border-white/20 focus-within:bg-zinc-900/65 focus-within:text-zinc-300 focus-within:ring-2 focus-within:ring-white/[0.05]">
             <svg className="size-[15px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
               <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
             </svg>
@@ -521,7 +648,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
               onClick={() => setConversationFilter("conversations")}
               aria-pressed={conversationFilter === "conversations"}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-              className={`relative h-8 px-2 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 ${conversationFilter === "conversations" ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+              className={`relative h-10 px-2 text-[13px] lg:h-8 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 ${conversationFilter === "conversations" ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
             >
               Conversas
               {conversationFilter === "conversations" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)]" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
@@ -531,7 +658,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
               onClick={() => setConversationFilter("groups")}
               aria-pressed={conversationFilter === "groups"}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-              className={`relative h-8 px-2 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 ${conversationFilter === "groups" ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+              className={`relative h-10 px-2 text-[13px] lg:h-8 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 ${conversationFilter === "groups" ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
             >
               Grupos
               {conversationFilter === "groups" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)]" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
@@ -541,7 +668,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
               onClick={() => setConversationFilter("mine")}
               aria-pressed={conversationFilter === "mine"}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-              className={`relative h-8 px-2 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 ${conversationFilter === "mine" ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+              className={`relative h-10 px-2 text-[13px] lg:h-8 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 ${conversationFilter === "mine" ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
             >
               Minhas
               {conversationFilter === "mine" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)]" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
@@ -552,7 +679,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
             type="button"
             onClick={() => setShowArchived((current) => !current)}
             aria-pressed={showArchived}
-            className={`mt-1.5 flex h-8 w-full items-center gap-2.5 rounded-[10px] px-2 text-left text-[13px] transition-colors hover:bg-white/[0.04] hover:text-zinc-200 ${showArchived ? "bg-white/[0.06] text-zinc-100" : "text-zinc-400"}`}
+            className={`mt-1.5 flex h-10 w-full items-center lg:h-8 gap-2.5 rounded-[10px] px-2 text-left text-[13px] transition-colors hover:bg-white/[0.04] hover:text-zinc-200 ${showArchived ? "bg-white/[0.06] text-zinc-100" : "text-zinc-400"}`}
           >
             <svg className="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M4 7h16v13H4zM3 4h18v3H3z" /><path d="M10 12h4" />
@@ -566,7 +693,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
         </header>
 
         <CompactScrollArea className="flex-1" label="Lista de conversas">
-          <div className={isCollapsed ? "space-y-1 py-3 pr-1 pl-3" : "px-2 pb-2"}>
+          <div className={collapsed ? "space-y-1 py-3 pr-1 pl-3" : "px-2 pb-2"}>
             <AnimatePresence initial={false} mode="popLayout">
             {visibleContacts.map((contact, index) => {
               const lastMessage = contact.messages?.[0];
@@ -597,12 +724,12 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                     aria-label={`${contact.name}${unread ? `, ${contact.unreadCount} mensagens não lidas` : ""}`}
                     aria-current={selected ? "true" : undefined}
                     title={`${contact.name} — Clique para abrir a conversa; segure o botão direito por 1 segundo para ver a prévia`}
-                    className={`block w-full select-none text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 ${isCollapsed ? "rounded-xl py-2" : "px-2"}`}
+                    className={`block w-full select-none text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 ${collapsed ? "rounded-xl py-2" : "px-2"}`}
                   >
-                  <div className={`flex items-center ${isCollapsed ? "justify-center" : "gap-2.5"}`}>
+                  <div className={`flex items-center ${collapsed ? "justify-center" : "gap-2.5"}`}>
                     <span className="relative shrink-0">
                       <Avatar contact={contact} />
-                      {isCollapsed && unread && (
+                      {collapsed && unread && (
                         <motion.span
                           aria-hidden="true"
                           initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }}
@@ -633,7 +760,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                         </svg>
                       )}
                     </span>
-                    <div className={isCollapsed ? "hidden" : "min-w-0 flex-1 py-2"}>
+                    <div className={collapsed ? "hidden" : "min-w-0 flex-1 py-2"}>
                       <div className="flex items-baseline justify-between gap-3">
                         <p className="truncate text-[14px] leading-tight font-medium tracking-[-0.01em] text-zinc-50">{contact.name}</p>
                         {lastMessage && (
@@ -661,25 +788,25 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
             })}
             </AnimatePresence>
             {loading && (
-              <p role="status" title="Carregando conversas..." className={`py-10 text-center text-[13px] text-zinc-500 ${isCollapsed ? "flex justify-center" : "px-4"}`}>
-                {isCollapsed && <span aria-hidden="true" className="size-5 animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-300 motion-reduce:animate-none" />}
-                <span className={isCollapsed ? "sr-only" : undefined}>Carregando conversas...</span>
+              <p role="status" title="Carregando conversas..." className={`py-10 text-center text-[13px] text-zinc-500 ${collapsed ? "flex justify-center" : "px-4"}`}>
+                {collapsed && <span aria-hidden="true" className="size-5 animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-300 motion-reduce:animate-none" />}
+                <span className={collapsed ? "sr-only" : undefined}>Carregando conversas...</span>
               </p>
             )}
             {!loading && error && (
-              <p role="alert" title={error} className={`py-10 text-center text-[13px] text-red-300 ${isCollapsed ? "flex justify-center" : "px-4"}`}>
-                {isCollapsed && <span aria-hidden="true" className="flex size-5 items-center justify-center rounded-full border border-current">!</span>}
-                <span className={isCollapsed ? "sr-only" : undefined}>{error}</span>
+              <p role="alert" title={error} className={`py-10 text-center text-[13px] text-red-300 ${collapsed ? "flex justify-center" : "px-4"}`}>
+                {collapsed && <span aria-hidden="true" className="flex size-5 items-center justify-center rounded-full border border-current">!</span>}
+                <span className={collapsed ? "sr-only" : undefined}>{error}</span>
               </p>
             )}
             {!loading && !error && visibleContacts.length === 0 && (
-              <p title={emptyMessage} className={`py-10 text-center text-[13px] text-zinc-500 ${isCollapsed ? "flex justify-center" : "px-4"}`}>
-                {isCollapsed && (
+              <p title={emptyMessage} className={`py-10 text-center text-[13px] text-zinc-500 ${collapsed ? "flex justify-center" : "px-4"}`}>
+                {collapsed && (
                   <svg aria-hidden="true" className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z" />
                   </svg>
                 )}
-                <span className={isCollapsed ? "sr-only" : undefined}>{emptyMessage}</span>
+                <span className={collapsed ? "sr-only" : undefined}>{emptyMessage}</span>
               </p>
             )}
           </div>
@@ -692,7 +819,6 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
           panelRef={previewPanelRef}
           onOpenConversation={openConversation}
         />
-      </aside>
-      </>
+      </aside>,
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Info, UserRoundCheck, UserRoundPlus } from "lucide-react";
+import { Info, Menu, UserRoundCheck, UserRoundPlus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Contact } from "@/types/chat";
 import { Avatar } from "@/components/chat/avatar";
@@ -21,11 +21,30 @@ type ChatHeaderProps = {
   onPreviousResult: () => void;
   onNextResult: () => void;
   onCloseSearch: () => void;
+  onOpenSidebar: () => void;
+  sidebarOpen: boolean;
 };
 
-const actionClass = "flex size-9 items-center justify-center rounded-full transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-35";
+// Botão hambúrguer: só aparece abaixo do breakpoint lg, onde a barra lateral fica oculta.
+export function SidebarMenuButton({ onClick, expanded, className = "" }: { onClick: () => void; expanded: boolean; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Abrir menu de conversas"
+      aria-controls="chat-sidebar"
+      aria-expanded={expanded}
+      title="Abrir menu de conversas"
+      className={`flex size-10 shrink-0 items-center justify-center rounded-full text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/50 lg:hidden ${className}`}
+    >
+      <Menu className="size-5" strokeWidth={2} aria-hidden="true" />
+    </button>
+  );
+}
 
-export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isTyping, searchOpen, searchQuery, currentResult, resultCount, onOpenSearch, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch }: ChatHeaderProps) {
+const actionClass = "flex size-10 shrink-0 items-center sm:size-9 justify-center rounded-full transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-35";
+
+export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isTyping, searchOpen, searchQuery, currentResult, resultCount, onOpenSearch, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch, onOpenSidebar, sidebarOpen }: ChatHeaderProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const [assigning, setAssigning] = useState(false);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
@@ -53,7 +72,7 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
   useEffect(() => { if (searchOpen) searchRef.current?.focus(); }, [searchOpen]);
 
   return (
-    <header className="pointer-events-auto relative isolate flex h-[64px] w-full items-center gap-3 px-4 py-2">
+    <header className="pointer-events-auto relative isolate flex h-[64px] w-full min-w-0 items-center gap-1.5 px-2 py-2 sm:gap-3 sm:px-4">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[200px] backdrop-blur-3xl backdrop-saturate-150 [mask-image:linear-gradient(to_bottom,black_0%,black_35%,rgba(0,0,0,0.75)_55%,rgba(0,0,0,0.3)_78%,transparent_100%)]"
@@ -67,15 +86,16 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
             <svg className="size-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
             <input ref={searchRef} type="search" value={searchQuery} onChange={(event) => onSearchQueryChange(event.target.value)} placeholder="Localizar mensagem..." className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-zinc-500" />
           </label>
-          <span className="text-xs tabular-nums text-zinc-400">{resultCount ? currentResult + 1 : 0}/{resultCount}</span>
+          <span className="shrink-0 text-xs tabular-nums text-zinc-400">{resultCount ? currentResult + 1 : 0}/{resultCount}</span>
           <button type="button" onClick={onPreviousResult} disabled={!resultCount} aria-label="Resultado anterior" className={actionClass}>↑</button>
           <button type="button" onClick={onNextResult} disabled={!resultCount} aria-label="Próximo resultado" className={actionClass}>↓</button>
           <button type="button" onClick={onCloseSearch} aria-label="Fechar busca" className={actionClass}>✕</button>
         </>
       ) : (
         <>
-          <button type="button" onClick={onOpenContactInfo} aria-label={`Abrir informações de ${contact.name}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus-visible:outline-2 focus-visible:outline-white/50">
-            <Avatar contact={contact} className="size-10" />
+          <SidebarMenuButton onClick={onOpenSidebar} expanded={sidebarOpen} />
+          <button type="button" onClick={onOpenContactInfo} aria-label={`Abrir informações de ${contact.name}`} className="flex min-w-0 flex-1 items-center gap-2 rounded-xl sm:gap-3 text-left focus-visible:outline-2 focus-visible:outline-white/50">
+            <Avatar contact={contact} className="size-9 sm:size-10" />
             <span key={contact.id} className="min-w-0 flex-1">
               <span className="block truncate text-[15px] font-medium">{contact.name}</span>
               {isTyping
@@ -83,7 +103,7 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
                 : <span className={`${styles.subtitle} block truncate text-xs text-zinc-400`}>{contact.isGroup ? "Grupo do WhatsApp" : contact.phone}</span>}
             </span>
           </button>
-          <div className="ml-auto flex h-11 items-center rounded-full border border-white/10 bg-white/[0.035] px-1">
+          <div className="ml-auto flex h-11 shrink-0 items-center rounded-full border border-white/10 bg-white/[0.035] px-1">
             {!contact.isGroup && <button
               type="button"
               onClick={() => void toggleAssignment()}
@@ -105,7 +125,7 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
               <Info className="size-5" strokeWidth={2} aria-hidden="true" />
             </button>
           </div>
-          {assignmentError && <span role="alert" className="absolute top-14 right-4 z-30 max-w-64 rounded-lg border border-red-400/25 bg-zinc-950 px-3 py-2 text-xs text-red-300 shadow-xl">{assignmentError}</span>}
+          {assignmentError && <span role="alert" className="absolute top-14 right-2 z-30 max-w-[min(16rem,calc(100vw-1rem))] sm:right-4 rounded-lg border border-red-400/25 bg-zinc-950 px-3 py-2 text-xs text-red-300 shadow-xl">{assignmentError}</span>}
         </>
       )}
     </header>

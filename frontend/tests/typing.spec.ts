@@ -4,7 +4,7 @@ async function openTestConversation(page: Page) {
   const runtimeErrors: string[] = [];
   const sent: { text: string; private: boolean }[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
-  const contact = { id: 1, name: "Contato de teste", phone: "5500000000000", isGroup: false, archived: false, unreadCount: 0, profilePictureUrl: null, messages: [] };
+  const contact = { id: 1, name: "Contato de teste", phone: "5500000000000", isGroup: false, archived: false, unreadCount: 0, profilePictureUrl: null, messages: [{ id: 1, content: "Olá", direction: "INCOMING", createdAt: "2026-01-01T00:00:00Z" }] };
 
   // O frontend e o hook reais são exercitados; toda API é simulada no navegador.
   await page.route("**/socket.io/**", (route) => route.abort());
@@ -26,6 +26,8 @@ async function openTestConversation(page: Page) {
       const data = route.request().postDataJSON();
       sent.push(data);
       body = { message: { id: 100 + sent.length, externalId: `test-${sent.length}`, clientId: data.clientId, content: data.text, private: data.private, contactId: 1, direction: "OUTGOING", type: "TEXT", createdAt: new Date().toISOString(), readAt: null, reaction: null, senderName: null, senderPhone: null, senderProfilePictureUrl: null } };
+    } else if (pathname.endsWith("/notifications")) {
+      body = { notifications: [], unreadCount: 0 };
     } else if (!pathname.endsWith("/messages/read") && !pathname.endsWith("/presence-subscription")) {
       throw new Error(`API de teste não simulada: ${pathname}`);
     }
@@ -33,6 +35,9 @@ async function openTestConversation(page: Page) {
   });
 
   await page.goto("/");
+  // Abaixo do breakpoint lg a lista de conversas fica no menu retrátil.
+  const menuButton = page.getByRole("button", { name: "Abrir menu de conversas" });
+  if (await menuButton.isVisible()) await menuButton.click();
   await page.getByText("Contato de teste", { exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Mensagem", exact: true })).toBeVisible();
   return { runtimeErrors, sent };

@@ -16,7 +16,7 @@ export function DocumentMessage({ mediaUrl, content, showSignature }: DocumentMe
   const fileName = content !== "[Documento]" ? content : "Documento";
 
   return (
-    <div className="flex min-w-[280px] max-w-[min(420px,72vw)] items-center gap-3 rounded-xl bg-black/20 p-3">
+    <div className="flex min-w-[min(280px,62vw)] max-w-[min(420px,72vw)] items-center gap-3 rounded-xl bg-black/20 p-3">
       <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/10 text-white/85">
         <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />

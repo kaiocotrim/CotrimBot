@@ -634,7 +634,7 @@ export function MessageComposer({
   };
 
   return (
-    <div ref={composerRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent px-4 pt-5 pb-[max(2.125rem,env(safe-area-inset-bottom))] sm:px-5">
+    <div ref={composerRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent px-2 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5 sm:pb-[max(2.125rem,env(safe-area-inset-bottom))]">
       <div className="pointer-events-auto mx-auto max-w-2xl">
         <form
           ref={formRef}
