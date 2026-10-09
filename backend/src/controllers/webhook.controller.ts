@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { notifyIncomingMessage } from "../services/notification.service.js";
 import { getGroupInfo, getMediaMessage } from "../services/evolution.service.js";
+import { contactDisplayName } from "../utils/contact-name.js";
 import {
   findReplyContextInfo,
   getQuotedContent,
@@ -177,7 +178,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
         where: { id: contact.id },
         data: { archived },
       });
-      getSocketServer().emit("contact_updated", updatedContact);
+      getSocketServer().emit("contact_updated", { ...updatedContact, name: contactDisplayName(updatedContact) });
     }
     return res.status(200).json({ received: true });
   }
@@ -312,7 +313,12 @@ export async function whatsappWebhook(req: Request, res: Response) {
   const senderPhone = typeof participantJid === "string"
     ? participantJid.replace("@s.whatsapp.net", "").replace("@lid", "")
     : null;
-  const senderName = isGroup && !fromMe ? data.pushName || senderPhone || "Participante" : null;
+  const savedSender = isGroup && !fromMe && senderPhone
+    ? await prisma.contact.findUnique({ where: { phone: senderPhone }, select: { name: true, isSaved: true } })
+    : null;
+  const senderName = isGroup && !fromMe
+    ? savedSender?.isSaved ? savedSender.name : senderPhone || "Participante"
+    : null;
   const reportedMessageType = String(data.messageType ?? data.type ?? body.messageType ?? "").toLowerCase();
 
   // Tipo da mensagem que será salvo no banco.
@@ -406,7 +412,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
         ? replyContextInfo.participant.replace("@s.whatsapp.net", "").replace("@lid", "")
         : null;
       const quotedSenderName = quotedMessage
-        ? quotedMessage.direction === "OUTGOING" ? "Você" : quotedMessage.senderName ?? contact?.name ?? null
+        ? quotedMessage.direction === "OUTGOING" ? "Você" : quotedMessage.senderName ?? (contact ? contactDisplayName(contact) : null)
         : quotedParticipant;
 
       const updatedMessage = await prisma.message.update({
@@ -436,7 +442,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
   }
 
   const existingContact = await prisma.contact.findUnique({ where: { phone } });
-  let name = existingContact?.name ?? data.pushName ?? "Contato";
+  let name = existingContact?.name ?? phone;
   if (isGroup && !existingContact) {
     name = data.groupMetadata?.subject ?? "Grupo do WhatsApp";
     try {
@@ -477,7 +483,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
     : null;
   const quotedSenderName = replyContextInfo
     ? quotedMessage
-      ? quotedMessage.direction === "OUTGOING" ? "Você" : quotedMessage.senderName ?? contact.name
+      ? quotedMessage.direction === "OUTGOING" ? "Você" : quotedMessage.senderName ?? contactDisplayName(contact)
       : quotedParticipant
     : null;
 
@@ -524,7 +530,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
   // Dispara um evento para os navegadores conectados.
   io.emit("new_message", {
     message: incomingMessage,
-    contact,
+    contact: { ...contact, name: contactDisplayName(contact) },
   });
   if (!contact.isGroup && !fromMe) notifyIncomingMessage(contact, incomingMessage);
   for (const reply of waitingReplies) {

@@ -24,6 +24,7 @@ import {
 
 import { getSatisfactionSurvey } from "../services/bot.service.js";
 import { getSignedOutgoingText, SignatureMembershipError } from "../services/user-signature.service.js";
+import { contactDisplayName } from "../utils/contact-name.js";
 
 const sentByUserInclude = {
   sentByUser: { select: { id: true, name: true, image: true } },
@@ -281,7 +282,7 @@ export async function sendMediaToContact(
     return res.status(404).json({ message: "Mensagem respondida não encontrada" });
   }
   const quotedSenderName = quotedMessage
-    ? quotedMessage.direction === "OUTGOING" ? "Você" : quotedMessage.senderName ?? contact.name
+    ? quotedMessage.direction === "OUTGOING" ? "Você" : quotedMessage.senderName ?? contactDisplayName(contact)
     : null;
 
   // Descobre qual tipo de mídia será enviado
@@ -395,7 +396,7 @@ export async function sendMediaToContact(
 
     io.emit("new_message", {
       message,
-      contact,
+      contact: { ...contact, name: contactDisplayName(contact) },
     });
 
     return res.status(201).json({
@@ -530,7 +531,7 @@ export async function sendMessageToContact(req: Request, res: Response) {
     return res.status(404).json({ message: "Mensagem respondida não encontrada" });
   }
   const quotedSenderName = quotedMessage
-    ? quotedMessage.direction === "OUTGOING" ? "Você" : quotedMessage.senderName ?? contact.name
+    ? quotedMessage.direction === "OUTGOING" ? "Você" : quotedMessage.senderName ?? contactDisplayName(contact)
     : null;
 
   try {
@@ -555,7 +556,7 @@ export async function sendMessageToContact(req: Request, res: Response) {
         private: true,
         ...(typeof clientId === "string" ? { clientId } : {}),
       };
-      getSocketServer().emit("new_message", { message: responseMessage, contact });
+      getSocketServer().emit("new_message", { message: responseMessage, contact: { ...contact, name: contactDisplayName(contact) } });
       return res.status(201).json({ message: responseMessage, evolution: null });
     }
 
@@ -619,7 +620,7 @@ export async function sendMessageToContact(req: Request, res: Response) {
 
     io.emit("new_message", {
       message: responseMessage,
-      contact,
+      contact: { ...contact, name: contactDisplayName(contact) },
     });
 
     // Mantém a resposta atual: registro local e resposta original da Evolution.
@@ -676,7 +677,7 @@ export async function closeConversationWithBot(req: Request, res: Response) {
 
     io.emit("new_message", {
       message,
-      contact,
+      contact: { ...contact, name: contactDisplayName(contact) },
     });
 
     return res.status(201).json({ message, evolution: evolutionResponse });

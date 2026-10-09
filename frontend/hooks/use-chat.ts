@@ -12,6 +12,7 @@ import {
   markMessagesAsRead,
   postMessage,
   reactToMessage as reactToMessageRequest,
+  saveContact as saveContactRequest,
   sendMedia as sendMediaRequest,
   setContactAssignment as setContactAssignmentRequest,
   setContactPriority as setContactPriorityRequest,
@@ -611,6 +612,22 @@ export function useChat() {
     setSelectedContact(contact);
   }
 
+  async function loadSavedContacts(): Promise<Contact[]> {
+    const updated = await getContacts();
+    setContacts(updated);
+    setSelectedContact((current) => current ? updated.find((contact) => contact.id === current.id) ?? current : null);
+    return updated.filter((contact) => contact.isSaved && !contact.isGroup);
+  }
+
+  async function saveContact(name: string, phone: string, companyName: string): Promise<Contact[]> {
+    const savedContact = await saveContactRequest(name, phone, companyName);
+    const savedContacts = await loadSavedContacts();
+    const contactToOpen = savedContacts.find((contact) => contact.id === savedContact.id)
+      ?? { ...savedContact, messages: [], unreadCount: 0 };
+    selectContact(contactToOpen);
+    return savedContacts;
+  }
+
   async function archiveContact(contact: Contact, archived: boolean) {
     setContacts((current) => current.map((item) => item.id === contact.id ? { ...item, archived } : item));
     try {
@@ -623,13 +640,13 @@ export function useChat() {
     }
   }
 
-  async function renameContact(contactId: number, name: string) {
-    const updated = await updateContactNameRequest(contactId, name);
+  async function renameContact(contactId: number, name: string, companyName?: string) {
+    const updated = await updateContactNameRequest(contactId, name, companyName);
     setContacts((current) => current.map((contact) =>
-      contact.id === updated.id ? { ...contact, name: updated.name } : contact
+      contact.id === updated.id ? { ...contact, name: updated.name, companyName: updated.companyName, isSaved: true } : contact
     ));
     setSelectedContact((current) =>
-      current?.id === updated.id ? { ...current, name: updated.name } : current
+      current?.id === updated.id ? { ...current, name: updated.name, companyName: updated.companyName, isSaved: true } : current
     );
   }
 
@@ -995,6 +1012,8 @@ export function useChat() {
     setText,
 
     selectContact,
+    loadSavedContacts,
+    saveContact,
     archiveContact,
     renameContact,
     setContactAssignment,

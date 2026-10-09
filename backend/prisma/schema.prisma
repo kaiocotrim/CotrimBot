@@ -10,10 +10,12 @@ datasource db {
 model Contact {
   id                Int       @id @default(autoincrement())
   name              String
+  companyName       String?   @db.VarChar(191)
   phone             String    @unique
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   isGroup           Boolean   @default(false)
+  isSaved           Boolean   @default(false)
   archived          Boolean   @default(false)
   priority          ContactPriority @default(MEDIUM)
   profilePictureUrl String?   @db.Text

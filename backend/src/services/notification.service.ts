@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { sendPushToUser } from "./push.service.js";
+import { contactDisplayName } from "../utils/contact-name.js";
 
 export type NotificationType = "CONVERSATION_ASSIGNED" | "NEW_MESSAGE";
 
@@ -36,7 +37,7 @@ function safely(task: Promise<unknown>) {
 }
 
 export function notifyAssignment(
-  contact: { id: number; name: string },
+  contact: { id: number; name: string; phone: string; isGroup: boolean; isSaved: boolean },
   userIds: string[],
   actor: { id: string; name: string },
 ) {
@@ -46,14 +47,14 @@ export function notifyAssignment(
       userId,
       type: "CONVERSATION_ASSIGNED",
       title: "Nova conversa atribuída",
-      body: `${actor.name} atribuiu a conversa com ${contact.name} a você.`,
+      body: `${actor.name} atribuiu a conversa com ${contactDisplayName(contact)} a você.`,
       contactId: contact.id,
     }));
   }
 }
 
 export function notifyIncomingMessage(
-  contact: { id: number; name: string },
+  contact: { id: number; name: string; phone: string; isGroup: boolean; isSaved: boolean },
   message: { content: string; type: string },
 ) {
   safely((async () => {
@@ -69,7 +70,7 @@ export function notifyIncomingMessage(
     await Promise.all(assignments.map(({ userId }) => sendPushToUser(userId, {
       id: null,
       type: "NEW_MESSAGE",
-      title: contact.name,
+      title: contactDisplayName(contact),
       body,
       contactId: contact.id,
     })));

@@ -1,0 +1,1 @@
+ALTER TABLE `Contact` ADD COLUMN `companyName` VARCHAR(191) NULL;

@@ -8,6 +8,7 @@ import {
   getContacts,
   setContactArchived,
   setContactAssignment,
+  setContactSaved,
   setContactPriority,
   subscribeContactPresence,
   updateContact,
@@ -33,6 +34,7 @@ contactRouter.post("/contacts", createContact);
 
 // PATCH /contacts/:id - Atualiza um contato especifico pelo ID
 contactRouter.patch("/contacts/:id", updateContact);
+contactRouter.patch("/contacts/:id/saved", setContactSaved);
 contactRouter.patch("/contacts/:id/archived", setContactArchived);
 contactRouter.patch("/contacts/:id/assignment", setContactAssignment);
 contactRouter.patch("/contacts/:id/priority", setContactPriority);

@@ -37,7 +37,7 @@ export function ContactInfoPanel({
   contact: Contact;
   onClose: () => void;
   onSearch: () => void;
-  onRenameContact: (contactId: number, name: string) => Promise<void>;
+  onRenameContact: (contactId: number, name: string, companyName?: string) => Promise<void>;
   onSetContactAssignment: (contactId: number, assignedUserIds: string[]) => Promise<void>;
   onSetContactPriority: (contactId: number, priority: NonNullable<Contact["priority"]>) => Promise<void>;
 }) {
@@ -45,6 +45,7 @@ export function ContactInfoPanel({
   const [editing, setEditing] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [assignees, setAssignees] = useState<ContactAssignee[]>([]);
@@ -139,6 +140,7 @@ export function ContactInfoPanel({
     const [first = "", ...rest] = contact.name.trim().split(/\s+/);
     setFirstName(first);
     setLastName(rest.join(" "));
+    setCompanyName(contact.companyName ?? "");
     setError(null);
     setEditing(true);
   }
@@ -151,7 +153,7 @@ export function ContactInfoPanel({
     setSaving(true);
     setError(null);
     try {
-      await onRenameContact(contact.id, name);
+      await onRenameContact(contact.id, name, companyName.trim());
       setEditing(false);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Não foi possível editar o contato");
@@ -218,6 +220,17 @@ export function ContactInfoPanel({
                 className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50"
               />
             </label>
+            <label className="block text-xs text-zinc-300/80">
+              Empresa
+              <input
+                autoComplete="organization"
+                maxLength={191}
+                value={companyName}
+                onChange={(event) => setCompanyName(event.target.value)}
+                disabled={saving}
+                className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50"
+              />
+            </label>
             {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
             <div className="flex justify-end gap-2">
               <button
@@ -259,6 +272,10 @@ export function ContactInfoPanel({
             <dt className="text-xs text-zinc-400">Telefone</dt>
             <dd className="mt-1 break-words text-sm text-white">{contact.phone}</dd>
           </div>
+          {!contact.isGroup && contact.companyName && <div>
+            <dt className="text-xs text-zinc-400">Empresa</dt>
+            <dd className="mt-1 break-words text-sm text-white">{contact.companyName}</dd>
+          </div>}
           {!contact.isGroup && <div>
             <dt className="text-xs text-zinc-400">Responsáveis</dt>
             <dd className="mt-1">

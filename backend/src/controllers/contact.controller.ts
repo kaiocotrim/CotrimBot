@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { notifyAssignment } from "../services/notification.service.js";
+import { contactDisplayName } from "../utils/contact-name.js";
 import {
   archiveWhatsAppChat,
   getProfilePicture,
@@ -42,6 +43,7 @@ export async function getContacts(req: Request, res: Response) {
   const result = contacts
     .map(({ _count, assignments, ...contact }) => ({
       ...contact,
+      name: contactDisplayName(contact),
       assignedUserIds: assignments.map((assignment) => assignment.userId),
       unreadCount: _count.messages,
     }))
@@ -74,7 +76,7 @@ export async function getContactById(req: Request, res: Response) {
   }
 
   const { assignments, ...result } = contact;
-  res.json({ ...result, assignedUserIds: assignments.map((assignment) => assignment.userId) });
+  res.json({ ...result, name: contactDisplayName(result), assignedUserIds: assignments.map((assignment) => assignment.userId) });
 }
 
 // GET /contacts/:id/avatar - Busca a foto do contato na Evolution API
@@ -162,22 +164,58 @@ export async function subscribeContactPresence(req: Request, res: Response) {
 
 // POST /contacts - Cria um novo contato
 export async function createContact(req: Request, res: Response) {
-  const { name, phone } = req.body;
+  const name = typeof req.body?.name === "string" ? req.body.name.trim().replace(/\s+/g, " ") : "";
+  const phone = typeof req.body?.phone === "string" ? req.body.phone.replace(/\D/g, "") : "";
+  const companyName = typeof req.body?.companyName === "string" ? req.body.companyName.trim().replace(/\s+/g, " ") : "";
+  if (!name || !/^\d{7,15}$/.test(phone)) {
+    return res.status(400).json({ message: "Informe um nome e um número internacional válido (7 a 15 dígitos)" });
+  }
+  if (companyName.length > 191) {
+    return res.status(400).json({ message: "A empresa deve ter no máximo 191 caracteres" });
+  }
 
-  const newContact = await prisma.contact.create({
-    data: {
-      name,
-      phone,
-    },
+  const contact = await prisma.contact.upsert({
+    where: { phone },
+    create: { name, phone, companyName: companyName || null, isSaved: true },
+    update: { name, ...(companyName ? { companyName } : {}), isSaved: true },
+    include: { assignments: { select: { userId: true } } },
   });
+  const { assignments, ...savedContact } = contact;
+  const response = { ...savedContact, assignedUserIds: assignments.map((assignment) => assignment.userId) };
+  getSocketServer().emit("contact_updated", response);
+  return res.json(response);
+}
 
-  res.status(201).json({ ...newContact, assignedUserIds: [] });
+// PATCH /contacts/:id/saved - Remove ou recoloca um contato na agenda local.
+export async function setContactSaved(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const isSaved = req.body?.isSaved;
+  if (!Number.isInteger(id) || typeof isSaved !== "boolean") {
+    return res.status(400).json({ message: "Dados do contato inválidos" });
+  }
+
+  const contact = await prisma.contact.findUnique({ where: { id } });
+  if (!contact) return res.status(404).json({ message: "Contato não encontrado" });
+  if (contact.isGroup) return res.status(400).json({ message: "Grupos não podem ser salvos como contatos" });
+
+  const updated = await prisma.contact.update({ where: { id }, data: { isSaved } });
+  const response = { ...updated, name: contactDisplayName(updated) };
+  getSocketServer().emit("contact_updated", response);
+  return res.json(response);
 }
 
 // PATCH /contacts/:id - Atualiza um contato especifico pelo ID
 export async function updateContact(req: Request, res: Response) {
   const id = Number(req.params.id);
-  const { name, phone } = req.body;
+  const { name, phone, companyName } = req.body;
+
+  if (companyName !== undefined && companyName !== null && typeof companyName !== "string") {
+    return res.status(400).json({ message: "Empresa inválida" });
+  }
+  const normalizedCompanyName = typeof companyName === "string" ? companyName.trim().replace(/\s+/g, " ") : null;
+  if (normalizedCompanyName && normalizedCompanyName.length > 191) {
+    return res.status(400).json({ message: "A empresa deve ter no máximo 191 caracteres" });
+  }
 
   const contact = await prisma.contact.findUnique({
     where: { id },
@@ -192,10 +230,13 @@ export async function updateContact(req: Request, res: Response) {
     data: {
       name,
       phone,
+      ...(companyName !== undefined ? { companyName: normalizedCompanyName } : {}),
+      isSaved: true,
     },
   });
 
-  res.json(updatedContact);
+  getSocketServer().emit("contact_updated", updatedContact);
+  return res.json(updatedContact);
 }
 
 export async function setContactArchived(req: Request, res: Response) {
@@ -218,8 +259,9 @@ export async function setContactArchived(req: Request, res: Response) {
   // Nesse caso, o arquivamento ainda funciona como organização local do CotrimBot.
   if (!lastMessage) {
     const updated = await prisma.contact.update({ where: { id }, data: { archived } });
-    getSocketServer().emit("contact_updated", updated);
-    return res.json(updated);
+    const response = { ...updated, name: contactDisplayName(updated) };
+    getSocketServer().emit("contact_updated", response);
+    return res.json(response);
   }
 
   try {
@@ -229,8 +271,9 @@ export async function setContactArchived(req: Request, res: Response) {
       ...(lastMessage ? { lastMessage: { id: lastMessage.externalId, fromMe: lastMessage.direction === "OUTGOING" } } : {}),
     });
     const updated = await prisma.contact.update({ where: { id }, data: { archived } });
-    getSocketServer().emit("contact_updated", updated);
-    return res.json(updated);
+    const response = { ...updated, name: contactDisplayName(updated) };
+    getSocketServer().emit("contact_updated", response);
+    return res.json(response);
   } catch (error) {
     console.error("Erro ao alterar arquivamento:", error);
     return res.status(502).json({ message: "Não foi possível alterar o arquivamento no WhatsApp" });
@@ -271,7 +314,7 @@ export async function setContactAssignment(req: Request, res: Response) {
   const nextIds = [...assigneeIds].sort();
   if (currentIds.length === nextIds.length && currentIds.every((value, index) => value === nextIds[index])) {
     const { assignments, ...unchanged } = contact;
-    return res.json({ ...unchanged, assignedUserIds: assignments.map((assignment) => assignment.userId) });
+    return res.json({ ...unchanged, name: contactDisplayName(unchanged), assignedUserIds: assignments.map((assignment) => assignment.userId) });
   }
 
   const updated = await prisma.$transaction(async (transaction) => {
@@ -287,7 +330,7 @@ export async function setContactAssignment(req: Request, res: Response) {
     });
   });
   const { assignments, ...updatedContact } = updated;
-  const response = { ...updatedContact, assignedUserIds: assignments.map((assignment) => assignment.userId) };
+  const response = { ...updatedContact, name: contactDisplayName(updatedContact), assignedUserIds: assignments.map((assignment) => assignment.userId) };
   getSocketServer().emit("contact_updated", response);
   notifyAssignment(
     contact,
@@ -306,11 +349,12 @@ export async function setContactPriority(req: Request, res: Response) {
 
   const contact = await prisma.contact.findUnique({ where: { id } });
   if (!contact) return res.status(404).json({ message: "Contato não encontrado" });
-  if (contact.priority === priority) return res.json(contact);
+  if (contact.priority === priority) return res.json({ ...contact, name: contactDisplayName(contact) });
 
   const updated = await prisma.contact.update({ where: { id }, data: { priority } });
-  getSocketServer().emit("contact_updated", updated);
-  return res.json(updated);
+  const response = { ...updated, name: contactDisplayName(updated) };
+  getSocketServer().emit("contact_updated", response);
+  return res.json(response);
 }
 
 // DELETE /contacts/:id - Exclui um contato especifico pelo ID

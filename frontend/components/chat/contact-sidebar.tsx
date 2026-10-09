@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ArrowLeft, Building2, Phone, Search, UserRound, UserRoundPlus } from "lucide-react";
+import { getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/min";
 import { Avatar } from "@/components/chat/avatar";
-import { AccountSettings } from "@/components/chat/account-settings";
+import { ChatNavigationRail, type ChatRailSection } from "@/components/chat/chat-navigation-rail";
+import { CountryCodePicker } from "@/components/chat/country-code-picker";
 import { MessageText } from "@/components/chat/message-text";
 import { QuickConversationPreview } from "@/components/chat/quick-conversation-preview";
 import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
@@ -11,7 +14,7 @@ import { useSession } from "@/lib/auth-client";
 import { getMessages } from "@/lib/chat-api";
 import type { Contact, Message } from "@/types/chat";
 
-type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; headerActions?: ReactNode };
+type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string) => Promise<Contact[]>; headerActions?: ReactNode };
 type ConversationFilter = "conversations" | "groups" | "mine";
 const PREVIEW_HOLD_DURATION = 1_000;
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
@@ -32,15 +35,26 @@ function formatSidebarDate(value: string) {
   return dateFormatter.format(date);
 }
 
-export function ContactSidebar({ userId, contacts, loading, error, selectedContactId, onSelectContact, headerActions }: ContactSidebarProps) {
+export function ContactSidebar({ userId, contacts, loading, error, selectedContactId, onSelectContact, onLoadSavedContacts, onSaveContact, headerActions }: ContactSidebarProps) {
   const reduceMotion = useReducedMotion();
   const { data: session } = useSession();
-  const userImage = session?.user?.image;
-  const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [query, setQuery] = useState("");
   const [conversationFilter, setConversationFilter] = useState<ConversationFilter>("conversations");
   const [showArchived, setShowArchived] = useState(false);
+  const [showSavedContacts, setShowSavedContacts] = useState(false);
+  const [savedContacts, setSavedContacts] = useState<Contact[]>([]);
+  const [savedQuery, setSavedQuery] = useState("");
+  const [savedLoading, setSavedLoading] = useState(false);
+  const [savedError, setSavedError] = useState<string | null>(null);
+  const [showNewContact, setShowNewContact] = useState(false);
+  const [newContactFirstName, setNewContactFirstName] = useState("");
+  const [newContactLastName, setNewContactLastName] = useState("");
+  const [newContactCompany, setNewContactCompany] = useState("");
+  const [newContactCountry, setNewContactCountry] = useState<CountryCode>("BR");
+  const [newContactPhone, setNewContactPhone] = useState("");
+  const [savingContact, setSavingContact] = useState(false);
+  const [savedActionError, setSavedActionError] = useState<string | null>(null);
   const [holdingContactId, setHoldingContactId] = useState<number | null>(null);
   const [previewContact, setPreviewContact] = useState<Contact | null>(null);
   const [previewMessages, setPreviewMessages] = useState<Message[]>([]);
@@ -55,6 +69,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   const visibleContacts = useMemo(() => {
     const search = query.trim().toLocaleLowerCase("pt-BR");
     return contacts.filter((contact) => {
+      if (!contact.isGroup && !contact.messages?.length && contact.id !== selectedContactId) return false;
       if (contact.archived !== showArchived) return false;
       if (contact.isGroup !== (conversationFilter === "groups")) return false;
       if (conversationFilter === "mine" && !contact.assignedUserIds?.includes(userId)) return false;
@@ -63,7 +78,112 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
         || contact.phone.includes(search)
         || Boolean(contact.messages?.[0]?.content.toLocaleLowerCase("pt-BR").includes(search));
     });
-  }, [contacts, conversationFilter, query, showArchived, userId]);
+  }, [contacts, conversationFilter, query, selectedContactId, showArchived, userId]);
+
+  const visibleSavedContacts = useMemo(() => {
+    const search = savedQuery.trim().toLocaleLowerCase("pt-BR");
+    const phoneSearch = search.replace(/\D/g, "");
+    return savedContacts
+      .filter((contact) => !search || contact.name.toLocaleLowerCase("pt-BR").includes(search) || (phoneSearch.length > 0 && contact.phone.includes(phoneSearch)))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }));
+  }, [savedContacts, savedQuery]);
+
+  const loadSavedContacts = useCallback(async () => {
+    setSavedLoading(true);
+    setSavedError(null);
+    try {
+      setSavedContacts(await onLoadSavedContacts());
+    } catch (loadError) {
+      setSavedError(loadError instanceof Error ? loadError.message : "Não foi possível carregar os contatos salvos");
+    } finally {
+      setSavedLoading(false);
+    }
+  }, [onLoadSavedContacts]);
+
+  function openSavedContacts() {
+    cancelPreviewHold();
+    closePreview();
+    setConversationFilter("conversations");
+    setShowArchived(false);
+    setSavedQuery("");
+    setSavedActionError(null);
+    setShowNewContact(false);
+    setShowSavedContacts(true);
+    void loadSavedContacts();
+  }
+
+  function navigateFromRail(section: ChatRailSection) {
+    if (section === "contacts") {
+      openSavedContacts();
+      return;
+    }
+    cancelPreviewHold();
+    closePreview();
+    setShowNewContact(false);
+    setShowSavedContacts(false);
+    setSavedActionError(null);
+    setShowArchived(section === "archived");
+    setConversationFilter(section === "groups" || section === "mine" ? section : "conversations");
+  }
+
+  async function handleSaveContact(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (savingContact) return;
+    const callingCode = getCountryCallingCode(newContactCountry);
+    const enteredDigits = newContactPhone.replace(/\D/g, "");
+    if (newContactPhone.trim().startsWith("+") && !enteredDigits.startsWith(callingCode)) {
+      setSavedActionError(`O número precisa usar o código +${callingCode} do país selecionado.`);
+      return;
+    }
+    const phoneDigits = enteredDigits.startsWith(callingCode)
+      && (newContactPhone.trim().startsWith("+") || newContactCountry === "BR" && enteredDigits.length >= 12)
+      ? enteredDigits.slice(callingCode.length)
+      : enteredDigits;
+    if (newContactCountry === "BR" && !/^\d{10,11}$/.test(phoneDigits)) {
+      setSavedActionError("Informe o DDD e um número de telefone válido.");
+      return;
+    }
+    const internationalPhone = `+${callingCode}${phoneDigits}`;
+    if (!parsePhoneNumberFromString(internationalPhone)?.isPossible()) {
+      setSavedActionError("Informe um número de telefone válido.");
+      return;
+    }
+    setSavingContact(true);
+    setSavedActionError(null);
+    try {
+      const name = `${newContactFirstName.trim()} ${newContactLastName.trim()}`.trim();
+      setSavedContacts(await onSaveContact(name, internationalPhone.slice(1), newContactCompany.trim()));
+      setSavedError(null);
+      setNewContactFirstName("");
+      setNewContactLastName("");
+      setNewContactCompany("");
+      setNewContactCountry("BR");
+      setNewContactPhone("");
+      setSavedQuery("");
+      setShowNewContact(false);
+      setShowSavedContacts(false);
+    } catch (actionError) {
+      setSavedActionError(actionError instanceof Error ? actionError.message : "Não foi possível salvar o contato");
+    } finally {
+      setSavingContact(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!showSavedContacts) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (event.defaultPrevented || (event.target as Element)?.closest?.("[data-country-code-popup]")) return;
+      if (showNewContact) {
+        setSavedActionError(null);
+        setShowNewContact(false);
+      } else {
+        setShowSavedContacts(false);
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [showNewContact, showSavedContacts]);
 
   const closePreview = useCallback(() => {
     previewRequestRef.current += 1;
@@ -179,6 +299,8 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
       if (headerRef.current?.contains(document.activeElement)) sidebarRef.current?.focus();
       cancelPreviewHold();
       closePreview();
+      setShowNewContact(false);
+      setShowSavedContacts(false);
       setIsCollapsed((current) => !current);
     }
 
@@ -191,9 +313,169 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
     : conversationFilter === "mine"
       ? showArchived ? "Nenhuma conversa sua arquivada" : "Nenhuma conversa atribuída a você. Assuma uma conversa na aba Conversas."
       : showArchived ? "Nenhuma conversa arquivada" : "Nenhuma conversa encontrada";
+  const activeRailSection: ChatRailSection = showSavedContacts ? "contacts" : showArchived ? "archived" : conversationFilter;
+  const navigationRail = (
+    <AnimatePresence initial={false}>
+      {!isCollapsed && (
+        <motion.div
+          key="navigation-rail"
+          initial={reduceMotion ? false : { width: 0, opacity: 0 }}
+          animate={{ width: 60, opacity: 1 }}
+          exit={{ width: 0, opacity: 0 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          className="h-full shrink-0 overflow-hidden"
+        >
+          <ChatNavigationRail
+            activeSection={activeRailSection}
+            unreadCount={contacts.reduce((total, contact) => total + contact.unreadCount, 0)}
+            user={session?.user}
+            onNavigate={navigateFromRail}
+            onOpenSettings={() => { cancelPreviewHold(); closePreview(); }}
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  if (showSavedContacts && showNewContact) {
+    return (
+      <>
+      {navigationRail}
+      <motion.aside
+        key="new-contact"
+        aria-label="Novo contato"
+        initial={reduceMotion ? false : { opacity: 0, x: 24 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={reduceMotion ? { duration: 0 } : { duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+        className="flex h-full min-h-0 w-[320px] min-w-[280px] max-w-[42vw] shrink-0 flex-col border-r border-white/[0.08] bg-[#111111] text-white"
+      >
+        <header className="flex h-16 shrink-0 items-center gap-3 px-4">
+          <button type="button" aria-label="Voltar aos contatos" onClick={() => { setSavedActionError(null); setShowNewContact(false); }} className="flex size-8 items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-white">
+            <ArrowLeft aria-hidden="true" className="size-5" strokeWidth={1.8} />
+          </button>
+          <h2 className="text-[16px] font-medium">Novo contato</h2>
+        </header>
+        <form onSubmit={(event) => void handleSaveContact(event)} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-9 pb-8">
+            <div className="flex gap-4">
+              <UserRound aria-hidden="true" className="mt-3 size-5 shrink-0 text-zinc-500" strokeWidth={1.8} />
+              <div className="min-w-0 flex-1 space-y-7">
+                <label className="block border-b border-zinc-600 focus-within:border-white">
+                  <span className="sr-only">Nome</span>
+                  <input autoFocus required autoComplete="given-name" maxLength={100} value={newContactFirstName} onChange={(event) => setNewContactFirstName(event.target.value)} placeholder="Nome" className="h-11 w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-500" />
+                </label>
+                <label className="block border-b border-zinc-600 focus-within:border-white">
+                  <span className="sr-only">Sobrenome</span>
+                  <input autoComplete="family-name" maxLength={90} value={newContactLastName} onChange={(event) => setNewContactLastName(event.target.value)} placeholder="Sobrenome" className="h-11 w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-500" />
+                </label>
+              </div>
+            </div>
+            <div className="mt-10 flex gap-4">
+              <Building2 aria-hidden="true" className="mt-3 size-5 shrink-0 text-zinc-500" strokeWidth={1.8} />
+              <label className="min-w-0 flex-1 border-b border-zinc-600 focus-within:border-white">
+                <span className="sr-only">Empresa</span>
+                <input autoComplete="organization" maxLength={191} value={newContactCompany} onChange={(event) => setNewContactCompany(event.target.value)} placeholder="Empresa" className="h-11 w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-500" />
+              </label>
+            </div>
+            <div className="mt-12 flex gap-4">
+              <Phone aria-hidden="true" className="mt-6 size-5 shrink-0 text-zinc-500" strokeWidth={1.8} />
+              <div className="flex min-w-0 flex-1 gap-3">
+                <div className="relative min-w-0 w-[94px] shrink-0 border-b border-zinc-600 focus-within:border-white">
+                  <span className="block text-[11px] text-zinc-500">País</span>
+                  <CountryCodePicker value={newContactCountry} onChange={setNewContactCountry} />
+                </div>
+                <label className="min-w-0 flex-1 border-b border-zinc-600 focus-within:border-white">
+                  <span className="block text-[11px] text-zinc-500">Número de telefone</span>
+                  <input required type="tel" inputMode="tel" autoComplete="tel-national" maxLength={20} value={newContactPhone} onChange={(event) => setNewContactPhone(event.target.value)} placeholder="DDD + número" className="h-11 w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-600" />
+                </label>
+              </div>
+            </div>
+            {savedActionError && <p role="alert" className="mt-6 pl-9 text-sm text-red-300">{savedActionError}</p>}
+          </div>
+          <div className="shrink-0 border-t border-white/[0.08] px-5 py-4">
+            <button type="submit" disabled={savingContact || !newContactFirstName.trim() || !newContactPhone.trim()} className="w-full rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:bg-zinc-700 disabled:text-zinc-400">
+              {savingContact ? "Salvando..." : "Salvar contato"}
+            </button>
+          </div>
+        </form>
+      </motion.aside>
+      </>
+    );
+  }
+
+  if (showSavedContacts) {
+    let previousLetter = "";
+    return (
+      <>
+      {navigationRail}
+      <motion.aside
+        key="saved-contacts"
+        aria-label="Nova conversa"
+        initial={reduceMotion ? false : { opacity: 0, x: 24 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={reduceMotion ? { duration: 0 } : { duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+        className="flex h-full min-h-0 w-[320px] min-w-[280px] max-w-[42vw] shrink-0 flex-col border-r border-white/[0.08] bg-[#111111] text-zinc-100"
+      >
+        <header className="flex h-16 shrink-0 items-center gap-3 px-4">
+          <button type="button" aria-label="Voltar às conversas" onClick={() => setShowSavedContacts(false)} className="flex size-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-white">
+            <ArrowLeft aria-hidden="true" className="size-5" strokeWidth={1.8} />
+          </button>
+          <h2 className="text-[16px] font-semibold tracking-tight">Nova conversa</h2>
+        </header>
+        <label className="mx-4 mb-3 flex h-10 shrink-0 items-center gap-2.5 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 text-zinc-500 transition-colors focus-within:border-white/40 focus-within:text-zinc-300">
+          <Search aria-hidden="true" className="size-4 shrink-0" strokeWidth={1.8} />
+          <input autoFocus type="search" aria-label="Pesquisar contatos salvos" value={savedQuery} onChange={(event) => setSavedQuery(event.target.value)} placeholder="Pesquisar nome ou número" className="min-w-0 flex-1 bg-transparent text-[13px] text-zinc-100 outline-none placeholder:text-zinc-500" />
+        </label>
+        <CompactScrollArea className="flex-1" label="Contatos salvos">
+          <div className="px-2 pt-1">
+            <motion.button type="button" onClick={() => { setSavedActionError(null); setShowNewContact(true); }} whileTap={reduceMotion ? undefined : { scale: 0.98 }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-2 focus-visible:outline-white">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-zinc-800 text-zinc-100">
+                <UserRoundPlus aria-hidden="true" className="size-5" strokeWidth={1.8} />
+              </span>
+              <span className="text-sm font-medium text-zinc-100">Novo contato</span>
+            </motion.button>
+            {savedActionError && <p role="alert" className="px-3 pt-3 text-sm text-red-300">{savedActionError}</p>}
+          </div>
+          {savedLoading && <p role="status" className="px-5 py-8 text-sm text-zinc-400">Carregando contatos salvos...</p>}
+          {!savedLoading && savedError && (
+            <div className="px-5 py-8 text-sm text-red-300" role="alert">
+              <p>{savedError}</p>
+              <button type="button" onClick={() => void loadSavedContacts()} className="mt-3 rounded-lg border border-white/20 px-3 py-1.5 text-zinc-100 hover:bg-white/10">Tentar novamente</button>
+            </div>
+          )}
+          {!savedLoading && !savedError && (
+            <div className="px-5 pt-7 pb-2 text-[11px] font-semibold tracking-[0.12em] text-zinc-500 uppercase">Contatos salvos</div>
+          )}
+          {!savedLoading && !savedError && visibleSavedContacts.length === 0 && <p className="px-5 py-6 text-sm leading-5 text-zinc-500">{savedQuery ? "Nenhum contato encontrado" : "Sua lista está vazia. Salve um contato para iniciar uma conversa."}</p>}
+          {!savedLoading && !savedError && visibleSavedContacts.map((contact) => {
+            const first = contact.name.trim().charAt(0).toLocaleUpperCase("pt-BR");
+            const letter = /^[A-ZÀ-ÖØ-Ý]$/u.test(first) ? first : "#";
+            const showLetter = letter !== previousLetter;
+            previousLetter = letter;
+            return (
+              <div key={contact.id}>
+                {showLetter && <div className="px-5 pt-5 pb-1.5 text-xs font-medium text-zinc-500">{letter}</div>}
+                <div className="mx-2 flex items-center rounded-xl transition-colors hover:bg-white/[0.05]">
+                  <button type="button" onClick={() => { onSelectContact(contact); setShowSavedContacts(false); }} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left focus-visible:bg-white/[0.07] focus-visible:outline-none">
+                    <Avatar contact={contact} className="size-10" />
+                    <span className="min-w-0 flex-1 py-1">
+                      <span className="block truncate text-sm font-medium">{contact.name}</span>
+                      <span className="mt-0.5 block truncate text-xs text-zinc-500">{contact.phone}</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </CompactScrollArea>
+      </motion.aside>
+      </>
+    );
+  }
 
   return (
-
+      <>
+      {navigationRail}
       <aside
         ref={sidebarRef}
         tabIndex={-1}
@@ -202,46 +484,21 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
         className={`relative flex h-full min-h-0 shrink-0 flex-col border-r border-white/[0.08] outline-none transition-[width,min-width,max-width] duration-200 motion-reduce:transition-none ${isCollapsed ? "w-20 min-w-20 max-w-20" : "w-[320px] min-w-[280px] max-w-[42vw]"}`}
       >
         <header ref={headerRef} hidden={isCollapsed} className="px-4 pt-4 pb-2">
-          <h1 className="sr-only">CotrimBot</h1>
           <div className="flex items-center justify-between">
-            {session?.user && (
-              <AccountSettings user={session.user} onOpen={() => {
-                cancelPreviewHold();
-                closePreview();
-              }}>
-                <span
-                  aria-hidden="true"
-                  className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-800 text-zinc-400"
-                >
-                  {userImage && userImage !== failedAvatarUrl ? (
-                    // A foto da sessão pode vir de uma URL externa e dinâmica.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={userImage}
-                      alt=""
-                      className="size-full object-cover"
-                      onError={() => setFailedAvatarUrl(userImage)}
-                    />
-                  ) : (
-                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="size-6">
-                      <circle cx="12" cy="8" r="4" />
-                      <path d="M5 21v-2a7 7 0 0 1 14 0v2" />
-                    </svg>
-                  )}
-                </span>
-              </AccountSettings>
-            )}
+            <h1 className="text-lg font-semibold tracking-tight text-zinc-100">CotrimBot</h1>
             <div className="flex items-center gap-1.5">
               {headerActions}
-              <button
+              <motion.button
                 type="button"
                 aria-label="Nova conversa"
-                className="flex size-8 items-center justify-center rounded-full bg-zinc-950 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 active:scale-95"
+                onClick={openSavedContacts}
+                whileTap={reduceMotion ? undefined : { scale: 0.9 }}
+                className="flex size-8 items-center justify-center rounded-full bg-zinc-950 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
               >
                 <svg className="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
                   <path d="M12 5v14M5 12h14" />
                 </svg>
-              </button>
+              </motion.button>
             </div>
           </div>
 
@@ -427,39 +684,6 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
             )}
           </div>
         </CompactScrollArea>
-        {isCollapsed && session?.user && (
-          <motion.footer
-            initial={reduceMotion ? false : { opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex shrink-0 justify-center bg-[#09090b]/95 py-3"
-          >
-            <AccountSettings user={session.user} onOpen={() => {
-              cancelPreviewHold();
-              closePreview();
-            }}>
-              <span
-                aria-hidden="true"
-                className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-zinc-800 text-zinc-300 shadow-[0_4px_14px_rgba(0,0,0,0.28)]"
-              >
-                {userImage && userImage !== failedAvatarUrl ? (
-                  // A foto da sessão pode vir de uma URL externa e dinâmica.
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={userImage}
-                    alt=""
-                    className="size-full object-cover"
-                    onError={() => setFailedAvatarUrl(userImage)}
-                  />
-                ) : (
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="size-6">
-                    <circle cx="12" cy="8" r="4" />
-                    <path d="M5 21v-2a7 7 0 0 1 14 0v2" />
-                  </svg>
-                )}
-              </span>
-            </AccountSettings>
-          </motion.footer>
-        )}
         <QuickConversationPreview
           contact={previewContact}
           messages={previewMessages}
@@ -469,5 +693,6 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
           onOpenConversation={openConversation}
         />
       </aside>
+      </>
   );
 }

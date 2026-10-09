@@ -4,8 +4,10 @@
 export type Contact = {
   id: number;
   name: string;
+  companyName?: string | null;
   phone: string;
   isGroup: boolean;
+  isSaved: boolean;
   archived: boolean;
   assignedUserIds?: string[];
   priority?: "LOW" | "MEDIUM" | "HIGH";

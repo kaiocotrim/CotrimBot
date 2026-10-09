@@ -60,6 +60,8 @@ export default function Home() {
         error={chat.contactsError}
         selectedContactId={chat.selectedContact?.id}
         onSelectContact={chat.selectContact}
+        onLoadSavedContacts={chat.loadSavedContacts}
+        onSaveContact={chat.saveContact}
         headerActions={
           <NotificationsPopover
             notifications={notifications.notifications}
