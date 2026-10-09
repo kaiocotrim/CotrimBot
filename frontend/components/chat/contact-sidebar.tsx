@@ -80,6 +80,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   const previewPanelRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const headerRef = useRef<HTMLElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
   const archivedCount = contacts.filter((contact) => contact.archived).length;
   const visibleContacts = useMemo(() => {
     const search = query.trim().toLocaleLowerCase("pt-BR");
@@ -334,6 +335,24 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [isDesktop, mobileOpen, onMobileOpenChange, previewContact, showSavedContacts]);
 
+  // Ao passar para o desktop o painel sobreposto deixa de existir; evita que reapareça ao reduzir a tela.
+  useEffect(() => {
+    if (isDesktop && mobileOpen) onMobileOpenChange(false);
+  }, [isDesktop, mobileOpen, onMobileOpenChange]);
+
+  // No mobile o painel funciona como uma gaveta: recebe o foco ao abrir e devolve ao fechar.
+  useEffect(() => {
+    if (isDesktop || !mobileOpen) return;
+    const drawer = drawerRef.current;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    drawer?.focus({ preventScroll: true });
+    return () => {
+      if (!drawer?.contains(document.activeElement) && document.activeElement !== document.body) return;
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+      else if (document.activeElement instanceof HTMLElement && drawer?.contains(document.activeElement)) document.activeElement.blur();
+    };
+  }, [isDesktop, mobileOpen]);
+
   function toggleCollapsed() {
     cancelPreviewHold();
     closePreview();
@@ -378,9 +397,11 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
         className={`fixed inset-0 z-30 bg-black/60 backdrop-blur-[2px] transition-opacity duration-300 motion-reduce:transition-none lg:hidden ${mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
       />
       <div
+        ref={drawerRef}
         id="chat-sidebar"
+        tabIndex={-1}
         data-sidebar-open={mobileOpen ? "true" : "false"}
-        className={`fixed inset-y-0 left-0 z-40 flex h-dvh max-w-[calc(100vw-2rem)] bg-zinc-950 shadow-[12px_0_40px_rgba(0,0,0,0.5)] transition-[translate,visibility] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none lg:visible lg:static lg:z-auto lg:h-full lg:max-w-none lg:shrink-0 lg:translate-none lg:bg-transparent lg:shadow-none lg:transition-none ${mobileOpen ? "visible translate-x-0" : "invisible -translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-40 flex h-dvh outline-none max-w-[calc(100vw-2rem)] bg-zinc-950 shadow-[12px_0_40px_rgba(0,0,0,0.5)] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none lg:visible lg:static lg:z-auto lg:h-full lg:max-w-none lg:shrink-0 lg:translate-none lg:bg-transparent lg:shadow-none lg:transition-none ${mobileOpen ? "visible translate-x-0 transition-[translate]" : "invisible -translate-x-full transition-[translate,visibility]"}`}
       >
         {navigationRail}
         {content}

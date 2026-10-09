@@ -52,6 +52,7 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 414, height: 800 }
     // Abre pelo botão de menu e fecha ao escolher a conversa.
     await page.getByRole("button", { name: "Abrir menu de conversas" }).click();
     await expect(sidebar).toHaveAttribute("data-sidebar-open", "true");
+    await expect(sidebar).toBeFocused();
     await expect(contactButton).toBeVisible();
     await expect.poll(async () => (await sidebar.boundingBox())!.x).toBe(0);
     expect((await sidebar.boundingBox())!.width).toBeLessThan(viewport.width);
