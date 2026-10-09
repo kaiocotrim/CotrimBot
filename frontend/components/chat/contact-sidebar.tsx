@@ -22,7 +22,7 @@ const dayKeyFormatter = new Intl.DateTimeFormat("en-CA", { year: "numeric", mont
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: CHAT_TIME_ZONE });
 const weekdayFormatter = new Intl.DateTimeFormat("pt-BR", { weekday: "long", timeZone: CHAT_TIME_ZONE });
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: CHAT_TIME_ZONE });
-// Mesmo breakpoint "lg" do Tailwind: abaixo dele a barra lateral vira um painel sobreposto.
+// Mesmo breakpoint "lg" do Tailwind: abaixo dele a lista vira uma tela completa.
 const DESKTOP_QUERY = "(min-width: 1024px)";
 
 function subscribeToDesktopQuery(callback: () => void) {
@@ -335,7 +335,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   }, [cancelPreviewHold, closePreview, isDesktop, mobileOpen, onMobileOpenChange]);
 
   useEffect(() => {
-    if (isDesktop || !mobileOpen || previewContact) return;
+    if (isDesktop || !mobileOpen || previewContact || !selectedContactId) return;
     function closeOnEscape(event: KeyboardEvent) {
       if (
         event.key !== "Escape"
@@ -347,7 +347,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
     }
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [isDesktop, mobileOpen, onMobileOpenChange, previewContact]);
+  }, [isDesktop, mobileOpen, onMobileOpenChange, previewContact, selectedContactId]);
 
   useEffect(() => {
     if (!restoreCollapseFocusRef.current) return;
@@ -360,7 +360,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
     if (isDesktop && mobileOpen) onMobileOpenChange(false);
   }, [isDesktop, mobileOpen, onMobileOpenChange]);
 
-  // No mobile o painel funciona como uma gaveta: recebe o foco ao abrir e devolve ao fechar.
+  // No mobile a lista funciona como uma tela: recebe o foco ao abrir e devolve ao fechar.
   useEffect(() => {
     if (isDesktop || !mobileOpen) return;
     const drawer = drawerRef.current;
@@ -396,7 +396,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
           animate={{ width: 60, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          className="h-full shrink-0 overflow-hidden"
+          className="hidden h-full shrink-0 overflow-hidden lg:block"
         >
           <ChatNavigationRail
             activeSection={activeRailSection}
@@ -410,27 +410,22 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
     </AnimatePresence>
   );
 
-  // Desktop: barra fixa ao lado do chat. Mobile/tablet: painel deslizante com fundo escurecido.
+  // Desktop: barra fixa ao lado do chat. Mobile/tablet: tela completa de conversas.
   const renderShell = (content: ReactNode) => (
     <>
-      <div
-        aria-hidden="true"
-        onClick={() => onMobileOpenChange(false)}
-        className={`fixed inset-0 z-30 bg-black/60 backdrop-blur-[2px] transition-opacity duration-300 motion-reduce:transition-none lg:hidden ${mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-      />
       <div
         ref={drawerRef}
         id="chat-sidebar"
         tabIndex={-1}
         data-sidebar-open={mobileOpen ? "true" : "false"}
-        className={`fixed inset-y-0 left-0 z-40 flex h-dvh outline-none max-w-[calc(100vw-2rem)] bg-zinc-950 shadow-[12px_0_40px_rgba(0,0,0,0.5)] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none lg:visible lg:static lg:z-auto lg:h-full lg:max-w-none lg:shrink-0 lg:translate-none lg:bg-transparent lg:shadow-none lg:transition-none ${mobileOpen ? "visible translate-x-0 transition-[translate]" : "invisible -translate-x-full transition-[translate,visibility]"}`}
+        className={`fixed inset-0 z-40 flex h-dvh w-screen bg-zinc-950 outline-none transition-opacity duration-200 motion-reduce:transition-none lg:visible lg:static lg:z-auto lg:h-full lg:w-auto lg:shrink-0 lg:bg-transparent lg:opacity-100 lg:pointer-events-auto lg:transition-none ${mobileOpen ? "visible opacity-100" : "invisible pointer-events-none opacity-0"}`}
       >
         {navigationRail}
         {content}
       </div>
     </>
   );
-  const panelWidthClass = "w-[320px] min-w-0 max-w-[calc(100vw-60px-2rem)] lg:min-w-[280px] lg:max-w-[42vw]";
+  const panelWidthClass = "w-full min-w-0 max-w-none lg:w-[320px] lg:min-w-[280px] lg:max-w-[42vw]";
   const closeDrawerButton = (
     <button
       type="button"
@@ -581,7 +576,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
         tabIndex={-1}
         aria-label="Barra lateral de conversas"
         aria-keyshortcuts="Control+b"
-        className={`relative flex h-full min-h-0 shrink-0 flex-col border-r border-white/[0.08] outline-none transition-[width,min-width,max-width] duration-200 motion-reduce:transition-none ${collapsed ? "w-20 min-w-20 max-w-20" : panelWidthClass}`}
+        className={`relative flex h-full min-h-0 shrink-0 flex-col bg-[#09090b] outline-none transition-[width,min-width,max-width] duration-200 motion-reduce:transition-none lg:border-r lg:border-white/[0.08] lg:bg-transparent ${collapsed ? "w-20 min-w-20 max-w-20" : panelWidthClass}`}
       >
         {collapsed && (
           <div className="flex justify-center pt-4">
@@ -598,17 +593,20 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
             </button>
           </div>
         )}
-        <header ref={headerRef} hidden={collapsed} className="px-3 pt-4 pb-2 sm:px-4">
+        <header ref={headerRef} hidden={collapsed} className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-2 sm:px-5 lg:px-4 lg:pt-4">
           <div className="flex items-center justify-between gap-2">
-            <h1 className="min-w-0 truncate text-lg font-semibold tracking-tight text-zinc-100">CotrimBot</h1>
+            <h1 className="min-w-0 truncate text-[28px] font-semibold tracking-[-0.03em] text-zinc-100 lg:text-lg lg:tracking-tight">
+              <span className="lg:hidden">Conversas</span>
+              <span className="hidden lg:inline">CotrimBot</span>
+            </h1>
             <div className="flex shrink-0 items-center gap-1.5">
-              {headerActions}
+              <span className="hidden lg:contents">{headerActions}</span>
               <motion.button
                 type="button"
                 aria-label="Nova conversa"
                 onClick={openSavedContacts}
                 whileTap={reduceMotion ? undefined : { scale: 0.9 }}
-                className="flex size-10 items-center justify-center rounded-full bg-zinc-950 text-zinc-400 lg:size-8 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                className="flex size-10 items-center justify-center rounded-full bg-zinc-200 text-zinc-950 transition-colors hover:bg-white lg:size-8 lg:bg-zinc-950 lg:text-zinc-400 lg:hover:bg-zinc-800 lg:hover:text-zinc-200"
               >
                 <svg className="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
                   <path d="M12 5v14M5 12h14" />
@@ -625,7 +623,6 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
               >
                 <PanelLeftClose aria-hidden="true" className="size-[18px]" strokeWidth={1.8} />
               </button>
-              {closeDrawerButton}
             </div>
           </div>
 
@@ -637,41 +634,41 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar"
+              placeholder="Pesquisar conversas"
               className="min-w-0 flex-1 bg-transparent text-[13px] font-normal text-zinc-100 outline-none placeholder:text-zinc-400 [&::-webkit-search-cancel-button]:hidden"
             />
           </label>
 
-          <div className="mt-1.5 grid grid-cols-3 gap-1" role="group" aria-label="Filtrar conversas">
+          <div className="mt-3 grid grid-cols-3 items-center gap-2 pb-1 lg:mt-1.5 lg:gap-1 lg:pb-0" role="group" aria-label="Filtrar conversas">
             <motion.button
               type="button"
               onClick={() => setConversationFilter("conversations")}
               aria-pressed={conversationFilter === "conversations"}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-              className={`relative h-10 px-2 text-[13px] lg:h-8 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 ${conversationFilter === "conversations" ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+              className={`relative flex h-8 w-full items-center justify-center rounded-full border px-2 text-[13px] font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:rounded-none lg:border-0 ${conversationFilter === "conversations" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
             >
               Conversas
-              {conversationFilter === "conversations" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)]" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
+              {conversationFilter === "conversations" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 hidden h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)] lg:block" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
             </motion.button>
             <motion.button
               type="button"
               onClick={() => setConversationFilter("groups")}
               aria-pressed={conversationFilter === "groups"}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-              className={`relative h-10 px-2 text-[13px] lg:h-8 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 ${conversationFilter === "groups" ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+              className={`relative flex h-8 w-full items-center justify-center rounded-full border px-2 text-[13px] font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:rounded-none lg:border-0 ${conversationFilter === "groups" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
             >
               Grupos
-              {conversationFilter === "groups" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)]" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
+              {conversationFilter === "groups" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 hidden h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)] lg:block" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
             </motion.button>
             <motion.button
               type="button"
               onClick={() => setConversationFilter("mine")}
               aria-pressed={conversationFilter === "mine"}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-              className={`relative h-10 px-2 text-[13px] lg:h-8 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 ${conversationFilter === "mine" ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+              className={`relative flex h-8 w-full items-center justify-center rounded-full border px-2 text-[13px] font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:rounded-none lg:border-0 ${conversationFilter === "mine" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
             >
               Minhas
-              {conversationFilter === "mine" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)]" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
+              {conversationFilter === "mine" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 hidden h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)] lg:block" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
             </motion.button>
           </div>
 
@@ -708,7 +705,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                   exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.985 }}
                   whileHover={reduceMotion ? undefined : { x: 2 }}
                   transition={reduceMotion ? { duration: 0 } : { duration: 0.2, delay: Math.min(index, 6) * 0.018, ease: [0.22, 1, 0.36, 1], layout: { type: "spring", stiffness: 460, damping: 38 } }}
-                  className={`group relative rounded-xl transition-colors ${selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"}`}
+                  className={`group relative rounded-none border-b border-white/[0.08] transition-colors lg:rounded-xl lg:border-b-0 ${selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"}`}
                 >
                   <button
                     type="button"
@@ -734,7 +731,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                           aria-hidden="true"
                           initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }}
                           animate={{ opacity: 1, scale: 1 }}
-                          className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-[#09090b] bg-emerald-400 px-1 text-[9px] font-bold leading-none text-zinc-950"
+                          className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-[#09090b] bg-zinc-300 px-1 text-[9px] font-bold leading-none text-zinc-950"
                         >
                           {contact.unreadCount > 99 ? "99+" : contact.unreadCount}
                         </motion.span>
@@ -760,11 +757,11 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                         </svg>
                       )}
                     </span>
-                    <div className={collapsed ? "hidden" : "min-w-0 flex-1 py-2"}>
+                    <div className={collapsed ? "hidden" : "min-w-0 flex-1 py-3 lg:py-2"}>
                       <div className="flex items-baseline justify-between gap-3">
                         <p className="truncate text-[14px] leading-tight font-medium tracking-[-0.01em] text-zinc-50">{contact.name}</p>
                         {lastMessage && (
-                          <time dateTime={lastMessage.createdAt} className={`shrink-0 text-[11px] leading-tight ${unread ? "font-medium text-emerald-400" : "font-normal text-zinc-500"}`}>
+                          <time dateTime={lastMessage.createdAt} className={`shrink-0 text-[11px] leading-tight ${unread ? "font-medium text-zinc-300" : "font-normal text-zinc-500"}`}>
                             {formatSidebarDate(lastMessage.createdAt)}
                           </time>
                         )}
@@ -775,7 +772,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                           <MessageText content={lastMessage ? lastMessage.deletedAt ? "Mensagem apagada" : lastMessage.content : "Nenhuma mensagem"} showSignature={Boolean(lastMessage && !lastMessage.deletedAt && !lastMessage.private && lastMessage.direction === "OUTGOING")} linkify={false} />
                         </p>
                          {unread && (
-                          <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-semibold text-zinc-950">
+                          <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-zinc-300 px-1.5 text-[10px] font-semibold text-zinc-950">
                             {contact.unreadCount}
                           </span>
                         )}

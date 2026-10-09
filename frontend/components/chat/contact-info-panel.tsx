@@ -8,9 +8,9 @@ import { getContactAssignees, type ContactAssignee } from "@/lib/chat-api";
 import type { Contact } from "@/types/chat";
 
 const priorities = [
-  { value: "LOW", label: "Baixa", dot: "bg-emerald-400" },
-  { value: "MEDIUM", label: "Média", dot: "bg-amber-400" },
-  { value: "HIGH", label: "Alta", dot: "bg-rose-400" },
+  { value: "LOW", label: "Baixa", dot: "bg-zinc-600" },
+  { value: "MEDIUM", label: "Média", dot: "bg-zinc-400" },
+  { value: "HIGH", label: "Alta", dot: "bg-zinc-200" },
 ] as const;
 
 function UserAvatar({ name, image }: { name: string; image?: string | null }) {
@@ -169,8 +169,8 @@ export function ContactInfoPanel({
       exit={{ opacity: 0, x: 24 }}
       transition={{ duration: reduceMotion ? 0 : 0.25, ease: [0.22, 1, 0.36, 1] }}
       aria-label="Informações do contato"
-      className="relative flex h-1/2 min-h-0 w-full shrink-0 flex-col overflow-hidden bg-black
-        @min-[640px]:h-full @min-[640px]:w-[min(24rem,40%)]"
+      className="absolute inset-0 z-40 flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden bg-black
+        @min-[1024px]:relative @min-[1024px]:inset-auto @min-[1024px]:z-auto @min-[1024px]:h-full @min-[1024px]:w-[min(24rem,40%)]"
     >
       <header className="flex h-16 shrink-0 items-center gap-3 px-4">
         <button
@@ -184,7 +184,7 @@ export function ContactInfoPanel({
         <h2 className="text-sm font-medium text-white">Informações do contato</h2>
       </header>
 
-      <div className="relative flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-8">
+      <div className="relative flex min-h-0 flex-1 flex-col items-center overflow-y-auto overscroll-contain px-6 pt-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
         <ContactPhoto contact={contact} />
         <h3 className="mt-4 max-w-full text-center text-xl font-semibold break-words text-white">{contact.name}</h3>
         <p className="mt-1 text-sm text-zinc-300/80">
@@ -314,12 +314,12 @@ export function ContactInfoPanel({
                 <button type="button" role="menuitemcheckbox" aria-checked={assignedUserIds.length === 0} onClick={() => void changeAssignees([])} className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.08] focus-visible:outline-none">
                   <UserAvatar name="" />
                   <span className="min-w-0 flex-1 truncate">Não atribuído</span>
-                  {assignedUserIds.length === 0 && <Check aria-hidden="true" className="size-4 text-emerald-400" />}
+                  {assignedUserIds.length === 0 && <Check aria-hidden="true" className="size-4 text-zinc-200" />}
                 </button>
                 {assignees.map((user) => <button key={user.id} type="button" role="menuitemcheckbox" aria-checked={assignedUserIds.includes(user.id)} onClick={() => toggleAssignee(user.id)} className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.08] focus-visible:outline-none">
                   <UserAvatar name={user.name} image={user.image} />
                   <span className="min-w-0 flex-1 truncate">{user.name}</span>
-                  {assignedUserIds.includes(user.id) && <Check aria-hidden="true" className="size-4 text-emerald-400" />}
+                  {assignedUserIds.includes(user.id) && <Check aria-hidden="true" className="size-4 text-zinc-200" />}
                 </button>)}
               </div>}
               {assignmentSaving && <p role="status" className="mt-1 text-xs text-zinc-400">Salvando responsáveis...</p>}

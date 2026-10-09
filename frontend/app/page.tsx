@@ -15,8 +15,12 @@ export default function Home() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const chat = useChat();
-  // Menu de conversas no mobile/tablet: oculto por padrão e aberto pelo botão de menu.
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // No mobile/tablet a lista de conversas é a tela inicial; ao selecionar um
+  // contato, o chat passa a ocupar a tela inteira.
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Impede que o mobile caia na tela vazia do chat: sem contato selecionado,
+  // a lista permanece aberta mesmo durante hidratação ou restauração de estado.
+  const mobileConversationListOpen = sidebarOpen || !chat.selectedContact;
 
   function selectContact(contact: Contact) {
     chat.selectContact(contact);
@@ -42,7 +46,7 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
     if (!params.has("contactId") && !params.has("notificationId")) return;
     const contact = chat.contacts.find((item) => item.id === Number(params.get("contactId")));
-    if (contact) chat.selectContact(contact);
+    if (contact) selectContact(contact);
     window.history.replaceState(null, "", window.location.pathname);
   }, [chat]);
   useEffect(() => {
@@ -68,7 +72,7 @@ export default function Home() {
         error={chat.contactsError}
         selectedContactId={chat.selectedContact?.id}
         onSelectContact={selectContact}
-        mobileOpen={sidebarOpen}
+        mobileOpen={mobileConversationListOpen}
         onMobileOpenChange={setSidebarOpen}
         onLoadSavedContacts={chat.loadSavedContacts}
         onSaveContact={chat.saveContact}
@@ -88,35 +92,37 @@ export default function Home() {
         }
       />
 
-      <ChatPanel
-        userId={session.user.id}
-        currentUser={session.user}
-        contact={chat.selectedContact}
-        contacts={chat.contacts}
-        messages={chat.messages}
-        text={chat.text}
-        sending={chat.sending}
-        closing={chat.closing}
-        hasOlderMessages={chat.hasOlderMessages}
-        loadingOlderMessages={chat.loadingOlderMessages}
-        newMessageId={chat.newMessageId}
-        isTyping={chat.isTyping}
-        onTextChange={chat.setText}
-        onSend={chat.sendMessage}
-        onLoadOlderMessages={chat.loadOlderMessages}
-        onEnsureMessageLoaded={chat.ensureMessageLoaded}
-        onReactToMessage={chat.reactToMessage}
-        onUpdateMessageFlags={chat.updateMessageFlags}
-        onDeleteMessage={chat.deleteMessage}
-        onForwardMessage={chat.forwardMessage}
-        onSendMedia={chat.sendMediaMessage}
-        onCloseWithBot={chat.closeWithBot}
-        onRenameContact={chat.renameContact}
-        onSetContactAssignment={chat.setContactAssignment}
-        onSetContactPriority={chat.setContactPriority}
-        onOpenSidebar={() => setSidebarOpen(true)}
-        sidebarOpen={sidebarOpen}
-      />
+      <div className={`flex min-h-0 min-w-0 flex-1 ${mobileConversationListOpen ? "max-lg:invisible" : ""}`}>
+        <ChatPanel
+          userId={session.user.id}
+          currentUser={session.user}
+          contact={chat.selectedContact}
+          contacts={chat.contacts}
+          messages={chat.messages}
+          text={chat.text}
+          sending={chat.sending}
+          closing={chat.closing}
+          hasOlderMessages={chat.hasOlderMessages}
+          loadingOlderMessages={chat.loadingOlderMessages}
+          newMessageId={chat.newMessageId}
+          isTyping={chat.isTyping}
+          onTextChange={chat.setText}
+          onSend={chat.sendMessage}
+          onLoadOlderMessages={chat.loadOlderMessages}
+          onEnsureMessageLoaded={chat.ensureMessageLoaded}
+          onReactToMessage={chat.reactToMessage}
+          onUpdateMessageFlags={chat.updateMessageFlags}
+          onDeleteMessage={chat.deleteMessage}
+          onForwardMessage={chat.forwardMessage}
+          onSendMedia={chat.sendMediaMessage}
+          onCloseWithBot={chat.closeWithBot}
+          onRenameContact={chat.renameContact}
+          onSetContactAssignment={chat.setContactAssignment}
+          onSetContactPriority={chat.setContactPriority}
+          onOpenSidebar={() => setSidebarOpen(true)}
+          sidebarOpen={mobileConversationListOpen}
+        />
+      </div>
     </main>
   );
 }

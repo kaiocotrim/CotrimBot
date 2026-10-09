@@ -18,6 +18,8 @@ async function mockApi(page: Page) {
         user: { id: "test-user", name: "Teste local", email: "test@example.invalid", emailVerified: true, role: "user", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
         session: { id: "test-session", userId: "test-user", token: "test-only", expiresAt: "2099-01-01T00:00:00Z", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
       };
+    } else if (pathname.endsWith("/contacts/assignees")) {
+      body = [];
     } else if (pathname.endsWith("/contacts")) {
       body = [contact];
     } else if (pathname.endsWith("/avatar")) {
@@ -38,31 +40,30 @@ async function expectNoHorizontalOverflow(page: Page) {
 }
 
 for (const viewport of [{ width: 320, height: 640 }, { width: 414, height: 800 }, { width: 768, height: 1024 }]) {
-  test(`menu de conversas vira painel sobreposto (${viewport.width}px)`, async ({ page }) => {
+  test(`lista de conversas vira a tela principal (${viewport.width}px)`, async ({ page }) => {
     await page.setViewportSize(viewport);
     const { runtimeErrors } = await mockApi(page);
     await page.goto("/");
 
     const sidebar = page.locator("#chat-sidebar");
     const contactButton = page.getByRole("button", { name: "Contato de teste", exact: true });
-    const menuButton = page.getByRole("button", { name: "Abrir menu de conversas" });
-    await expect(page.getByText("Selecione um contato para iniciar")).toBeVisible();
-    await expect(sidebar).toBeHidden();
-    await expect(menuButton).toHaveAttribute("aria-expanded", "false");
+    await expect(sidebar).toBeVisible();
+    await expect(sidebar).toHaveAttribute("data-sidebar-open", "true");
+    await expect(page.getByRole("heading", { name: "Conversas" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);
+    await expect(contactButton).toBeVisible();
+    const listBox = await sidebar.boundingBox();
+    expect(listBox!.x).toBe(0);
+    expect(listBox!.width).toBe(viewport.width);
     await expectNoHorizontalOverflow(page);
 
-    // Abre pelo botão de menu e fecha ao escolher a conversa.
-    await menuButton.click();
-    await expect(menuButton).toHaveAttribute("aria-expanded", "true");
-    await expect(sidebar).toHaveAttribute("data-sidebar-open", "true");
-    await expect(sidebar).toBeFocused();
-    await expect(contactButton).toBeVisible();
-    await expect.poll(async () => (await sidebar.boundingBox())!.x).toBe(0);
-    expect((await sidebar.boundingBox())!.width).toBeLessThan(viewport.width);
+    // Escolher uma conversa troca a lista pelo chat em tela cheia.
     await contactButton.click();
     await expect(sidebar).toBeHidden();
-    await expect(menuButton).toHaveAttribute("aria-expanded", "false");
     await expect(page.getByRole("textbox", { name: "Mensagem", exact: true })).toBeVisible();
+    const backButton = page.getByRole("button", { name: "Voltar para conversas" });
+    await expect(backButton).toBeVisible();
+    await expect(backButton).toHaveAttribute("aria-expanded", "false");
 
     // Mensagens com textos longos quebram sem gerar rolagem horizontal.
     const bubble = page.locator('[data-message-id="1"]').getByText(longWord, { exact: false });
@@ -71,30 +72,28 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 414, height: 800 }
     expect(bubbleBox!.x + bubbleBox!.width).toBeLessThanOrEqual(viewport.width);
     await expectNoHorizontalOverflow(page);
 
-    // Reabre pelo cabeçalho do chat e fecha clicando fora (no fundo escurecido).
-    await menuButton.click();
-    await expect(contactButton).toBeVisible();
-    await expect(menuButton).toHaveAttribute("aria-expanded", "true");
-    await page.getByRole("button", { name: "Nova conversa" }).click();
-    await page.getByRole("button", { name: "Novo contato" }).click();
-    await page.getByRole("button", { name: /^País, Brasil/ }).click();
-    await expect(page.locator("[data-country-code-popup]")).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.locator("[data-country-code-popup]")).toBeHidden();
-    await expect(sidebar).toHaveAttribute("data-sidebar-open", "true");
-    await page.keyboard.press("Escape");
-    await expect(sidebar).toBeHidden();
+    // As informações do contato substituem visualmente o chat no mobile,
+    // sem entrar no fluxo abaixo da conversa nem aumentar a página.
+    await page.getByRole("button", { name: "Informações do contato", exact: true }).click();
+    const contactInfo = page.getByRole("complementary", { name: "Informações do contato" });
+    await expect(contactInfo).toBeVisible();
+    await expect.poll(async () => (await contactInfo.boundingBox())!.x).toBe(0);
+    const infoBox = await contactInfo.boundingBox();
+    expect(infoBox!.x).toBe(0);
+    expect(infoBox!.y).toBe(0);
+    expect(infoBox!.width).toBe(viewport.width);
+    expect(infoBox!.height).toBe(viewport.height);
+    await expectNoHorizontalOverflow(page);
+    await page.getByRole("button", { name: "Fechar informações" }).click();
+    await expect(contactInfo).toBeHidden();
+    await expect(page.getByRole("textbox", { name: "Mensagem", exact: true })).toBeVisible();
 
-    await menuButton.click();
-    await page.getByRole("button", { name: "Voltar às conversas" }).click();
+    // O botão de voltar restaura a lista como tela principal.
+    await backButton.click();
     await expect(contactButton).toBeVisible();
-    await page.mouse.click(viewport.width - 8, viewport.height / 2);
-    await expect(sidebar).toBeHidden();
+    await expect(sidebar).toBeVisible();
+    expect((await sidebar.boundingBox())!.width).toBe(viewport.width);
 
-    // Também fecha pelo botão de fechar dentro do painel.
-    await menuButton.click();
-    await page.getByRole("button", { name: "Fechar menu de conversas" }).first().click();
-    await expect(sidebar).toBeHidden();
     expect(runtimeErrors).toEqual([]);
   });
 }
@@ -104,7 +103,7 @@ test("menu de conversas pode ser recolhido no desktop (1280px)", async ({ page }
   const { runtimeErrors } = await mockApi(page);
   await page.goto("/");
 
-  await expect(page.getByRole("button", { name: "Abrir menu de conversas" })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Voltar para conversas" })).toBeHidden();
   await expect(page.getByRole("heading", { name: "CotrimBot" })).toBeVisible();
   await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Mensagem", exact: true })).toBeVisible();

@@ -1,6 +1,6 @@
 "use client";
 
-import { Info, Menu, UserRoundCheck, UserRoundPlus } from "lucide-react";
+import { ArrowLeft, Info, UserRoundCheck, UserRoundPlus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Contact } from "@/types/chat";
 import { Avatar } from "@/components/chat/avatar";
@@ -25,19 +25,19 @@ type ChatHeaderProps = {
   sidebarOpen: boolean;
 };
 
-// Botão hambúrguer: só aparece abaixo do breakpoint lg, onde a barra lateral fica oculta.
+// No mobile, volta do chat para a tela completa de conversas.
 export function SidebarMenuButton({ onClick, expanded, className = "" }: { onClick: () => void; expanded: boolean; className?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label="Abrir menu de conversas"
+      aria-label="Voltar para conversas"
       aria-controls="chat-sidebar"
       aria-expanded={expanded}
-      title="Abrir menu de conversas"
+      title="Voltar para conversas"
       className={`flex size-10 shrink-0 items-center justify-center rounded-full text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/50 lg:hidden ${className}`}
     >
-      <Menu className="size-5" strokeWidth={2} aria-hidden="true" />
+      <ArrowLeft className="size-5" strokeWidth={2} aria-hidden="true" />
     </button>
   );
 }
@@ -99,7 +99,7 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
             <span key={contact.id} className="min-w-0 flex-1">
               <span className="block truncate text-[15px] font-medium">{contact.name}</span>
               {isTyping
-                ? <span role="status" aria-label={`${contact.name} está digitando`} className="block h-4 truncate text-xs text-emerald-400">digitando…</span>
+                ? <span role="status" aria-label={`${contact.name} está digitando`} className="block h-4 truncate text-xs text-zinc-300">digitando…</span>
                 : <span className={`${styles.subtitle} block truncate text-xs text-zinc-400`}>{contact.isGroup ? "Grupo do WhatsApp" : contact.phone}</span>}
             </span>
           </button>
@@ -110,7 +110,7 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
               disabled={assigning}
               aria-label={assignedToMe ? "Deixar de acompanhar conversa" : "Acompanhar conversa"}
               title={assignedToMe ? "Você acompanha esta conversa · clique para sair" : assignedUserIds.length ? "Acompanhar junto com os outros responsáveis" : "Assumir conversa para aparecer em Minhas"}
-              className={`${actionClass} ${assignedToMe ? "text-emerald-300" : "text-zinc-300"}`}
+              className={`${actionClass} ${assignedToMe ? "text-white" : "text-zinc-300"}`}
             >
               {assignedToMe ? <UserRoundCheck className="size-5" aria-hidden="true" /> : <UserRoundPlus className="size-5" aria-hidden="true" />}
             </button>}

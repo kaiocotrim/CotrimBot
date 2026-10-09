@@ -134,7 +134,7 @@ export function ChatPanel({
   }
 
   return (
-    <section className="@container flex min-h-0 min-w-0 flex-1 overflow-hidden">
+    <section className="@container relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col @min-[640px]:flex-row">
         <div ref={setConversationPanel} className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {/* Papel de parede fornecido pelo usuário via Unsplash. */}
