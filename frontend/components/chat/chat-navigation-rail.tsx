@@ -70,7 +70,7 @@ export function ChatNavigationRail({
             )}
             <Icon aria-hidden="true" className="relative size-5" strokeWidth={1.8} />
             {id === "conversations" && unreadCount > 0 && (
-              <span aria-hidden="true" className="absolute -top-0.5 -right-1 flex size-5 min-w-5 items-center justify-center rounded-full bg-emerald-400 px-1 text-[10px] font-semibold leading-none text-zinc-950">
+              <span aria-hidden="true" className="absolute -top-0.5 -right-1 flex size-5 min-w-5 items-center justify-center rounded-full border border-[#1a1a1a] bg-zinc-300 px-1 text-[10px] font-semibold leading-none text-zinc-950">
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}

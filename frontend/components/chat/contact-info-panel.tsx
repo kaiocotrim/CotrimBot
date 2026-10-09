@@ -172,7 +172,7 @@ export function ContactInfoPanel({
       className="absolute inset-0 z-40 flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden bg-black
         @min-[1024px]:relative @min-[1024px]:inset-auto @min-[1024px]:z-auto @min-[1024px]:h-full @min-[1024px]:w-[min(24rem,40%)]"
     >
-      <header className="flex h-16 shrink-0 items-center gap-3 px-4">
+      <header className="flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center gap-3 px-4 pt-[env(safe-area-inset-top)] @min-[1024px]:h-16 @min-[1024px]:pt-0">
         <button
           type="button"
           onClick={onClose}

@@ -180,7 +180,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
       >
         <div
           ref={contentRef}
-          className="flex min-h-full flex-col gap-2 px-2 py-4 pt-16 sm:px-5"
+          className="flex min-h-full flex-col gap-2 px-2 pt-[calc(4rem+env(safe-area-inset-top))] sm:px-5"
           style={{ paddingBottom: "max(7rem, calc(var(--chat-composer-height, 0px) + 0.75rem))" }}
         >
         {loadingOlderMessages && (

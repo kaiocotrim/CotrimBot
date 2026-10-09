@@ -72,7 +72,7 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
   useEffect(() => { if (searchOpen) searchRef.current?.focus(); }, [searchOpen]);
 
   return (
-    <header className="pointer-events-auto relative isolate flex h-[64px] w-full min-w-0 items-center gap-1.5 px-2 py-2 sm:gap-3 sm:px-4">
+    <header className="pointer-events-auto relative isolate flex h-[calc(64px+env(safe-area-inset-top))] w-full min-w-0 items-center gap-1.5 px-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-2 sm:gap-3 sm:px-4">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[200px] backdrop-blur-3xl backdrop-saturate-150 [mask-image:linear-gradient(to_bottom,black_0%,black_35%,rgba(0,0,0,0.75)_55%,rgba(0,0,0,0.3)_78%,transparent_100%)]"
