@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { ChatHeader } from "@/components/chat/chat-header";
+import { ChatHeader, SidebarMenuButton } from "@/components/chat/chat-header";
 import { EmptyChatAnimation } from "@/components/chat/empty-chat-animation";
 import { ContactInfoPanel } from "@/components/chat/contact-info-panel";
 import { MessageComposer } from "@/components/chat/message-composer";
@@ -44,6 +44,7 @@ type ChatPanelProps = {
   onRenameContact: (contactId: number, name: string, companyName?: string) => Promise<void>;
   onSetContactAssignment: (contactId: number, assignedUserIds: string[]) => Promise<void>;
   onSetContactPriority: (contactId: number, priority: NonNullable<Contact["priority"]>) => Promise<void>;
+  onOpenSidebar: () => void;
 };
 
 // Agrupa todas as partes visuais da conversa selecionada.
@@ -73,6 +74,7 @@ export function ChatPanel({
   onRenameContact,
   onSetContactAssignment,
   onSetContactPriority,
+  onOpenSidebar,
 }: ChatPanelProps) {
   const [conversationPanel, setConversationPanel] = useState<HTMLElement | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -121,7 +123,8 @@ export function ChatPanel({
 
   if (!contact) {
     return (
-      <section className="flex min-w-0 flex-1 flex-col items-center justify-center gap-4 p-6 text-center text-zinc-500">
+      <section className="relative flex min-w-0 flex-1 flex-col items-center justify-center gap-4 p-6 text-center text-zinc-500">
+        <SidebarMenuButton onClick={onOpenSidebar} className="absolute top-3 left-3" />
         <EmptyChatAnimation />
         <p>Selecione um contato para iniciar</p>
       </section>
@@ -157,6 +160,7 @@ export function ChatPanel({
               onPreviousResult={() => setSearchIndex((current) => searchResults.length ? (current - 1 + searchResults.length) % searchResults.length : 0)}
               onNextResult={() => setSearchIndex((current) => searchResults.length ? (current + 1) % searchResults.length : 0)}
               onCloseSearch={() => { setSearchOpen(false); setSearchQuery(""); }}
+              onOpenSidebar={onOpenSidebar}
             />
           </div>
 

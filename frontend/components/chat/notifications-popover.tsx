@@ -41,7 +41,7 @@ export function NotificationsPopover({
     <Popover.Root>
       <Popover.Trigger
         aria-label={unreadCount ? `Notificações, ${unreadCount} não lidas` : "Notificações"}
-        className="group relative flex size-8 items-center justify-center rounded-full bg-zinc-950 text-zinc-500 transition-[background-color,color,transform] hover:bg-zinc-800 hover:text-zinc-100 focus-visible:text-zinc-100 active:scale-95"
+        className="group relative flex size-10 items-center justify-center rounded-full bg-zinc-950 lg:size-8 text-zinc-500 transition-[background-color,color,transform] hover:bg-zinc-800 hover:text-zinc-100 focus-visible:text-zinc-100 active:scale-95"
       >
         <Bell aria-hidden="true" className="size-[18px] opacity-30 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100" />
         {unreadCount > 0 && (

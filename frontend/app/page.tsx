@@ -1,23 +1,31 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ContactSidebar } from "@/components/chat/contact-sidebar";
 import { NotificationsPopover } from "@/components/chat/notifications-popover";
 import { useChat } from "@/hooks/use-chat";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useSession } from "@/lib/auth-client";
+import type { Contact } from "@/types/chat";
 
 // A página apenas conecta o estado da conversa aos componentes visuais.
 export default function Home() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const chat = useChat();
+  // Menu de conversas no mobile/tablet: oculto por padrão e aberto pelo botão de menu.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  function selectContact(contact: Contact) {
+    chat.selectContact(contact);
+    setSidebarOpen(false);
+  }
 
   function openContactById(contactId: number) {
     const contact = chat.contacts.find((item) => item.id === contactId);
-    if (contact) chat.selectContact(contact);
+    if (contact) selectContact(contact);
   }
 
   const notifications = useNotifications({
@@ -59,7 +67,9 @@ export default function Home() {
         loading={chat.loadingContacts}
         error={chat.contactsError}
         selectedContactId={chat.selectedContact?.id}
-        onSelectContact={chat.selectContact}
+        onSelectContact={selectContact}
+        mobileOpen={sidebarOpen}
+        onMobileOpenChange={setSidebarOpen}
         onLoadSavedContacts={chat.loadSavedContacts}
         onSaveContact={chat.saveContact}
         headerActions={
@@ -104,6 +114,7 @@ export default function Home() {
         onRenameContact={chat.renameContact}
         onSetContactAssignment={chat.setContactAssignment}
         onSetContactPriority={chat.setContactPriority}
+        onOpenSidebar={() => setSidebarOpen(true)}
       />
     </main>
   );
