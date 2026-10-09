@@ -115,6 +115,7 @@ export default function Home() {
         onSetContactAssignment={chat.setContactAssignment}
         onSetContactPriority={chat.setContactPriority}
         onOpenSidebar={() => setSidebarOpen(true)}
+        sidebarOpen={sidebarOpen}
       />
     </main>
   );

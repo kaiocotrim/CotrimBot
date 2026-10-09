@@ -45,12 +45,15 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 414, height: 800 }
 
     const sidebar = page.locator("#chat-sidebar");
     const contactButton = page.getByRole("button", { name: "Contato de teste", exact: true });
+    const menuButton = page.getByRole("button", { name: "Abrir menu de conversas" });
     await expect(page.getByText("Selecione um contato para iniciar")).toBeVisible();
     await expect(sidebar).toBeHidden();
+    await expect(menuButton).toHaveAttribute("aria-expanded", "false");
     await expectNoHorizontalOverflow(page);
 
     // Abre pelo botão de menu e fecha ao escolher a conversa.
-    await page.getByRole("button", { name: "Abrir menu de conversas" }).click();
+    await menuButton.click();
+    await expect(menuButton).toHaveAttribute("aria-expanded", "true");
     await expect(sidebar).toHaveAttribute("data-sidebar-open", "true");
     await expect(sidebar).toBeFocused();
     await expect(contactButton).toBeVisible();
@@ -58,6 +61,7 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 414, height: 800 }
     expect((await sidebar.boundingBox())!.width).toBeLessThan(viewport.width);
     await contactButton.click();
     await expect(sidebar).toBeHidden();
+    await expect(menuButton).toHaveAttribute("aria-expanded", "false");
     await expect(page.getByRole("textbox", { name: "Mensagem", exact: true })).toBeVisible();
 
     // Mensagens com textos longos quebram sem gerar rolagem horizontal.
@@ -68,13 +72,27 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 414, height: 800 }
     await expectNoHorizontalOverflow(page);
 
     // Reabre pelo cabeçalho do chat e fecha clicando fora (no fundo escurecido).
-    await page.getByRole("button", { name: "Abrir menu de conversas" }).click();
+    await menuButton.click();
+    await expect(contactButton).toBeVisible();
+    await expect(menuButton).toHaveAttribute("aria-expanded", "true");
+    await page.getByRole("button", { name: "Nova conversa" }).click();
+    await page.getByRole("button", { name: "Novo contato" }).click();
+    await page.getByRole("button", { name: /^País, Brasil/ }).click();
+    await expect(page.locator("[data-country-code-popup]")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-country-code-popup]")).toBeHidden();
+    await expect(sidebar).toHaveAttribute("data-sidebar-open", "true");
+    await page.keyboard.press("Escape");
+    await expect(sidebar).toBeHidden();
+
+    await menuButton.click();
+    await page.getByRole("button", { name: "Voltar às conversas" }).click();
     await expect(contactButton).toBeVisible();
     await page.mouse.click(viewport.width - 8, viewport.height / 2);
     await expect(sidebar).toBeHidden();
 
     // Também fecha pelo botão de fechar dentro do painel.
-    await page.getByRole("button", { name: "Abrir menu de conversas" }).click();
+    await menuButton.click();
     await page.getByRole("button", { name: "Fechar menu de conversas" }).first().click();
     await expect(sidebar).toBeHidden();
     expect(runtimeErrors).toEqual([]);
@@ -94,13 +112,17 @@ test("menu de conversas pode ser recolhido no desktop (1280px)", async ({ page }
 
   const sidebar = page.getByRole("complementary", { name: "Barra lateral de conversas" });
   const expandedWidth = (await sidebar.boundingBox())!.width;
-  await page.getByRole("button", { name: "Recolher menu de conversas" }).click();
+  const collapseButton = page.getByRole("button", { name: "Recolher menu de conversas" });
+  await collapseButton.click();
   await expect(page.getByRole("heading", { name: "CotrimBot" })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Expandir menu de conversas" })).toBeFocused();
   await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);
   await expect.poll(async () => (await sidebar.boundingBox())!.width).toBeLessThan(expandedWidth);
 
-  await page.getByRole("button", { name: "Expandir menu de conversas" }).click();
+  const expandButton = page.getByRole("button", { name: "Expandir menu de conversas" });
+  await expandButton.click();
   await expect(page.getByRole("heading", { name: "CotrimBot" })).toBeVisible();
+  await expect(collapseButton).toBeFocused();
   await expect(page.getByRole("navigation", { name: "Navegação principal" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   expect(runtimeErrors).toEqual([]);

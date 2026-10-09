@@ -22,16 +22,18 @@ type ChatHeaderProps = {
   onNextResult: () => void;
   onCloseSearch: () => void;
   onOpenSidebar: () => void;
+  sidebarOpen: boolean;
 };
 
 // Botão hambúrguer: só aparece abaixo do breakpoint lg, onde a barra lateral fica oculta.
-export function SidebarMenuButton({ onClick, className = "" }: { onClick: () => void; className?: string }) {
+export function SidebarMenuButton({ onClick, expanded, className = "" }: { onClick: () => void; expanded: boolean; className?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label="Abrir menu de conversas"
       aria-controls="chat-sidebar"
+      aria-expanded={expanded}
       title="Abrir menu de conversas"
       className={`flex size-10 shrink-0 items-center justify-center rounded-full text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/50 lg:hidden ${className}`}
     >
@@ -42,7 +44,7 @@ export function SidebarMenuButton({ onClick, className = "" }: { onClick: () => 
 
 const actionClass = "flex size-10 shrink-0 items-center sm:size-9 justify-center rounded-full transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-35";
 
-export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isTyping, searchOpen, searchQuery, currentResult, resultCount, onOpenSearch, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch, onOpenSidebar }: ChatHeaderProps) {
+export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isTyping, searchOpen, searchQuery, currentResult, resultCount, onOpenSearch, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch, onOpenSidebar, sidebarOpen }: ChatHeaderProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const [assigning, setAssigning] = useState(false);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
@@ -91,7 +93,7 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
         </>
       ) : (
         <>
-          <SidebarMenuButton onClick={onOpenSidebar} />
+          <SidebarMenuButton onClick={onOpenSidebar} expanded={sidebarOpen} />
           <button type="button" onClick={onOpenContactInfo} aria-label={`Abrir informações de ${contact.name}`} className="flex min-w-0 flex-1 items-center gap-2 rounded-xl sm:gap-3 text-left focus-visible:outline-2 focus-visible:outline-white/50">
             <Avatar contact={contact} className="size-9 sm:size-10" />
             <span key={contact.id} className="min-w-0 flex-1">

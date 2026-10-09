@@ -81,6 +81,9 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   const sidebarRef = useRef<HTMLElement>(null);
   const headerRef = useRef<HTMLElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const collapsedButtonRef = useRef<HTMLButtonElement>(null);
+  const expandedButtonRef = useRef<HTMLButtonElement>(null);
+  const restoreCollapseFocusRef = useRef(false);
   const archivedCount = contacts.filter((contact) => contact.archived).length;
   const visibleContacts = useMemo(() => {
     const search = query.trim().toLocaleLowerCase("pt-BR");
@@ -312,12 +315,18 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
       event.preventDefault();
       if (event.repeat) return;
 
-      if (headerRef.current?.contains(document.activeElement)) sidebarRef.current?.focus();
+      const headerHasFocus = Boolean(headerRef.current?.contains(document.activeElement));
+      const collapseButtonHasFocus = document.activeElement === collapsedButtonRef.current
+        || document.activeElement === expandedButtonRef.current;
+      if (headerHasFocus) sidebarRef.current?.focus();
       cancelPreviewHold();
       closePreview();
       setShowNewContact(false);
       setShowSavedContacts(false);
-      if (isDesktop) setIsCollapsed((current) => !current);
+      if (isDesktop) {
+        restoreCollapseFocusRef.current = !headerHasFocus && collapseButtonHasFocus;
+        setIsCollapsed((current) => !current);
+      }
       else onMobileOpenChange(!mobileOpen);
     }
 
@@ -326,14 +335,25 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   }, [cancelPreviewHold, closePreview, isDesktop, mobileOpen, onMobileOpenChange]);
 
   useEffect(() => {
-    if (isDesktop || !mobileOpen || showSavedContacts || previewContact) return;
+    if (isDesktop || !mobileOpen || previewContact) return;
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key !== "Escape" || event.defaultPrevented || document.activeElement?.closest('[role="dialog"]')) return;
+      if (
+        event.key !== "Escape"
+        || event.defaultPrevented
+        || (event.target instanceof Element && event.target.closest("[data-country-code-popup]"))
+        || document.activeElement?.closest('[role="dialog"]')
+      ) return;
       onMobileOpenChange(false);
     }
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [isDesktop, mobileOpen, onMobileOpenChange, previewContact, showSavedContacts]);
+  }, [isDesktop, mobileOpen, onMobileOpenChange, previewContact]);
+
+  useEffect(() => {
+    if (!restoreCollapseFocusRef.current) return;
+    restoreCollapseFocusRef.current = false;
+    (collapsed ? collapsedButtonRef : expandedButtonRef).current?.focus();
+  }, [collapsed]);
 
   // Ao passar para o desktop o painel sobreposto deixa de existir; evita que reapareça ao reduzir a tela.
   useEffect(() => {
@@ -356,6 +376,8 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   function toggleCollapsed() {
     cancelPreviewHold();
     closePreview();
+    restoreCollapseFocusRef.current = document.activeElement === collapsedButtonRef.current
+      || document.activeElement === expandedButtonRef.current;
     setIsCollapsed((current) => !current);
   }
 
@@ -564,6 +586,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
         {collapsed && (
           <div className="flex justify-center pt-4">
             <button
+              ref={collapsedButtonRef}
               type="button"
               onClick={toggleCollapsed}
               aria-label="Expandir menu de conversas"
@@ -592,6 +615,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                 </svg>
               </motion.button>
               <button
+                ref={expandedButtonRef}
                 type="button"
                 onClick={toggleCollapsed}
                 aria-label="Recolher menu de conversas"

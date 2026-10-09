@@ -45,6 +45,7 @@ type ChatPanelProps = {
   onSetContactAssignment: (contactId: number, assignedUserIds: string[]) => Promise<void>;
   onSetContactPriority: (contactId: number, priority: NonNullable<Contact["priority"]>) => Promise<void>;
   onOpenSidebar: () => void;
+  sidebarOpen: boolean;
 };
 
 // Agrupa todas as partes visuais da conversa selecionada.
@@ -75,6 +76,7 @@ export function ChatPanel({
   onSetContactAssignment,
   onSetContactPriority,
   onOpenSidebar,
+  sidebarOpen,
 }: ChatPanelProps) {
   const [conversationPanel, setConversationPanel] = useState<HTMLElement | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -124,7 +126,7 @@ export function ChatPanel({
   if (!contact) {
     return (
       <section className="relative flex min-w-0 flex-1 flex-col items-center justify-center gap-4 p-6 text-center text-zinc-500">
-        <SidebarMenuButton onClick={onOpenSidebar} className="absolute top-3 left-3" />
+        <SidebarMenuButton onClick={onOpenSidebar} expanded={sidebarOpen} className="absolute top-3 left-3" />
         <EmptyChatAnimation />
         <p>Selecione um contato para iniciar</p>
       </section>
@@ -161,6 +163,7 @@ export function ChatPanel({
               onNextResult={() => setSearchIndex((current) => searchResults.length ? (current + 1) % searchResults.length : 0)}
               onCloseSearch={() => { setSearchOpen(false); setSearchQuery(""); }}
               onOpenSidebar={onOpenSidebar}
+              sidebarOpen={sidebarOpen}
             />
           </div>
 
