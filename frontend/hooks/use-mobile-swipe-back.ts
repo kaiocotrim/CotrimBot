@@ -7,7 +7,6 @@ type SwipeGesture = {
   startY: number;
   width: number;
   dragging: boolean;
-  direction: -1 | 1 | null;
 };
 
 const DESKTOP_QUERY = "(min-width: 1024px)";
@@ -57,7 +56,6 @@ export function useMobileSwipeBack(enabled: boolean, onBack: () => void) {
       startY: event.clientY,
       width: event.currentTarget.clientWidth,
       dragging: false,
-      direction: null,
     };
   }
 
@@ -72,13 +70,12 @@ export function useMobileSwipeBack(enabled: boolean, onBack: () => void) {
     const dx = event.clientX - gesture.startX;
     const dy = event.clientY - gesture.startY;
     if (!gesture.dragging) {
-      if (window.getSelection()?.type === "Range" || (Math.abs(dy) > DIRECTION_DISTANCE && Math.abs(dy) >= Math.abs(dx))) {
+      if (window.getSelection()?.type === "Range" || dx > DIRECTION_DISTANCE || (Math.abs(dy) > DIRECTION_DISTANCE && Math.abs(dy) >= Math.abs(dx))) {
         gestureRef.current = null;
         return;
       }
-      if (Math.abs(dx) < DIRECTION_DISTANCE || Math.abs(dx) < Math.abs(dy) * 1.3) return;
+      if (dx > -DIRECTION_DISTANCE || -dx < Math.abs(dy) * 1.3) return;
       gesture.dragging = true;
-      gesture.direction = dx < 0 ? -1 : 1;
       setRevealing(true);
       try {
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -88,9 +85,7 @@ export function useMobileSwipeBack(enabled: boolean, onBack: () => void) {
     }
 
     event.preventDefault();
-    x.set(gesture.direction === -1
-      ? Math.max(-gesture.width, Math.min(0, dx))
-      : Math.min(gesture.width, Math.max(0, dx)));
+    x.set(Math.max(-gesture.width, Math.min(0, dx)));
   }
 
   function finish(confirm: boolean) {
@@ -104,7 +99,7 @@ export function useMobileSwipeBack(enabled: boolean, onBack: () => void) {
         onBack();
         return;
       }
-      const controls = animate(x, gesture.width * (gesture.direction ?? 1), { duration: 0.24, ease: [0.22, 1, 0.36, 1] });
+      const controls = animate(x, -gesture.width, { duration: 0.24, ease: [0.22, 1, 0.36, 1] });
       animationRef.current = controls;
       void controls.finished.then(() => {
         if (animationRef.current !== controls) return;
@@ -131,14 +126,9 @@ export function useMobileSwipeBack(enabled: boolean, onBack: () => void) {
   function onPointerUp(event: PointerEvent<HTMLDivElement>) {
     const gesture = gestureRef.current;
     if (!gesture || gesture.pointerId !== event.pointerId) return;
-    if (gesture.dragging) {
-      const dx = event.clientX - gesture.startX;
-      x.set(gesture.direction === -1
-        ? Math.max(-gesture.width, Math.min(0, dx))
-        : Math.min(gesture.width, Math.max(0, dx)));
-    }
+    if (gesture.dragging) x.set(Math.max(-gesture.width, Math.min(0, event.clientX - gesture.startX)));
     const threshold = Math.max(80, Math.min(120, gesture.width * 0.25));
-    finish(gesture.dragging && Math.abs(x.get()) >= threshold);
+    finish(gesture.dragging && -x.get() >= threshold);
   }
 
   function onPointerCancel(event: PointerEvent<HTMLDivElement>) {
