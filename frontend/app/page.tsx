@@ -57,14 +57,14 @@ export default function Home() {
 
   if (isPending || !session) {
     return (
-      <main className="flex h-dvh items-center justify-center bg-zinc-950 text-white">
+      <main data-chat-root className="flex h-dvh items-center justify-center bg-zinc-950 text-white">
         <p className="text-sm text-zinc-400">Carregando...</p>
       </main>
     );
   }
 
   return (
-    <main className="flex h-dvh overflow-hidden bg-zinc-950 text-white">
+    <main data-chat-root className="flex h-dvh overflow-hidden bg-zinc-950 text-white">
       <ContactSidebar
         userId={session.user.id}
         contacts={chat.contacts}

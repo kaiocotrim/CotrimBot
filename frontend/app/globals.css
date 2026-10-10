@@ -4,6 +4,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* O chat tem rolagens próprias; a página não deve arrastar atrás delas. */
+html:has([data-chat-root]),
+html:has([data-chat-root]) body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 /* Cursores locais, com fallback nativo e pontos de clique por imagem. */
 html {
   --apple-cursor: url("/cursors/default-small.svg") 5 4, default;
@@ -83,6 +91,7 @@ html {
 /* A lista de contatos mantém a rolagem nativa e usa um indicador curto próprio. */
 .compact-scroll-viewport {
   scrollbar-width: none;
+  overscroll-behavior-y: none;
 }
 
 .compact-scroll-viewport::-webkit-scrollbar {

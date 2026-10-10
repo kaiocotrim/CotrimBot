@@ -176,7 +176,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
       <div
         ref={scrollRef}
         onScroll={updateScrollState}
-        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-none"
       >
         <div
           ref={contentRef}
