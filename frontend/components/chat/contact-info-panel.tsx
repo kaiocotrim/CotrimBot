@@ -5,13 +5,8 @@ import { Check, ChevronDown, Pencil, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ContactPhoto } from "@/components/chat/contact-photo";
 import { getContactAssignees, type ContactAssignee } from "@/lib/chat-api";
+import { contactPriorities } from "@/lib/contact-priority";
 import type { Contact } from "@/types/chat";
-
-const priorities = [
-  { value: "LOW", label: "Baixa", dot: "bg-zinc-600" },
-  { value: "MEDIUM", label: "Média", dot: "bg-zinc-400" },
-  { value: "HIGH", label: "Alta", dot: "bg-zinc-200" },
-] as const;
 
 function UserAvatar({ name, image }: { name: string; image?: string | null }) {
   const [failed, setFailed] = useState(false);
@@ -55,6 +50,7 @@ export function ContactInfoPanel({
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [prioritySaving, setPrioritySaving] = useState(false);
   const [priorityError, setPriorityError] = useState<string | null>(null);
+  const selectedPriority = contact.priority ?? "NONE";
   const assigneeMenuRef = useRef<HTMLDivElement>(null);
   const assigneeTriggerRef = useRef<HTMLButtonElement>(null);
   const assignedUserIds = contact.assignedUserIds ?? [];
@@ -124,7 +120,7 @@ export function ContactInfoPanel({
   }
 
   async function changePriority(priority: NonNullable<Contact["priority"]>) {
-    if (prioritySaving || priority === (contact.priority ?? "MEDIUM")) return;
+    if (prioritySaving || priority === selectedPriority) return;
     setPrioritySaving(true);
     setPriorityError(null);
     try {
@@ -329,13 +325,13 @@ export function ContactInfoPanel({
           <div>
             <dt className="text-xs text-zinc-400">Prioridade</dt>
             <dd className="mt-2 grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-white/[0.025] p-1">
-              {priorities.map((option) => <button
+              {contactPriorities.map((option) => <button
                 key={option.value}
                 type="button"
-                aria-pressed={(contact.priority ?? "MEDIUM") === option.value}
+                aria-pressed={selectedPriority === option.value}
                 disabled={prioritySaving}
-                onClick={() => void changePriority(option.value)}
-                className={`flex h-9 items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-white/40 disabled:opacity-60 ${(contact.priority ?? "MEDIUM") === option.value ? "bg-white/[0.1] text-zinc-100 shadow-sm" : "text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200"}`}
+                onClick={() => void changePriority(selectedPriority === option.value ? "NONE" : option.value)}
+                className={`flex h-9 items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-white/40 disabled:opacity-60 ${selectedPriority === option.value ? "bg-white/[0.1] text-zinc-100 shadow-sm" : "text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200"}`}
               >
                 <span aria-hidden="true" className={`size-1.5 rounded-full ${option.dot}`} />
                 {option.label}

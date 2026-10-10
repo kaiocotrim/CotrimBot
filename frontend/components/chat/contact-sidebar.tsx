@@ -12,6 +12,7 @@ import { QuickConversationPreview } from "@/components/chat/quick-conversation-p
 import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
 import { useSession } from "@/lib/auth-client";
 import { getMessages } from "@/lib/chat-api";
+import { getContactPriorityDetails } from "@/lib/contact-priority";
 import type { Contact, Message } from "@/types/chat";
 
 type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string) => Promise<Contact[]>; headerActions?: ReactNode; mobileOpen: boolean; onMobileOpenChange: (open: boolean) => void };
@@ -696,6 +697,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
               const lastMessage = contact.messages?.[0];
               const selected = selectedContactId === contact.id;
               const unread = contact.unreadCount > 0;
+              const priority = getContactPriorityDetails(contact.priority);
               return (
                 <motion.div
                   layout="position"
@@ -718,9 +720,9 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                     }}
                     onDragStart={(event) => event.preventDefault()}
                     onClick={(event) => selectContactFromClick(contact, event)}
-                    aria-label={`${contact.name}${unread ? `, ${contact.unreadCount} mensagens não lidas` : ""}`}
+                    aria-label={`${contact.name}${priority ? `, prioridade ${priority.label.toLowerCase()}` : ""}${unread ? `, ${contact.unreadCount} mensagens não lidas` : ""}`}
                     aria-current={selected ? "true" : undefined}
-                    title={`${contact.name} — Clique para abrir a conversa; segure o botão direito por 1 segundo para ver a prévia`}
+                    title={`${contact.name}${priority ? ` — Prioridade ${priority.label.toLowerCase()}` : ""} — Clique para abrir a conversa; segure o botão direito por 1 segundo para ver a prévia`}
                     className={`block w-full select-none text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 ${collapsed ? "rounded-xl py-2" : "px-2"}`}
                   >
                   <div className={`flex items-center ${collapsed ? "justify-center" : "gap-2.5"}`}>
@@ -736,6 +738,18 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                           {contact.unreadCount > 99 ? "99+" : contact.unreadCount}
                         </motion.span>
                       )}
+                      <AnimatePresence initial={false}>
+                        {collapsed && priority && (
+                          <motion.span
+                            aria-hidden="true"
+                            initial={reduceMotion ? false : { opacity: 0, scale: 0.4 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.4 }}
+                            transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                            className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[#09090b] transition-colors duration-200 ${priority.dot}`}
+                          />
+                        )}
+                      </AnimatePresence>
                       {holdingContactId === contact.id && (
                         <svg className="pointer-events-none absolute -inset-1 size-12 -rotate-90" viewBox="0 0 48 48" aria-hidden="true">
                           <circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/20" />
@@ -759,7 +773,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                     </span>
                     <div className={collapsed ? "hidden" : "min-w-0 flex-1 py-3 lg:py-2"}>
                       <div className="flex items-baseline justify-between gap-3">
-                        <p className="truncate text-[14px] leading-tight font-medium tracking-[-0.01em] text-zinc-50">{contact.name}</p>
+                        <p className="min-w-0 flex-1 truncate text-[14px] leading-tight font-medium tracking-[-0.01em] text-zinc-50">{contact.name}</p>
                         {lastMessage && (
                           <time dateTime={lastMessage.createdAt} className={`shrink-0 text-[11px] leading-tight ${unread ? "font-medium text-zinc-300" : "font-normal text-zinc-500"}`}>
                             {formatSidebarDate(lastMessage.createdAt)}
@@ -771,11 +785,23 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                           {lastMessage && !lastMessage.deletedAt && lastMessage.direction === "OUTGOING" && "✓✓ "}
                           <MessageText content={lastMessage ? lastMessage.deletedAt ? "Mensagem apagada" : lastMessage.content : "Nenhuma mensagem"} showSignature={Boolean(lastMessage && !lastMessage.deletedAt && !lastMessage.private && lastMessage.direction === "OUTGOING")} linkify={false} />
                         </p>
-                         {unread && (
+                        {unread && (
                           <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-zinc-300 px-1.5 text-[10px] font-semibold text-zinc-950">
                             {contact.unreadCount}
                           </span>
                         )}
+                        <AnimatePresence initial={false}>
+                          {priority && (
+                            <motion.span
+                              aria-hidden="true"
+                              initial={reduceMotion ? false : { opacity: 0, scale: 0.4 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.4 }}
+                              transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                              className={`size-2 shrink-0 rounded-full transition-colors duration-200 ${priority.dot}`}
+                            />
+                          )}
+                        </AnimatePresence>
                       </div>
                     </div>
                   </div>

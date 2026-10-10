@@ -10,7 +10,7 @@ export type Contact = {
   isSaved: boolean;
   archived: boolean;
   assignedUserIds?: string[];
-  priority?: "LOW" | "MEDIUM" | "HIGH";
+  priority?: "LOW" | "MEDIUM" | "HIGH" | "NONE";
 
   // Pode existir uma URL de foto,
   // ou null caso o WhatsApp não forneça.

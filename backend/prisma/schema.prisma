@@ -17,7 +17,7 @@ model Contact {
   isGroup           Boolean   @default(false)
   isSaved           Boolean   @default(false)
   archived          Boolean   @default(false)
-  priority          ContactPriority @default(MEDIUM)
+  priority          ContactPriority @default(NONE)
   profilePictureUrl String?   @db.Text
   whatsappLid       String?   @unique
   muted             Boolean   @default(false)
@@ -146,6 +146,7 @@ enum ContactPriority {
   LOW
   MEDIUM
   HIGH
+  NONE
 }
 
 // Tabelas exigidas pelo Better Auth (https://www.better-auth.com/docs/adapters/prisma).

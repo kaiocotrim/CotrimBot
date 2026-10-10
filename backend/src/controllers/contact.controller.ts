@@ -343,7 +343,7 @@ export async function setContactAssignment(req: Request, res: Response) {
 export async function setContactPriority(req: Request, res: Response) {
   const id = Number(req.params.id);
   const priority = req.body?.priority;
-  if (!Number.isInteger(id) || id <= 0 || !["LOW", "MEDIUM", "HIGH"].includes(priority)) {
+  if (!Number.isInteger(id) || id <= 0 || !["NONE", "LOW", "MEDIUM", "HIGH"].includes(priority)) {
     return res.status(400).json({ message: "Prioridade inválida" });
   }
 
