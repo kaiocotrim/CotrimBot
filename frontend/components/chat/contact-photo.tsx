@@ -44,7 +44,7 @@ export function ContactPhoto({ contact }: { contact: Contact }) {
           type="button"
           onClick={() => dialogRef.current?.close()}
           aria-label="Fechar foto"
-          className="absolute top-4 right-4 flex size-10 items-center justify-center rounded-full text-zinc-200 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white/70"
+          className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 flex size-10 items-center justify-center rounded-full text-zinc-200 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white/70"
         >
           <X className="size-6" aria-hidden="true" />
         </button>

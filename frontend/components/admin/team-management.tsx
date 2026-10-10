@@ -577,7 +577,7 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
       {canManage && inviteOpen && <Dialog.Root open onOpenChange={(open) => { if (!inviting) setInviteOpen(open); }}>
         <Dialog.Portal>
           <MotionDialogBackdrop initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduceMotion ? 0 : 0.2 }} className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-sm" />
-          <div className="pointer-events-none fixed inset-0 z-[201] flex items-center justify-center p-4">
+          <div className="pointer-events-none fixed inset-0 z-[201] flex items-center justify-center px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
             <MotionDialogPopup initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: [0.16, 1, 0.3, 1] }} className="pointer-events-auto flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/[0.1] bg-[#090909] text-zinc-100 shadow-2xl outline-none">
             <header className="flex items-start justify-between gap-4 border-b border-white/[0.07] px-6 py-5">
               <div>

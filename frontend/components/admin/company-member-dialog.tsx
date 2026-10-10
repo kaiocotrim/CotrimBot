@@ -50,7 +50,7 @@ export function CompanyMemberDialog({ organizationId, member, canEdit, canEditSi
     <Dialog.Portal>
       <MotionDialogBackdrop initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduceMotion ? 0 : 0.2 }} className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-sm" />
       <MotionDialogPopup initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: [0.16, 1, 0.3, 1] }} className="fixed right-0 top-0 z-[201] flex h-dvh w-full max-w-lg flex-col border-l border-white/[0.08] bg-[#070707] text-zinc-100 shadow-2xl outline-none">
-        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-white/[0.07] px-6 py-5">
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-white/[0.07] px-6 pb-5 pt-[calc(1.25rem+env(safe-area-inset-top))]">
           <div><Dialog.Title className="text-lg font-semibold">{member.displayName || member.user.name}</Dialog.Title><Dialog.Description className="mt-1 text-sm text-zinc-500">{member.user.email}</Dialog.Description></div>
           <Dialog.Close aria-label="Fechar" className="p-1 text-zinc-600 transition-colors hover:text-white"><X size={20} /></Dialog.Close>
         </header>
@@ -88,7 +88,7 @@ export function CompanyMemberDialog({ organizationId, member, canEdit, canEditSi
 
           {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
           </div>
-          <footer className="flex shrink-0 justify-end gap-3 border-t border-white/[0.07] px-6 py-4"><Dialog.Close className="px-3 py-2 text-sm text-zinc-500 hover:text-white">Fechar</Dialog.Close>{(canEdit || canEditSignature) && <button type="submit" disabled={saving} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black hover:bg-zinc-200 disabled:opacity-50">{saving ? "Salvando…" : "Salvar alterações"}</button>}</footer>
+          <footer className="flex shrink-0 justify-end gap-3 border-t border-white/[0.07] px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"><Dialog.Close className="px-3 py-2 text-sm text-zinc-500 hover:text-white">Fechar</Dialog.Close>{(canEdit || canEditSignature) && <button type="submit" disabled={saving} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black hover:bg-zinc-200 disabled:opacity-50">{saving ? "Salvando…" : "Salvar alterações"}</button>}</footer>
         </form>
       </MotionDialogPopup>
     </Dialog.Portal>

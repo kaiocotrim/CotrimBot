@@ -30,7 +30,7 @@ export default function CompanyPage() {
         transition={reduceMotion ? { duration: 0 } : { duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
         className="sticky top-0 z-30 bg-black/90 backdrop-blur-xl"
       >
-        <div className="mx-auto flex h-24 max-w-7xl items-center justify-between px-5 pt-8 sm:px-8">
+        <div className="mx-auto flex h-[calc(6rem+env(safe-area-inset-top))] max-w-7xl items-center justify-between px-5 pt-[calc(2rem+env(safe-area-inset-top))] sm:px-8">
           <div>
             <h1 className="text-base font-semibold text-zinc-100">Empresa</h1>
             <p className="hidden text-xs text-zinc-600 sm:block">Membros, grupos e permissões</p>

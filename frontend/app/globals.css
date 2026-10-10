@@ -353,11 +353,13 @@ html[data-loading-cursor="true"] *::after {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
+    background-color: #000;
     @apply font-sans;
+  }
+  body {
+    background-color: #000;
+    @apply text-foreground;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-cal-geo), var(--font-cal-ui), var(--font-apple);

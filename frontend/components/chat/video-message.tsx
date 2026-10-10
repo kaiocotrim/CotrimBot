@@ -121,7 +121,7 @@ export function VideoMessage({ messageId, mediaUrl, content, showSignature, cont
               transition={{ duration: reduceMotion ? 0 : 0.2 }}
               className="fixed inset-0 z-[2147483646] flex flex-col bg-[#111312]/98 text-white"
             >
-              <header className="flex h-16 shrink-0 items-center gap-3 px-5">
+              <header className="flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center gap-3 px-5 pt-[env(safe-area-inset-top)]">
                 {/* Identificação da conversa e ações principais do visualizador. */}
                 <Avatar contact={contact} />
                 <div className="min-w-0">
@@ -157,7 +157,7 @@ export function VideoMessage({ messageId, mediaUrl, content, showSignature, cont
               {/* Legenda da mídia atualmente selecionada. */}
               {activeHasCaption && <p className="shrink-0 px-6 py-2 text-center text-xs text-zinc-300"><MessageText content={activeItem.content} showSignature={activeItem.showSignature} /></p>}
               {/* Faixa de miniaturas para navegação direta entre imagens e vídeos. */}
-              {gallery.length > 1 && <div className="flex h-20 shrink-0 items-center justify-center gap-2 overflow-x-auto border-t border-white/10 px-4 py-2">
+              {gallery.length > 1 && <div className="flex h-[calc(5rem+env(safe-area-inset-bottom))] shrink-0 items-center justify-center gap-2 overflow-x-auto border-t border-white/10 px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
                 {gallery.map((item, index) => <button key={item.id} type="button" onClick={() => setActiveIndex(index)} aria-label={`Abrir mídia ${index + 1}`} aria-current={index === activeIndex} className={`relative h-14 w-16 shrink-0 overflow-hidden rounded-md border-2 bg-black/30 p-0.5 ${index === activeIndex ? "border-emerald-400" : "border-transparent hover:border-white/30"}`}>
                   {item.type === "VIDEO" ? <><video src={`${item.mediaUrl}#t=0.1`} preload="metadata" muted playsInline className="h-full w-full rounded-[3px] object-cover" /><span className="absolute inset-0 flex items-center justify-center bg-black/15"><span className="flex size-6 items-center justify-center rounded-full bg-black/65"><svg className="ml-px size-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10-6.5z" /></svg></span></span></> : <img src={item.mediaUrl} alt="" loading="lazy" className="h-full w-full rounded-[3px] object-cover" />}
                 </button>)}

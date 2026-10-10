@@ -448,7 +448,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
         transition={reduceMotion ? { duration: 0 } : { duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
         className={`flex h-full min-h-0 ${panelWidthClass} shrink-0 flex-col border-r border-white/[0.08] bg-[#111111] text-white`}
       >
-        <header className="flex h-16 shrink-0 items-center gap-3 px-4">
+        <header className="flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center gap-3 px-4 pt-[env(safe-area-inset-top)] lg:h-16 lg:pt-0">
           <button type="button" aria-label="Voltar aos contatos" onClick={() => { setSavedActionError(null); setShowNewContact(false); }} className="flex size-10 items-center justify-center rounded-full text-zinc-300 transition-colors lg:size-8 hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-white">
             <ArrowLeft aria-hidden="true" className="size-5" strokeWidth={1.8} />
           </button>
@@ -492,7 +492,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
             </div>
             {savedActionError && <p role="alert" className="mt-6 pl-9 text-sm text-red-300">{savedActionError}</p>}
           </div>
-          <div className="shrink-0 border-t border-white/[0.08] px-5 py-4">
+          <div className="shrink-0 border-t border-white/[0.08] px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:pb-4">
             <button type="submit" disabled={savingContact || !newContactFirstName.trim() || !newContactPhone.trim()} className="w-full rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:bg-zinc-700 disabled:text-zinc-400">
               {savingContact ? "Salvando..." : "Salvar contato"}
             </button>
@@ -513,7 +513,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
         transition={reduceMotion ? { duration: 0 } : { duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
         className={`flex h-full min-h-0 ${panelWidthClass} shrink-0 flex-col border-r border-white/[0.08] bg-[#111111] text-zinc-100`}
       >
-        <header className="flex h-16 shrink-0 items-center gap-3 px-4">
+        <header className="flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center gap-3 px-4 pt-[env(safe-area-inset-top)] lg:h-16 lg:pt-0">
           <button type="button" aria-label="Voltar às conversas" onClick={() => setShowSavedContacts(false)} className="flex size-10 items-center justify-center rounded-full text-zinc-400 transition-colors lg:size-8 hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-white">
             <ArrowLeft aria-hidden="true" className="size-5" strokeWidth={1.8} />
           </button>

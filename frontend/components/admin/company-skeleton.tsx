@@ -66,7 +66,7 @@ export function CompanyPageSkeleton() {
   return (
     <main className="min-h-dvh bg-black text-white">
       <header className="sticky top-0 z-30 bg-black/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-24 max-w-7xl items-center justify-between px-5 pt-8 sm:px-8">
+        <div className="mx-auto flex h-[calc(6rem+env(safe-area-inset-top))] max-w-7xl items-center justify-between px-5 pt-[calc(2rem+env(safe-area-inset-top))] sm:px-8">
           <div className="space-y-2" aria-hidden="true">
             <div className={`${placeholder} h-4 w-20`} />
             <div className={`${placeholder} hidden h-3 w-44 sm:block`} />

@@ -77,7 +77,7 @@ export function CompanyGroupDialog({ organizationId, group, members, open, onOpe
       <Dialog.Portal>
         <MotionDialogBackdrop initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduceMotion ? 0 : 0.2 }} className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-[2px]" />
         <MotionDialogPopup initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.16, 1, 0.3, 1] }} className="fixed right-0 top-0 z-[201] flex h-dvh w-full max-w-[520px] flex-col border-l border-white/[0.07] bg-[#090909] text-zinc-100 shadow-2xl outline-none">
-          <header className="flex shrink-0 items-start justify-between px-7 pb-5 pt-6">
+          <header className="flex shrink-0 items-start justify-between px-7 pb-5 pt-[calc(1.5rem+env(safe-area-inset-top))]">
             <div>
               <Dialog.Title className="text-lg font-medium tracking-[-0.02em]">{group ? "Editar grupo" : "Novo grupo"}</Dialog.Title>
               <Dialog.Description className="mt-1 text-xs text-zinc-600">Organize membros e defina o que este grupo pode acessar.</Dialog.Description>
@@ -135,7 +135,7 @@ export function CompanyGroupDialog({ organizationId, group, members, open, onOpe
               {error && <p role="alert" className="rounded-lg bg-red-400/[0.07] px-3 py-2 text-xs text-red-300">{error}</p>}
             </div>
 
-            <footer className="flex shrink-0 items-center gap-2 border-t border-white/[0.06] bg-[#090909]/95 px-7 py-3.5 backdrop-blur">
+            <footer className="flex shrink-0 items-center gap-2 border-t border-white/[0.06] bg-[#090909]/95 px-7 pt-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))] backdrop-blur">
               {group && <button type="button" disabled={saving || deleting} onClick={() => void remove()} className="mr-auto flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-zinc-600 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"><Trash2 size={14} />{deleting ? "Excluindo…" : "Excluir"}</button>}
               <Dialog.Close className={`${group ? "" : "ml-auto"} rounded-lg px-3.5 py-2 text-sm text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-200`}>Cancelar</Dialog.Close>
               <button type="submit" disabled={saving || deleting || !name.trim()} className="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-white disabled:bg-zinc-800 disabled:text-zinc-500">{saving ? "Salvando…" : "Salvar"}</button>
