@@ -5,15 +5,13 @@ type SwipeGesture = {
   pointerId: number;
   startX: number;
   startY: number;
-  startedAt: number;
   width: number;
   dragging: boolean;
+  direction: -1 | 1 | null;
 };
 
 const DESKTOP_QUERY = "(min-width: 1024px)";
-const EDGE_INSET = 32;
 const DIRECTION_DISTANCE = 12;
-const MAX_START_DELAY = 500;
 
 export function useMobileSwipeBack(enabled: boolean, onBack: () => void) {
   const x = useMotionValue(0);
@@ -47,7 +45,6 @@ export function useMobileSwipeBack(enabled: boolean, onBack: () => void) {
 
   function onPointerDown(event: PointerEvent<HTMLDivElement>) {
     if (!enabled || settlingRef.current || event.pointerType !== "touch" || !event.isPrimary || window.matchMedia(DESKTOP_QUERY).matches) return;
-    if (event.clientX < EDGE_INSET || event.clientX > window.innerWidth - EDGE_INSET) return;
     const target = event.target;
     if (!(target instanceof Element) || !target.closest("[data-swipe-back-area]")) return;
     if (target.closest("button, a, input, textarea, select, [contenteditable], [draggable='true'], [role='button'], [role='menu'], [role='dialog'], img, video, audio, canvas, [data-swipe-back-ignore]")) return;
@@ -58,9 +55,9 @@ export function useMobileSwipeBack(enabled: boolean, onBack: () => void) {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      startedAt: event.timeStamp,
       width: event.currentTarget.clientWidth,
       dragging: false,
+      direction: null,
     };
   }
 
@@ -75,12 +72,13 @@ export function useMobileSwipeBack(enabled: boolean, onBack: () => void) {
     const dx = event.clientX - gesture.startX;
     const dy = event.clientY - gesture.startY;
     if (!gesture.dragging) {
-      if (event.timeStamp - gesture.startedAt > MAX_START_DELAY || dx > DIRECTION_DISTANCE || (Math.abs(dy) > DIRECTION_DISTANCE && Math.abs(dy) >= Math.abs(dx))) {
+      if (window.getSelection()?.type === "Range" || (Math.abs(dy) > DIRECTION_DISTANCE && Math.abs(dy) >= Math.abs(dx))) {
         gestureRef.current = null;
         return;
       }
-      if (dx > -DIRECTION_DISTANCE || -dx < Math.abs(dy) * 1.3) return;
+      if (Math.abs(dx) < DIRECTION_DISTANCE || Math.abs(dx) < Math.abs(dy) * 1.3) return;
       gesture.dragging = true;
+      gesture.direction = dx < 0 ? -1 : 1;
       setRevealing(true);
       try {
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -90,7 +88,9 @@ export function useMobileSwipeBack(enabled: boolean, onBack: () => void) {
     }
 
     event.preventDefault();
-    x.set(Math.max(-gesture.width, Math.min(0, dx)));
+    x.set(gesture.direction === -1
+      ? Math.max(-gesture.width, Math.min(0, dx))
+      : Math.min(gesture.width, Math.max(0, dx)));
   }
 
   function finish(confirm: boolean) {
@@ -104,7 +104,7 @@ export function useMobileSwipeBack(enabled: boolean, onBack: () => void) {
         onBack();
         return;
       }
-      const controls = animate(x, -gesture.width, { duration: 0.24, ease: [0.22, 1, 0.36, 1] });
+      const controls = animate(x, gesture.width * (gesture.direction ?? 1), { duration: 0.24, ease: [0.22, 1, 0.36, 1] });
       animationRef.current = controls;
       void controls.finished.then(() => {
         if (animationRef.current !== controls) return;
@@ -131,9 +131,14 @@ export function useMobileSwipeBack(enabled: boolean, onBack: () => void) {
   function onPointerUp(event: PointerEvent<HTMLDivElement>) {
     const gesture = gestureRef.current;
     if (!gesture || gesture.pointerId !== event.pointerId) return;
-    if (gesture.dragging) x.set(Math.max(-gesture.width, Math.min(0, event.clientX - gesture.startX)));
+    if (gesture.dragging) {
+      const dx = event.clientX - gesture.startX;
+      x.set(gesture.direction === -1
+        ? Math.max(-gesture.width, Math.min(0, dx))
+        : Math.min(gesture.width, Math.max(0, dx)));
+    }
     const threshold = Math.max(80, Math.min(120, gesture.width * 0.25));
-    finish(gesture.dragging && -x.get() >= threshold);
+    finish(gesture.dragging && Math.abs(x.get()) >= threshold);
   }
 
   function onPointerCancel(event: PointerEvent<HTMLDivElement>) {

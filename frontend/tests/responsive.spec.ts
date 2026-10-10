@@ -127,7 +127,7 @@ test("menu de conversas pode ser recolhido no desktop (1280px)", async ({ page }
   expect(runtimeErrors).toEqual([]);
 });
 
-test("deslizar a conversa para a esquerda retorna à lista e preserva o rascunho", async ({ page }) => {
+test("deslizar a conversa nos dois sentidos retorna à lista e preserva o rascunho", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const { runtimeErrors } = await mockApi(page);
   await page.goto("/");
@@ -155,6 +155,12 @@ test("deslizar a conversa para a esquerda retorna à lista e preserva o rascunho
   await touch("touchEnd", 175, 180);
   await expect.poll(async () => (await panel.boundingBox())!.x).toBeGreaterThan(-1);
   await expect(sidebar).toHaveAttribute("data-sidebar-open", "false");
+  await touch("touchStart", 175, 180);
+  await touch("touchMove", 220, 180);
+  await expect.poll(async () => (await panel.boundingBox())!.x).toBeGreaterThan(20);
+  await touch("touchEnd", 220, 180);
+  await expect.poll(async () => (await panel.boundingBox())!.x).toBeLessThan(1);
+  await expect(sidebar).toHaveAttribute("data-sidebar-open", "false");
 
   await touch("touchStart", 280, 180);
   await touch("touchMove", 130, 180);
@@ -164,5 +170,13 @@ test("deslizar a conversa para a esquerda retorna à lista e preserva o rascunho
   await expect(contactButton).toHaveAttribute("aria-current", "true");
   await contactButton.click();
   await expect(composer).toHaveValue("rascunho preservado");
+
+  // O gesto usado para voltar no PWA também funciona da esquerda para a direita.
+  await touch("touchStart", 24, 180);
+  await page.waitForTimeout(600);
+  await touch("touchMove", 204, 180);
+  await expect.poll(async () => (await panel.boundingBox())!.x).toBeGreaterThan(100);
+  await touch("touchEnd", 204, 180);
+  await expect(sidebar).toHaveAttribute("data-sidebar-open", "true");
   expect(runtimeErrors).toEqual([]);
 });
