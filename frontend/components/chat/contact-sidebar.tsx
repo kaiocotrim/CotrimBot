@@ -15,7 +15,7 @@ import { getMessages } from "@/lib/chat-api";
 import { getContactPriorityDetails } from "@/lib/contact-priority";
 import type { Contact, Message } from "@/types/chat";
 
-type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string) => Promise<Contact[]>; headerActions?: ReactNode; mobileOpen: boolean; onMobileOpenChange: (open: boolean) => void };
+type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string) => Promise<Contact[]>; headerActions?: ReactNode; mobileOpen: boolean; revealForSwipe: boolean; onMobileOpenChange: (open: boolean) => void };
 type ConversationFilter = "conversations" | "groups" | "mine";
 const PREVIEW_HOLD_DURATION = 1_000;
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
@@ -48,7 +48,7 @@ function formatSidebarDate(value: string) {
   return dateFormatter.format(date);
 }
 
-export function ContactSidebar({ userId, contacts, loading, error, selectedContactId, onSelectContact, onLoadSavedContacts, onSaveContact, headerActions, mobileOpen, onMobileOpenChange }: ContactSidebarProps) {
+export function ContactSidebar({ userId, contacts, loading, error, selectedContactId, onSelectContact, onLoadSavedContacts, onSaveContact, headerActions, mobileOpen, revealForSwipe, onMobileOpenChange }: ContactSidebarProps) {
   const reduceMotion = useReducedMotion();
   const { data: session } = useSession();
   const isDesktop = useIsDesktop();
@@ -419,7 +419,8 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
         id="chat-sidebar"
         tabIndex={-1}
         data-sidebar-open={mobileOpen ? "true" : "false"}
-        className={`fixed inset-0 z-40 flex h-dvh w-screen bg-zinc-950 outline-none transition-opacity duration-200 motion-reduce:transition-none lg:visible lg:static lg:z-auto lg:h-full lg:w-auto lg:shrink-0 lg:bg-transparent lg:opacity-100 lg:pointer-events-auto lg:transition-none ${mobileOpen ? "visible opacity-100" : "invisible pointer-events-none opacity-0"}`}
+        inert={!mobileOpen && !isDesktop}
+        className={`fixed inset-0 z-40 flex h-dvh w-screen bg-zinc-950 outline-none transition-opacity duration-200 motion-reduce:transition-none lg:visible lg:static lg:z-auto lg:h-full lg:w-auto lg:shrink-0 lg:bg-transparent lg:opacity-100 lg:pointer-events-auto lg:transition-none ${mobileOpen ? "visible opacity-100" : revealForSwipe ? "visible pointer-events-none opacity-100" : "invisible pointer-events-none opacity-0"}`}
       >
         {navigationRail}
         {content}

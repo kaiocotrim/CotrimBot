@@ -175,8 +175,9 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
     <div className="relative flex min-h-0 flex-1">
       <div
         ref={scrollRef}
+        data-swipe-back-area
         onScroll={updateScrollState}
-        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-none"
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-none max-lg:touch-pan-y"
       >
         <div
           ref={contentRef}

@@ -1,11 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ContactSidebar } from "@/components/chat/contact-sidebar";
 import { NotificationsPopover } from "@/components/chat/notifications-popover";
 import { useChat } from "@/hooks/use-chat";
+import { useMobileSwipeBack } from "@/hooks/use-mobile-swipe-back";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useSession } from "@/lib/auth-client";
 import type { Contact } from "@/types/chat";
@@ -21,11 +23,16 @@ export default function Home() {
   // Impede que o mobile caia na tela vazia do chat: sem contato selecionado,
   // a lista permanece aberta mesmo durante hidratação ou restauração de estado.
   const mobileConversationListOpen = sidebarOpen || !chat.selectedContact;
+  const swipeBack = useMobileSwipeBack(!mobileConversationListOpen, () => setSidebarOpen(true));
+  const selectedContactId = chat.selectedContact?.id;
+  const selectChatContact = chat.selectContact;
+  const resetSwipeBack = swipeBack.reset;
 
-  function selectContact(contact: Contact) {
-    chat.selectContact(contact);
+  const selectContact = useCallback((contact: Contact) => {
+    resetSwipeBack();
+    if (selectedContactId !== contact.id) selectChatContact(contact);
     setSidebarOpen(false);
-  }
+  }, [selectedContactId, selectChatContact, resetSwipeBack]);
 
   function openContactById(contactId: number) {
     const contact = chat.contacts.find((item) => item.id === contactId);
@@ -46,9 +53,9 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
     if (!params.has("contactId") && !params.has("notificationId")) return;
     const contact = chat.contacts.find((item) => item.id === Number(params.get("contactId")));
-    if (contact) selectContact(contact);
+    if (contact) queueMicrotask(() => selectContact(contact));
     window.history.replaceState(null, "", window.location.pathname);
-  }, [chat]);
+  }, [chat, selectContact]);
   useEffect(() => {
     if (!isPending && !session) {
       router.replace("/login");
@@ -73,6 +80,7 @@ export default function Home() {
         selectedContactId={chat.selectedContact?.id}
         onSelectContact={selectContact}
         mobileOpen={mobileConversationListOpen}
+        revealForSwipe={swipeBack.revealing}
         onMobileOpenChange={setSidebarOpen}
         onLoadSavedContacts={chat.loadSavedContacts}
         onSaveContact={chat.saveContact}
@@ -92,7 +100,15 @@ export default function Home() {
         }
       />
 
-      <div className={`flex min-h-0 min-w-0 flex-1 ${mobileConversationListOpen ? "max-lg:invisible" : ""}`}>
+      <motion.div
+        data-swipe-back-panel
+        className={`flex min-h-0 min-w-0 flex-1 bg-zinc-950 max-lg:relative max-lg:z-50 ${mobileConversationListOpen ? "max-lg:invisible" : ""}`}
+        style={{ x: swipeBack.x }}
+        onPointerDown={swipeBack.onPointerDown}
+        onPointerMove={swipeBack.onPointerMove}
+        onPointerUp={swipeBack.onPointerUp}
+        onPointerCancel={swipeBack.onPointerCancel}
+      >
         <ChatPanel
           userId={session.user.id}
           currentUser={session.user}
@@ -122,7 +138,7 @@ export default function Home() {
           onOpenSidebar={() => setSidebarOpen(true)}
           sidebarOpen={mobileConversationListOpen}
         />
-      </div>
+      </motion.div>
     </main>
   );
 }

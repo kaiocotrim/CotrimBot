@@ -204,8 +204,8 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
     };
   }, [actionsOpen, reactionPickerOpen]);
 
-  function openReactionPicker() {
-    const trigger = reactionTriggerRef.current?.getBoundingClientRect();
+  function openReactionPicker(triggerElement: HTMLElement | null = reactionTriggerRef.current) {
+    const trigger = triggerElement?.getBoundingClientRect();
     if (!trigger) return;
     const pickerWidth = 250;
     const pickerHeight = 42;
@@ -372,7 +372,7 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
           {message.senderName}
         </p>
       )}
-      <div ref={reactionControlsRef} className={`absolute top-1/2 z-50 -translate-y-1/2 ${outgoing ? "-left-6" : "-right-6"}`}>
+      <div ref={reactionControlsRef} className={`absolute top-1/2 z-50 hidden -translate-y-1/2 lg:block ${outgoing ? "-left-6" : "-right-6"}`}>
         <button
           ref={reactionTriggerRef}
           type="button"
@@ -448,7 +448,7 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
                     <Copy size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Copiar</span>
                   </button>
-                  <button type="button" role="menuitem" onClick={openReactionPicker} className={menuButtonClass}>
+                  <button type="button" role="menuitem" onClick={(event) => openReactionPicker(event.currentTarget)} className={menuButtonClass}>
                     <Smiley size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Reagir</span>
                   </button>

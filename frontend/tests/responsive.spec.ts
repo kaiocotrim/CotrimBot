@@ -126,3 +126,43 @@ test("menu de conversas pode ser recolhido no desktop (1280px)", async ({ page }
   await expectNoHorizontalOverflow(page);
   expect(runtimeErrors).toEqual([]);
 });
+
+test("deslizar a conversa para a esquerda retorna à lista e preserva o rascunho", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { runtimeErrors } = await mockApi(page);
+  await page.goto("/");
+  const contactButton = page.getByRole("button", { name: "Contato de teste", exact: true });
+  await contactButton.click();
+  const composer = page.getByRole("textbox", { name: "Mensagem", exact: true });
+  await composer.fill("rascunho preservado");
+
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", x: number, y: number) =>
+    cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
+  const panel = page.locator("[data-swipe-back-panel]");
+  const sidebar = page.locator("#chat-sidebar");
+  expect(await page.evaluate(() => Boolean(document.elementFromPoint(220, 180)?.closest("[data-swipe-back-area]")))).toBe(true);
+
+  // Um movimento vertical e um horizontal curto não fecham a conversa.
+  await touch("touchStart", 220, 180);
+  await touch("touchMove", 215, 255);
+  await touch("touchEnd", 215, 255);
+  await expect(sidebar).toHaveAttribute("data-sidebar-open", "false");
+  await touch("touchStart", 220, 180);
+  await touch("touchMove", 175, 180);
+  await expect.poll(async () => (await panel.boundingBox())!.x).toBeLessThan(-20);
+  await touch("touchEnd", 175, 180);
+  await expect.poll(async () => (await panel.boundingBox())!.x).toBeGreaterThan(-1);
+  await expect(sidebar).toHaveAttribute("data-sidebar-open", "false");
+
+  await touch("touchStart", 280, 180);
+  await touch("touchMove", 130, 180);
+  await expect.poll(async () => (await panel.boundingBox())!.x).toBeLessThan(-100);
+  await touch("touchEnd", 130, 180);
+  await expect(sidebar).toHaveAttribute("data-sidebar-open", "true");
+  await expect(contactButton).toHaveAttribute("aria-current", "true");
+  await contactButton.click();
+  await expect(composer).toHaveValue("rascunho preservado");
+  expect(runtimeErrors).toEqual([]);
+});
