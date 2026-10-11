@@ -85,7 +85,7 @@ export function VideoMessage({ messageId, mediaUrl, content, showSignature, cont
         type="button"
         onClick={openViewer}
         aria-label="Reproduzir vídeo"
-        className="group/video relative flex max-h-[420px] w-full max-w-[min(380px,62vw)] items-center justify-center overflow-hidden rounded-[20px] bg-transparent p-0 shadow-[0_2px_12px_rgba(0,0,0,0.12)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
+        className="group/video relative flex max-h-[420px] w-full max-w-[min(360px,76vw)] items-center justify-center overflow-hidden rounded-[20px] bg-transparent p-0 shadow-[0_2px_12px_rgba(0,0,0,0.12)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 lg:max-w-[min(380px,62vw)]"
       >
         {/* Um pequeno deslocamento ajuda o navegador a gerar o frame inicial. */}
         <video

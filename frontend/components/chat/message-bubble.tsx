@@ -156,7 +156,7 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
     <time
       dateTime={message.createdAt}
       title={messageDateFormatter.format(createdAt)}
-      className={`shrink-0 select-none text-[9px] leading-none font-normal tabular-nums ${isPrivate ? "text-zinc-600" : "text-white/55"}`}
+      className={`shrink-0 select-none text-[11px] leading-none font-normal tabular-nums lg:text-[9px] ${isPrivate ? "text-zinc-600" : "text-white/55"}`}
     >
       {messageTimeFormatter.format(createdAt)}
     </time>
@@ -293,7 +293,7 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
     </div>
   );
 
-  const menuButtonClass = "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left hover:bg-white/[0.08] focus-visible:bg-white/[0.08] focus-visible:outline-none";
+  const menuButtonClass = "flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left hover:bg-white/[0.08] focus-visible:bg-white/[0.08] focus-visible:outline-none lg:py-2";
 
   return (
     <div
@@ -305,7 +305,7 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
         setCopyError(false);
         setActionError(null);
       }}
-      className={`group/message relative min-w-0 max-w-[80%] text-[13.5px] sm:max-w-[72%] lg:max-w-[min(62%,620px)] leading-[1.4] font-normal [overflow-wrap:anywhere] ${isPrivate ? "text-zinc-900" : "text-white"} ${message.reaction ? "mb-3" : ""} ${
+      className={`group/message relative min-w-0 max-w-[86%] text-base leading-[1.45] lg:max-w-[min(62%,620px)] lg:text-[13.5px] lg:leading-[1.4] font-normal [overflow-wrap:anywhere] ${isPrivate ? "text-zinc-900" : "text-white"} ${message.reaction ? "mb-3" : ""} ${
         isPrivate
           ? "rounded-[24px] bg-zinc-100 px-3.5 py-2.5 shadow-[0_4px_16px_rgba(24,24,27,0.12)]"
           : isSticker
@@ -362,13 +362,13 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
       )}
       </AnimatePresence>
       {isPrivate && (
-        <div className="mb-1 flex items-center gap-1 text-[10px] font-semibold tracking-wide text-zinc-600">
+        <div className="mb-1 flex items-center gap-1 text-xs font-semibold tracking-wide text-zinc-600 lg:text-[10px]">
           <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
           <span>Privado</span>
         </div>
       )}
       {contact.isGroup && !outgoing && message.senderName && (
-        <p className={`${isImage || isVideo ? "px-3 pt-2 pb-2" : "mb-1"} pr-5 text-[11px] font-semibold leading-tight text-emerald-300`}>
+        <p className={`${isImage || isVideo ? "px-3 pt-2 pb-2" : "mb-1"} pr-5 text-[13px] font-semibold leading-tight text-emerald-300 lg:text-[11px]`}>
           {message.senderName}
         </p>
       )}
@@ -402,7 +402,7 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
         </AnimatePresence>,
         document.body
       )}
-      <div ref={actionControlsRef} className="absolute top-1.5 right-2 z-40">
+      <div ref={actionControlsRef} className="absolute top-1 right-1 z-40 lg:top-1.5 lg:right-2">
         <button
           type="button"
           aria-label="Ações da mensagem"
@@ -415,7 +415,7 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
             setCopyError(false);
             setActionError(null);
           }}
-          className={`flex size-5 items-center justify-center rounded-full transition-[opacity,transform,color] duration-150 focus-visible:opacity-100 focus-visible:outline-2 [@media(hover:none)]:opacity-100 ${isPrivate ? "text-zinc-500 hover:text-zinc-800 focus-visible:outline-zinc-500/60" : "text-zinc-300 hover:text-white focus-visible:outline-white/50"} ${actionsOpen ? "opacity-100" : "opacity-0 group-hover/message:opacity-100"}`}
+          className={`flex size-8 items-center justify-center rounded-full transition-[opacity,transform,color] duration-150 focus-visible:opacity-100 focus-visible:outline-2 [@media(hover:none)]:opacity-100 lg:size-5 ${isPrivate ? "text-zinc-500 hover:text-zinc-800 focus-visible:outline-zinc-500/60" : "text-zinc-300 hover:text-white focus-visible:outline-white/50"} ${actionsOpen ? "opacity-100" : "opacity-0 group-hover/message:opacity-100"}`}
         >
           <CaretDown size={13} weight="bold" aria-hidden="true" />
         </button>
@@ -426,9 +426,9 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute right-0 top-7 flex min-w-[178px] origin-top-right flex-col items-end"
+            className={`absolute top-9 flex min-w-[210px] flex-col lg:top-7 lg:min-w-[178px] ${outgoing ? "right-0 origin-top-right items-end" : "left-0 origin-top-left items-start lg:right-0 lg:left-auto lg:origin-top-right lg:items-end"}`}
           >
-            <div role="menu" aria-label="Ações da mensagem" className="w-[178px] overflow-hidden rounded-xl border border-white/10 bg-zinc-900/95 p-1 text-[12px] font-medium leading-tight text-zinc-100 shadow-xl backdrop-blur-xl">
+            <div role="menu" aria-label="Ações da mensagem" className="w-[210px] overflow-hidden rounded-xl border border-white/10 bg-zinc-900/95 p-1 text-sm font-medium leading-tight text-zinc-100 shadow-xl backdrop-blur-xl lg:w-[178px] lg:text-[12px]">
               {choosingContact ? (
                 <>
                   <div className="px-3 py-2 text-[11px] leading-tight text-zinc-400">Encaminhar para</div>

@@ -173,17 +173,17 @@ export function ContactInfoPanel({
           type="button"
           onClick={onClose}
           aria-label="Fechar informações"
-          className="flex size-9 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 active:scale-95"
+          className="flex size-11 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 active:scale-95 lg:size-9"
         >
           <X className="size-4" aria-hidden="true" />
         </button>
-        <h2 className="text-sm font-medium text-white">Informações do contato</h2>
+        <h2 className="text-base font-medium text-white lg:text-sm">Informações do contato</h2>
       </header>
 
       <div className="relative flex min-h-0 flex-1 flex-col items-center overflow-y-auto overscroll-contain px-6 pt-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
         <ContactPhoto contact={contact} />
-        <h3 className="mt-4 max-w-full text-center text-xl font-semibold break-words text-white">{contact.name}</h3>
-        <p className="mt-1 text-sm text-zinc-300/80">
+        <h3 className="mt-4 max-w-full text-center text-2xl font-semibold break-words text-white lg:text-xl">{contact.name}</h3>
+        <p className="mt-1 text-base text-zinc-300/80 lg:text-sm">
           {contact.isGroup ? "Grupo do WhatsApp" : contact.phone}
         </p>
 
@@ -194,7 +194,7 @@ export function ContactInfoPanel({
             aria-busy={saving}
             className="mt-4 w-full space-y-4 py-4"
           >
-            <label className="block text-xs text-zinc-300/80">
+            <label className="block text-sm text-zinc-300/80 lg:text-xs">
               Nome
               <input
                 autoFocus
@@ -203,20 +203,20 @@ export function ContactInfoPanel({
                 value={firstName}
                 onChange={(event) => setFirstName(event.target.value)}
                 disabled={saving}
-                className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50"
+                className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-base text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50 lg:text-sm"
               />
             </label>
-            <label className="block text-xs text-zinc-300/80">
+            <label className="block text-sm text-zinc-300/80 lg:text-xs">
               Sobrenome
               <input
                 autoComplete="family-name"
                 value={lastName}
                 onChange={(event) => setLastName(event.target.value)}
                 disabled={saving}
-                className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50"
+                className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-base text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50 lg:text-sm"
               />
             </label>
-            <label className="block text-xs text-zinc-300/80">
+            <label className="block text-sm text-zinc-300/80 lg:text-xs">
               Empresa
               <input
                 autoComplete="organization"
@@ -224,7 +224,7 @@ export function ContactInfoPanel({
                 value={companyName}
                 onChange={(event) => setCompanyName(event.target.value)}
                 disabled={saving}
-                className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50"
+                className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-base text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50 lg:text-sm"
               />
             </label>
             {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
@@ -250,7 +250,7 @@ export function ContactInfoPanel({
           <button
             type="button"
             onClick={startEditing}
-            className="mt-3 flex items-center gap-2 rounded-full px-3 py-1.5 text-xs text-zinc-300/80 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50"
+            className="mt-3 flex min-h-11 items-center gap-2 rounded-full px-3 py-1.5 text-sm text-zinc-300/80 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 lg:min-h-0 lg:text-xs"
           >
             <Pencil className="size-3.5" aria-hidden="true" />
             Editar contato
@@ -259,21 +259,21 @@ export function ContactInfoPanel({
 
         <dl className="mt-8 w-full shrink-0 space-y-5 px-1">
           <div>
-            <dt className="text-xs text-zinc-400">Tipo</dt>
-            <dd className="mt-1 text-sm text-white">
+            <dt className="text-sm text-zinc-400 lg:text-xs">Tipo</dt>
+            <dd className="mt-1 text-base text-white lg:text-sm">
               {contact.isGroup ? "Grupo" : "Contato"}
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-400">Telefone</dt>
-            <dd className="mt-1 break-words text-sm text-white">{contact.phone}</dd>
+            <dt className="text-sm text-zinc-400 lg:text-xs">Telefone</dt>
+            <dd className="mt-1 break-words text-base text-white lg:text-sm">{contact.phone}</dd>
           </div>
           {!contact.isGroup && contact.companyName && <div>
-            <dt className="text-xs text-zinc-400">Empresa</dt>
-            <dd className="mt-1 break-words text-sm text-white">{contact.companyName}</dd>
+            <dt className="text-sm text-zinc-400 lg:text-xs">Empresa</dt>
+            <dd className="mt-1 break-words text-base text-white lg:text-sm">{contact.companyName}</dd>
           </div>}
           {!contact.isGroup && <div>
-            <dt className="text-xs text-zinc-400">Responsáveis</dt>
+            <dt className="text-sm text-zinc-400 lg:text-xs">Responsáveis</dt>
             <dd className="mt-1">
               <button
                 ref={assigneeTriggerRef}
@@ -283,7 +283,7 @@ export function ContactInfoPanel({
                 aria-expanded={assigneeOpen}
                 disabled={assigneesLoading || assignmentSaving || Boolean(assignmentError && assignees.length === 0)}
                 onClick={() => setAssigneeOpen((open) => !open)}
-                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-left text-sm text-zinc-100 transition-colors hover:bg-white/[0.075] focus-visible:outline-2 focus-visible:outline-white/40 disabled:opacity-60"
+                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-left text-base text-zinc-100 transition-colors hover:bg-white/[0.075] focus-visible:outline-2 focus-visible:outline-white/40 disabled:opacity-60 lg:text-sm"
               >
                 {selectedAssignees.length ? (
                   <span aria-hidden="true" className="flex shrink-0 -space-x-2">
@@ -323,7 +323,7 @@ export function ContactInfoPanel({
             </dd>
           </div>}
           <div>
-            <dt className="text-xs text-zinc-400">Prioridade</dt>
+            <dt className="text-sm text-zinc-400 lg:text-xs">Prioridade</dt>
             <dd className="mt-2 grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-white/[0.025] p-1">
               {contactPriorities.map((option) => <button
                 key={option.value}
@@ -331,7 +331,7 @@ export function ContactInfoPanel({
                 aria-pressed={selectedPriority === option.value}
                 disabled={prioritySaving}
                 onClick={() => void changePriority(selectedPriority === option.value ? "NONE" : option.value)}
-                className={`flex h-9 items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-white/40 disabled:opacity-60 ${selectedPriority === option.value ? "bg-white/[0.1] text-zinc-100 shadow-sm" : "text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200"}`}
+                className={`flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-white/40 disabled:opacity-60 lg:h-9 lg:text-xs ${selectedPriority === option.value ? "bg-white/[0.1] text-zinc-100 shadow-sm" : "text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200"}`}
               >
                 <span aria-hidden="true" className={`size-1.5 rounded-full ${option.dot}`} />
                 {option.label}
@@ -340,8 +340,8 @@ export function ContactInfoPanel({
             {priorityError && <p role="alert" className="mt-1 text-xs text-red-300">{priorityError}</p>}
           </div>
           <div>
-            <dt className="text-xs text-zinc-400">Status</dt>
-            <dd className="mt-1 text-sm text-white">
+            <dt className="text-sm text-zinc-400 lg:text-xs">Status</dt>
+            <dd className="mt-1 text-base text-white lg:text-sm">
               {contact.archived ? "Arquivado" : "Ativo"}
             </dd>
           </div>

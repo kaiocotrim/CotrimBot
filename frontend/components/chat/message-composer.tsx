@@ -89,7 +89,7 @@ function ComposerIcon({ name }: { name: ComposerIconName }) {
 }
 
 // Oculta a barra lateral, mantendo a rolagem por mouse, toque e teclado.
-const textClassName = "resize-none bg-transparent p-0 text-[13.5px] leading-6 font-normal text-white outline-none placeholder:text-zinc-400 [overflow-wrap:anywhere] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+const textClassName = "resize-none bg-transparent p-0 text-base leading-6 font-normal text-white outline-none placeholder:text-zinc-400 lg:text-[13.5px] [overflow-wrap:anywhere] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 const buttonClassName = "flex items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 disabled:text-zinc-500 motion-reduce:transition-none";
 const privateButtonClassName = "border-zinc-300 bg-zinc-100 !text-zinc-700 hover:bg-zinc-200 hover:!text-zinc-950 focus-visible:!outline-zinc-500/60 disabled:!text-zinc-400";
 
@@ -833,7 +833,7 @@ export function MessageComposer({
               animate={textLayout}
               transition={transition}
               onAnimationComplete={syncTextScroll}
-              className={`pointer-events-none absolute overflow-hidden p-0 text-[13.5px] leading-6 font-normal whitespace-pre-wrap [overflow-wrap:anywhere] ${isPrivateMode ? "text-zinc-900" : "text-white"} ${isLongTextCollapsed ? "invisible" : ""}`}
+              className={`pointer-events-none absolute overflow-hidden p-0 text-base leading-6 font-normal whitespace-pre-wrap lg:text-[13.5px] [overflow-wrap:anywhere] ${isPrivateMode ? "text-zinc-900" : "text-white"} ${isLongTextCollapsed ? "invisible" : ""}`}
             >
               <EmojiText content={text ? `${text}\u200b` : ""} preserveMetrics />
             </motion.div>

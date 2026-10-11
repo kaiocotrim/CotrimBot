@@ -227,7 +227,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
           >
             {label && (
               <div className="flex w-full items-center justify-center py-1" role="separator" aria-label={label}>
-                <span className="rounded-md border border-white/[0.06] bg-zinc-900/90 px-2.5 py-1 text-[10px] font-medium text-zinc-300 shadow-sm backdrop-blur-md">
+                <span className="rounded-md border border-white/[0.06] bg-zinc-900/90 px-2.5 py-1 text-xs font-medium text-zinc-300 shadow-sm backdrop-blur-md lg:text-[10px]">
                   {label}
                 </span>
               </div>

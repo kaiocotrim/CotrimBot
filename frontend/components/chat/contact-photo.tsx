@@ -11,7 +11,7 @@ export function ContactPhoto({ contact }: { contact: Contact }) {
   const [imageFailed, setImageFailed] = useState(false);
   const photoUrl = contact.profilePictureUrl;
 
-  if (!photoUrl) return <Avatar contact={contact} className="size-28" />;
+  if (!photoUrl) return <Avatar contact={contact} className="size-32 text-4xl lg:size-28 lg:text-base" />;
 
   function openPhoto() {
     setImageFailed(false);
@@ -28,7 +28,7 @@ export function ContactPhoto({ contact }: { contact: Contact }) {
         aria-haspopup="dialog"
         className="shrink-0 cursor-zoom-in rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/70"
       >
-        <Avatar contact={contact} className="size-28" />
+        <Avatar contact={contact} className="size-32 text-4xl lg:size-28 lg:text-base" />
       </button>
 
       <dialog

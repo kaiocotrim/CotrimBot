@@ -464,11 +464,11 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
               <div className="min-w-0 flex-1 space-y-7">
                 <label className="block border-b border-zinc-600 focus-within:border-white">
                   <span className="sr-only">Nome</span>
-                  <input autoFocus required autoComplete="given-name" maxLength={100} value={newContactFirstName} onChange={(event) => setNewContactFirstName(event.target.value)} placeholder="Nome" className="h-11 w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-500" />
+                  <input autoFocus required autoComplete="given-name" maxLength={100} value={newContactFirstName} onChange={(event) => setNewContactFirstName(event.target.value)} placeholder="Nome" className="h-11 w-full bg-transparent text-base text-white outline-none placeholder:text-zinc-500 lg:text-sm" />
                 </label>
                 <label className="block border-b border-zinc-600 focus-within:border-white">
                   <span className="sr-only">Sobrenome</span>
-                  <input autoComplete="family-name" maxLength={90} value={newContactLastName} onChange={(event) => setNewContactLastName(event.target.value)} placeholder="Sobrenome" className="h-11 w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-500" />
+                  <input autoComplete="family-name" maxLength={90} value={newContactLastName} onChange={(event) => setNewContactLastName(event.target.value)} placeholder="Sobrenome" className="h-11 w-full bg-transparent text-base text-white outline-none placeholder:text-zinc-500 lg:text-sm" />
                 </label>
               </div>
             </div>
@@ -476,7 +476,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
               <Building2 aria-hidden="true" className="mt-3 size-5 shrink-0 text-zinc-500" strokeWidth={1.8} />
               <label className="min-w-0 flex-1 border-b border-zinc-600 focus-within:border-white">
                 <span className="sr-only">Empresa</span>
-                <input autoComplete="organization" maxLength={191} value={newContactCompany} onChange={(event) => setNewContactCompany(event.target.value)} placeholder="Empresa" className="h-11 w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-500" />
+                <input autoComplete="organization" maxLength={191} value={newContactCompany} onChange={(event) => setNewContactCompany(event.target.value)} placeholder="Empresa" className="h-11 w-full bg-transparent text-base text-white outline-none placeholder:text-zinc-500 lg:text-sm" />
               </label>
             </div>
             <div className="mt-12 flex gap-4">
@@ -608,7 +608,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                 aria-label="Nova conversa"
                 onClick={openSavedContacts}
                 whileTap={reduceMotion ? undefined : { scale: 0.9 }}
-                className="flex size-10 items-center justify-center rounded-full bg-zinc-200 text-zinc-950 transition-colors hover:bg-white lg:size-8 lg:bg-zinc-950 lg:text-zinc-400 lg:hover:bg-zinc-800 lg:hover:text-zinc-200"
+                className="flex size-11 items-center justify-center rounded-full bg-zinc-200 text-zinc-950 transition-colors hover:bg-white lg:size-8 lg:bg-zinc-950 lg:text-zinc-400 lg:hover:bg-zinc-800 lg:hover:text-zinc-200"
               >
                 <svg className="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
                   <path d="M12 5v14M5 12h14" />
@@ -628,7 +628,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
             </div>
           </div>
 
-          <label className="mt-3 flex h-10 items-center gap-2 rounded-full lg:h-9 border border-white/10 bg-gradient-to-b from-white/[0.075] via-white/[0.035] to-white/[0.015] px-3 text-zinc-500 shadow-[inset_0_1px_1px_rgba(255,255,255,0.16),inset_0_-1px_1px_rgba(0,0,0,0.2),0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow,color] focus-within:border-white/20 focus-within:bg-zinc-900/65 focus-within:text-zinc-300 focus-within:ring-2 focus-within:ring-white/[0.05]">
+          <label className="mt-3 flex h-11 items-center gap-2 rounded-full lg:h-9 border border-white/10 bg-gradient-to-b from-white/[0.075] via-white/[0.035] to-white/[0.015] px-3 text-zinc-500 shadow-[inset_0_1px_1px_rgba(255,255,255,0.16),inset_0_-1px_1px_rgba(0,0,0,0.2),0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow,color] focus-within:border-white/20 focus-within:bg-zinc-900/65 focus-within:text-zinc-300 focus-within:ring-2 focus-within:ring-white/[0.05]">
             <svg className="size-[15px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
               <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
             </svg>
@@ -637,7 +637,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Pesquisar conversas"
-              className="min-w-0 flex-1 bg-transparent text-[13px] font-normal text-zinc-100 outline-none placeholder:text-zinc-400 [&::-webkit-search-cancel-button]:hidden"
+              className="min-w-0 flex-1 bg-transparent text-base font-normal text-zinc-100 outline-none placeholder:text-zinc-400 lg:text-[13px] [&::-webkit-search-cancel-button]:hidden"
             />
           </label>
 
@@ -647,7 +647,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
               onClick={() => setConversationFilter("conversations")}
               aria-pressed={conversationFilter === "conversations"}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-              className={`relative flex h-8 w-full items-center justify-center rounded-full border px-2 text-[13px] font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:rounded-none lg:border-0 ${conversationFilter === "conversations" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
+              className={`relative flex h-11 w-full items-center justify-center rounded-full border px-2 text-sm font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:h-8 lg:rounded-none lg:border-0 lg:text-[13px] ${conversationFilter === "conversations" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
             >
               Conversas
               {conversationFilter === "conversations" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 hidden h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)] lg:block" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
@@ -657,7 +657,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
               onClick={() => setConversationFilter("groups")}
               aria-pressed={conversationFilter === "groups"}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-              className={`relative flex h-8 w-full items-center justify-center rounded-full border px-2 text-[13px] font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:rounded-none lg:border-0 ${conversationFilter === "groups" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
+              className={`relative flex h-11 w-full items-center justify-center rounded-full border px-2 text-sm font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:h-8 lg:rounded-none lg:border-0 lg:text-[13px] ${conversationFilter === "groups" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
             >
               Grupos
               {conversationFilter === "groups" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 hidden h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)] lg:block" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
@@ -667,7 +667,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
               onClick={() => setConversationFilter("mine")}
               aria-pressed={conversationFilter === "mine"}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-              className={`relative flex h-8 w-full items-center justify-center rounded-full border px-2 text-[13px] font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:rounded-none lg:border-0 ${conversationFilter === "mine" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
+              className={`relative flex h-11 w-full items-center justify-center rounded-full border px-2 text-sm font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:h-8 lg:rounded-none lg:border-0 lg:text-[13px] ${conversationFilter === "mine" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
             >
               Minhas
               {conversationFilter === "mine" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 hidden h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)] lg:block" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
@@ -678,7 +678,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
             type="button"
             onClick={() => setShowArchived((current) => !current)}
             aria-pressed={showArchived}
-            className={`mt-1.5 flex h-10 w-full items-center lg:h-8 gap-2.5 rounded-[10px] px-2 text-left text-[13px] transition-colors hover:bg-white/[0.04] hover:text-zinc-200 ${showArchived ? "bg-white/[0.06] text-zinc-100" : "text-zinc-400"}`}
+            className={`mt-1.5 flex h-11 w-full items-center lg:h-8 gap-2.5 rounded-[10px] px-2 text-left text-sm lg:text-[13px] transition-colors hover:bg-white/[0.04] hover:text-zinc-200 ${showArchived ? "bg-white/[0.06] text-zinc-100" : "text-zinc-400"}`}
           >
             <svg className="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M4 7h16v13H4zM3 4h18v3H3z" /><path d="M10 12h4" />
@@ -728,7 +728,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                   >
                   <div className={`flex items-center ${collapsed ? "justify-center" : "gap-2.5"}`}>
                     <span className="relative shrink-0">
-                      <Avatar contact={contact} />
+                      <Avatar contact={contact} className="size-12 text-lg lg:size-10 lg:text-base" />
                       {collapsed && unread && (
                         <motion.span
                           aria-hidden="true"
@@ -752,7 +752,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                         )}
                       </AnimatePresence>
                       {holdingContactId === contact.id && (
-                        <svg className="pointer-events-none absolute -inset-1 size-12 -rotate-90" viewBox="0 0 48 48" aria-hidden="true">
+                        <svg className="pointer-events-none absolute -inset-1 size-14 -rotate-90 lg:size-12" viewBox="0 0 48 48" aria-hidden="true">
                           <circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/20" />
                           <circle
                             cx="24"
@@ -774,15 +774,15 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                     </span>
                     <div className={collapsed ? "hidden" : "min-w-0 flex-1 py-3 lg:py-2"}>
                       <div className="flex items-baseline justify-between gap-3">
-                        <p className="min-w-0 flex-1 truncate text-[14px] leading-tight font-medium tracking-[-0.01em] text-zinc-50">{contact.name}</p>
+                        <p className="min-w-0 flex-1 truncate text-base leading-tight font-medium tracking-[-0.01em] text-zinc-50 lg:text-[14px]">{contact.name}</p>
                         {lastMessage && (
-                          <time dateTime={lastMessage.createdAt} className={`shrink-0 text-[11px] leading-tight ${unread ? "font-medium text-zinc-300" : "font-normal text-zinc-500"}`}>
+                          <time dateTime={lastMessage.createdAt} className={`shrink-0 text-xs leading-tight lg:text-[11px] ${unread ? "font-medium text-zinc-300" : "font-normal text-zinc-500"}`}>
                             {formatSidebarDate(lastMessage.createdAt)}
                           </time>
                         )}
                       </div>
                       <div className="mt-0.5 flex items-center gap-2">
-                        <p className="min-w-0 flex-1 truncate text-[12px] leading-tight font-normal text-zinc-500">
+                        <p className="min-w-0 flex-1 truncate text-sm leading-tight font-normal text-zinc-400 lg:text-[12px] lg:text-zinc-500">
                           {lastMessage && !lastMessage.deletedAt && lastMessage.direction === "OUTGOING" && "✓✓ "}
                           <MessageText content={lastMessage ? lastMessage.deletedAt ? "Mensagem apagada" : lastMessage.content : "Nenhuma mensagem"} showSignature={Boolean(lastMessage && !lastMessage.deletedAt && !lastMessage.private && lastMessage.direction === "OUTGOING")} linkify={false} />
                         </p>

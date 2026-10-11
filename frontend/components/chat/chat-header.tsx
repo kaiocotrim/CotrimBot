@@ -84,7 +84,7 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
         <>
           <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3">
             <svg className="size-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
-            <input ref={searchRef} type="search" value={searchQuery} onChange={(event) => onSearchQueryChange(event.target.value)} placeholder="Localizar mensagem..." className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-zinc-500" />
+            <input ref={searchRef} type="search" value={searchQuery} onChange={(event) => onSearchQueryChange(event.target.value)} placeholder="Localizar mensagem..." className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-zinc-500 lg:text-sm" />
           </label>
           <span className="shrink-0 text-xs tabular-nums text-zinc-400">{resultCount ? currentResult + 1 : 0}/{resultCount}</span>
           <button type="button" onClick={onPreviousResult} disabled={!resultCount} aria-label="Resultado anterior" className={actionClass}>↑</button>
@@ -95,12 +95,12 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
         <>
           <SidebarMenuButton onClick={onOpenSidebar} expanded={sidebarOpen} />
           <button type="button" onClick={onOpenContactInfo} aria-label={`Abrir informações de ${contact.name}`} className="flex min-w-0 flex-1 items-center gap-2 rounded-xl sm:gap-3 text-left focus-visible:outline-2 focus-visible:outline-white/50">
-            <Avatar contact={contact} className="size-9 sm:size-10" />
+            <Avatar contact={contact} className="size-10" />
             <span key={contact.id} className="min-w-0 flex-1">
-              <span className="block truncate text-[15px] font-medium">{contact.name}</span>
+              <span className="block truncate text-base font-medium lg:text-[15px]">{contact.name}</span>
               {isTyping
-                ? <span role="status" aria-label={`${contact.name} está digitando`} className="block h-4 truncate text-xs text-zinc-300">digitando…</span>
-                : <span className={`${styles.subtitle} block truncate text-xs text-zinc-400`}>{contact.isGroup ? "Grupo do WhatsApp" : contact.phone}</span>}
+                ? <span role="status" aria-label={`${contact.name} está digitando`} className="block h-4 truncate text-[13px] text-zinc-300 lg:text-xs">digitando…</span>
+                : <span className={`${styles.subtitle} block truncate text-[13px] text-zinc-400 lg:text-xs`}>{contact.isGroup ? "Grupo do WhatsApp" : contact.phone}</span>}
             </span>
           </button>
           <div className="ml-auto flex h-11 shrink-0 items-center rounded-full border border-white/10 bg-white/[0.035] px-1">

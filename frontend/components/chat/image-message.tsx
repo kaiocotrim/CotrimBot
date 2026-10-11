@@ -117,7 +117,7 @@ export function ImageMessage({ messageId, mediaUrl, content, showSignature, view
               initial={reduceMotion ? false : { opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: zoom }}
               transition={{ duration: reduceMotion ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="flex h-full max-h-[calc(100dvh-9rem)] w-full max-w-[calc(100vw-5rem)] items-center justify-center"
+              className="flex h-full max-h-[calc(100dvh-9rem)] w-full max-w-[calc(100vw-2rem)] items-center justify-center lg:max-w-[calc(100vw-5rem)]"
             >
               <img
                 src={activeItem.mediaUrl}
@@ -159,7 +159,7 @@ export function ImageMessage({ messageId, mediaUrl, content, showSignature, view
           src={mediaUrl}
           alt={hasCaption ? content : "Imagem recebida"}
           loading="lazy"
-          className="block max-h-[360px] max-w-[min(340px,62vw)] object-contain transition-transform duration-200 hover:scale-[1.015]"
+          className="block max-h-[420px] max-w-[min(360px,76vw)] object-contain transition-transform duration-200 hover:scale-[1.015] lg:max-h-[360px] lg:max-w-[min(340px,62vw)]"
         />
         {viewOnce && (
           <span className="absolute top-2 left-2 flex items-center gap-1 rounded-full border border-white/15 bg-black/55 px-2 py-1 text-[10px] font-medium text-white/90 shadow-sm backdrop-blur-md">

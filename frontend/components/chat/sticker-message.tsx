@@ -4,7 +4,7 @@ type StickerMessageProps = {
 
 export function StickerMessage({ mediaUrl }: StickerMessageProps) {
   return (
-    <div className="flex size-[clamp(140px,18vw,220px)] items-end justify-center">
+    <div className="flex size-[170px] items-end justify-center lg:size-[clamp(140px,18vw,220px)]">
       {/* A mídia pode ser uma figurinha PNG ou WebP animada. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
