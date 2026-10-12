@@ -154,7 +154,7 @@ export function ImageMessage({ messageId, mediaUrl, content, showSignature, view
 
   return (
     <div>
-      <button type="button" onClick={(event) => { event.stopPropagation(); openViewer(); }} aria-label={viewOnce ? "Abrir imagem de visualização única" : "Abrir imagem"} className="relative block overflow-hidden rounded-[15px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60">
+      <button type="button" data-message-media-preview onClick={(event) => { event.stopPropagation(); openViewer(); }} aria-label={viewOnce ? "Abrir imagem de visualização única" : "Abrir imagem"} className="relative block overflow-hidden rounded-[15px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60">
         <motion.img
           src={mediaUrl}
           alt={hasCaption ? content : "Imagem recebida"}

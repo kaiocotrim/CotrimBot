@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft, Building2, PanelLeftClose, PanelLeftOpen, Phone, Search, UserRound, UserRoundPlus, X } from "lucide-react";
 import { getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/min";
@@ -18,6 +18,8 @@ import type { Contact, Message } from "@/types/chat";
 type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string) => Promise<Contact[]>; headerActions?: ReactNode; mobileOpen: boolean; revealForSwipe: boolean; onMobileOpenChange: (open: boolean) => void };
 type ConversationFilter = "conversations" | "groups" | "mine";
 const PREVIEW_HOLD_DURATION = 1_000;
+const MOBILE_PREVIEW_HOLD_DURATION = 500;
+const PREVIEW_MOVE_TOLERANCE = 12;
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
 const dayKeyFormatter = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: CHAT_TIME_ZONE });
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: CHAT_TIME_ZONE });
@@ -72,11 +74,15 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   const [savingContact, setSavingContact] = useState(false);
   const [savedActionError, setSavedActionError] = useState<string | null>(null);
   const [holdingContactId, setHoldingContactId] = useState<number | null>(null);
+  const [previewHoldDuration, setPreviewHoldDuration] = useState(PREVIEW_HOLD_DURATION);
   const [previewContact, setPreviewContact] = useState<Contact | null>(null);
   const [previewMessages, setPreviewMessages] = useState<Message[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const holdingContactIdRef = useRef<number | null>(null);
+  const touchHoldRef = useRef<{ contactId: number; pointerId: number; startX: number; startY: number } | null>(null);
+  const touchHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressContactClickRef = useRef<number | null>(null);
   const previewRequestRef = useRef(0);
   const previewPanelRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -207,6 +213,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
 
   const closePreview = useCallback(() => {
     previewRequestRef.current += 1;
+    suppressContactClickRef.current = null;
     setPreviewContact(null);
     setPreviewMessages([]);
     setPreviewLoading(false);
@@ -237,6 +244,9 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
 
   const cancelPreviewHold = useCallback((contactId?: number) => {
     if (contactId !== undefined && holdingContactIdRef.current !== contactId) return;
+    if (touchHoldTimerRef.current !== null) clearTimeout(touchHoldTimerRef.current);
+    touchHoldTimerRef.current = null;
+    touchHoldRef.current = null;
     holdingContactIdRef.current = null;
     setHoldingContactId(null);
   }, []);
@@ -244,17 +254,51 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   function startPreviewHold(contact: Contact, event: ReactMouseEvent<HTMLButtonElement>) {
     if (event.button !== 2) return;
     cancelPreviewHold();
+    setPreviewHoldDuration(PREVIEW_HOLD_DURATION);
     holdingContactIdRef.current = contact.id;
     setHoldingContactId(contact.id);
   }
 
+  function startTouchPreviewHold(contact: Contact, event: ReactPointerEvent<HTMLButtonElement>) {
+    suppressContactClickRef.current = null;
+    if (isDesktop || !event.isPrimary || event.button !== 0 || !["touch", "pen"].includes(event.pointerType)) return;
+    cancelPreviewHold();
+    const pointerId = event.pointerId;
+    touchHoldRef.current = { contactId: contact.id, pointerId, startX: event.clientX, startY: event.clientY };
+    holdingContactIdRef.current = contact.id;
+    setPreviewHoldDuration(MOBILE_PREVIEW_HOLD_DURATION);
+    setHoldingContactId(contact.id);
+    touchHoldTimerRef.current = setTimeout(() => {
+      if (touchHoldRef.current?.pointerId === pointerId) activateTouchPreviewHold(contact);
+    }, MOBILE_PREVIEW_HOLD_DURATION);
+  }
+
+  function activateTouchPreviewHold(contact: Contact) {
+    if (touchHoldRef.current?.contactId !== contact.id) return;
+    suppressContactClickRef.current = contact.id;
+    cancelPreviewHold(contact.id);
+    openPreview(contact);
+  }
+
+  function moveTouchPreviewHold(contactId: number, event: ReactPointerEvent<HTMLButtonElement>) {
+    const hold = touchHoldRef.current;
+    if (!hold || hold.contactId !== contactId || hold.pointerId !== event.pointerId) return;
+    if (Math.hypot(event.clientX - hold.startX, event.clientY - hold.startY) > PREVIEW_MOVE_TOLERANCE) cancelPreviewHold(contactId);
+  }
+
   function completePreviewHold(contact: Contact) {
-    if (holdingContactIdRef.current !== contact.id) return;
+    if (holdingContactIdRef.current !== contact.id || touchHoldRef.current) return;
     // A própria animação controla a espera e mantém o círculo completo até soltar.
     openPreview(contact);
   }
 
   function selectContactFromClick(contact: Contact, event: ReactMouseEvent<HTMLButtonElement>) {
+    if (suppressContactClickRef.current === contact.id) {
+      suppressContactClickRef.current = null;
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (event.detail > 1) return;
     openConversation(contact);
   }
@@ -304,6 +348,9 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
       window.removeEventListener("mouseup", handleMouseUp);
       window.removeEventListener("blur", handleBlur);
       document.removeEventListener("keydown", handleKeyDown);
+      if (touchHoldTimerRef.current !== null) clearTimeout(touchHoldTimerRef.current);
+      touchHoldTimerRef.current = null;
+      touchHoldRef.current = null;
       holdingContactIdRef.current = null;
       previewRequestRef.current += 1;
     };
@@ -714,17 +761,22 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                     type="button"
                     onMouseDown={(event) => startPreviewHold(contact, event)}
                     onMouseLeave={() => cancelPreviewHold(contact.id)}
+                    onPointerDown={(event) => startTouchPreviewHold(contact, event)}
+                    onPointerMove={(event) => moveTouchPreviewHold(contact.id, event)}
+                    onPointerUp={(event) => { if (touchHoldRef.current?.pointerId === event.pointerId) cancelPreviewHold(contact.id); }}
                     onPointerCancel={() => cancelPreviewHold(contact.id)}
                     onContextMenu={(event) => {
-                      if (event.button !== 2) return;
-                      event.preventDefault();
+                      if (event.button === 2 || !isDesktop) {
+                        event.preventDefault();
+                        if (!isDesktop) activateTouchPreviewHold(contact);
+                      }
                     }}
                     onDragStart={(event) => event.preventDefault()}
                     onClick={(event) => selectContactFromClick(contact, event)}
                     aria-label={`${contact.name}${priority ? `, prioridade ${priority.label.toLowerCase()}` : ""}${unread ? `, ${contact.unreadCount} mensagens não lidas` : ""}`}
                     aria-current={selected ? "true" : undefined}
-                    title={`${contact.name}${priority ? ` — Prioridade ${priority.label.toLowerCase()}` : ""} — Clique para abrir a conversa; segure o botão direito por 1 segundo para ver a prévia`}
-                    className={`block w-full select-none text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 ${collapsed ? "rounded-xl py-2" : "px-2"}`}
+                    title={`${contact.name}${priority ? ` — Prioridade ${priority.label.toLowerCase()}` : ""} — Toque para abrir; pressione e segure para ver a prévia`}
+                    className={`block w-full select-none text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 max-lg:touch-pan-y max-lg:[-webkit-touch-callout:none] ${collapsed ? "rounded-xl py-2" : "px-2"}`}
                   >
                   <div className={`flex items-center ${collapsed ? "justify-center" : "gap-2.5"}`}>
                     <span className="relative shrink-0">
@@ -766,7 +818,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                             strokeDasharray="100"
                             strokeDashoffset="100"
                             className="text-white"
-                            style={{ animation: `conversation-preview-hold ${PREVIEW_HOLD_DURATION}ms linear forwards` }}
+                            style={{ animation: `conversation-preview-hold ${previewHoldDuration}ms linear forwards` }}
                             onAnimationEnd={() => completePreviewHold(contact)}
                           />
                         </svg>

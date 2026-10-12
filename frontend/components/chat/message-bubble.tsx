@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { Dialog } from "@base-ui/react/dialog";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -43,6 +43,9 @@ type MessageBubbleProps = {
 };
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+const LONG_PRESS_DURATION = 500;
+const LONG_PRESS_MOVE_TOLERANCE = 12;
+const DESKTOP_QUERY = "(min-width: 1024px)";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ??
@@ -77,6 +80,9 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
   const reactionControlsRef = useRef<HTMLDivElement>(null);
   const reactionPickerRef = useRef<HTMLDivElement>(null);
   const reactionTriggerRef = useRef<HTMLButtonElement>(null);
+  const longPressRef = useRef<{ pointerId: number; startX: number; startY: number; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const lastTouchStartRef = useRef(0);
+  const suppressNextClickRef = useRef(false);
   const [reactionPosition, setReactionPosition] = useState({ top: 0, left: 0 });
   const outgoing = message.direction === "OUTGOING";
   const isPrivate = Boolean(message.private);
@@ -204,6 +210,57 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
     };
   }, [actionsOpen, reactionPickerOpen]);
 
+  useEffect(() => () => {
+    if (longPressRef.current) clearTimeout(longPressRef.current.timer);
+  }, []);
+
+  function cancelLongPress() {
+    if (longPressRef.current) clearTimeout(longPressRef.current.timer);
+    longPressRef.current = null;
+  }
+
+  function showActions() {
+    setActionsOpen(true);
+    setReactionPickerOpen(false);
+    setChoosingContact(false);
+    setCopyError(false);
+    setActionError(null);
+  }
+
+  function activateLongPress() {
+    if (!longPressRef.current) return;
+    cancelLongPress();
+    lastTouchStartRef.current = 0;
+    suppressNextClickRef.current = true;
+    showActions();
+  }
+
+  function onMessagePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    suppressNextClickRef.current = false;
+    lastTouchStartRef.current = 0;
+    if (window.matchMedia(DESKTOP_QUERY).matches || !event.isPrimary || event.button !== 0 || !["touch", "pen"].includes(event.pointerType)) return;
+    if (window.getSelection()?.type === "Range") return;
+    const target = event.target;
+    if (!(target instanceof Element) || target.closest("a, input, textarea, select, audio, video, canvas, [contenteditable], [role='slider'], [role='menu'], [role='dialog']")) return;
+    if (target.closest("button") && !target.closest("[data-message-media-preview]")) return;
+    cancelLongPress();
+    lastTouchStartRef.current = Date.now();
+    const pointerId = event.pointerId;
+    const timer = setTimeout(() => {
+      if (longPressRef.current?.pointerId === pointerId) activateLongPress();
+    }, LONG_PRESS_DURATION);
+    longPressRef.current = { pointerId, startX: event.clientX, startY: event.clientY, timer };
+  }
+
+  function onMessagePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const press = longPressRef.current;
+    if (!press || press.pointerId !== event.pointerId) return;
+    if (Math.hypot(event.clientX - press.startX, event.clientY - press.startY) > LONG_PRESS_MOVE_TOLERANCE) {
+      cancelLongPress();
+      lastTouchStartRef.current = 0;
+    }
+  }
+
   function openReactionPicker(triggerElement: HTMLElement | null = reactionTriggerRef.current) {
     const trigger = triggerElement?.getBoundingClientRect();
     if (!trigger) return;
@@ -299,13 +356,26 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
     <div
       onContextMenu={(event) => {
         event.preventDefault();
-        setActionsOpen(true);
-        setReactionPickerOpen(false);
-        setChoosingContact(false);
-        setCopyError(false);
-        setActionError(null);
+        if (event.button === 2 || window.matchMedia(DESKTOP_QUERY).matches) showActions();
+        else if (longPressRef.current) activateLongPress();
+        else if (lastTouchStartRef.current && Date.now() - lastTouchStartRef.current < 1_500) {
+          lastTouchStartRef.current = 0;
+          suppressNextClickRef.current = true;
+          showActions();
+        }
       }}
-      className={`group/message relative min-w-0 max-w-[86%] text-base leading-[1.45] lg:max-w-[min(62%,620px)] lg:text-[13.5px] lg:leading-[1.4] font-normal [overflow-wrap:anywhere] ${isPrivate ? "text-zinc-900" : "text-white"} ${message.reaction ? "mb-3" : ""} ${
+      onPointerDown={onMessagePointerDown}
+      onPointerMove={onMessagePointerMove}
+      onPointerUp={(event) => { if (longPressRef.current?.pointerId === event.pointerId) cancelLongPress(); }}
+      onPointerCancel={(event) => { if (longPressRef.current?.pointerId === event.pointerId) cancelLongPress(); }}
+      onClickCapture={(event) => {
+        lastTouchStartRef.current = 0;
+        if (!suppressNextClickRef.current) return;
+        suppressNextClickRef.current = false;
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      className={`group/message relative min-w-0 max-w-[86%] text-base leading-[1.45] lg:max-w-[min(62%,620px)] lg:text-[13.5px] lg:leading-[1.4] font-normal [overflow-wrap:anywhere] max-lg:[-webkit-touch-callout:none] ${isPrivate ? "text-zinc-900" : "text-white"} ${message.reaction ? "mb-3" : ""} ${
         isPrivate
           ? "rounded-[24px] bg-zinc-100 px-3.5 py-2.5 shadow-[0_4px_16px_rgba(24,24,27,0.12)]"
           : isSticker

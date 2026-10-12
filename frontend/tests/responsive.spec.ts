@@ -175,3 +175,84 @@ test("deslizar para a direita retorna à lista e preserva o rascunho", async ({ 
   await expect(composer).toHaveValue("rascunho preservado");
   expect(runtimeErrors).toEqual([]);
 });
+
+test("segurar uma conversa no mobile abre a prévia sem abrir o chat", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { runtimeErrors } = await mockApi(page);
+  await page.goto("/");
+  const contactButton = page.getByRole("button", { name: "Contato de teste", exact: true });
+  const preview = page.getByRole("dialog", { name: "Contato de teste" });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", x: number, y: number) =>
+    cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
+  const box = (await contactButton.boundingBox())!;
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+
+  await touch("touchStart", x, y);
+  await touch("touchMove", x, y + 50);
+  await page.waitForTimeout(600);
+  await touch("touchEnd", x, y + 50);
+  await expect(preview).toBeHidden();
+  await expect(contactButton).toBeVisible();
+
+  await touch("touchStart", x, y);
+  await touch("touchEnd", x, y);
+  await expect(page.getByRole("textbox", { name: "Mensagem", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Voltar para conversas" }).click();
+  await expect(contactButton).toBeVisible();
+
+  await touch("touchStart", x, y);
+  await expect(preview).toBeVisible();
+  await touch("touchEnd", x, y);
+  await expect(preview).toBeVisible();
+  await expect(page.locator("#chat-sidebar")).toHaveAttribute("data-sidebar-open", "true");
+  await touch("touchStart", 20, 30);
+  await touch("touchEnd", 20, 30);
+  await expect(preview).toBeHidden();
+  await contactButton.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("textbox", { name: "Mensagem", exact: true })).toBeVisible();
+  expect(runtimeErrors).toEqual([]);
+});
+
+test("segurar uma mensagem abre as ações e arrastar cancela o gesto", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { runtimeErrors } = await mockApi(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+  const message = page.locator('[data-message-id="1"]').getByText(longWord, { exact: false });
+  await expect(message).toBeVisible();
+  const menu = page.getByRole("menu", { name: "Ações da mensagem" });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", x: number, y: number) =>
+    cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
+  const center = async () => {
+    const box = (await message.boundingBox())!;
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
+
+  let point = await center();
+  await touch("touchStart", point.x, point.y);
+  await touch("touchEnd", point.x, point.y);
+  await expect(menu).toBeHidden();
+
+  point = await center();
+  await touch("touchStart", point.x, point.y);
+  await touch("touchMove", point.x, point.y + 70);
+  await page.waitForTimeout(600);
+  await touch("touchEnd", point.x, point.y + 70);
+  await expect(menu).toBeHidden();
+
+  point = await center();
+  await touch("touchStart", point.x, point.y);
+  await expect(menu).toBeVisible();
+  await touch("touchEnd", point.x, point.y);
+  await expect(menu).toBeVisible();
+  await touch("touchStart", 20, 100);
+  await touch("touchEnd", 20, 100);
+  await expect(menu).toBeHidden();
+  expect(runtimeErrors).toEqual([]);
+});
