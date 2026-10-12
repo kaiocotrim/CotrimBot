@@ -8,12 +8,14 @@ import { ContactSidebar } from "@/components/chat/contact-sidebar";
 import { NotificationsPopover } from "@/components/chat/notifications-popover";
 import { useChat } from "@/hooks/use-chat";
 import { useMobileSwipeBack } from "@/hooks/use-mobile-swipe-back";
+import { useMobileVisualViewport } from "@/hooks/use-mobile-visual-viewport";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useSession } from "@/lib/auth-client";
 import type { Contact } from "@/types/chat";
 
 // A página apenas conecta o estado da conversa aos componentes visuais.
 export default function Home() {
+  const chatRootRef = useMobileVisualViewport();
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const chat = useChat();
@@ -64,14 +66,14 @@ export default function Home() {
 
   if (isPending || !session) {
     return (
-      <main data-chat-root className="flex h-dvh items-center justify-center bg-zinc-950 text-white">
+      <main ref={chatRootRef} data-chat-root className="flex h-dvh items-center justify-center bg-zinc-950 text-white">
         <p className="text-sm text-zinc-400">Carregando...</p>
       </main>
     );
   }
 
   return (
-    <main data-chat-root className="flex h-dvh overflow-hidden bg-zinc-950 text-white">
+    <main ref={chatRootRef} data-chat-root className="flex h-dvh overflow-hidden bg-zinc-950 text-white">
       <ContactSidebar
         userId={session.user.id}
         contacts={chat.contacts}

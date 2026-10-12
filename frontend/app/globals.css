@@ -12,6 +12,29 @@ html:has([data-chat-root]) body {
   overscroll-behavior: none;
 }
 
+/* Mantém cabeçalho e composer dentro da área realmente visível no mobile. */
+@media (max-width: 1023px) {
+  [data-chat-root] {
+    position: fixed;
+    inset-inline: 0;
+    top: var(--chat-viewport-top, 0px);
+    height: var(--chat-viewport-height, 100dvh);
+  }
+
+  /* Apenas o conteúdo não editável dos balões dispensa a seleção nativa. */
+  [data-message-bubble] {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  [data-message-bubble] :is(input, textarea, select, [contenteditable]:not([contenteditable="false"])) {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: initial;
+  }
+}
+
 /* Cursores locais, com fallback nativo e pontos de clique por imagem. */
 html {
   --apple-cursor: url("/cursors/default-small.svg") 5 4, default;

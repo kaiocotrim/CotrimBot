@@ -47,6 +47,12 @@ const LONG_PRESS_DURATION = 500;
 const LONG_PRESS_MOVE_TOLERANCE = 12;
 const DESKTOP_QUERY = "(min-width: 1024px)";
 
+function isMessageGestureTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+  if (target.closest("input, textarea, select, audio, video, canvas, [contenteditable], [role='slider'], [role='menu'], [role='dialog']")) return false;
+  return !target.closest("button") || Boolean(target.closest("[data-message-media-preview]"));
+}
+
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   "/api";
@@ -239,10 +245,7 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
     suppressNextClickRef.current = false;
     lastTouchStartRef.current = 0;
     if (window.matchMedia(DESKTOP_QUERY).matches || !event.isPrimary || event.button !== 0 || !["touch", "pen"].includes(event.pointerType)) return;
-    if (window.getSelection()?.type === "Range") return;
-    const target = event.target;
-    if (!(target instanceof Element) || target.closest("a, input, textarea, select, audio, video, canvas, [contenteditable], [role='slider'], [role='menu'], [role='dialog']")) return;
-    if (target.closest("button") && !target.closest("[data-message-media-preview]")) return;
+    if (!isMessageGestureTarget(event.target)) return;
     cancelLongPress();
     lastTouchStartRef.current = Date.now();
     const pointerId = event.pointerId;
@@ -354,7 +357,9 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
 
   return (
     <div
+      data-message-bubble
       onContextMenu={(event) => {
+        if (!isMessageGestureTarget(event.target)) return;
         event.preventDefault();
         if (event.button === 2 || window.matchMedia(DESKTOP_QUERY).matches) showActions();
         else if (longPressRef.current) activateLongPress();
@@ -375,7 +380,7 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
         event.preventDefault();
         event.stopPropagation();
       }}
-      className={`group/message relative min-w-0 max-w-[86%] text-base leading-[1.45] lg:max-w-[min(62%,620px)] lg:text-[13.5px] lg:leading-[1.4] font-normal [overflow-wrap:anywhere] max-lg:[-webkit-touch-callout:none] ${isPrivate ? "text-zinc-900" : "text-white"} ${message.reaction ? "mb-3" : ""} ${
+      className={`group/message relative min-w-0 max-w-[86%] text-base leading-[1.45] lg:max-w-[min(62%,620px)] lg:text-[13.5px] lg:leading-[1.4] font-normal [overflow-wrap:anywhere] ${isPrivate ? "text-zinc-900" : "text-white"} ${message.reaction ? "mb-3" : ""} ${
         isPrivate
           ? "rounded-[24px] bg-zinc-100 px-3.5 py-2.5 shadow-[0_4px_16px_rgba(24,24,27,0.12)]"
           : isSticker

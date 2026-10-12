@@ -131,7 +131,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
     previousLastMessageIdRef.current = lastMessageId;
   }, [contact.id, messages.length, messages]);
 
-  // Imagens, vídeos e transcrições podem alterar a altura depois da renderização.
+  // Imagens, vídeos, transcrições e o teclado podem alterar a área disponível.
   useEffect(() => {
     const content = contentRef.current;
     const element = scrollRef.current;
@@ -144,6 +144,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
       setShowScrollButton(distanceFromBottom > 180);
     });
     observer.observe(content);
+    observer.observe(element);
     return () => observer.disconnect();
   }, []);
 

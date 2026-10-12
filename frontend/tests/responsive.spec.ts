@@ -2,10 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 
 const longWord = "a".repeat(160);
 
-async function mockApi(page: Page) {
+async function mockApi(page: Page, messageCount = 1) {
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   const message = { id: 1, externalId: "test-1", content: `Mensagem longa ${longWord}`, private: false, contactId: 1, direction: "INCOMING", type: "TEXT", createdAt: new Date().toISOString(), readAt: null, reaction: null, senderName: null, senderPhone: null, senderProfilePictureUrl: null };
+  const messages = Array.from({ length: messageCount }, (_, index) => ({ ...message, id: index + 1, externalId: `test-${index + 1}`, content: `Mensagem ${index + 1}: ${message.content}` }));
   const contact = { id: 1, name: "Contato de teste", phone: "5500000000000", isGroup: false, archived: false, unreadCount: 0, profilePictureUrl: null, messages: [message] };
 
   // Toda API é simulada no navegador, como no teste de digitação.
@@ -25,7 +26,7 @@ async function mockApi(page: Page) {
     } else if (pathname.endsWith("/avatar")) {
       body = { profilePictureUrl: null };
     } else if (pathname.endsWith("/messages")) {
-      body = { messages: [message], hasMore: false, nextCursor: null };
+      body = { messages, hasMore: false, nextCursor: null };
     } else if (pathname.endsWith("/notifications")) {
       body = { notifications: [], unreadCount: 0 };
     }
@@ -98,6 +99,64 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 414, height: 800 }
   });
 }
 
+test("teclado reduz só a conversa e mantém a posição de leitura", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { runtimeErrors } = await mockApi(page, 40);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+
+  const root = page.locator("[data-chat-root]");
+  const list = page.locator("[data-swipe-back-area]");
+  const input = page.getByRole("textbox", { name: "Mensagem", exact: true });
+  const scrollMetrics = () => list.evaluate((element) => ({
+    top: element.scrollTop,
+    bottom: element.scrollHeight - element.clientHeight - element.scrollTop,
+    height: element.clientHeight,
+  }));
+  const resizeVisualViewport = (height: number) => page.evaluate((nextHeight) => {
+    const viewport = window.visualViewport!;
+    Object.defineProperty(viewport, "height", { configurable: true, value: nextHeight });
+    Object.defineProperty(viewport, "offsetTop", { configurable: true, value: 0 });
+    viewport.dispatchEvent(new Event("resize"));
+  }, height);
+
+  await expect.poll(async () => (await scrollMetrics()).bottom).toBeLessThan(2);
+  await input.focus();
+  await resizeVisualViewport(500);
+  await expect.poll(async () => (await root.boundingBox())!.height).toBe(500);
+  const inputBox = (await input.boundingBox())!;
+  const rootBox = (await root.boundingBox())!;
+  expect(inputBox.y + inputBox.height).toBeLessThanOrEqual(rootBox.y + rootBox.height);
+  expect(inputBox.y + inputBox.height).toBeGreaterThan(rootBox.y + rootBox.height - 100);
+  expect((await page.getByRole("button", { name: "Voltar para conversas" }).boundingBox())!.y).toBeLessThan(80);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect((await scrollMetrics()).height).toBeLessThan(844);
+  await expect.poll(async () => (await scrollMetrics()).bottom).toBeLessThan(2);
+
+  await resizeVisualViewport(844);
+  await expect.poll(async () => (await root.boundingBox())!.height).toBe(844);
+  await expect.poll(async () => (await scrollMetrics()).bottom).toBeLessThan(2);
+
+  await list.evaluate((element) => { element.scrollTop = 250; });
+  await expect.poll(async () => (await scrollMetrics()).top).toBe(250);
+  await resizeVisualViewport(500);
+  await expect.poll(async () => (await root.boundingBox())!.height).toBe(500);
+  expect((await scrollMetrics()).top).toBe(250);
+  await resizeVisualViewport(844);
+  await expect.poll(async () => (await root.boundingBox())!.height).toBe(844);
+  expect((await scrollMetrics()).top).toBe(250);
+
+  // Também cobre navegadores que redimensionam a viewport de layout.
+  await page.evaluate(() => { Reflect.deleteProperty(window.visualViewport!, "height"); });
+  await page.setViewportSize({ width: 390, height: 500 });
+  await expect.poll(async () => (await root.boundingBox())!.height).toBe(500);
+  expect((await scrollMetrics()).top).toBe(250);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(async () => (await root.boundingBox())!.height).toBe(844);
+  expect((await scrollMetrics()).top).toBe(250);
+  expect(runtimeErrors).toEqual([]);
+});
+
 test("menu de conversas pode ser recolhido no desktop (1280px)", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   const { runtimeErrors } = await mockApi(page);
@@ -108,6 +167,7 @@ test("menu de conversas pode ser recolhido no desktop (1280px)", async ({ page }
   await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Mensagem", exact: true })).toBeVisible();
   await expect(page.locator("#chat-sidebar")).toBeVisible();
+  expect(await page.locator("[data-message-bubble]").evaluate((element) => getComputedStyle(element).userSelect)).not.toBe("none");
 
   const sidebar = page.getByRole("complementary", { name: "Barra lateral de conversas" });
   const expandedWidth = (await sidebar.boundingBox())!.width;
@@ -224,6 +284,12 @@ test("segurar uma mensagem abre as ações e arrastar cancela o gesto", async ({
   await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
   const message = page.locator('[data-message-id="1"]').getByText(longWord, { exact: false });
   await expect(message).toBeVisible();
+  const bubble = page.locator('[data-message-id="1"] [data-message-bubble]');
+  expect(await bubble.evaluate((element) => getComputedStyle(element).userSelect)).toBe("none");
+  expect(await message.evaluate((element) => getComputedStyle(element).userSelect)).toBe("none");
+  expect(await bubble.evaluate((element) => getComputedStyle(element).getPropertyValue("-webkit-user-select"))).toBe("none");
+  expect(await message.evaluate((element) => element.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })))).toBe(false);
+  expect(await page.getByRole("textbox", { name: "Mensagem", exact: true }).evaluate((element) => getComputedStyle(element).userSelect)).not.toBe("none");
   const menu = page.getByRole("menu", { name: "Ações da mensagem" });
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
@@ -254,5 +320,16 @@ test("segurar uma mensagem abre as ações e arrastar cancela o gesto", async ({
   await touch("touchStart", 20, 100);
   await touch("touchEnd", 20, 100);
   await expect(menu).toBeHidden();
+
+  await page.evaluate(() => {
+    Object.defineProperty(navigator.clipboard, "writeText", {
+      configurable: true,
+      value: async (value: string) => { document.documentElement.dataset.copiedMessage = value; },
+    });
+  });
+  await bubble.getByRole("button", { name: "Ações da mensagem" }).click();
+  await menu.getByRole("menuitem", { name: "Copiar" }).click();
+  await expect(menu).toBeHidden();
+  expect(await page.locator("html").getAttribute("data-copied-message")).toContain(longWord);
   expect(runtimeErrors).toEqual([]);
 });
