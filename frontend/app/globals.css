@@ -21,6 +21,11 @@ html:has([data-chat-root]) body {
     height: var(--chat-viewport-height, 100dvh);
   }
 
+  /* Com teclado aberto, a borda dele substitui o safe area do dispositivo. */
+  [data-chat-keyboard-open] [data-chat-composer] {
+    padding-bottom: 0.5rem;
+  }
+
   /* Apenas o conteúdo não editável dos balões dispensa a seleção nativa. */
   [data-message-bubble] {
     -webkit-user-select: none;
