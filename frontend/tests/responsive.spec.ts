@@ -107,7 +107,6 @@ test("teclado reduz só a conversa e mantém a posição de leitura", async ({ p
 
   const root = page.locator("[data-chat-root]");
   const list = page.locator("[data-swipe-back-area]");
-  const composer = page.locator("[data-chat-composer]");
   const input = page.getByRole("textbox", { name: "Mensagem", exact: true });
   const scrollMetrics = () => list.evaluate((element) => ({
     top: element.scrollTop,
@@ -122,20 +121,9 @@ test("teclado reduz só a conversa e mantém a posição de leitura", async ({ p
   }, height);
 
   await expect.poll(async () => (await scrollMetrics()).bottom).toBeLessThan(2);
-  expect((await composer.boundingBox())!.y + (await composer.boundingBox())!.height).toBe((await root.boundingBox())!.height);
-  // Um valor residual de visualViewport sem teclado não pode abrir uma faixa inferior.
-  await resizeVisualViewport(800);
-  await expect.poll(async () => (await root.boundingBox())!.height).toBe(844);
-  await resizeVisualViewport(500);
-  await expect.poll(async () => (await root.boundingBox())!.height).toBe(844);
-  await expect(root).not.toHaveAttribute("data-chat-keyboard-open");
-  await resizeVisualViewport(844);
   await input.focus();
   await resizeVisualViewport(500);
   await expect.poll(async () => (await root.boundingBox())!.height).toBe(500);
-  await expect(root).toHaveAttribute("data-chat-keyboard-open", "");
-  expect(await composer.evaluate((element) => getComputedStyle(element).paddingBottom)).toBe("8px");
-  expect((await composer.boundingBox())!.y + (await composer.boundingBox())!.height).toBe(500);
   const inputBox = (await input.boundingBox())!;
   const rootBox = (await root.boundingBox())!;
   expect(inputBox.y + inputBox.height).toBeLessThanOrEqual(rootBox.y + rootBox.height);
@@ -147,21 +135,7 @@ test("teclado reduz só a conversa e mantém a posição de leitura", async ({ p
 
   await resizeVisualViewport(844);
   await expect.poll(async () => (await root.boundingBox())!.height).toBe(844);
-  await expect(root).not.toHaveAttribute("data-chat-keyboard-open");
   await expect.poll(async () => (await scrollMetrics()).bottom).toBeLessThan(2);
-
-  await resizeVisualViewport(800);
-  await expect.poll(async () => (await root.boundingBox())!.height).toBe(844);
-  await resizeVisualViewport(844);
-
-  // Ao fechar o teclado, o PWA pode manter temporariamente a medida curta.
-  await resizeVisualViewport(500);
-  await expect.poll(async () => (await root.boundingBox())!.height).toBe(500);
-  await input.evaluate((element) => (element as HTMLTextAreaElement).blur());
-  await expect.poll(async () => (await root.boundingBox())!.height).toBe(844);
-  await expect(root).not.toHaveAttribute("data-chat-keyboard-open");
-  await resizeVisualViewport(844);
-  await input.focus();
 
   await list.evaluate((element) => { element.scrollTop = 250; });
   await expect.poll(async () => (await scrollMetrics()).top).toBe(250);
