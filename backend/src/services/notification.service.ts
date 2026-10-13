@@ -42,36 +42,53 @@ export function notifyAssignment(
   userIds: string[],
   actor: { id: string; name: string },
 ) {
-  void safely(processInBatches(userIds.filter((userId) => userId !== actor.id), (userId) =>
-    safely(createNotification({
-      userId,
-      type: "CONVERSATION_ASSIGNED",
-      title: "Nova conversa atribuída",
-      body: `${actor.name} atribuiu a conversa com ${contactDisplayName(contact)} a você.`,
-      contactId: contact.id,
-    })), 1));
+  void safely(
+    processInBatches(
+      userIds.filter((userId) => userId !== actor.id),
+      (userId) =>
+        safely(
+          createNotification({
+            userId,
+            type: "CONVERSATION_ASSIGNED",
+            title: "Nova conversa atribuída",
+            body: `${actor.name} atribuiu a conversa com ${contactDisplayName(contact)} a você.`,
+            contactId: contact.id,
+          })
+        ),
+      1
+    )
+  );
 }
 
 export function notifyIncomingMessage(
   contact: { id: number; name: string; phone: string; isGroup: boolean; isSaved: boolean },
   message: { content: string; type: string },
 ) {
-  safely((async () => {
-    const assignments = await prisma.contactAssignment.findMany({
-      where: { contactId: contact.id },
-      select: { userId: true },
-    });
-    if (!assignments.length) return;
+  safely(
+    (async () => {
+      const assignments = await prisma.contactAssignment.findMany({
+        where: { contactId: contact.id },
+        select: { userId: true },
+      });
+      if (!assignments.length) return;
 
-    const preview = message.content.trim() || `[${message.type.toLowerCase()}]`;
-    const body = preview.length > 140 ? `${preview.slice(0, 137)}...` : preview;
-    // Mensagens são apenas push: não entram na central de notificações.
-    await processInBatches(assignments, ({ userId }) => safely(sendPushToUser(userId, {
-      id: null,
-      type: "NEW_MESSAGE",
-      title: contactDisplayName(contact),
-      body,
-      contactId: contact.id,
-    })), 1);
-  })());
+      const preview = message.content.trim() || `[${message.type.toLowerCase()}]`;
+      const body = preview.length > 140 ? `${preview.slice(0, 137)}...` : preview;
+      // Mensagens são apenas push: não entram na central de notificações.
+      await processInBatches(
+        assignments,
+        ({ userId }) =>
+          safely(
+            sendPushToUser(userId, {
+              id: null,
+              type: "NEW_MESSAGE",
+              title: contactDisplayName(contact),
+              body,
+              contactId: contact.id,
+            })
+          ),
+        1
+      );
+    })()
+  );
 }
