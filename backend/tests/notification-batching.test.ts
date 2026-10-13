@@ -19,6 +19,7 @@ const delivered: Array<{ endpoint: string; payload: string }> = [];
 let active = 0;
 let peak = 0;
 let expireSubscriptions = false;
+let failDelivery = false;
 let failedUser: string | undefined;
 
 mock.module("../src/lib/prisma.ts", {
@@ -64,6 +65,10 @@ mock.method(webpush, "sendNotification", async (subscription, body, options) => 
   await new Promise<void>((resolve) => setImmediate(resolve));
   active--;
   assert.equal(options?.TTL, 60 * 60 * 24);
+  assert.equal(options?.timeout, 10000);
+  if (failDelivery && subscription.endpoint.endsWith("/0")) {
+    throw new Error("push delivery timeout");
+  }
   if (expireSubscriptions && (subscription.endpoint.endsWith("/0") || subscription.endpoint.endsWith("/1"))) {
     throw new webpush.WebPushError("expired", subscription.endpoint.endsWith("/0") ? 404 : 410, {}, "", subscription.endpoint);
   }
@@ -91,6 +96,7 @@ function reset() {
   active = 0;
   peak = 0;
   expireSubscriptions = false;
+  failDelivery = false;
   failedUser = undefined;
 }
 
@@ -122,6 +128,19 @@ test("mensagem recebida limita também a concorrência dos lotes aninhados de pu
   assert.deepEqual(queriedUsers, users);
   assert.equal(createdUsers.length, 0);
   assert.ok(delivered.every((delivery) => delivery.payload === JSON.stringify(payload)));
+});
+
+test("falha de entrega push não impede subscriptions nem destinatários seguintes", async (t) => {
+  reset();
+  failDelivery = true;
+  const logged = t.mock.method(console, "error", () => {});
+  notifyIncomingMessage(contact, { content: "Olá", type: "TEXT" });
+  await waitForDeliveries(users.length * (subscriptions.length - 1));
+
+  assert.equal(peak, 5);
+  assert.deepEqual(queriedUsers, users);
+  assert.equal(deleted.length, 0);
+  assert.equal(logged.mock.callCount(), users.length);
 });
 
 test("atribuição ignora o autor e aguarda cada entrega antes de iniciar o próximo usuário", async () => {

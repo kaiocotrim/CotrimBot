@@ -40,7 +40,7 @@ export async function sendPushToUser(userId: string, payload: PushPayload) {
       await webpush.sendNotification(
         { endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } },
         body,
-        { TTL: 60 * 60 * 24 },
+        { TTL: 60 * 60 * 24, timeout: 10000 },
       );
     } catch (error) {
       // 404/410: a assinatura expirou ou foi revogada pelo navegador; remove do banco.
