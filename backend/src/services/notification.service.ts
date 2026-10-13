@@ -66,12 +66,12 @@ export function notifyIncomingMessage(
     const preview = message.content.trim() || `[${message.type.toLowerCase()}]`;
     const body = preview.length > 140 ? `${preview.slice(0, 137)}...` : preview;
     // Mensagens são apenas push: não entram na central de notificações.
-    await processInBatches(assignments, ({ userId }) => sendPushToUser(userId, {
+    await processInBatches(assignments, ({ userId }) => safely(sendPushToUser(userId, {
       id: null,
       type: "NEW_MESSAGE",
       title: contactDisplayName(contact),
       body,
       contactId: contact.id,
-    }), 1);
+    })), 1);
   })());
 }

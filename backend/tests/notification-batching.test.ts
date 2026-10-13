@@ -20,6 +20,7 @@ let active = 0;
 let peak = 0;
 let expireSubscriptions = false;
 let failDelivery = false;
+let failDeletion = false;
 let failedUser: string | undefined;
 
 mock.module("../src/lib/prisma.ts", {
@@ -28,10 +29,12 @@ mock.module("../src/lib/prisma.ts", {
       pushSubscription: {
         findMany: async ({ where }: { where: { userId: string } }) => {
           queriedUsers.push(where.userId);
+          if (where.userId === failedUser) throw new Error("falha ao buscar subscriptions");
           return subscriptions;
         },
         deleteMany: async ({ where }: { where: { id: number } }) => {
           deleted.push(where.id);
+          if (failDeletion && where.id === 0) throw new Error("falha ao remover subscription");
         },
       },
       contactAssignment: {
@@ -97,6 +100,7 @@ function reset() {
   peak = 0;
   expireSubscriptions = false;
   failDelivery = false;
+  failDeletion = false;
   failedUser = undefined;
 }
 
@@ -128,6 +132,30 @@ test("mensagem recebida limita também a concorrência dos lotes aninhados de pu
   assert.deepEqual(queriedUsers, users);
   assert.equal(createdUsers.length, 0);
   assert.ok(delivered.every((delivery) => delivery.payload === JSON.stringify(payload)));
+});
+
+test("falha ao remover subscription expirada não interrompe os próximos lotes", async (t) => {
+  reset();
+  expireSubscriptions = true;
+  failDeletion = true;
+  const logged = t.mock.method(console, "error", () => {});
+  await sendPushToUser("user-0", payload);
+
+  assert.deepEqual(deleted, [0, 1]);
+  assert.equal(delivered.length, subscriptions.length - 2);
+  assert.equal(logged.mock.callCount(), 1);
+});
+
+test("falha de banco para um destinatário não interrompe os próximos destinatários", async (t) => {
+  reset();
+  failedUser = users[1];
+  const logged = t.mock.method(console, "error", () => {});
+  notifyIncomingMessage(contact, { content: "Olá", type: "TEXT" });
+  await waitForDeliveries((users.length - 1) * subscriptions.length);
+
+  assert.equal(peak, 5);
+  assert.deepEqual(queriedUsers, users);
+  assert.equal(logged.mock.callCount(), 1);
 });
 
 test("falha de entrega push não impede subscriptions nem destinatários seguintes", async (t) => {

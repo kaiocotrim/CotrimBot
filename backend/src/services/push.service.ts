@@ -45,7 +45,8 @@ export async function sendPushToUser(userId: string, payload: PushPayload) {
     } catch (error) {
       // 404/410: a assinatura expirou ou foi revogada pelo navegador; remove do banco.
       if (error instanceof webpush.WebPushError && (error.statusCode === 404 || error.statusCode === 410)) {
-        await prisma.pushSubscription.deleteMany({ where: { id: subscription.id } });
+        await prisma.pushSubscription.deleteMany({ where: { id: subscription.id } })
+          .catch((error) => console.error("Erro ao remover assinatura push:", error));
         return;
       }
       console.error("Erro ao enviar notificação push:", error);
