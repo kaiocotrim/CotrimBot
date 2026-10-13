@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { sendPushToUser } from "./push.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
+import { processInBatches } from "../utils/batch.js";
 
 export type NotificationType = "CONVERSATION_ASSIGNED" | "NEW_MESSAGE";
 
@@ -21,7 +22,7 @@ async function createNotification(data: NewNotification) {
   const notification = await prisma.notification.create({ data });
   getSocketServer().to(userRoom(data.userId)).emit("notification_created", notification);
   // O push chega ao sistema operacional mesmo com o app fechado (PWA).
-  safely(sendPushToUser(data.userId, {
+  await safely(sendPushToUser(data.userId, {
     id: notification.id,
     type: notification.type,
     title: notification.title,
@@ -33,7 +34,7 @@ async function createNotification(data: NewNotification) {
 
 // Falhas aqui não podem interromper o fluxo principal (webhook/atribuição).
 function safely(task: Promise<unknown>) {
-  task.catch((error) => console.error("Erro ao gerar notificação:", error));
+  return task.catch((error) => console.error("Erro ao gerar notificação:", error));
 }
 
 export function notifyAssignment(
@@ -41,16 +42,14 @@ export function notifyAssignment(
   userIds: string[],
   actor: { id: string; name: string },
 ) {
-  for (const userId of userIds) {
-    if (userId === actor.id) continue;
+  void safely(processInBatches(userIds.filter((userId) => userId !== actor.id), (userId) =>
     safely(createNotification({
       userId,
       type: "CONVERSATION_ASSIGNED",
       title: "Nova conversa atribuída",
       body: `${actor.name} atribuiu a conversa com ${contactDisplayName(contact)} a você.`,
       contactId: contact.id,
-    }));
-  }
+    })), 1));
 }
 
 export function notifyIncomingMessage(
@@ -67,12 +66,12 @@ export function notifyIncomingMessage(
     const preview = message.content.trim() || `[${message.type.toLowerCase()}]`;
     const body = preview.length > 140 ? `${preview.slice(0, 137)}...` : preview;
     // Mensagens são apenas push: não entram na central de notificações.
-    await Promise.all(assignments.map(({ userId }) => sendPushToUser(userId, {
+    await processInBatches(assignments, ({ userId }) => safely(sendPushToUser(userId, {
       id: null,
       type: "NEW_MESSAGE",
       title: contactDisplayName(contact),
       body,
       contactId: contact.id,
-    })));
+    })), 1);
   })());
 }

@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { prisma } from "../lib/prisma.js";
+import { processInBatches } from "../utils/batch.js";
 
 export type PushPayload = {
   id: number | null;
@@ -34,20 +35,21 @@ export async function sendPushToUser(userId: string, payload: PushPayload) {
   if (!subscriptions.length) return;
 
   const body = JSON.stringify(payload);
-  await Promise.all(subscriptions.map(async (subscription) => {
+  await processInBatches(subscriptions, async (subscription) => {
     try {
       await webpush.sendNotification(
         { endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } },
         body,
-        { TTL: 60 * 60 * 24 },
+        { TTL: 60 * 60 * 24, timeout: 10000 },
       );
     } catch (error) {
       // 404/410: a assinatura expirou ou foi revogada pelo navegador; remove do banco.
       if (error instanceof webpush.WebPushError && (error.statusCode === 404 || error.statusCode === 410)) {
-        await prisma.pushSubscription.deleteMany({ where: { id: subscription.id } });
+        await prisma.pushSubscription.deleteMany({ where: { id: subscription.id } })
+          .catch((error) => console.error("Erro ao remover assinatura push:", error));
         return;
       }
       console.error("Erro ao enviar notificação push:", error);
     }
-  }));
+  });
 }
