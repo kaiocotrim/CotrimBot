@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { prisma } from "../lib/prisma.js";
+import { processInBatches } from "../utils/batch.js";
 
 export type PushPayload = {
   id: number | null;
@@ -34,7 +35,7 @@ export async function sendPushToUser(userId: string, payload: PushPayload) {
   if (!subscriptions.length) return;
 
   const body = JSON.stringify(payload);
-  await Promise.all(subscriptions.map(async (subscription) => {
+  await processInBatches(subscriptions, async (subscription) => {
     try {
       await webpush.sendNotification(
         { endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } },
@@ -49,5 +50,5 @@ export async function sendPushToUser(userId: string, payload: PushPayload) {
       }
       console.error("Erro ao enviar notificação push:", error);
     }
-  }));
+  });
 }

@@ -12,6 +12,7 @@ import { auth } from "./lib/auth.js";
 import { requireAuth } from "./middlewares/auth.middleware.js";
 import { getAllGroups } from "./services/evolution.service.js";
 import { userRoom } from "./services/notification.service.js";
+import { processInBatches } from "./utils/batch.js";
 
 import { contactRouter } from "./routes/contact.routes.js";
 import { notificationRouter } from "./routes/notification.routes.js";
@@ -135,14 +136,14 @@ httpServer.listen(port, () => {
 
   void getAllGroups()
     .then(async (groups) => {
-      await Promise.all(groups.map((group) => {
+      await processInBatches(groups, (group) => {
         if (!group.id?.endsWith("@g.us")) return Promise.resolve();
         return prisma.contact.upsert({
           where: { phone: group.id },
           update: { name: group.subject?.trim() || "Grupo do WhatsApp", isGroup: true, ...(group.pictureUrl ? { profilePictureUrl: group.pictureUrl } : {}) },
           create: { name: group.subject?.trim() || "Grupo do WhatsApp", phone: group.id, isGroup: true, profilePictureUrl: group.pictureUrl ?? null },
         });
-      }));
+      });
       console.log(`${groups.length} grupos sincronizados.`);
     })
     .catch((error) => console.error("Não foi possível sincronizar os grupos:", error));
