@@ -350,6 +350,22 @@ export async function setContactArchived(req: Request, res: Response) {
   }
 }
 
+export async function setContactPinned(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const pinned = req.body?.pinned;
+  if (!Number.isInteger(id) || id <= 0 || typeof pinned !== "boolean") {
+    return res.status(400).json({ message: "Dados de fixação inválidos" });
+  }
+
+  const contact = await prisma.contact.findUnique({ where: { id } });
+  if (!contact) return res.status(404).json({ message: "Contato não encontrado" });
+
+  const updated = await prisma.contact.update({ where: { id }, data: { pinned } });
+  const response = { ...updated, name: contactDisplayName(updated) };
+  getSocketServer().emit("contact_updated", response);
+  return res.json(response);
+}
+
 export async function getContactAssignees(req: Request, res: Response) {
   if (!req.user?.id) return res.status(401).json({ message: "Não autenticado" });
   const users = await prisma.user.findMany({

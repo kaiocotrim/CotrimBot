@@ -9,6 +9,7 @@ export type Contact = {
   isGroup: boolean;
   isSaved: boolean;
   archived: boolean;
+  pinned?: boolean;
   assignedUserIds?: string[];
   priority?: "LOW" | "MEDIUM" | "HIGH" | "NONE";
 

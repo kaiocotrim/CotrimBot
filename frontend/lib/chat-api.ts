@@ -77,6 +77,11 @@ export async function getMessages(contactId: number, before?: number, limit = 30
   return parseResponse<MessagesPage>(response, "Erro ao buscar mensagens");
 }
 
+export async function getFavoriteMessages(contactId: number): Promise<Message[]> {
+  const response = await fetch(`${API_URL}/contacts/${contactId}/messages/favorites`, { credentials: "include" });
+  return parseResponse<Message[]>(response, "Erro ao buscar mensagens favoritas");
+}
+
 export async function subscribeToContactPresence(contactId: number): Promise<void> {
   const response = await fetch(`${API_URL}/contacts/${contactId}/presence-subscription`, {
     method: "POST",
@@ -151,6 +156,16 @@ export async function setContactArchived(contactId: number, archived: boolean): 
     credentials: "include",
   });
   return parseResponse<Contact>(response, "Erro ao alterar arquivamento");
+}
+
+export async function setContactPinned(contactId: number, pinned: boolean): Promise<Contact> {
+  const response = await fetch(`${API_URL}/contacts/${contactId}/pinned`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pinned }),
+    credentials: "include",
+  });
+  return parseResponse<Contact>(response, "Erro ao alterar fixação da conversa");
 }
 
 export async function updateContactName(contactId: number, name: string, companyName?: string) {

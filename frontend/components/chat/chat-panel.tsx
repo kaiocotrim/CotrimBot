@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Pin, Search, Send, Trash2, X } from "lucide-react";
+import { Pin, Search, Send, Star, Trash2, X } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Avatar } from "@/components/chat/avatar";
 import { ChatHeader, SidebarMenuButton } from "@/components/chat/chat-header";
@@ -10,7 +10,7 @@ import { EmptyChatAnimation } from "@/components/chat/empty-chat-animation";
 import { ContactInfoPanel } from "@/components/chat/contact-info-panel";
 import { MessageComposer } from "@/components/chat/message-composer";
 import { MessageList } from "@/components/chat/message-list";
-import type { GroupParticipant } from "@/lib/chat-api";
+import { getFavoriteMessages, type GroupParticipant } from "@/lib/chat-api";
 import type { Contact, Message } from "@/types/chat";
 
 type ChatPanelProps = {
@@ -101,6 +101,11 @@ export function ChatPanel({
   const [forwardOpen, setForwardOpen] = useState(false);
   const [forwardQuery, setForwardQuery] = useState("");
   const [forwardTargetIds, setForwardTargetIds] = useState<Set<number>>(() => new Set());
+  const [forwardingMessages, setForwardingMessages] = useState<Message[]>([]);
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
+  const [favoriteMessages, setFavoriteMessages] = useState<Message[]>([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
+  const [favoritesError, setFavoritesError] = useState<string | null>(null);
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase("pt-BR");
     return query ? messages.filter((message) => message.content.toLocaleLowerCase("pt-BR").includes(query)) : [];
@@ -140,6 +145,7 @@ export function ChatPanel({
     setForwardOpen(false);
     setForwardQuery("");
     setForwardTargetIds(new Set());
+    setForwardingMessages([]);
     setSelectionMode(false);
     setSelectedMessageIds(new Set());
   }
@@ -172,10 +178,17 @@ export function ChatPanel({
   }
 
   function forwardSelectedMessages() {
-    const selected = messages.filter((message) => selectedMessageIds.has(message.id));
     const targets = contacts.filter((item) => forwardTargetIds.has(item.id));
-    targets.forEach((target) => selected.forEach((message) => onForwardMessage(message, target)));
+    targets.forEach((target) => forwardingMessages.forEach((message) => onForwardMessage(message, target)));
     closeSelection();
+  }
+
+  function openForwardPanel(messagesToForward: Message[]) {
+    if (!messagesToForward.length) return;
+    setForwardingMessages(messagesToForward);
+    setForwardQuery("");
+    setForwardTargetIds(new Set());
+    setForwardOpen(true);
   }
 
   function toggleForwardTarget(contactId: number) {
@@ -185,6 +198,29 @@ export function ChatPanel({
       else next.add(contactId);
       return next;
     });
+  }
+
+  async function openFavoriteMessages() {
+    if (!contact) return;
+    setFavoritesOpen(true);
+    setFavoritesLoading(true);
+    setFavoritesError(null);
+    try {
+      setFavoriteMessages(await getFavoriteMessages(contact.id));
+    } catch (error) {
+      setFavoritesError(error instanceof Error ? error.message : "Não foi possível carregar as mensagens favoritas.");
+    } finally {
+      setFavoritesLoading(false);
+    }
+  }
+
+  async function goToFavoriteMessage(messageId: number) {
+    const available = messages.some((message) => message.id === messageId) || await onEnsureMessageLoaded(messageId);
+    if (!available) return;
+    setFavoritesOpen(false);
+    window.setTimeout(() => {
+      document.getElementById(`message-${messageId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
   }
 
   function toggleMessageSelection(messageId: number) {
@@ -224,6 +260,11 @@ export function ChatPanel({
         setSearchQuery("");
         return;
       }
+      if (event.key === "Escape" && favoritesOpen) {
+        event.preventDefault();
+        setFavoritesOpen(false);
+        return;
+      }
       if (event.key === "Escape" && forwardOpen) {
         event.preventDefault();
         setForwardOpen(false);
@@ -236,7 +277,7 @@ export function ChatPanel({
     }
     window.addEventListener("keydown", handleSearchShortcut);
     return () => window.removeEventListener("keydown", handleSearchShortcut);
-  }, [forwardOpen, searchOpen, selectionMode]);
+  }, [favoritesOpen, forwardOpen, searchOpen, selectionMode]);
 
   useEffect(() => {
     if (highlightedMessageId === null) return;
@@ -246,6 +287,8 @@ export function ChatPanel({
   useEffect(() => {
     setSelectionMode(false);
     setSelectedMessageIds(new Set());
+    setFavoritesOpen(false);
+    setFavoriteMessages([]);
   }, [contact?.id]);
 
   if (!contact) {
@@ -285,11 +328,12 @@ export function ChatPanel({
               selectedCount={selectedMessageIds.size}
               selectionBusy={selectionBusy}
               onOpenSearch={() => { setContactInfoOpen(false); setSearchOpen(true); }}
+              onOpenFavorites={() => { setContactInfoOpen(false); void openFavoriteMessages(); }}
               onStartSelection={startSelection}
               onCloseSelection={closeSelection}
               onFavoriteSelected={() => void favoriteSelectedMessages()}
               onDeleteSelected={() => { setDeleteSelectionError(null); setDeleteSelectionOpen(true); }}
-              onOpenForward={() => { setForwardQuery(""); setForwardTargetIds(new Set()); setForwardOpen(true); }}
+              onOpenForward={() => openForwardPanel(messages.filter((message) => selectedMessageIds.has(message.id)))}
               onOpenContactInfo={() => setContactInfoOpen(true)}
               onSearchQueryChange={(value) => { setSearchQuery(value); setSearchIndex(0); }}
               onPreviousResult={() => setSearchIndex((current) => searchResults.length ? (current - 1 + searchResults.length) % searchResults.length : 0)}
@@ -337,7 +381,6 @@ export function ChatPanel({
           <MessageList
             currentUser={currentUser}
             contact={contact}
-            contacts={contacts}
             messages={messages}
             hasOlderMessages={hasOlderMessages}
             loadingOlderMessages={loadingOlderMessages}
@@ -350,7 +393,7 @@ export function ChatPanel({
             onReactToMessage={onReactToMessage}
             onUpdateMessageFlags={onUpdateMessageFlags}
             onDeleteMessage={onDeleteMessage}
-            onForwardMessage={onForwardMessage}
+            onRequestForward={(message) => openForwardPanel([message])}
             onReplyToMessage={replyToMessage}
             onEnsureMessageLoaded={onEnsureMessageLoaded}
             onToggleMessageSelection={toggleMessageSelection}
@@ -483,6 +526,72 @@ export function ChatPanel({
               </Dialog.Portal>
             </Dialog.Root>
           )}
+
+          <AnimatePresence>
+            {favoritesOpen && (
+              <motion.div
+                className="absolute inset-0 z-50 flex justify-end bg-black/65 backdrop-blur-[2px]"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18 }}
+                onMouseDown={(event) => { if (event.target === event.currentTarget) setFavoritesOpen(false); }}
+              >
+                <motion.section
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="favorites-title"
+                  initial={{ opacity: 0, x: 28 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex h-full w-full max-w-[430px] flex-col bg-zinc-950 shadow-[-24px_0_70px_rgba(0,0,0,0.38)]"
+                >
+                  <header className="flex h-16 shrink-0 items-center gap-3 px-4">
+                    <button type="button" onClick={() => setFavoritesOpen(false)} aria-label="Fechar mensagens favoritas" className="flex size-9 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50">
+                      <X className="size-5" aria-hidden="true" />
+                    </button>
+                    <div className="min-w-0">
+                      <h2 id="favorites-title" className="text-base font-semibold text-zinc-100">Mensagens favoritas</h2>
+                      {!favoritesLoading && <p className="text-xs text-zinc-500">{favoriteMessages.length} {favoriteMessages.length === 1 ? "mensagem" : "mensagens"}</p>}
+                    </div>
+                  </header>
+
+                  <div className="min-h-0 flex-1 overflow-y-auto p-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {favoritesLoading && (
+                      <div className="flex h-40 items-center justify-center" role="status" aria-label="Carregando mensagens favoritas">
+                        <span className="size-5 animate-spin rounded-full border-2 border-white/15 border-t-white/70 motion-reduce:animate-none" />
+                      </div>
+                    )}
+                    {!favoritesLoading && favoritesError && <p role="alert" className="m-3 rounded-xl border border-red-400/15 bg-red-500/[0.06] p-3 text-center text-xs text-red-300">{favoritesError}</p>}
+                    {!favoritesLoading && !favoritesError && !favoriteMessages.length && (
+                      <div className="flex h-56 flex-col items-center justify-center text-center">
+                        <span className="flex size-11 items-center justify-center rounded-full bg-white/[0.05] text-zinc-500"><Star className="size-5" aria-hidden="true" /></span>
+                        <p className="mt-3 text-sm font-medium text-zinc-300">Nenhuma mensagem favorita</p>
+                        <p className="mt-1 max-w-56 text-xs leading-5 text-zinc-500">Favorite uma mensagem para encontrá-la rapidamente aqui.</p>
+                      </div>
+                    )}
+                    {!favoritesLoading && !favoritesError && favoriteMessages.length > 0 && (
+                      <div className="space-y-1.5">
+                        {favoriteMessages.map((message) => (
+                          <button key={message.id} type="button" onClick={() => void goToFavoriteMessage(message.id)} className="group flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-white/[0.055] focus-visible:outline-2 focus-visible:outline-white/50">
+                            <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-300/[0.08] text-amber-300"><Star className="size-4" fill="currentColor" aria-hidden="true" /></span>
+                            <span className="min-w-0 flex-1">
+                              <span className="flex items-center justify-between gap-3">
+                                <strong className="truncate text-xs font-medium text-zinc-300">{message.direction === "OUTGOING" ? "Você" : message.senderName || contact.name}</strong>
+                                <time className="shrink-0 text-[10px] text-zinc-600">{new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" }).format(new Date(message.createdAt))}</time>
+                              </span>
+                              <span className="mt-1 block line-clamp-2 text-sm leading-5 text-zinc-400">{message.content || "Mídia"}</span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </motion.section>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <AnimatePresence mode="wait">

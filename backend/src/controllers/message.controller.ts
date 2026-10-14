@@ -121,6 +121,33 @@ export async function getMessages(req: Request, res: Response) {
   });
 }
 
+export async function getFavoriteMessages(req: Request, res: Response) {
+  const contactId = Number(req.params.id);
+  if (!Number.isInteger(contactId) || contactId <= 0) {
+    return res.status(400).json({ message: "Contato inválido" });
+  }
+
+  const contact = await prisma.contact.findUnique({ where: { id: contactId }, select: { id: true } });
+  if (!contact) return res.status(404).json({ message: "Contato não encontrado" });
+
+  const messages = await prisma.message.findMany({
+    where: {
+      contactId,
+      favorited: true,
+      deletedAt: null,
+      ...(req.user?.id ? { deletions: { none: { userId: req.user.id } } } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+    include: sentByUserInclude,
+  });
+
+  return res.json(messages.map((message) => ({
+    ...message,
+    private: message.externalId.startsWith("private:"),
+  })));
+}
+
 export async function reactToMessage(req: Request, res: Response) {
   const messageId = Number(req.params.id);
   const reaction = typeof req.body.reaction === "string" ? req.body.reaction : null;

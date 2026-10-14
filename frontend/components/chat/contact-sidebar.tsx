@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, Building2, PanelLeftClose, PanelLeftOpen, Phone, Search, UserRound, UserRoundPlus, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, Building2, ChevronDown, Copy, MessageCircle, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Phone, Search, UserRound, UserRoundPlus, X } from "lucide-react";
 import { getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/min";
 import { Avatar } from "@/components/chat/avatar";
 import { ChatNavigationRail, type ChatRailSection } from "@/components/chat/chat-navigation-rail";
@@ -15,7 +15,7 @@ import { getMessages } from "@/lib/chat-api";
 import { getContactPriorityDetails } from "@/lib/contact-priority";
 import type { Contact, Message } from "@/types/chat";
 
-type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string) => Promise<Contact[]>; headerActions?: ReactNode; mobileOpen: boolean; revealForSwipe: boolean; onMobileOpenChange: (open: boolean) => void };
+type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string) => Promise<Contact[]>; onArchiveContact: (contact: Contact, archived: boolean) => Promise<void>; onPinContact: (contact: Contact, pinned: boolean) => Promise<void>; headerActions?: ReactNode; mobileOpen: boolean; revealForSwipe: boolean; onMobileOpenChange: (open: boolean) => void };
 type ConversationFilter = "conversations" | "groups" | "mine";
 const PREVIEW_HOLD_DURATION = 1_000;
 const MOBILE_PREVIEW_HOLD_DURATION = 500;
@@ -50,7 +50,7 @@ function formatSidebarDate(value: string) {
   return dateFormatter.format(date);
 }
 
-export function ContactSidebar({ userId, contacts, loading, error, selectedContactId, onSelectContact, onLoadSavedContacts, onSaveContact, headerActions, mobileOpen, revealForSwipe, onMobileOpenChange }: ContactSidebarProps) {
+export function ContactSidebar({ userId, contacts, loading, error, selectedContactId, onSelectContact, onLoadSavedContacts, onSaveContact, onArchiveContact, onPinContact, headerActions, mobileOpen, revealForSwipe, onMobileOpenChange }: ContactSidebarProps) {
   const reduceMotion = useReducedMotion();
   const { data: session } = useSession();
   const isDesktop = useIsDesktop();
@@ -79,6 +79,9 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   const [previewMessages, setPreviewMessages] = useState<Message[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [conversationMenuContactId, setConversationMenuContactId] = useState<number | null>(null);
+  const [conversationMenuBusy, setConversationMenuBusy] = useState(false);
+  const [conversationMenuError, setConversationMenuError] = useState<string | null>(null);
   const holdingContactIdRef = useRef<number | null>(null);
   const touchHoldRef = useRef<{ contactId: number; pointerId: number; startX: number; startY: number } | null>(null);
   const touchHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,8 +93,31 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   const drawerRef = useRef<HTMLDivElement>(null);
   const collapsedButtonRef = useRef<HTMLButtonElement>(null);
   const expandedButtonRef = useRef<HTMLButtonElement>(null);
+  const conversationMenuRef = useRef<HTMLDivElement>(null);
   const restoreCollapseFocusRef = useRef(false);
   const archivedCount = contacts.filter((contact) => contact.archived).length;
+
+  useEffect(() => {
+    if (conversationMenuContactId === null) return;
+    function closeConversationMenu(event: PointerEvent) {
+      if (!conversationMenuRef.current?.contains(event.target as Node)) {
+        setConversationMenuContactId(null);
+        setConversationMenuError(null);
+      }
+    }
+    function closeConversationMenuWithKeyboard(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setConversationMenuContactId(null);
+        setConversationMenuError(null);
+      }
+    }
+    document.addEventListener("pointerdown", closeConversationMenu);
+    window.addEventListener("keydown", closeConversationMenuWithKeyboard);
+    return () => {
+      document.removeEventListener("pointerdown", closeConversationMenu);
+      window.removeEventListener("keydown", closeConversationMenuWithKeyboard);
+    };
+  }, [conversationMenuContactId]);
   const visibleContacts = useMemo(() => {
     const search = query.trim().toLocaleLowerCase("pt-BR");
     return contacts.filter((contact) => {
@@ -103,7 +129,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
       return contact.name.toLocaleLowerCase("pt-BR").includes(search)
         || contact.phone.includes(search)
         || Boolean(contact.messages?.[0]?.content.toLocaleLowerCase("pt-BR").includes(search));
-    });
+    }).sort((first, second) => Number(Boolean(second.pinned)) - Number(Boolean(first.pinned)));
   }, [contacts, conversationFilter, query, selectedContactId, showArchived, userId]);
 
   const visibleSavedContacts = useMemo(() => {
@@ -755,7 +781,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                   exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.985 }}
                   whileHover={reduceMotion ? undefined : { x: 2 }}
                   transition={reduceMotion ? { duration: 0 } : { duration: 0.2, delay: Math.min(index, 6) * 0.018, ease: [0.22, 1, 0.36, 1], layout: { type: "spring", stiffness: 460, damping: 38 } }}
-                  className={`group relative rounded-none border-b border-white/[0.08] transition-colors lg:rounded-xl lg:border-b-0 ${selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"}`}
+                  className={`group relative rounded-none border-b border-white/[0.08] transition-colors lg:rounded-xl lg:border-b-0 ${conversationMenuContactId === contact.id ? "z-40" : ""} ${selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"}`}
                 >
                   <button
                     type="button"
@@ -833,7 +859,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                           </time>
                         )}
                       </div>
-                      <div className="mt-0.5 flex items-center gap-2">
+                      <div className="mt-0.5 flex items-center gap-2 pr-7">
                         <p className="min-w-0 flex-1 truncate text-sm leading-tight font-normal text-zinc-400 lg:text-[12px] lg:text-zinc-500">
                           {lastMessage && !lastMessage.deletedAt && lastMessage.direction === "OUTGOING" && "✓✓ "}
                           <MessageText content={lastMessage ? lastMessage.deletedAt ? "Mensagem apagada" : lastMessage.content : "Nenhuma mensagem"} showSignature={Boolean(lastMessage && !lastMessage.deletedAt && !lastMessage.private && lastMessage.direction === "OUTGOING")} linkify={false} />
@@ -843,6 +869,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                             {contact.unreadCount}
                           </span>
                         )}
+                        {contact.pinned && <Pin className="size-3 shrink-0 text-zinc-500" fill="currentColor" strokeWidth={1.6} aria-label="Conversa fixada" />}
                         <AnimatePresence initial={false}>
                           {priority && (
                             <motion.span
@@ -859,6 +886,79 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                     </div>
                   </div>
                   </button>
+                  {!collapsed && (
+                    <div ref={conversationMenuContactId === contact.id ? conversationMenuRef : undefined} className="absolute right-2 bottom-1.5 z-50">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setConversationMenuError(null);
+                          setConversationMenuContactId((current) => current === contact.id ? null : contact.id);
+                        }}
+                        aria-label={`Ações da conversa com ${contact.name}`}
+                        aria-haspopup="menu"
+                        aria-expanded={conversationMenuContactId === contact.id}
+                        className={`flex size-6 items-center justify-center text-zinc-500 transition-[opacity,color] duration-150 hover:text-white focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-white/50 ${conversationMenuContactId === contact.id ? "opacity-100 text-zinc-200" : "opacity-0 group-hover:opacity-100"}`}
+                      >
+                        <ChevronDown className={`size-3.5 transition-transform duration-150 ${conversationMenuContactId === contact.id ? "rotate-180" : ""}`} strokeWidth={1.8} aria-hidden="true" />
+                      </button>
+
+                      <AnimatePresence>
+                        {conversationMenuContactId === contact.id && (
+                          <motion.div
+                            role="menu"
+                            initial={reduceMotion ? false : { opacity: 0, y: -5, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -3, scale: 0.985 }}
+                            transition={reduceMotion ? { duration: 0 } : { duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                            className="absolute top-[calc(100%+0.4rem)] right-0 w-52 overflow-hidden rounded-xl border border-white/10 bg-zinc-900/98 p-1.5 text-sm text-zinc-100 shadow-[0_18px_55px_rgba(0,0,0,0.58)] backdrop-blur-xl"
+                          >
+                            <button type="button" role="menuitem" onClick={() => { setConversationMenuContactId(null); onSelectContact(contact); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.07] focus-visible:outline-none">
+                              <MessageCircle className="size-4 text-zinc-400" strokeWidth={1.8} aria-hidden="true" />
+                              Abrir conversa
+                            </button>
+                            <button type="button" role="menuitem" disabled={conversationMenuBusy} onClick={async () => {
+                              setConversationMenuBusy(true);
+                              setConversationMenuError(null);
+                              try {
+                                await onPinContact(contact, !contact.pinned);
+                                setConversationMenuContactId(null);
+                              } catch (actionError) {
+                                setConversationMenuError(actionError instanceof Error ? actionError.message : "Não foi possível alterar a fixação.");
+                              } finally {
+                                setConversationMenuBusy(false);
+                              }
+                            }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.07] focus-visible:outline-none disabled:opacity-50">
+                              {contact.pinned ? <PinOff className="size-4 text-zinc-400" strokeWidth={1.8} aria-hidden="true" /> : <Pin className="size-4 text-zinc-400" strokeWidth={1.8} aria-hidden="true" />}
+                              {contact.pinned ? "Desafixar conversa" : "Fixar conversa"}
+                            </button>
+                            <button type="button" role="menuitem" disabled={conversationMenuBusy} onClick={async () => {
+                              setConversationMenuBusy(true);
+                              setConversationMenuError(null);
+                              try {
+                                await onArchiveContact(contact, !contact.archived);
+                                setConversationMenuContactId(null);
+                              } catch (actionError) {
+                                setConversationMenuError(actionError instanceof Error ? actionError.message : "Não foi possível alterar a conversa.");
+                              } finally {
+                                setConversationMenuBusy(false);
+                              }
+                            }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.07] focus-visible:outline-none disabled:opacity-50">
+                              {contact.archived ? <ArchiveRestore className="size-4 text-zinc-400" strokeWidth={1.8} aria-hidden="true" /> : <Archive className="size-4 text-zinc-400" strokeWidth={1.8} aria-hidden="true" />}
+                              {contact.archived ? "Desarquivar conversa" : "Arquivar conversa"}
+                            </button>
+                            {!contact.isGroup && (
+                              <button type="button" role="menuitem" onClick={() => { void navigator.clipboard.writeText(contact.phone); setConversationMenuContactId(null); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.07] focus-visible:outline-none">
+                                <Copy className="size-4 text-zinc-400" strokeWidth={1.8} aria-hidden="true" />
+                                Copiar número
+                              </button>
+                            )}
+                            {conversationMenuError && <p role="alert" className="px-3 py-2 text-xs leading-4 text-red-300">{conversationMenuError}</p>}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
                 </motion.div>
               );
             })}

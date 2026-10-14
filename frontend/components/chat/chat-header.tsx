@@ -20,6 +20,7 @@ type ChatHeaderProps = {
   selectedCount: number;
   selectionBusy: boolean;
   onOpenSearch: () => void;
+  onOpenFavorites: () => void;
   onStartSelection: () => void;
   onCloseSelection: () => void;
   onFavoriteSelected: () => void;
@@ -53,7 +54,7 @@ export function SidebarMenuButton({ onClick, expanded, className = "" }: { onCli
 
 const actionClass = "flex size-10 shrink-0 items-center sm:size-9 justify-center rounded-full transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-35";
 
-export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isTyping, searchOpen, searchQuery, currentResult, resultCount, selectionMode, selectedCount, selectionBusy, onOpenSearch, onStartSelection, onCloseSelection, onFavoriteSelected, onDeleteSelected, onOpenForward, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch, onOpenSidebar, sidebarOpen }: ChatHeaderProps) {
+export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isTyping, searchOpen, searchQuery, currentResult, resultCount, selectionMode, selectedCount, selectionBusy, onOpenSearch, onOpenFavorites, onStartSelection, onCloseSelection, onFavoriteSelected, onDeleteSelected, onOpenForward, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch, onOpenSidebar, sidebarOpen }: ChatHeaderProps) {
   const reduceMotion = useReducedMotion();
   const searchRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -196,6 +197,15 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
                   >
                     <CheckCheck className="size-4 text-zinc-400" aria-hidden="true" />
                     Selecionar mensagens
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { setMenuOpen(false); onOpenFavorites(); }}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/50"
+                  >
+                    <Star className="size-4 text-zinc-400" aria-hidden="true" />
+                    Mensagens favoritas
                   </button>
                   <button
                     type="button"

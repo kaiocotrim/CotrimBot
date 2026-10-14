@@ -17,6 +17,7 @@ import {
   setContactAssignment as setContactAssignmentRequest,
   setContactPriority as setContactPriorityRequest,
   setContactArchived as setContactArchivedRequest,
+  setContactPinned as setContactPinnedRequest,
   subscribeToContactPresence,
   updateContactName as updateContactNameRequest,
   updateMessageFlags as updateMessageFlagsRequest,
@@ -640,6 +641,18 @@ export function useChat() {
     }
   }
 
+  async function pinContact(contact: Contact, pinned: boolean) {
+    setContacts((current) => current.map((item) => item.id === contact.id ? { ...item, pinned } : item));
+    try {
+      const updated = await setContactPinnedRequest(contact.id, pinned);
+      setContacts((current) => current.map((item) => item.id === contact.id ? { ...item, ...updated } : item));
+      setSelectedContact((current) => current?.id === contact.id ? { ...current, ...updated } : current);
+    } catch (error) {
+      setContacts((current) => current.map((item) => item.id === contact.id ? { ...item, pinned: contact.pinned } : item));
+      throw error;
+    }
+  }
+
   async function renameContact(contactId: number, name: string, companyName?: string) {
     const updated = await updateContactNameRequest(contactId, name, companyName);
     setContacts((current) => current.map((contact) =>
@@ -1034,6 +1047,7 @@ export function useChat() {
     loadSavedContacts,
     saveContact,
     archiveContact,
+    pinContact,
     renameContact,
     setContactAssignment,
     setContactPriority,

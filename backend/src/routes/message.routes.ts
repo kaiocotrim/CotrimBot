@@ -11,6 +11,7 @@ import {
   deleteMessage,
   getMessageMedia,
   getGroupSenderAvatar,
+  getFavoriteMessages,
   getMessages,
   markMessagesAsRead,
   reactToMessage,
@@ -32,6 +33,7 @@ export const messageRouter = Router();
  * Exemplo: /contacts/15/messages?limit=30&before=120.
  */
 messageRouter.get("/contacts/:id/messages", getMessages);
+messageRouter.get("/contacts/:id/messages/favorites", getFavoriteMessages);
 
 /**
  * POST /contacts/:id/send

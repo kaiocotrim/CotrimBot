@@ -8,6 +8,7 @@ import {
   getContactGroupParticipants,
   getContacts,
   setContactArchived,
+  setContactPinned,
   setContactAssignment,
   setContactSaved,
   setContactPriority,
@@ -38,6 +39,7 @@ contactRouter.post("/contacts", createContact);
 contactRouter.patch("/contacts/:id", updateContact);
 contactRouter.patch("/contacts/:id/saved", setContactSaved);
 contactRouter.patch("/contacts/:id/archived", setContactArchived);
+contactRouter.patch("/contacts/:id/pinned", setContactPinned);
 contactRouter.patch("/contacts/:id/assignment", setContactAssignment);
 contactRouter.patch("/contacts/:id/priority", setContactPriority);
 

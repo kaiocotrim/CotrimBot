@@ -86,6 +86,8 @@ export default function Home() {
         onMobileOpenChange={setSidebarOpen}
         onLoadSavedContacts={chat.loadSavedContacts}
         onSaveContact={chat.saveContact}
+        onArchiveContact={chat.archiveContact}
+        onPinContact={chat.pinContact}
         headerActions={
           <NotificationsPopover
             notifications={notifications.notifications}

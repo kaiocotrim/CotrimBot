@@ -11,7 +11,6 @@ import type { Contact, Message } from "@/types/chat";
 type MessageListProps = {
   currentUser: { id: string; name: string; image?: string | null };
   contact: Contact;
-  contacts: Contact[];
   messages: Message[];
   hasOlderMessages: boolean;
   loadingOlderMessages: boolean;
@@ -24,7 +23,7 @@ type MessageListProps = {
   onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
   onUpdateMessageFlags: (messageId: number, flags: { pinned?: boolean; pinDurationHours?: 24 | 168 | 720; favorited?: boolean }) => Promise<void>;
   onDeleteMessage: (messageId: number, scope: "me" | "everyone") => Promise<void>;
-  onForwardMessage: (message: Message, target: Contact) => void;
+  onRequestForward: (message: Message) => void;
   onReplyToMessage: (message: Message) => void;
   onEnsureMessageLoaded: (messageId: number) => Promise<boolean>;
   onToggleMessageSelection: (messageId: number) => void;
@@ -65,7 +64,7 @@ function dateLabel(value: string) {
 }
 
 // Posiciona mensagens recebidas à esquerda e enviadas à direita.
-export function MessageList({ currentUser, contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, hasPinnedMessage, selectionMode, selectedMessageIds, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onDeleteMessage, onForwardMessage, onReplyToMessage, onEnsureMessageLoaded, onToggleMessageSelection }: MessageListProps) {
+export function MessageList({ currentUser, contact, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, hasPinnedMessage, selectionMode, selectedMessageIds, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onDeleteMessage, onRequestForward, onReplyToMessage, onEnsureMessageLoaded, onToggleMessageSelection }: MessageListProps) {
   const reduceMotion = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -261,7 +260,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
                 : <Avatar contact={contact} />)}
 
               {/* O balão escolhe entre player de áudio e conteúdo textual. */}
-              <MessageBubble message={message} quotedMessage={message.quotedMessageId ? messagesById.get(message.quotedMessageId) : undefined} contact={contact} contacts={contacts} mediaMessages={mediaMessages} onReact={onReactToMessage} onUpdateFlags={onUpdateMessageFlags} onDelete={onDeleteMessage} onForwardMessage={onForwardMessage} onReply={onReplyToMessage} onNavigateToMessage={navigateToMessage} />
+              <MessageBubble message={message} quotedMessage={message.quotedMessageId ? messagesById.get(message.quotedMessageId) : undefined} contact={contact} mediaMessages={mediaMessages} onReact={onReactToMessage} onUpdateFlags={onUpdateMessageFlags} onDelete={onDeleteMessage} onRequestForward={onRequestForward} onReply={onReplyToMessage} onNavigateToMessage={navigateToMessage} />
 
               {outgoing && (
                 <OutgoingMessageAvatar

@@ -17,6 +17,7 @@ model Contact {
   isGroup           Boolean   @default(false)
   isSaved           Boolean   @default(false)
   archived          Boolean   @default(false)
+  pinned            Boolean   @default(false)
   priority          ContactPriority @default(NONE)
   profilePictureUrl String?   @db.Text
   whatsappLid       String?   @unique
