@@ -8,14 +8,16 @@ import { Avatar } from "@/components/chat/avatar";
 import { ChatNavigationRail, type ChatRailSection } from "@/components/chat/chat-navigation-rail";
 import { CountryCodePicker } from "@/components/chat/country-code-picker";
 import { MessageText } from "@/components/chat/message-text";
+import { NotificationCenter } from "@/components/chat/notification-center";
 import { QuickConversationPreview } from "@/components/chat/quick-conversation-preview";
 import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
-import { useSession } from "@/lib/auth-client";
+import { authClient, useSession } from "@/lib/auth-client";
 import { getMessages } from "@/lib/chat-api";
 import { getContactPriorityDetails } from "@/lib/contact-priority";
+import type { AppNotification } from "@/lib/notification-api";
 import type { Contact, Message } from "@/types/chat";
 
-type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string) => Promise<Contact[]>; onArchiveContact: (contact: Contact, archived: boolean) => Promise<void>; onPinContact: (contact: Contact, pinned: boolean) => Promise<void>; headerActions?: ReactNode; mobileOpen: boolean; revealForSwipe: boolean; onMobileOpenChange: (open: boolean) => void };
+type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string, jobTitle?: string) => Promise<Contact[]>; onArchiveContact: (contact: Contact, archived: boolean) => Promise<void>; onPinContact: (contact: Contact, pinned: boolean) => Promise<void>; headerActions?: ReactNode; mobileOpen: boolean; revealForSwipe: boolean; onMobileOpenChange: (open: boolean) => void; notifications: AppNotification[]; notificationUnreadCount: number; notificationPermission: NotificationPermission | "unsupported"; onRequestNotificationPermission: () => void; onOpenNotification: (notification: AppNotification) => void; onMarkAllNotificationsRead: () => void; onClearNotifications: () => void };
 type ConversationFilter = "conversations" | "groups" | "mine";
 const PREVIEW_HOLD_DURATION = 1_000;
 const MOBILE_PREVIEW_HOLD_DURATION = 500;
@@ -50,9 +52,10 @@ function formatSidebarDate(value: string) {
   return dateFormatter.format(date);
 }
 
-export function ContactSidebar({ userId, contacts, loading, error, selectedContactId, onSelectContact, onLoadSavedContacts, onSaveContact, onArchiveContact, onPinContact, headerActions, mobileOpen, revealForSwipe, onMobileOpenChange }: ContactSidebarProps) {
+export function ContactSidebar({ userId, contacts, loading, error, selectedContactId, onSelectContact, onLoadSavedContacts, onSaveContact, onArchiveContact, onPinContact, headerActions, mobileOpen, revealForSwipe, onMobileOpenChange, notifications, notificationUnreadCount, notificationPermission, onRequestNotificationPermission, onOpenNotification, onMarkAllNotificationsRead, onClearNotifications }: ContactSidebarProps) {
   const reduceMotion = useReducedMotion();
   const { data: session } = useSession();
+  const activeOrganizationId = (session?.session as { activeOrganizationId?: string | null } | undefined)?.activeOrganizationId;
   const isDesktop = useIsDesktop();
   const [isCollapsed, setIsCollapsed] = useState(false);
   // O modo recolhido só existe no desktop; no mobile o painel abre sempre completo.
@@ -60,6 +63,8 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   const [query, setQuery] = useState("");
   const [conversationFilter, setConversationFilter] = useState<ConversationFilter>("conversations");
   const [showArchived, setShowArchived] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [companyBrand, setCompanyBrand] = useState<{ name: string; logo: string | null } | null>(null);
   const [showSavedContacts, setShowSavedContacts] = useState(false);
   const [savedContacts, setSavedContacts] = useState<Contact[]>([]);
   const [savedQuery, setSavedQuery] = useState("");
@@ -69,6 +74,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   const [newContactFirstName, setNewContactFirstName] = useState("");
   const [newContactLastName, setNewContactLastName] = useState("");
   const [newContactCompany, setNewContactCompany] = useState("");
+  const [newContactJobTitle, setNewContactJobTitle] = useState("");
   const [newContactCountry, setNewContactCountry] = useState<CountryCode>("BR");
   const [newContactPhone, setNewContactPhone] = useState("");
   const [savingContact, setSavingContact] = useState(false);
@@ -96,6 +102,19 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   const conversationMenuRef = useRef<HTMLDivElement>(null);
   const restoreCollapseFocusRef = useRef(false);
   const archivedCount = contacts.filter((contact) => contact.archived).length;
+
+  useEffect(() => {
+    let active = true;
+    void authClient.organization.list().then(({ data }) => {
+      if (!active) return;
+      const organizations = (data ?? []) as Array<{ id: string; name: string; logo?: string | null }>;
+      const organization = organizations.find((item) => item.id === activeOrganizationId) ?? organizations[0];
+      setCompanyBrand(organization ? { name: organization.name, logo: organization.logo ?? null } : null);
+    }).catch(() => {
+      if (active) setCompanyBrand(null);
+    });
+    return () => { active = false; };
+  }, [activeOrganizationId]);
 
   useEffect(() => {
     if (conversationMenuContactId === null) return;
@@ -165,6 +184,15 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   }
 
   function navigateFromRail(section: ChatRailSection) {
+    if (section === "notifications") {
+      cancelPreviewHold();
+      closePreview();
+      setShowNewContact(false);
+      setShowSavedContacts(false);
+      setShowNotifications(true);
+      return;
+    }
+    setShowNotifications(false);
     if (section === "contacts") {
       openSavedContacts();
       return;
@@ -204,11 +232,12 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
     setSavedActionError(null);
     try {
       const name = `${newContactFirstName.trim()} ${newContactLastName.trim()}`.trim();
-      setSavedContacts(await onSaveContact(name, internationalPhone.slice(1), newContactCompany.trim()));
+      setSavedContacts(await onSaveContact(name, internationalPhone.slice(1), newContactCompany.trim(), newContactJobTitle.trim()));
       setSavedError(null);
       setNewContactFirstName("");
       setNewContactLastName("");
       setNewContactCompany("");
+      setNewContactJobTitle("");
       setNewContactCountry("BR");
       setNewContactPhone("");
       setSavedQuery("");
@@ -460,7 +489,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
     : conversationFilter === "mine"
       ? showArchived ? "Nenhuma conversa sua arquivada" : "Nenhuma conversa atribuída a você. Assuma uma conversa na aba Conversas."
       : showArchived ? "Nenhuma conversa arquivada" : "Nenhuma conversa encontrada";
-  const activeRailSection: ChatRailSection = showSavedContacts ? "contacts" : showArchived ? "archived" : conversationFilter;
+  const activeRailSection: ChatRailSection = showNotifications ? "notifications" : showSavedContacts ? "contacts" : showArchived ? "archived" : conversationFilter;
   const navigationRail = (
     <AnimatePresence initial={false}>
       {!collapsed && (
@@ -475,6 +504,8 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
           <ChatNavigationRail
             activeSection={activeRailSection}
             unreadCount={contacts.reduce((total, contact) => total + contact.unreadCount, 0)}
+            notificationUnreadCount={notificationUnreadCount}
+            company={companyBrand}
             user={session?.user}
             onNavigate={navigateFromRail}
             onOpenSettings={() => { cancelPreviewHold(); closePreview(); }}
@@ -491,9 +522,9 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
         ref={drawerRef}
         id="chat-sidebar"
         tabIndex={-1}
-        data-sidebar-open={mobileOpen ? "true" : "false"}
-        inert={!mobileOpen && !isDesktop}
-        className={`fixed inset-0 z-40 flex h-dvh w-screen bg-zinc-950 outline-none transition-opacity duration-200 motion-reduce:transition-none lg:visible lg:static lg:z-auto lg:h-full lg:w-auto lg:shrink-0 lg:bg-transparent lg:opacity-100 lg:pointer-events-auto lg:transition-none ${mobileOpen ? "visible opacity-100" : revealForSwipe ? "visible pointer-events-none opacity-100" : "invisible pointer-events-none opacity-0"}`}
+        data-sidebar-open={mobileOpen || showNotifications ? "true" : "false"}
+        inert={!mobileOpen && !showNotifications && !isDesktop}
+        className={`fixed inset-0 z-40 flex h-dvh w-screen bg-zinc-950 outline-none transition-opacity duration-200 motion-reduce:transition-none lg:visible lg:static lg:z-auto lg:h-full lg:w-auto lg:shrink-0 lg:bg-transparent lg:opacity-100 lg:pointer-events-auto lg:transition-none ${mobileOpen || showNotifications ? "visible opacity-100" : revealForSwipe ? "visible pointer-events-none opacity-100" : "invisible pointer-events-none opacity-0"}`}
       >
         {navigationRail}
         {content}
@@ -512,6 +543,37 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
       <X aria-hidden="true" className="size-5" strokeWidth={1.8} />
     </button>
   );
+
+  if (showNotifications) {
+    return renderShell(
+      <aside className={`relative flex h-full min-h-0 ${panelWidthClass} shrink-0 border-r border-white/[0.08]`}>
+        <NotificationCenter
+          notifications={notifications}
+          unreadCount={notificationUnreadCount}
+          permission={notificationPermission}
+          onRequestPermission={onRequestNotificationPermission}
+          onMarkAllRead={onMarkAllNotificationsRead}
+          onClear={onClearNotifications}
+          onOpenNotification={(notification) => {
+            onOpenNotification(notification);
+            if (notification.contactId) {
+              setShowNotifications(false);
+            }
+          }}
+        />
+        <button
+          type="button"
+          aria-label="Fechar notificações"
+          onClick={() => {
+            setShowNotifications(false);
+          }}
+          className="absolute top-3 right-3 flex size-10 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-white lg:hidden"
+        >
+          <X aria-hidden="true" className="size-5" />
+        </button>
+      </aside>,
+    );
+  }
 
   if (showSavedContacts && showNewContact) {
     return renderShell(
@@ -547,10 +609,16 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
             </div>
             <div className="mt-10 flex gap-4">
               <Building2 aria-hidden="true" className="mt-3 size-5 shrink-0 text-zinc-500" strokeWidth={1.8} />
-              <label className="min-w-0 flex-1 border-b border-zinc-600 focus-within:border-white">
-                <span className="sr-only">Empresa</span>
-                <input autoComplete="organization" maxLength={191} value={newContactCompany} onChange={(event) => setNewContactCompany(event.target.value)} placeholder="Empresa" className="h-11 w-full bg-transparent text-base text-white outline-none placeholder:text-zinc-500 lg:text-sm" />
-              </label>
+              <div className="min-w-0 flex-1 space-y-7">
+                <label className="block border-b border-zinc-600 focus-within:border-white">
+                  <span className="sr-only">Empresa</span>
+                  <input autoComplete="organization" maxLength={191} value={newContactCompany} onChange={(event) => setNewContactCompany(event.target.value)} placeholder="Empresa" className="h-11 w-full bg-transparent text-base text-white outline-none placeholder:text-zinc-500 lg:text-sm" />
+                </label>
+                <label className="block border-b border-zinc-600 focus-within:border-white">
+                  <span className="sr-only">Cargo</span>
+                  <input autoComplete="organization-title" maxLength={191} value={newContactJobTitle} onChange={(event) => setNewContactJobTitle(event.target.value)} placeholder="Cargo" className="h-11 w-full bg-transparent text-base text-white outline-none placeholder:text-zinc-500 lg:text-sm" />
+                </label>
+              </div>
             </div>
             <div className="mt-12 flex gap-4">
               <Phone aria-hidden="true" className="mt-6 size-5 shrink-0 text-zinc-500" strokeWidth={1.8} />
@@ -717,13 +785,13 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
           <div className="mt-3 grid grid-cols-3 items-center gap-2 pb-1 lg:mt-1.5 lg:gap-1 lg:pb-0" role="group" aria-label="Filtrar conversas">
             <motion.button
               type="button"
-              onClick={() => setConversationFilter("conversations")}
-              aria-pressed={conversationFilter === "conversations"}
+              onClick={() => setConversationFilter("mine")}
+              aria-pressed={conversationFilter === "mine"}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-              className={`relative flex h-11 w-full items-center justify-center rounded-full border px-2 text-sm font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:h-8 lg:rounded-none lg:border-0 lg:text-[13px] ${conversationFilter === "conversations" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
+              className={`relative flex h-11 w-full items-center justify-center rounded-full border px-2 text-sm font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:h-8 lg:rounded-none lg:border-0 lg:text-[13px] ${conversationFilter === "mine" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
             >
-              Conversas
-              {conversationFilter === "conversations" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 hidden h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)] lg:block" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
+              Minhas
+              {conversationFilter === "mine" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 hidden h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)] lg:block" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
             </motion.button>
             <motion.button
               type="button"
@@ -737,17 +805,17 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
             </motion.button>
             <motion.button
               type="button"
-              onClick={() => setConversationFilter("mine")}
-              aria-pressed={conversationFilter === "mine"}
+              onClick={() => setConversationFilter("conversations")}
+              aria-pressed={conversationFilter === "conversations"}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-              className={`relative flex h-11 w-full items-center justify-center rounded-full border px-2 text-sm font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:h-8 lg:rounded-none lg:border-0 lg:text-[13px] ${conversationFilter === "mine" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
+              className={`relative flex h-11 w-full items-center justify-center rounded-full border px-2 text-sm font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:h-8 lg:rounded-none lg:border-0 lg:text-[13px] ${conversationFilter === "conversations" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
             >
-              Minhas
-              {conversationFilter === "mine" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 hidden h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)] lg:block" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
+              Conversas
+              {conversationFilter === "conversations" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 hidden h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)] lg:block" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
             </motion.button>
           </div>
 
-          <button
+          {archivedCount > 0 && <button
             type="button"
             onClick={() => setShowArchived((current) => !current)}
             aria-pressed={showArchived}
@@ -757,11 +825,11 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
               <path d="M4 7h16v13H4zM3 4h18v3H3z" /><path d="M10 12h4" />
             </svg>
             <span className="flex-1">Arquivadas</span>
-            {archivedCount > 0 && <span className="text-[11px] tabular-nums text-zinc-500">{archivedCount}</span>}
+            <span className="text-[11px] tabular-nums text-zinc-500">{archivedCount}</span>
             <svg className={`size-3.5 text-zinc-600 transition-transform ${showArchived ? "rotate-90" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="m9 6 6 6-6 6" />
             </svg>
-          </button>
+          </button>}
         </header>
 
         <CompactScrollArea className="flex-1" label="Lista de conversas">
@@ -937,6 +1005,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                               setConversationMenuError(null);
                               try {
                                 await onArchiveContact(contact, !contact.archived);
+                                if (contact.archived && archivedCount === 1) setShowArchived(false);
                                 setConversationMenuContactId(null);
                               } catch (actionError) {
                                 setConversationMenuError(actionError instanceof Error ? actionError.message : "Não foi possível alterar a conversa.");

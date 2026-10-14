@@ -11,6 +11,7 @@ model Contact {
   id                Int       @id @default(autoincrement())
   name              String
   companyName       String?   @db.VarChar(191)
+  jobTitle          String?   @db.VarChar(191)
   phone             String    @unique
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -137,6 +138,7 @@ enum MessageDirection {
 
 enum MessageType {
   TEXT
+  SYSTEM
   IMAGE
   STICKER
   VIDEO
@@ -176,6 +178,7 @@ model User {
   contactAssignments ContactAssignment[]
   notifications      Notification[]
   pushSubscriptions  PushSubscription[]
+  organizationMessages OrganizationMessage[]
 }
 
 model Session {
@@ -236,6 +239,20 @@ model Organization {
   members     Member[]
   invitations Invitation[]
   groups      OrganizationGroup[]
+  internalMessages OrganizationMessage[]
+}
+
+model OrganizationMessage {
+  id             Int      @id @default(autoincrement())
+  organizationId String
+  senderId       String
+  content        String   @db.Text
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sender         User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, id])
+  @@index([senderId])
 }
 
 model Member {

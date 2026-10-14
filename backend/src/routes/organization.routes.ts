@@ -1,6 +1,8 @@
 import { Router } from "express";
 import type { GroupPermissionKey } from "../../generated/prisma/client.js";
 import { prisma } from "../lib/prisma.js";
+import { getSocketServer } from "../lib/socket.js";
+import { userRoom } from "../services/notification.service.js";
 
 export const organizationRouter = Router();
 
@@ -29,7 +31,7 @@ const permissionKeys = [
 
 const permissionKeySet = new Set<string>(permissionKeys);
 
-type Membership = { id: string; role: string; permissions: GroupPermissionKey[] };
+type Membership = { id: string; role: string; displayName: string | null; permissions: GroupPermissionKey[] };
 
 async function findMembership(organizationId: string, userId: string): Promise<Membership | null> {
   const membership = await prisma.member.findFirst({
@@ -37,6 +39,7 @@ async function findMembership(organizationId: string, userId: string): Promise<M
     select: {
       id: true,
       role: true,
+      displayName: true,
       groupMemberships: {
         select: { group: { select: { permissions: { select: { permission: true } } } } },
       },
@@ -47,6 +50,7 @@ async function findMembership(organizationId: string, userId: string): Promise<M
   return {
     id: membership.id,
     role: membership.role,
+    displayName: membership.displayName,
     permissions: [...new Set(membership.groupMemberships.flatMap(({ group }) => (
       group.permissions.map(({ permission }) => permission)
     )))],
@@ -162,6 +166,81 @@ organizationRouter.get("/organizations/:organizationId/workspace", async (reques
     console.error("Falha ao carregar estrutura da empresa:", error);
     response.status(500).json({ error: "Não foi possível carregar a empresa." });
   }
+});
+
+organizationRouter.get("/organizations/:organizationId/internal-messages", async (request, response) => {
+  const organizationId = request.params.organizationId;
+  const userId = request.user?.id;
+  const requestedLimit = Number(request.query.limit ?? 50);
+  const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, Math.trunc(requestedLimit))) : 50;
+  const before = request.query.before ? Number(request.query.before) : null;
+  if (!userId) return response.status(401).json({ error: "Não autenticado." });
+  if (before !== null && (!Number.isInteger(before) || before <= 0)) {
+    return response.status(400).json({ error: "Paginação inválida." });
+  }
+
+  const membership = await findMembership(organizationId, userId);
+  if (!membership) return response.status(403).json({ error: "Você não pertence a esta empresa." });
+
+  const [messages, members] = await Promise.all([
+    prisma.organizationMessage.findMany({
+      where: { organizationId, ...(before ? { id: { lt: before } } : {}) },
+      orderBy: { id: "desc" },
+      take: limit + 1,
+      include: { sender: { select: { id: true, name: true, image: true } } },
+    }),
+    prisma.member.findMany({
+      where: { organizationId },
+      select: { userId: true, displayName: true },
+    }),
+  ]);
+  const displayNames = new Map(members.map((member) => [member.userId, member.displayName?.trim() || null]));
+  const hasMore = messages.length > limit;
+  const page = messages.slice(0, limit).reverse().map((message) => ({
+    ...message,
+    sender: { ...message.sender, name: displayNames.get(message.senderId) || message.sender.name },
+  }));
+
+  return response.json({
+    messages: page,
+    memberCount: members.length,
+    hasMore,
+    nextCursor: hasMore ? page[0]?.id ?? null : null,
+  });
+});
+
+organizationRouter.post("/organizations/:organizationId/internal-messages", async (request, response) => {
+  const organizationId = request.params.organizationId;
+  const userId = request.user?.id;
+  const content = typeof request.body?.content === "string" ? request.body.content.trim() : "";
+  if (!userId) return response.status(401).json({ error: "Não autenticado." });
+  if (!content || content.length > 4_000) {
+    return response.status(400).json({ error: "A mensagem deve ter entre 1 e 4.000 caracteres." });
+  }
+
+  const membership = await findMembership(organizationId, userId);
+  if (!membership) return response.status(403).json({ error: "Você não pertence a esta empresa." });
+
+  const [created, members] = await prisma.$transaction(async (transaction) => {
+    const message = await transaction.organizationMessage.create({
+      data: { organizationId, senderId: userId, content },
+      include: { sender: { select: { id: true, name: true, image: true } } },
+    });
+    const organizationMembers = await transaction.member.findMany({
+      where: { organizationId },
+      select: { userId: true },
+    });
+    return [message, organizationMembers] as const;
+  });
+  const message = {
+    ...created,
+    sender: { ...created.sender, name: membership.displayName?.trim() || created.sender.name },
+  };
+  const event = { organizationId, message };
+  const io = getSocketServer();
+  for (const member of members) io.to(userRoom(member.userId)).emit("organization_message", event);
+
+  return response.status(201).json({ message });
 });
 
 organizationRouter.patch("/organizations/:organizationId/profile", async (request, response) => {

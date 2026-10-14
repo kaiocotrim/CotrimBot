@@ -180,6 +180,21 @@ export function useChat() {
         }
       }
 
+      // Eventos internos aparecem apenas na linha do tempo e não substituem
+      // a prévia da última mensagem do WhatsApp na barra lateral.
+      if (data.message.type === "SYSTEM") {
+        setContacts((currentContacts) => currentContacts.map((contact) => contact.id === data.contact.id
+          ? {
+              ...contact,
+              ...data.contact,
+              messages: contact.messages,
+              unreadCount: contact.unreadCount,
+            }
+          : contact
+        ));
+        return;
+      }
+
 
       // =====================================================
       // ATUALIZA A SIDEBAR DIRETAMENTE NA MEMÓRIA
@@ -299,6 +314,22 @@ export function useChat() {
       ));
     }
 
+    function handleGroupSenderUpdated(data: { contactId: number; senderPhones: string[]; senderName: string }) {
+      const senderPhones = new Set(data.senderPhones.map((phone) => phone.replace(/\D/g, "")).filter(Boolean));
+      const updateSenderName = (message: Message) => {
+        const senderPhone = message.senderPhone?.replace(/\D/g, "");
+        return message.contactId === data.contactId && senderPhone && senderPhones.has(senderPhone)
+          ? { ...message, senderName: data.senderName }
+          : message;
+      };
+
+      setMessages((current) => current.map(updateSenderName));
+      setContacts((current) => current.map((contact) => contact.id === data.contactId
+        ? { ...contact, messages: contact.messages?.map(updateSenderName) }
+        : contact
+      ));
+    }
+
     function handleContactUpdated(data: Contact) {
       setContacts((current) => current.map((contact) => contact.id === data.id ? { ...contact, ...data } : contact));
       setSelectedContact((current) => current?.id === data.id ? { ...current, ...data } : current);
@@ -321,6 +352,7 @@ export function useChat() {
     socket.on("message_reply_resolved", handleMessageReplyResolved);
     socket.on("message_quote_updated", handleMessageQuoteUpdated);
     socket.on("message_flags_updated", handleMessageFlagsUpdated);
+    socket.on("group_sender_updated", handleGroupSenderUpdated);
     socket.on("contact_updated", handleContactUpdated);
     socket.on("contact_presence", handleContactPresence);
 
@@ -338,6 +370,7 @@ export function useChat() {
       socket.off("message_reply_resolved", handleMessageReplyResolved);
       socket.off("message_quote_updated", handleMessageQuoteUpdated);
       socket.off("message_flags_updated", handleMessageFlagsUpdated);
+      socket.off("group_sender_updated", handleGroupSenderUpdated);
       socket.off("contact_updated", handleContactUpdated);
       socket.off("contact_presence", handleContactPresence);
     };
@@ -620,8 +653,8 @@ export function useChat() {
     return updated.filter((contact) => contact.isSaved && !contact.isGroup);
   }
 
-  async function saveContact(name: string, phone: string, companyName: string): Promise<Contact[]> {
-    const savedContact = await saveContactRequest(name, phone, companyName);
+  async function saveContact(name: string, phone: string, companyName: string, jobTitle?: string): Promise<Contact[]> {
+    const savedContact = await saveContactRequest(name, phone, companyName, jobTitle);
     const savedContacts = await loadSavedContacts();
     const contactToOpen = savedContacts.find((contact) => contact.id === savedContact.id)
       ?? { ...savedContact, messages: [], unreadCount: 0 };
@@ -653,13 +686,13 @@ export function useChat() {
     }
   }
 
-  async function renameContact(contactId: number, name: string, companyName?: string) {
-    const updated = await updateContactNameRequest(contactId, name, companyName);
+  async function renameContact(contactId: number, name: string, companyName?: string, jobTitle?: string, phone?: string) {
+    const updated = await updateContactNameRequest(contactId, name, companyName, jobTitle, phone);
     setContacts((current) => current.map((contact) =>
-      contact.id === updated.id ? { ...contact, name: updated.name, companyName: updated.companyName, isSaved: true } : contact
+      contact.id === updated.id ? { ...contact, name: updated.name, companyName: updated.companyName, jobTitle: updated.jobTitle, phone: updated.phone, isSaved: true } : contact
     ));
     setSelectedContact((current) =>
-      current?.id === updated.id ? { ...current, name: updated.name, companyName: updated.companyName, isSaved: true } : current
+      current?.id === updated.id ? { ...current, name: updated.name, companyName: updated.companyName, jobTitle: updated.jobTitle, phone: updated.phone, isSaved: true } : current
     );
   }
 
@@ -688,7 +721,7 @@ export function useChat() {
   // ENVIAR MENSAGEM DE TEXTO
   // =========================================================
 
-  function sendMessage(options: { private: boolean; includeSignature?: boolean; replyToMessageId?: number } = { private: false }) {
+  function sendMessage(options: { private: boolean; includeSignature?: boolean; replyToMessageId?: number; mentionedUserIds?: string[] } = { private: false }) {
     const content =
       text.trim();
     const contact = selectedContact;
@@ -740,7 +773,7 @@ export function useChat() {
       return [updatedContact, ...current.filter((item) => item.id !== contact.id)];
     });
 
-    void postMessage(contact.id, content, optimisticMessage.clientId, options.private, options.replyToMessageId, options.includeSignature)
+    void postMessage(contact.id, content, optimisticMessage.clientId, options.private, options.replyToMessageId, options.includeSignature, options.mentionedUserIds)
       .then(({ message }) => {
         const confirmedMessage = { ...message, clientId: optimisticMessage.clientId };
         const replaceOptimistic = (items: Message[]) => {

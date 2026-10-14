@@ -6,7 +6,8 @@ import type { Message } from "@/types/chat";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 export function MessageSenderAvatar({ message }: { message: Message }) {
-  const [pictureUrl, setPictureUrl] = useState(message.senderProfilePictureUrl);
+  const [fetchedPictureUrl, setFetchedPictureUrl] = useState<string | null>(null);
+  const pictureUrl = message.senderProfilePictureUrl ?? fetchedPictureUrl;
 
   useEffect(() => {
     if (pictureUrl || !message.senderPhone) return;
@@ -14,7 +15,7 @@ export function MessageSenderAvatar({ message }: { message: Message }) {
     fetch(`${API_URL}/messages/${message.id}/sender-avatar`, { credentials: "include" })
       .then((response) => response.ok ? response.json() as Promise<{ profilePictureUrl: string | null }> : null)
       .then((result) => {
-        if (active && result?.profilePictureUrl) setPictureUrl(result.profilePictureUrl);
+        if (active && result?.profilePictureUrl) setFetchedPictureUrl(result.profilePictureUrl);
       })
       .catch(() => undefined);
     return () => { active = false; };

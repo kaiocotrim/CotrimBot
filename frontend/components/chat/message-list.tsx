@@ -6,11 +6,13 @@ import { Avatar } from "@/components/chat/avatar";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { MessageSenderAvatar } from "@/components/chat/message-sender-avatar";
 import { OutgoingMessageAvatar } from "@/components/chat/outgoing-message-avatar";
+import { getGroupParticipants, type GroupParticipant } from "@/lib/chat-api";
 import type { Contact, Message } from "@/types/chat";
 
 type MessageListProps = {
   currentUser: { id: string; name: string; image?: string | null };
   contact: Contact;
+  contacts: Contact[];
   messages: Message[];
   hasOlderMessages: boolean;
   loadingOlderMessages: boolean;
@@ -63,8 +65,43 @@ function dateLabel(value: string) {
   return separatorDateFormatter.format(date);
 }
 
+function identifierDigits(value?: string | null) {
+  return value?.replace(/\D/g, "") ?? "";
+}
+
+function joinNames(names: string[]) {
+  if (names.length <= 1) return names[0] ?? "o bot";
+  return `${names.slice(0, -1).join(", ")} e ${names.at(-1)}`;
+}
+
+function systemMessageLabel(content: string, currentUserId: string) {
+  try {
+    const event = JSON.parse(content) as {
+      kind?: unknown;
+      actor?: { id?: unknown; name?: unknown };
+      targets?: Array<{ id?: unknown; name?: unknown }>;
+    };
+    const actorName = event.actor?.id === currentUserId
+      ? "Você"
+      : typeof event.actor?.name === "string" ? event.actor.name : "Alguém";
+
+    if (event.kind === "closed") return `${actorName} finalizou`;
+    if (event.kind === "assignment") {
+      const targets = Array.isArray(event.targets)
+        ? event.targets.map((target) => target.id === currentUserId
+          ? "você"
+          : typeof target.name === "string" ? target.name : "usuário")
+        : [];
+      return `${actorName} atribuiu para ${joinNames(targets)}`;
+    }
+  } catch {
+    // Eventos antigos ou desconhecidos continuam legíveis como texto simples.
+  }
+  return content;
+}
+
 // Posiciona mensagens recebidas à esquerda e enviadas à direita.
-export function MessageList({ currentUser, contact, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, hasPinnedMessage, selectionMode, selectedMessageIds, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onDeleteMessage, onRequestForward, onReplyToMessage, onEnsureMessageLoaded, onToggleMessageSelection }: MessageListProps) {
+export function MessageList({ currentUser, contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, hasPinnedMessage, selectionMode, selectedMessageIds, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onDeleteMessage, onRequestForward, onReplyToMessage, onEnsureMessageLoaded, onToggleMessageSelection }: MessageListProps) {
   const reduceMotion = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -75,11 +112,32 @@ export function MessageList({ currentUser, contact, messages, hasOlderMessages, 
   const prependAnchorRef = useRef<{ height: number; top: number; firstMessageId: number | null } | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [navigatedMessageId, setNavigatedMessageId] = useState<number | null>(null);
+  const [groupParticipantState, setGroupParticipantState] = useState<{ contactId: number; participants: GroupParticipant[] } | null>(null);
   const mediaMessages = useMemo(
     () => messages.filter((message) => message.type === "IMAGE" || message.type === "VIDEO"),
     [messages],
   );
   const messagesById = useMemo(() => new Map(messages.map((message) => [message.id, message])), [messages]);
+  const groupParticipantsByIdentifier = useMemo(() => {
+    const result = new Map<string, GroupParticipant>();
+    if (groupParticipantState?.contactId !== contact.id) return result;
+    for (const participant of groupParticipantState.participants) {
+      const phone = identifierDigits(participant.phone);
+      const lid = identifierDigits(participant.lid);
+      if (phone) result.set(phone, participant);
+      if (lid) result.set(lid, participant);
+    }
+    return result;
+  }, [contact.id, groupParticipantState]);
+
+  useEffect(() => {
+    if (!contact.isGroup) return;
+    let active = true;
+    void getGroupParticipants(contact.id)
+      .then((participants) => { if (active) setGroupParticipantState({ contactId: contact.id, participants }); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [contact.id, contact.isGroup]);
 
   function updateScrollState() {
     const element = scrollRef.current;
@@ -200,9 +258,59 @@ export function MessageList({ currentUser, contact, messages, hasOlderMessages, 
         const label = showDateSeparator ? dateLabel(message.createdAt) : null;
         const isNewMessage = message.id === newMessageId;
         const isNewOutgoingMessage = isNewMessage && outgoing;
+        if (message.type === "SYSTEM") {
+          return (
+            <motion.div
+              id={`message-${message.id}`}
+              data-message-id={message.id}
+              key={message.clientId ?? message.id}
+              initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.2 }}
+              className="flex w-full flex-col items-center gap-1 py-0.5"
+            >
+              {label && (
+                <div className="flex w-full items-center justify-center py-1" role="separator" aria-label={label}>
+                  <span className="rounded-md border border-white/[0.06] bg-zinc-900/90 px-2.5 py-1 text-xs font-medium text-zinc-300 shadow-sm backdrop-blur-md lg:text-[10px]">
+                    {label}
+                  </span>
+                </div>
+              )}
+              <span className="max-w-[85%] rounded-full bg-white/[0.035] px-2.5 py-1 text-center text-[10px] leading-4 text-zinc-500">
+                {systemMessageLabel(message.content, currentUser.id)}
+              </span>
+            </motion.div>
+          );
+        }
         const cascadeStart = Math.max(0, messages.length - 12);
         const cascadeOrder = Math.max(0, index - cascadeStart);
         const selected = selectedMessageIds.has(message.id);
+        const senderIdentifier = identifierDigits(message.senderPhone);
+        const groupParticipant = contact.isGroup && !outgoing && senderIdentifier
+          ? groupParticipantsByIdentifier.get(senderIdentifier)
+          : undefined;
+        const resolvedSenderIdentifiers = new Set([
+          senderIdentifier,
+          identifierDigits(groupParticipant?.phone),
+          identifierDigits(groupParticipant?.lid),
+        ].filter(Boolean));
+        const savedSender = contact.isGroup && !outgoing && senderIdentifier
+          ? contacts.find((item) => !item.isGroup && item.isSaved && (
+              resolvedSenderIdentifiers.has(identifierDigits(item.phone))
+              || resolvedSenderIdentifiers.has(identifierDigits(item.whatsappLid))
+            ))
+          : undefined;
+        const whatsappSenderName = message.senderName
+          && !resolvedSenderIdentifiers.has(identifierDigits(message.senderName))
+          ? message.senderName
+          : null;
+        const displayMessage = groupParticipant || savedSender
+          ? {
+              ...message,
+              senderName: savedSender?.name ?? whatsappSenderName ?? groupParticipant?.name ?? message.senderName,
+              senderProfilePictureUrl: savedSender?.profilePictureUrl ?? groupParticipant?.profilePictureUrl ?? message.senderProfilePictureUrl,
+            }
+          : message;
 
         return (
           <motion.div
@@ -256,11 +364,13 @@ export function MessageList({ currentUser, contact, messages, hasOlderMessages, 
                 </button>
               )}
               {!outgoing && (contact.isGroup
-                ? <MessageSenderAvatar message={message} />
+                ? savedSender
+                  ? <Avatar contact={savedSender} />
+                  : <MessageSenderAvatar message={displayMessage} />
                 : <Avatar contact={contact} />)}
 
               {/* O balão escolhe entre player de áudio e conteúdo textual. */}
-              <MessageBubble message={message} quotedMessage={message.quotedMessageId ? messagesById.get(message.quotedMessageId) : undefined} contact={contact} mediaMessages={mediaMessages} onReact={onReactToMessage} onUpdateFlags={onUpdateMessageFlags} onDelete={onDeleteMessage} onRequestForward={onRequestForward} onReply={onReplyToMessage} onNavigateToMessage={navigateToMessage} />
+              <MessageBubble message={displayMessage} quotedMessage={message.quotedMessageId ? messagesById.get(message.quotedMessageId) : undefined} contact={contact} mediaMessages={mediaMessages} onReact={onReactToMessage} onUpdateFlags={onUpdateMessageFlags} onDelete={onDeleteMessage} onRequestForward={onRequestForward} onReply={onReplyToMessage} onNavigateToMessage={navigateToMessage} />
 
               {outgoing && (
                 <OutgoingMessageAvatar

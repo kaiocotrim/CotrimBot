@@ -2,14 +2,14 @@
 
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from "framer-motion";
 import Image from "next/image";
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AttachmentMenu, type AttachmentKind } from "@/components/chat/attachment-menu";
 import { EmojiSelector } from "@/components/chat/emoji-selector";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { MessageText } from "@/components/chat/message-text";
 import { insertEmojiAtSelection } from "@/lib/emoji-text";
-import { rewriteMessage } from "@/lib/chat-api";
+import { getContactAssignees, rewriteMessage, type ContactAssignee } from "@/lib/chat-api";
 import type { Message } from "@/types/chat";
 
 
@@ -21,7 +21,7 @@ type MessageComposerProps = {
   closing: boolean;
 
   onTextChange: (text: string) => void;
-  onSend: (options: { private: boolean; includeSignature: boolean }) => void;
+  onSend: (options: { private: boolean; includeSignature: boolean; mentionedUserIds?: string[] }) => void;
   onCloseWithBot: () => void;
   allowCloseWithBot?: boolean;
   focusRequestKey: number;
@@ -39,6 +39,7 @@ type PendingAttachment = {
   file: File;
   previewUrl: string | null;
 };
+type MentionMatch = { start: number; end: number; query: string };
 type ComposerIconName = "message" | "lock" | "plus" | "sticker" | "mic" | "send" | "expand" | "collapse" | "sparkles";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
@@ -53,6 +54,10 @@ function longTextPreview(value: string) {
   const normalized = value.replace(/\s+/g, " ").trim();
   if (!normalized) return "Texto colado";
   return normalized.length > 42 ? `${normalized.slice(0, 42).trimEnd()}…` : normalized;
+}
+
+function normalizeMentionSearch(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
 }
 
 function replyPreview(message: Message) {
@@ -120,6 +125,13 @@ export function MessageComposer({
   const nextAttachmentIdRef = useRef(1);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [isPrivateMode, setIsPrivateMode] = useState(false);
+  const [mentionableUsers, setMentionableUsers] = useState<ContactAssignee[]>([]);
+  const [mentionsLoaded, setMentionsLoaded] = useState(false);
+  const [mentionsLoading, setMentionsLoading] = useState(false);
+  const [mentionError, setMentionError] = useState<string | null>(null);
+  const [mentionMatch, setMentionMatch] = useState<MentionMatch | null>(null);
+  const [activeMentionIndex, setActiveMentionIndex] = useState(0);
+  const [selectedMentions, setSelectedMentions] = useState<Record<string, string>>({});
   const signaturePreferenceKey = `cotrimbot:include-signature:${userId}`;
   const [includeSignature, setIncludeSignature] = useState(() => {
     if (typeof window === "undefined") return true;
@@ -155,6 +167,7 @@ export function MessageComposer({
   const selectionRef = useRef({ start: text.length, end: text.length });
   const pendingCaretRef = useRef<number | null>(null);
   const emojiSelectorId = useId();
+  const mentionListId = useId();
   const attachmentTriggerRef = useRef<HTMLButtonElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentKindRef = useRef<AttachmentKind>("document");
@@ -174,6 +187,64 @@ export function MessageComposer({
   const showControls = isFocused || text.length > 0 || isFullscreen;
   const isStacked = measurements.compact > 24 || isFullscreen || isLongTextCollapsed;
   const transition = { duration: reduceMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
+  const filteredMentionUsers = useMemo(() => {
+    if (!mentionMatch) return [];
+    const query = normalizeMentionSearch(mentionMatch.query);
+    return mentionableUsers
+      .filter((user) => user.id !== userId && (!query || normalizeMentionSearch(user.name).includes(query)))
+      .slice(0, 6);
+  }, [mentionMatch, mentionableUsers, userId]);
+
+  async function loadMentionableUsers() {
+    if (mentionsLoaded || mentionsLoading) return;
+    setMentionsLoading(true);
+    setMentionError(null);
+    try {
+      setMentionableUsers(await getContactAssignees());
+      setMentionsLoaded(true);
+    } catch (error) {
+      setMentionError(error instanceof Error ? error.message : "Não foi possível carregar os técnicos.");
+    } finally {
+      setMentionsLoading(false);
+    }
+  }
+
+  function updateMentionMatch(value: string, caret: number) {
+    const beforeCaret = value.slice(0, caret);
+    const match = beforeCaret.match(/(?:^|\s)@([^\s@]*)$/u);
+    if (!match) {
+      setMentionMatch(null);
+      return;
+    }
+    setMentionMatch({ start: beforeCaret.lastIndexOf("@"), end: caret, query: match[1] ?? "" });
+    setActiveMentionIndex(0);
+    void loadMentionableUsers();
+  }
+
+  function changeText(nextValue: string, caret: number) {
+    setLongTextCollapsed(false);
+    onTextChange(nextValue);
+    setSelectedMentions((current) => Object.fromEntries(
+      Object.entries(current).filter(([, token]) => nextValue.includes(token)),
+    ));
+    updateMentionMatch(nextValue, caret);
+  }
+
+  function selectMention(user: ContactAssignee) {
+    if (!mentionMatch) return;
+    const token = `@${user.name}`;
+    const replacement = `${token} `;
+    const nextValue = `${text.slice(0, mentionMatch.start)}${replacement}${text.slice(mentionMatch.end)}`;
+    const nextCaret = mentionMatch.start + replacement.length;
+    onTextChange(nextValue);
+    setSelectedMentions((current) => ({ ...current, [user.id]: token }));
+    setMentionMatch(null);
+    selectionRef.current = { start: nextCaret, end: nextCaret };
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(nextCaret, nextCaret);
+    });
+  }
 
   function toggleSignature() {
     const next = !includeSignature;
@@ -189,6 +260,7 @@ export function MessageComposer({
     function togglePrivateMode(event: KeyboardEvent) {
       if (!event.ctrlKey || event.altKey || event.metaKey || event.key.toLowerCase() !== "m") return;
       event.preventDefault();
+      setMentionMatch(null);
       setIsPrivateMode((current) => !current);
       textareaRef.current?.focus();
     }
@@ -665,7 +737,12 @@ export function MessageComposer({
                   ease: "easeInOut",
                 });
               }
-              onSend({ private: isPrivateMode, includeSignature });
+              const mentionedUserIds = Object.entries(selectedMentions)
+                .filter(([, token]) => text.includes(token))
+                .map(([id]) => id);
+              onSend({ private: isPrivateMode, includeSignature, mentionedUserIds });
+              setSelectedMentions({});
+              setMentionMatch(null);
             }
           }}
         >
@@ -788,6 +865,45 @@ export function MessageComposer({
             <textarea ref={stackedMirrorRef} value={text} readOnly tabIndex={-1} rows={1} className={textClassName} style={{ height: 0, width: "calc(100% - 66px)" }} />
           </div>
 
+          <AnimatePresence>
+            {mentionMatch && (
+              <motion.div
+                id={mentionListId}
+                role="listbox"
+                aria-label="Técnicos para mencionar"
+                initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 4, scale: 0.98 }}
+                transition={{ duration: reduceMotion ? 0 : 0.16, ease: [0.22, 1, 0.36, 1] }}
+                style={{ bottom: fieldHeight + 8, right: isStacked ? 0 : 56 }}
+                className={`absolute left-0 z-[80] max-h-64 overflow-y-auto rounded-2xl border p-1.5 shadow-[0_18px_55px_rgba(0,0,0,0.55)] backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${isPrivateMode ? "border-zinc-300 bg-zinc-100/98 text-zinc-900" : "border-white/10 bg-zinc-900/98 text-zinc-100"}`}
+              >
+                <p className={`px-3 py-2 text-[11px] font-medium ${isPrivateMode ? "text-zinc-600" : "text-zinc-500"}`}>Mencionar técnico</p>
+                {mentionsLoading && <p role="status" className={`px-3 py-4 text-center text-xs ${isPrivateMode ? "text-zinc-600" : "text-zinc-500"}`}>Carregando técnicos...</p>}
+                {!mentionsLoading && mentionError && <p role="alert" className={`px-3 py-3 text-xs ${isPrivateMode ? "text-red-700" : "text-red-300"}`}>{mentionError}</p>}
+                {!mentionsLoading && !mentionError && filteredMentionUsers.map((user, index) => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    role="option"
+                    aria-selected={index === activeMentionIndex}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => selectMention(user)}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors focus-visible:outline-none ${isPrivateMode ? index === activeMentionIndex ? "bg-zinc-200" : "hover:bg-zinc-200/70" : index === activeMentionIndex ? "bg-white/[0.09]" : "hover:bg-white/[0.055]"}`}
+                  >
+                    <span aria-hidden="true" className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${isPrivateMode ? "bg-zinc-300 text-zinc-800" : "bg-zinc-700 text-zinc-100"}`}>
+                      {user.name.trim().charAt(0).toLocaleUpperCase("pt-BR")}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm">{user.name}</span>
+                  </button>
+                ))}
+                {!mentionsLoading && !mentionError && mentionsLoaded && !filteredMentionUsers.length && (
+                  <p className={`px-3 py-4 text-center text-xs ${isPrivateMode ? "text-zinc-600" : "text-zinc-500"}`}>Nenhum técnico encontrado.</p>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <motion.div
             initial={false}
             animate={{ height: fieldHeight, marginRight: isStacked ? 0 : 56, borderTopLeftRadius: emojisOpen && !sending ? 0 : 24, borderTopRightRadius: emojisOpen && !sending ? 0 : 24 }}
@@ -846,10 +962,12 @@ export function MessageComposer({
               onAnimationComplete={syncTextScroll}
               rows={1}
               aria-label="Mensagem"
+              aria-autocomplete="list"
+              aria-controls={mentionMatch ? mentionListId : undefined}
+              aria-expanded={Boolean(mentionMatch)}
               value={text}
               onChange={(event) => {
-                setLongTextCollapsed(false);
-                onTextChange(event.target.value);
+                changeText(event.target.value, event.target.selectionStart);
               }}
               onPaste={(event) => {
                 const clipboardImage = Array.from(event.clipboardData.items)
@@ -886,11 +1004,33 @@ export function MessageComposer({
               onScroll={syncTextScroll}
               onSelect={(event) => {
                 selectionRef.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd };
+                updateMentionMatch(event.currentTarget.value, event.currentTarget.selectionStart);
               }}
               onBlur={(event) => {
                 selectionRef.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd };
               }}
               onKeyDown={(event) => {
+                if (mentionMatch && event.key === "Escape") {
+                  event.preventDefault();
+                  setMentionMatch(null);
+                  return;
+                }
+                if (mentionMatch && filteredMentionUsers.length && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+                  event.preventDefault();
+                  setActiveMentionIndex((current) => event.key === "ArrowDown"
+                    ? (current + 1) % filteredMentionUsers.length
+                    : (current - 1 + filteredMentionUsers.length) % filteredMentionUsers.length);
+                  return;
+                }
+                if (mentionMatch && filteredMentionUsers.length && (event.key === "Enter" || event.key === "Tab")) {
+                  event.preventDefault();
+                  selectMention(filteredMentionUsers[activeMentionIndex] ?? filteredMentionUsers[0]);
+                  return;
+                }
+                if (mentionMatch && mentionsLoading && event.key === "Enter") {
+                  event.preventDefault();
+                  return;
+                }
                 if (event.key === "Escape" && replyingTo) {
                   event.preventDefault();
                   onCancelReply();

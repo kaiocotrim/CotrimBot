@@ -44,7 +44,7 @@ export function ContactInfoPanel({
   contact: Contact;
   onClose: () => void;
   onSearch: () => void;
-  onRenameContact: (contactId: number, name: string, companyName?: string) => Promise<void>;
+  onRenameContact: (contactId: number, name: string, companyName?: string, jobTitle?: string, phone?: string) => Promise<void>;
   onSetContactAssignment: (contactId: number, assignedUserIds: string[]) => Promise<void>;
   onSetContactPriority: (contactId: number, priority: NonNullable<Contact["priority"]>) => Promise<void>;
   onCloseWithBot: () => void;
@@ -56,6 +56,8 @@ export function ContactInfoPanel({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
+  const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [assignees, setAssignees] = useState<ContactAssignee[]>([]);
@@ -74,6 +76,7 @@ export function ContactInfoPanel({
   const selectedPriority = contact.priority ?? "NONE";
   const assigneeMenuRef = useRef<HTMLDivElement>(null);
   const assigneeTriggerRef = useRef<HTMLButtonElement>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
   const assignedUserIds = contact.assignedUserIds ?? [];
   const selectedAssignees = assignees.filter((user) => assignedUserIds.includes(user.id));
   const assigneeSummary = selectedAssignees.length === 0
@@ -181,13 +184,16 @@ export function ContactInfoPanel({
     }
   }
 
-  function startEditing() {
+  function startEditing(focusPhone = false) {
     const [first = "", ...rest] = contact.name.trim().split(/\s+/);
     setFirstName(first);
     setLastName(rest.join(" "));
     setCompanyName(contact.companyName ?? "");
+    setJobTitle(contact.jobTitle ?? "");
+    setPhone(contact.phone);
     setError(null);
     setEditing(true);
+    if (focusPhone) requestAnimationFrame(() => phoneInputRef.current?.focus());
   }
 
   async function saveName(event: FormEvent<HTMLFormElement>) {
@@ -195,10 +201,15 @@ export function ContactInfoPanel({
     if (saving || !firstName.trim()) return;
 
     const name = `${firstName.trim()} ${lastName.trim()}`.trim().replace(/\s+/g, " ");
+    const normalizedPhone = phone.replace(/\D/g, "");
+    if (!contact.isGroup && !/^\d{7,15}$/.test(normalizedPhone)) {
+      setError("Informe um número internacional válido, com 7 a 15 dígitos.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      await onRenameContact(contact.id, name, companyName.trim());
+      await onRenameContact(contact.id, name, companyName.trim(), jobTitle.trim(), contact.isGroup ? undefined : normalizedPhone);
       setEditing(false);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Não foi possível editar o contato");
@@ -276,6 +287,34 @@ export function ContactInfoPanel({
                 className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-base text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50 lg:text-sm"
               />
             </label>
+            <label className="block text-sm text-zinc-300/80 lg:text-xs">
+              Cargo
+              <input
+                autoComplete="organization-title"
+                maxLength={191}
+                value={jobTitle}
+                onChange={(event) => setJobTitle(event.target.value)}
+                disabled={saving}
+                className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-base text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50 lg:text-sm"
+              />
+            </label>
+            {!contact.isGroup && <label className="block text-sm text-zinc-300/80 lg:text-xs">
+              Telefone
+              <input
+                ref={phoneInputRef}
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                required
+                maxLength={24}
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                disabled={saving}
+                placeholder="Ex.: 5511999999999"
+                className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-base text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50 lg:text-sm"
+              />
+              <span className="mt-1 block text-[11px] text-zinc-500">Inclua o código do país e o DDD.</span>
+            </label>}
             {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
             <div className="flex justify-end gap-2">
               <button
@@ -298,7 +337,7 @@ export function ContactInfoPanel({
         ) : (
           <button
             type="button"
-            onClick={startEditing}
+            onClick={() => startEditing()}
             className="mt-3 flex min-h-11 items-center gap-2 rounded-full px-3 py-1.5 text-sm text-zinc-300/80 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 lg:min-h-0 lg:text-xs"
           >
             <Pencil className="size-3.5" aria-hidden="true" />
@@ -315,7 +354,17 @@ export function ContactInfoPanel({
           </div>
           <div>
             <dt className="text-sm text-zinc-400 lg:text-xs">Telefone</dt>
-            <dd className="mt-1 break-words text-base text-white lg:text-sm">{contact.phone}</dd>
+            <dd className="mt-1 flex items-center gap-2 text-base text-white lg:text-sm">
+              <span className="min-w-0 break-all">{contact.phone}</span>
+              {!contact.isGroup && <button
+                type="button"
+                onClick={() => startEditing(true)}
+                aria-label="Editar telefone"
+                className="flex size-8 shrink-0 items-center justify-center rounded-full text-zinc-500 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50"
+              >
+                <Pencil className="size-3.5" aria-hidden="true" />
+              </button>}
+            </dd>
           </div>
           {contact.isGroup && <div>
             <dt className="flex items-center justify-between gap-3 text-sm text-zinc-400 lg:text-xs">
@@ -376,6 +425,10 @@ export function ContactInfoPanel({
           {!contact.isGroup && contact.companyName && <div>
             <dt className="text-sm text-zinc-400 lg:text-xs">Empresa</dt>
             <dd className="mt-1 break-words text-base text-white lg:text-sm">{contact.companyName}</dd>
+          </div>}
+          {!contact.isGroup && contact.jobTitle && <div>
+            <dt className="text-sm text-zinc-400 lg:text-xs">Cargo</dt>
+            <dd className="mt-1 break-words text-base text-white lg:text-sm">{contact.jobTitle}</dd>
           </div>}
           {!contact.isGroup && <div>
             <dt className="text-sm text-zinc-400 lg:text-xs">Responsáveis</dt>

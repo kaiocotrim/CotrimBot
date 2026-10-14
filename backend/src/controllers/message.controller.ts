@@ -24,6 +24,7 @@ import {
 
 import { getSatisfactionSurvey } from "../services/bot.service.js";
 import { getSignedOutgoingText, SignatureMembershipError } from "../services/user-signature.service.js";
+import { notifyMention } from "../services/notification.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
 
 const sentByUserInclude = {
@@ -532,7 +533,7 @@ export async function sendMessageToContact(req: Request, res: Response) {
   const contactId = Number(req.params.id);
 
   // O texto enviado pelo cliente da API é recebido no corpo JSON da requisição.
-  const { text, clientId, private: isPrivate = false, replyToMessageId, includeSignature = true } = req.body;
+  const { text, clientId, private: isPrivate = false, replyToMessageId, includeSignature = true, mentionedUserIds = [] } = req.body;
 
   // Procuramos o contato antes do envio porque precisamos do telefone cadastrado.
   // Isso também impede uma chamada desnecessária à Evolution para um contato
@@ -562,6 +563,25 @@ export async function sendMessageToContact(req: Request, res: Response) {
 
   if (typeof includeSignature !== "boolean") {
     return res.status(400).json({ message: "Opção de assinatura inválida" });
+  }
+
+  if (!Array.isArray(mentionedUserIds)
+    || mentionedUserIds.length > 20
+    || mentionedUserIds.some((userId) => typeof userId !== "string" || !userId.trim())) {
+    return res.status(400).json({ message: "Menções inválidas" });
+  }
+  const uniqueMentionedUserIds = [...new Set<string>(mentionedUserIds.map((userId: string) => userId.trim()))];
+  if (uniqueMentionedUserIds.length) {
+    const validUsers = req.activeOrganizationId
+      ? await prisma.member.findMany({
+          where: { organizationId: req.activeOrganizationId, userId: { in: uniqueMentionedUserIds } },
+          select: { userId: true },
+        })
+      : await prisma.user.findMany({ where: { id: { in: uniqueMentionedUserIds } }, select: { id: true } });
+    const validUserIds = new Set(validUsers.map((user) => "userId" in user ? user.userId : user.id));
+    if (uniqueMentionedUserIds.some((userId) => !validUserIds.has(userId))) {
+      return res.status(400).json({ message: "Um ou mais usuários mencionados não foram encontrados" });
+    }
   }
 
   if (replyToMessageId !== undefined && (!Number.isInteger(replyToMessageId) || replyToMessageId <= 0)) {
@@ -601,6 +621,9 @@ export async function sendMessageToContact(req: Request, res: Response) {
         ...(typeof clientId === "string" ? { clientId } : {}),
       };
       getSocketServer().emit("new_message", { message: responseMessage, contact: { ...contact, name: contactDisplayName(contact) } });
+      if (uniqueMentionedUserIds.length) {
+        notifyMention(contact, { content: text }, uniqueMentionedUserIds, { id: req.user!.id, name: req.user!.name });
+      }
       return res.status(201).json({ message: responseMessage, evolution: null });
     }
 
@@ -666,6 +689,9 @@ export async function sendMessageToContact(req: Request, res: Response) {
       message: responseMessage,
       contact: { ...contact, name: contactDisplayName(contact) },
     });
+    if (uniqueMentionedUserIds.length) {
+      notifyMention(contact, { content: text }, uniqueMentionedUserIds, { id: req.user!.id, name: req.user!.name });
+    }
 
     // Mantém a resposta atual: registro local e resposta original da Evolution.
     return res.status(201).json({
@@ -696,6 +722,13 @@ export async function closeConversationWithBot(req: Request, res: Response) {
   }
 
   try {
+    const actorMember = req.activeOrganizationId
+      ? await prisma.member.findFirst({
+          where: { organizationId: req.activeOrganizationId, userId: req.user!.id },
+          select: { displayName: true },
+        })
+      : null;
+    const actorName = actorMember?.displayName?.trim() || req.user!.name;
     const survey = getSatisfactionSurvey();
     const evolutionResponse = await sendWhatsAppMessage(contact.phone, survey);
     const externalId = evolutionResponse?.key?.id;
@@ -704,7 +737,7 @@ export async function closeConversationWithBot(req: Request, res: Response) {
       throw new Error("A Evolution API não retornou o ID da mensagem");
     }
 
-    const message = await prisma.$transaction(async (transaction) => {
+    const { message, systemMessage } = await prisma.$transaction(async (transaction) => {
       const createdMessage = await transaction.message.create({
         data: {
           externalId,
@@ -719,7 +752,21 @@ export async function closeConversationWithBot(req: Request, res: Response) {
       // Um chamado encerrado volta para a fila sem responsáveis atribuídos.
       await transaction.contactAssignment.deleteMany({ where: { contactId } });
 
-      return createdMessage;
+      const eventMessage = await transaction.message.create({
+        data: {
+          externalId: `system:${randomUUID()}`,
+          content: JSON.stringify({
+            kind: "closed",
+            actor: { id: req.user!.id, name: actorName },
+          }),
+          direction: "OUTGOING",
+          type: "SYSTEM",
+          contactId,
+          sentByUserId: req.user!.id,
+        },
+      });
+
+      return { message: createdMessage, systemMessage: eventMessage };
     });
 
     // Avisa os frontends conectados que uma nova
@@ -734,6 +781,10 @@ export async function closeConversationWithBot(req: Request, res: Response) {
 
     io.emit("new_message", {
       message,
+      contact: updatedContact,
+    });
+    io.emit("new_message", {
+      message: systemMessage,
       contact: updatedContact,
     });
     io.emit("contact_updated", updatedContact);

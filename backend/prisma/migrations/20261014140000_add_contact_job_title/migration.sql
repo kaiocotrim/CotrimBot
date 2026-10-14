@@ -1,0 +1,1 @@
+ALTER TABLE `Contact` ADD COLUMN `jobTitle` VARCHAR(191) NULL;

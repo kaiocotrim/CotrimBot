@@ -5,7 +5,9 @@ export type Contact = {
   id: number;
   name: string;
   companyName?: string | null;
+  jobTitle?: string | null;
   phone: string;
+  whatsappLid?: string | null;
   isGroup: boolean;
   isSaved: boolean;
   archived: boolean;
@@ -41,7 +43,7 @@ export type Message = {
   direction: "INCOMING" | "OUTGOING";
 
   // Define como o conteúdo será renderizado: texto, áudio ou outra mídia.
-  type: "TEXT" | "AUDIO" | "IMAGE" | "STICKER" | "VIDEO" | "DOCUMENT";
+  type: "TEXT" | "SYSTEM" | "AUDIO" | "IMAGE" | "STICKER" | "VIDEO" | "DOCUMENT";
 
   // Observação interna visível apenas no CotrimBot.
   private?: boolean;

@@ -4,7 +4,7 @@ import { sendPushToUser } from "./push.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
 import { processInBatches } from "../utils/batch.js";
 
-export type NotificationType = "CONVERSATION_ASSIGNED" | "NEW_MESSAGE";
+export type NotificationType = "CONVERSATION_ASSIGNED" | "MENTION" | "NEW_MESSAGE";
 
 export function userRoom(userId: string) {
   return `user:${userId}`;
@@ -12,7 +12,7 @@ export function userRoom(userId: string) {
 
 type NewNotification = {
   userId: string;
-  type: "CONVERSATION_ASSIGNED";
+  type: Exclude<NotificationType, "NEW_MESSAGE">;
   title: string;
   body: string;
   contactId?: number;
@@ -57,6 +57,29 @@ export function notifyAssignment(
         ),
       1
     )
+  );
+}
+
+export function notifyMention(
+  contact: { id: number; name: string; phone: string; isGroup: boolean; isSaved: boolean },
+  message: { content: string },
+  userIds: string[],
+  actor: { id: string; name: string },
+) {
+  const preview = message.content.trim();
+  const bodyPreview = preview.length > 110 ? `${preview.slice(0, 107)}...` : preview;
+  void safely(
+    processInBatches(
+      [...new Set(userIds)].filter((userId) => userId !== actor.id),
+      (userId) => safely(createNotification({
+        userId,
+        type: "MENTION",
+        title: `${actor.name} mencionou você`,
+        body: `${contactDisplayName(contact)}: ${bodyPreview}`,
+        contactId: contact.id,
+      })),
+      1,
+    ),
   );
 }
 

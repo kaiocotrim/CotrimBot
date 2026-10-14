@@ -1,11 +1,13 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Archive, CalendarDays, ContactRound, MessagesSquare, UserRound, UserRoundCheck, UsersRound } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { Archive, Bell, Building2, CalendarDays, ContactRound, MessagesSquare, UserRound, UserRoundCheck, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AccountSettings } from "@/components/chat/account-settings";
 
-export type ChatRailSection = "conversations" | "contacts" | "groups" | "mine" | "archived";
+export type ChatRailSection = "notifications" | "conversations" | "contacts" | "groups" | "mine" | "archived";
 
 type RailUser = {
   id: string;
@@ -16,6 +18,7 @@ type RailUser = {
 };
 
 const sections = [
+  { id: "notifications", label: "Notificações", icon: Bell },
   { id: "conversations", label: "Conversas", icon: MessagesSquare },
   { id: "contacts", label: "Contatos", icon: ContactRound },
   { id: "groups", label: "Grupos", icon: UsersRound },
@@ -26,12 +29,16 @@ const sections = [
 export function ChatNavigationRail({
   activeSection,
   unreadCount,
+  notificationUnreadCount,
+  company,
   user,
   onNavigate,
   onOpenSettings,
 }: {
   activeSection: ChatRailSection;
   unreadCount: number;
+  notificationUnreadCount: number;
+  company?: { name: string; logo: string | null } | null;
   user?: RailUser | null;
   onNavigate: (section: ChatRailSection) => void;
   onOpenSettings: () => void;
@@ -53,7 +60,11 @@ export function ChatNavigationRail({
           <motion.button
             key={id}
             type="button"
-            aria-label={id === "conversations" && unreadCount > 0 ? `${label}, ${unreadCount} mensagens não lidas` : label}
+            aria-label={id === "conversations" && unreadCount > 0
+              ? `${label}, ${unreadCount} mensagens não lidas`
+              : id === "notifications" && notificationUnreadCount > 0
+                ? `${label}, ${notificationUnreadCount} não lidas`
+                : label}
             aria-current={activeSection === id ? "page" : undefined}
             title={label}
             onClick={() => onNavigate(id)}
@@ -72,6 +83,11 @@ export function ChatNavigationRail({
             {id === "conversations" && unreadCount > 0 && (
               <span aria-hidden="true" className="absolute -top-0.5 -right-1 flex size-5 min-w-5 items-center justify-center rounded-full border border-[#1a1a1a] bg-zinc-300 px-1 text-[10px] font-semibold leading-none text-zinc-950">
                 {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+            {id === "notifications" && notificationUnreadCount > 0 && (
+              <span aria-hidden="true" className="absolute -top-0.5 -right-1 flex size-5 min-w-5 items-center justify-center rounded-full border border-[#1a1a1a] bg-violet-300 px-1 text-[10px] font-semibold leading-none text-zinc-950">
+                {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
               </span>
             )}
           </motion.button>
@@ -102,6 +118,23 @@ export function ChatNavigationRail({
             )}
           </AnimatePresence>
         </div>
+        {company && (
+          <>
+            <span aria-hidden="true" className="my-2 h-px w-7 shrink-0 bg-white/[0.1]" />
+            <Link
+              href="/empresa"
+              aria-label={`Abrir empresa ${company.name}`}
+              title={company.name}
+              className="flex size-11 shrink-0 items-center justify-center rounded-xl text-zinc-400 transition-colors hover:bg-white/[0.07] hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70"
+            >
+              <span className="flex size-8 items-center justify-center overflow-hidden rounded-lg bg-white/[0.035]">
+                {company.logo
+                  ? <Image src={company.logo} alt="" width={32} height={32} unoptimized className="size-full object-contain p-1" />
+                  : <Building2 aria-hidden="true" className="size-4" strokeWidth={1.8} />}
+              </span>
+            </Link>
+          </>
+        )}
       </div>
 
       {user && (

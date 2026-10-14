@@ -41,6 +41,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
 }
 
+function getWhatsAppProfileName(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+
+  const sender = isRecord(value.sender) ? value.sender : null;
+  const candidate = [
+    value.pushName,
+    value.pushname,
+    value.notifyName,
+    value.senderName,
+    sender?.pushName,
+    sender?.pushname,
+    sender?.notifyName,
+    sender?.name,
+  ].find((name): name is string => typeof name === "string" && Boolean(name.trim()));
+
+  return candidate ? candidate.trim().replace(/\s+/g, " ").slice(0, 191) : null;
+}
+
 type PresenceStatus = "unavailable" | "available" | "composing" | "recording" | "paused";
 const presenceStatuses = new Set<PresenceStatus>(["unavailable", "available", "composing", "recording", "paused"]);
 
@@ -307,18 +325,67 @@ export async function whatsappWebhook(req: Request, res: Response) {
   const externalId = data.key?.id;
 
   const isGroup = contactJid.endsWith("@g.us");
-  const participantJid = isGroup
-    ? data.key?.participant ?? data.participant ?? data.key?.participantAlt
-    : null;
+  const primaryParticipantJid = isGroup ? data.key?.participant ?? data.participant : null;
+  const alternateParticipantJid = isGroup ? data.key?.participantAlt : null;
+  const participantJid = typeof primaryParticipantJid === "string"
+    && primaryParticipantJid.endsWith("@lid")
+    && typeof alternateParticipantJid === "string"
+    && alternateParticipantJid.endsWith("@s.whatsapp.net")
+      ? alternateParticipantJid
+      : primaryParticipantJid ?? alternateParticipantJid;
   const senderPhone = typeof participantJid === "string"
     ? participantJid.replace("@s.whatsapp.net", "").replace("@lid", "")
     : null;
+  const senderIdentifiers = [...new Set([
+    senderPhone,
+    typeof primaryParticipantJid === "string"
+      ? primaryParticipantJid.replace("@s.whatsapp.net", "").replace("@lid", "")
+      : null,
+    typeof alternateParticipantJid === "string"
+      ? alternateParticipantJid.replace("@s.whatsapp.net", "").replace("@lid", "")
+      : null,
+  ].filter((identifier): identifier is string => Boolean(identifier)))];
   const savedSender = isGroup && !fromMe && senderPhone
-    ? await prisma.contact.findUnique({ where: { phone: senderPhone }, select: { name: true, isSaved: true } })
+    ? await prisma.contact.findFirst({
+        where: {
+          OR: [
+            { phone: senderPhone },
+            ...(typeof primaryParticipantJid === "string" && primaryParticipantJid.endsWith("@lid")
+              ? [{ whatsappLid: primaryParticipantJid }]
+              : []),
+          ],
+        },
+        select: { id: true, name: true, isSaved: true, whatsappLid: true },
+      })
     : null;
+  const whatsappSenderName = getWhatsAppProfileName(data);
   const senderName = isGroup && !fromMe
-    ? savedSender?.isSaved ? savedSender.name : senderPhone || "Participante"
+    ? savedSender?.isSaved ? savedSender.name : whatsappSenderName ?? senderPhone ?? "Participante"
     : null;
+  const backfillGroupSenderName = async (contactId: number) => {
+    if (!isGroup || fromMe || savedSender?.isSaved || !whatsappSenderName || !senderIdentifiers.length) return;
+
+    const result = await prisma.message.updateMany({
+      where: {
+        contactId,
+        senderPhone: { in: senderIdentifiers },
+        OR: [
+          { senderName: null },
+          { senderName: "Participante" },
+          { senderName: { in: senderIdentifiers } },
+        ],
+      },
+      data: { senderName: whatsappSenderName },
+    });
+
+    if (result.count) {
+      getSocketServer().emit("group_sender_updated", {
+        contactId,
+        senderPhones: senderIdentifiers,
+        senderName: whatsappSenderName,
+      });
+    }
+  };
   const reportedMessageType = String(data.messageType ?? data.type ?? body.messageType ?? "").toLowerCase();
 
   // Tipo da mensagem que será salvo no banco.
@@ -401,6 +468,8 @@ export async function whatsappWebhook(req: Request, res: Response) {
   // A Evolution pode repetir o mesmo ID com os metadados completos alguns
   // instantes depois. Só enriquecemos como resposta quando há quotedMessage.
   if (existingMessage) {
+    await backfillGroupSenderName(existingMessage.contactId);
+
     if (replyContextInfo && !existingMessage.quotedMessageId) {
       const quotedMessage = quotedExternalId
         ? await prisma.message.findFirst({
@@ -474,6 +543,8 @@ export async function whatsappWebhook(req: Request, res: Response) {
       ...(remoteJid.endsWith("@lid") ? { whatsappLid: remoteJid } : {}),
     },
   });
+
+  await backfillGroupSenderName(contact.id);
 
   const quotedMessage = replyContextInfo && quotedExternalId
     ? await prisma.message.findFirst({ where: { externalId: quotedExternalId, contactId: contact.id } })

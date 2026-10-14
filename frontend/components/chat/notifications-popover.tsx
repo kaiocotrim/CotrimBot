@@ -2,7 +2,7 @@
 
 import { Popover } from "@base-ui/react/popover";
 import { motion, useReducedMotion } from "framer-motion";
-import { Bell, MessageSquare, Trash2, UserRoundPlus } from "lucide-react";
+import { AtSign, Bell, MessageSquare, Trash2, UserRoundPlus } from "lucide-react";
 import type { AppNotification } from "@/lib/notification-api";
 
 type NotificationsPopoverProps = {
@@ -105,7 +105,9 @@ export function NotificationsPopover({
               {notifications.length === 0 ? (
                 <li className="px-4 py-12 text-center text-xs text-zinc-600">Tudo tranquilo por aqui</li>
               ) : notifications.map((notification) => {
-                const Icon = notification.type === "CONVERSATION_ASSIGNED" ? UserRoundPlus : MessageSquare;
+                const Icon = notification.type === "CONVERSATION_ASSIGNED"
+                  ? UserRoundPlus
+                  : notification.type === "MENTION" || notification.type === "PRIVATE_MENTION" ? AtSign : MessageSquare;
                 return (
                   <li key={notification.id}>
                     <button

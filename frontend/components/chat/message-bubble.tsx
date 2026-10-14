@@ -405,34 +405,6 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           />
         )}
       </AnimatePresence>
-      <AnimatePresence initial={false}>
-      {message.pinned && (
-        <motion.span
-          layout
-          initial={reduceMotion ? false : { opacity: 0, y: 3, scale: 0.86 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 2, scale: 0.9 }}
-          transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          className={`absolute -top-1 z-20 flex h-5 items-center gap-1 text-amber-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.75)] ${outgoing ? "-left-1" : "-right-1"}`}
-          title="Mensagem fixada"
-        >
-          <AnimatePresence initial={false}>
-            {message.pinned && (
-              <motion.span
-                key="pinned"
-                initial={reduceMotion ? false : { opacity: 0, rotate: -35, scale: 0.4 }}
-                animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, rotate: 25, scale: 0.5 }}
-                transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 650, damping: 20 }}
-                className="flex"
-              >
-                <PushPin size={11} weight="fill" aria-hidden="true" />
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </motion.span>
-      )}
-      </AnimatePresence>
       {isPrivate && (
         <div className="mb-1 flex items-center gap-1 text-xs font-semibold tracking-wide text-zinc-600 lg:text-[10px]">
           <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
@@ -659,6 +631,11 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           <div className="min-w-0">{content}</div>
           <span className="-mr-1 -mb-1 ml-auto flex shrink-0 items-center gap-0.5">
             <AnimatePresence initial={false}>
+              {message.pinned && (
+                <motion.span key="pinned-inline" initial={reduceMotion ? false : { opacity: 0, rotate: -35, scale: 0.4 }} animate={{ opacity: 1, rotate: 0, scale: 1 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, rotate: 25, scale: 0.5 }} transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 650, damping: 20 }} className="flex text-amber-300" title="Mensagem fixada">
+                  <PushPin size={9} weight="fill" aria-hidden="true" />
+                </motion.span>
+              )}
               {message.favorited && (
                 <motion.span key="favorite-inline" initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.75 }} transition={{ duration: reduceMotion ? 0 : 0.18 }} className="flex text-amber-300" title="Mensagem favorita">
                   <Star size={9} weight="fill" aria-hidden="true" />
@@ -686,6 +663,11 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
       {!inlineTime && timestamp && (
         <div className={`flex items-center justify-end gap-0.5 ${isSticker ? "absolute right-1 bottom-1 rounded-md bg-black/55 px-1.5 py-0.5 shadow-sm backdrop-blur-sm" : (isImage && !imageHasCaption) || (isVideo && message.content === "[Vídeo]") ? "absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-0.5 shadow-sm backdrop-blur-[2px]" : isImage || isVideo ? "px-2 pt-0.5 pb-1" : "-mr-1 -mb-1 mt-1"}`}>
           <AnimatePresence initial={false}>
+            {message.pinned && (
+              <motion.span key="pinned-footer" initial={reduceMotion ? false : { opacity: 0, rotate: -35, scale: 0.4 }} animate={{ opacity: 1, rotate: 0, scale: 1 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, rotate: 25, scale: 0.5 }} transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 650, damping: 20 }} className="flex text-amber-300" title="Mensagem fixada">
+                <PushPin size={9} weight="fill" aria-hidden="true" />
+              </motion.span>
+            )}
             {message.favorited && (
               <motion.span key="favorite-footer" initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.75 }} transition={{ duration: reduceMotion ? 0 : 0.18 }} className="flex text-amber-300" title="Mensagem favorita">
                 <Star size={9} weight="fill" aria-hidden="true" />

@@ -28,7 +28,7 @@ type ChatPanelProps = {
   isTyping: boolean;
 
   onTextChange: (text: string) => void;
-  onSend: (options: { private: boolean; includeSignature: boolean; replyToMessageId?: number }) => void;
+  onSend: (options: { private: boolean; includeSignature: boolean; replyToMessageId?: number; mentionedUserIds?: string[] }) => void;
   onLoadOlderMessages: () => Promise<void>;
   onEnsureMessageLoaded: (messageId: number) => Promise<boolean>;
   onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
@@ -46,8 +46,8 @@ type ChatPanelProps = {
 
   onCloseWithBot: () => void;
   onSelectContact: (contact: Contact) => void;
-  onSaveContact: (name: string, phone: string, companyName: string) => Promise<Contact[]>;
-  onRenameContact: (contactId: number, name: string, companyName?: string) => Promise<void>;
+  onSaveContact: (name: string, phone: string, companyName: string, jobTitle?: string) => Promise<Contact[]>;
+  onRenameContact: (contactId: number, name: string, companyName?: string, jobTitle?: string, phone?: string) => Promise<void>;
   onSetContactAssignment: (contactId: number, assignedUserIds: string[]) => Promise<void>;
   onSetContactPriority: (contactId: number, priority: NonNullable<Contact["priority"]>) => Promise<void>;
   onOpenSidebar: () => void;
@@ -120,8 +120,9 @@ export function ChatPanel({
   const showPinnedMessage = Boolean(pinnedMessage && !searchOpen && !selectionMode);
   const forwardTargets = useMemo(() => {
     const query = forwardQuery.trim().toLocaleLowerCase("pt-BR");
-    if (!query) return contacts;
-    return contacts.filter((item) => `${item.name} ${item.phone} ${item.companyName ?? ""}`.toLocaleLowerCase("pt-BR").includes(query));
+    const savedContacts = contacts.filter((item) => item.isSaved && !item.isGroup);
+    if (!query) return savedContacts;
+    return savedContacts.filter((item) => `${item.name} ${item.phone} ${item.companyName ?? ""} ${item.jobTitle ?? ""}`.toLocaleLowerCase("pt-BR").includes(query));
   }, [contacts, forwardQuery]);
   const activeReply = replyingTo?.contactId === contact?.id ? replyingTo : null;
 
@@ -381,6 +382,7 @@ export function ChatPanel({
           <MessageList
             currentUser={currentUser}
             contact={contact}
+            contacts={contacts}
             messages={messages}
             hasOlderMessages={hasOlderMessages}
             loadingOlderMessages={loadingOlderMessages}
@@ -457,7 +459,7 @@ export function ChatPanel({
                   </div>
 
                   <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <p className="px-3 py-3 text-xs font-medium text-zinc-500">Conversas recentes</p>
+                    <p className="px-3 py-3 text-xs font-medium text-zinc-500">Contatos salvos</p>
                     <div className="space-y-1">
                       {forwardTargets.map((target) => {
                         const selected = forwardTargetIds.has(target.id);
@@ -474,7 +476,7 @@ export function ChatPanel({
                           </button>
                         );
                       })}
-                      {!forwardTargets.length && <p className="px-3 py-10 text-center text-sm text-zinc-500">Nenhuma conversa encontrada.</p>}
+                      {!forwardTargets.length && <p className="px-3 py-10 text-center text-sm text-zinc-500">Nenhum contato salvo encontrado.</p>}
                     </div>
                   </div>
 

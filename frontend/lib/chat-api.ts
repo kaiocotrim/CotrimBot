@@ -23,11 +23,11 @@ export async function getContacts(): Promise<Contact[]> {
   return parseResponse<Contact[]>(response, "Erro ao buscar contatos");
 }
 
-export async function saveContact(name: string, phone: string, companyName: string): Promise<Contact> {
+export async function saveContact(name: string, phone: string, companyName: string, jobTitle?: string): Promise<Contact> {
   const response = await fetch(`${API_URL}/contacts`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, phone, companyName }),
+    body: JSON.stringify({ name, phone, companyName, jobTitle }),
     credentials: "include",
   });
   return parseResponse<Contact>(response, "Não foi possível salvar o contato");
@@ -36,6 +36,7 @@ export async function saveContact(name: string, phone: string, companyName: stri
 export type ContactAssignee = { id: string; name: string; image: string | null };
 export type GroupParticipant = {
   phone: string;
+  lid?: string | null;
   name: string | null;
   profilePictureUrl: string | null;
   isAdmin: boolean;
@@ -168,21 +169,21 @@ export async function setContactPinned(contactId: number, pinned: boolean): Prom
   return parseResponse<Contact>(response, "Erro ao alterar fixação da conversa");
 }
 
-export async function updateContactName(contactId: number, name: string, companyName?: string) {
+export async function updateContactName(contactId: number, name: string, companyName?: string, jobTitle?: string, phone?: string) {
   const response = await fetch(`${API_URL}/contacts/${contactId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, ...(companyName !== undefined ? { companyName } : {}) }),
+    body: JSON.stringify({ name, ...(companyName !== undefined ? { companyName } : {}), ...(jobTitle !== undefined ? { jobTitle } : {}), ...(phone !== undefined ? { phone } : {}) }),
     credentials: "include",
   });
-  return parseResponse<Pick<Contact, "id" | "name" | "companyName">>(response, "Erro ao editar contato");
+  return parseResponse<Pick<Contact, "id" | "name" | "companyName" | "jobTitle" | "phone">>(response, "Erro ao editar contato");
 }
 
-export async function postMessage(contactId: number, text: string, clientId?: string, isPrivate = false, replyToMessageId?: number, includeSignature = true): Promise<{ message: Message }> {
+export async function postMessage(contactId: number, text: string, clientId?: string, isPrivate = false, replyToMessageId?: number, includeSignature = true, mentionedUserIds: string[] = []): Promise<{ message: Message }> {
   const response = await fetch(`${API_URL}/contacts/${contactId}/send`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, clientId, private: isPrivate, replyToMessageId, includeSignature }),
+    body: JSON.stringify({ text, clientId, private: isPrivate, replyToMessageId, includeSignature, mentionedUserIds }),
     credentials: "include",
   });
 

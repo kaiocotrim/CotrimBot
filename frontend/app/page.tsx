@@ -88,6 +88,16 @@ export default function Home() {
         onSaveContact={chat.saveContact}
         onArchiveContact={chat.archiveContact}
         onPinContact={chat.pinContact}
+        notifications={notifications.notifications}
+        notificationUnreadCount={notifications.unreadCount}
+        notificationPermission={notifications.permission}
+        onRequestNotificationPermission={() => void notifications.requestPermission()}
+        onMarkAllNotificationsRead={notifications.markAllRead}
+        onClearNotifications={notifications.clearAll}
+        onOpenNotification={(notification) => {
+          if (!notification.readAt) notifications.markRead(notification.id);
+          if (notification.contactId) openContactById(notification.contactId);
+        }}
         headerActions={
           <NotificationsPopover
             notifications={notifications.notifications}
