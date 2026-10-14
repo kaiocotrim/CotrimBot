@@ -134,6 +134,8 @@ export default function Home() {
           onForwardMessage={chat.forwardMessage}
           onSendMedia={chat.sendMediaMessage}
           onCloseWithBot={chat.closeWithBot}
+          onSelectContact={selectContact}
+          onSaveContact={chat.saveContact}
           onRenameContact={chat.renameContact}
           onSetContactAssignment={chat.setContactAssignment}
           onSetContactPriority={chat.setContactPriority}

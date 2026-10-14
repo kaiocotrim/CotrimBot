@@ -5,6 +5,7 @@ import {
   getContactAvatar,
   getContactAssignees,
   getContactById,
+  getContactGroupParticipants,
   getContacts,
   setContactArchived,
   setContactAssignment,
@@ -22,6 +23,7 @@ contactRouter.get("/contacts/assignees", getContactAssignees);
 
 // GET /contacts/:id/avatar - Busca a foto do contato na Evolution API
 contactRouter.get("/contacts/:id/avatar", getContactAvatar);
+contactRouter.get("/contacts/:id/group-participants", getContactGroupParticipants);
 
 // POST /contacts/:id/presence-subscription - Assina o status de digitação no WhatsApp
 contactRouter.post("/contacts/:id/presence-subscription", subscribeContactPresence);

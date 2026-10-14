@@ -110,6 +110,7 @@ export async function getMessages(req: Request, res: Response) {
   const hasMore = messages.length > limit;
   const page = messages.slice(0, limit).reverse().map((message) => ({
     ...message,
+    pinned: message.pinned && (!message.pinnedUntil || message.pinnedUntil.getTime() > Date.now()),
     private: message.externalId.startsWith("private:"),
   }));
 
@@ -154,8 +155,19 @@ export async function updateMessageFlags(req: Request, res: Response) {
     return res.status(400).json({ message: "Mensagem inválida" });
   }
 
-  const data: { pinned?: boolean; favorited?: boolean } = {};
-  if (typeof req.body.pinned === "boolean") data.pinned = req.body.pinned;
+  const data: { pinned?: boolean; pinnedUntil?: Date | null; favorited?: boolean } = {};
+  if (typeof req.body.pinned === "boolean") {
+    data.pinned = req.body.pinned;
+    if (req.body.pinned) {
+      const durationHours = Number(req.body.pinDurationHours ?? 168);
+      if (![24, 168, 720].includes(durationHours)) {
+        return res.status(400).json({ message: "Prazo de fixação inválido" });
+      }
+      data.pinnedUntil = new Date(Date.now() + durationHours * 60 * 60 * 1000);
+    } else {
+      data.pinnedUntil = null;
+    }
+  }
   if (typeof req.body.favorited === "boolean") data.favorited = req.body.favorited;
   if (data.pinned === undefined && data.favorited === undefined) {
     return res.status(400).json({ message: "Nenhuma alteração informada" });
@@ -163,11 +175,16 @@ export async function updateMessageFlags(req: Request, res: Response) {
 
   const existing = await prisma.message.findUnique({ where: { id: messageId } });
   if (!existing) return res.status(404).json({ message: "Mensagem não encontrada" });
+  if (existing.pinned && existing.pinnedUntil && existing.pinnedUntil.getTime() <= Date.now() && data.pinned === undefined) {
+    data.pinned = false;
+    data.pinnedUntil = null;
+  }
 
   const message = await prisma.message.update({ where: { id: messageId }, data });
   getSocketServer().emit("message_flags_updated", {
     messageId: message.id,
     pinned: message.pinned,
+    pinnedUntil: message.pinnedUntil,
     favorited: message.favorited,
   });
   return res.json(message);
@@ -660,27 +677,41 @@ export async function closeConversationWithBot(req: Request, res: Response) {
       throw new Error("A Evolution API não retornou o ID da mensagem");
     }
 
-    const message = await prisma.message.create({
-      data: {
-        externalId,
-        content: survey,
-        direction: "OUTGOING",
-        contactId,
-        sentByUserId: req.user!.id,
-      },
-      include: sentByUserInclude,
+    const message = await prisma.$transaction(async (transaction) => {
+      const createdMessage = await transaction.message.create({
+        data: {
+          externalId,
+          content: survey,
+          direction: "OUTGOING",
+          contactId,
+          sentByUserId: req.user!.id,
+        },
+        include: sentByUserInclude,
+      });
+
+      // Um chamado encerrado volta para a fila sem responsáveis atribuídos.
+      await transaction.contactAssignment.deleteMany({ where: { contactId } });
+
+      return createdMessage;
     });
 
     // Avisa os frontends conectados que uma nova
     // mensagem OUTGOING foi salva.
     const io = getSocketServer();
 
+    const updatedContact = {
+      ...contact,
+      name: contactDisplayName(contact),
+      assignedUserIds: [],
+    };
+
     io.emit("new_message", {
       message,
-      contact: { ...contact, name: contactDisplayName(contact) },
+      contact: updatedContact,
     });
+    io.emit("contact_updated", updatedContact);
 
-    return res.status(201).json({ message, evolution: evolutionResponse });
+    return res.status(201).json({ message, contact: updatedContact, evolution: evolutionResponse });
   } catch (error) {
     console.error("Erro ao encerrar chamado com o bot:", error);
     return res.status(500).json({ message: "Erro ao enviar pesquisa de satisfação" });

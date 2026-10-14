@@ -5,6 +5,7 @@ import { notifyAssignment } from "../services/notification.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
 import {
   archiveWhatsAppChat,
+  getGroupInfo,
   getProfilePicture,
   subscribeWhatsAppPresence,
 } from "../services/evolution.service.js";
@@ -114,6 +115,75 @@ export async function getContactAvatar(req: Request, res: Response) {
     return res.status(500).json({
       message: "Erro ao buscar foto do contato",
     });
+  }
+}
+
+// GET /contacts/:id/group-participants - Lista os participantes atuais de um grupo.
+export async function getContactGroupParticipants(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ message: "Contato inválido" });
+  }
+
+  const contact = await prisma.contact.findUnique({
+    where: { id },
+    select: { phone: true, isGroup: true },
+  });
+
+  if (!contact) return res.status(404).json({ message: "Contato não encontrado" });
+  if (!contact.isGroup) return res.status(400).json({ message: "Este contato não é um grupo" });
+
+  try {
+    const group = await getGroupInfo(contact.phone, true);
+    const participants = [...new Map((group.participants ?? []).flatMap((participant) => {
+      const identifier = participant.phoneNumber ?? participant.id ?? "";
+      const phone = identifier.replace(/@.*$/, "").replace(/\D/g, "");
+      return phone ? [[phone, { phone, isAdmin: Boolean(participant.admin) }] as const] : [];
+    })).values()];
+    const phones = participants.map((participant) => participant.phone);
+
+    const [savedContacts, cachedAvatars] = phones.length ? await Promise.all([
+      prisma.contact.findMany({
+        where: { phone: { in: phones }, isSaved: true },
+        select: { phone: true, name: true, profilePictureUrl: true },
+      }),
+      prisma.message.findMany({
+        where: {
+          contactId: id,
+          senderPhone: { in: phones },
+          senderProfilePictureUrl: { not: null },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { senderPhone: true, senderProfilePictureUrl: true },
+      }),
+    ]) : [[], []];
+
+    const contactsByPhone = new Map(savedContacts.map((item) => [item.phone.replace(/\D/g, ""), item]));
+    const avatarsByPhone = new Map<string, string>();
+    for (const item of cachedAvatars) {
+      const phone = item.senderPhone?.replace(/\D/g, "");
+      if (phone && item.senderProfilePictureUrl && !avatarsByPhone.has(phone)) {
+        avatarsByPhone.set(phone, item.senderProfilePictureUrl);
+      }
+    }
+
+    const result = participants
+      .map((participant) => {
+        const savedContact = contactsByPhone.get(participant.phone);
+        return {
+          phone: participant.phone,
+          name: savedContact?.name ?? null,
+          profilePictureUrl: savedContact?.profilePictureUrl ?? avatarsByPhone.get(participant.phone) ?? null,
+          isAdmin: participant.isAdmin,
+        };
+      })
+      .sort((a, b) => Number(b.isAdmin) - Number(a.isAdmin)
+        || (a.name ?? a.phone).localeCompare(b.name ?? b.phone, "pt-BR"));
+
+    return res.json(result);
+  } catch (error) {
+    console.error("Erro ao buscar participantes do grupo:", error);
+    return res.status(502).json({ message: "Não foi possível carregar os participantes do grupo" });
   }
 }
 

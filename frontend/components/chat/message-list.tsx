@@ -17,13 +17,17 @@ type MessageListProps = {
   loadingOlderMessages: boolean;
   newMessageId: number | null;
   highlightedMessageId?: number | null;
+  hasPinnedMessage: boolean;
+  selectionMode: boolean;
+  selectedMessageIds: Set<number>;
   onLoadOlderMessages: () => Promise<void>;
   onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
-  onUpdateMessageFlags: (messageId: number, flags: { pinned?: boolean; favorited?: boolean }) => Promise<void>;
+  onUpdateMessageFlags: (messageId: number, flags: { pinned?: boolean; pinDurationHours?: 24 | 168 | 720; favorited?: boolean }) => Promise<void>;
   onDeleteMessage: (messageId: number, scope: "me" | "everyone") => Promise<void>;
   onForwardMessage: (message: Message, target: Contact) => void;
   onReplyToMessage: (message: Message) => void;
   onEnsureMessageLoaded: (messageId: number) => Promise<boolean>;
+  onToggleMessageSelection: (messageId: number) => void;
 };
 
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
@@ -61,7 +65,7 @@ function dateLabel(value: string) {
 }
 
 // Posiciona mensagens recebidas à esquerda e enviadas à direita.
-export function MessageList({ currentUser, contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onDeleteMessage, onForwardMessage, onReplyToMessage, onEnsureMessageLoaded }: MessageListProps) {
+export function MessageList({ currentUser, contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, hasPinnedMessage, selectionMode, selectedMessageIds, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onDeleteMessage, onForwardMessage, onReplyToMessage, onEnsureMessageLoaded, onToggleMessageSelection }: MessageListProps) {
   const reduceMotion = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -182,7 +186,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
       >
         <div
           ref={contentRef}
-          className="flex min-h-full flex-col gap-2 px-2 pt-[calc(4rem+env(safe-area-inset-top))] sm:px-5"
+          className={`flex min-h-full flex-col gap-2 px-2 sm:px-5 ${hasPinnedMessage ? "pt-[calc(7.5rem+env(safe-area-inset-top))]" : "pt-[calc(4rem+env(safe-area-inset-top))]"}`}
           style={{ paddingBottom: "max(7rem, calc(var(--chat-composer-height, 0px) + 0.75rem))" }}
         >
         {loadingOlderMessages && (
@@ -199,6 +203,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
         const isNewOutgoingMessage = isNewMessage && outgoing;
         const cascadeStart = Math.max(0, messages.length - 12);
         const cascadeOrder = Math.max(0, index - cascadeStart);
+        const selected = selectedMessageIds.has(message.id);
 
         return (
           <motion.div
@@ -224,7 +229,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
                   }
             }
             style={{ transformOrigin: outgoing ? "bottom right" : "bottom left" }}
-            className={`relative z-0 flex w-full flex-col gap-2 rounded-2xl transition-[background-color,box-shadow] duration-300 has-[[aria-expanded=true]]:z-30 ${highlightedMessageId === message.id ? "bg-amber-300/10 shadow-[0_0_0_2px_rgba(252,211,77,0.28)]" : navigatedMessageId === message.id ? "bg-emerald-300/10 shadow-[0_0_0_2px_rgba(110,231,183,0.28)]" : ""}`}
+            className={`relative z-0 flex w-full flex-col gap-2 rounded-2xl transition-[background-color,box-shadow] duration-200 has-[[aria-expanded=true]]:z-30 ${highlightedMessageId === message.id ? "bg-amber-300/10 shadow-[0_0_0_2px_rgba(252,211,77,0.28)]" : navigatedMessageId === message.id ? "bg-emerald-300/10 shadow-[0_0_0_2px_rgba(110,231,183,0.28)]" : ""}`}
           >
             {label && (
               <div className="flex w-full items-center justify-center py-1" role="separator" aria-label={label}>
@@ -234,10 +239,23 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
               </div>
             )}
             <div
-              className={`relative z-0 flex w-full min-w-0 items-center gap-2 overflow-visible hover:z-10 focus-within:z-10 ${
+              className={`relative z-0 flex w-full min-w-0 items-center gap-2 overflow-visible rounded-2xl transition-[background-color,box-shadow] duration-150 hover:z-10 focus-within:z-10 ${selectionMode ? "py-2 pr-2 pl-11" : ""} ${selected ? "bg-white/[0.09] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]" : ""} ${
                 outgoing ? "justify-end" : "justify-start"
               }`}
             >
+              {selectionMode && (
+                <button
+                  type="button"
+                  onClick={() => onToggleMessageSelection(message.id)}
+                  aria-label={`${selected ? "Remover" : "Adicionar"} mensagem da seleção`}
+                  aria-pressed={selected}
+                  className="absolute inset-0 z-20 cursor-pointer rounded-2xl focus-visible:outline-2 focus-visible:outline-white/70"
+                >
+                  <span className={`absolute left-3 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded-[6px] border transition-[color,background-color,border-color,transform,box-shadow] duration-150 ${selected ? "scale-100 border-white bg-white text-zinc-950 shadow-[0_2px_10px_rgba(255,255,255,0.22)]" : "scale-95 border-white/60 bg-white/[0.04] text-transparent"}`}>
+                    <svg className="size-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8 3 3 7-7" /></svg>
+                  </span>
+                </button>
+              )}
               {!outgoing && (contact.isGroup
                 ? <MessageSenderAvatar message={message} />
                 : <Avatar contact={contact} />)}

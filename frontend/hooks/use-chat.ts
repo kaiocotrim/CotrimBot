@@ -290,10 +290,10 @@ export function useChat() {
       ));
     }
 
-    function handleMessageFlagsUpdated(data: { messageId: number; pinned: boolean; favorited: boolean }) {
+    function handleMessageFlagsUpdated(data: { messageId: number; pinned: boolean; pinnedUntil: string | null; favorited: boolean }) {
       setMessages((current) => current.map((message) =>
         message.id === data.messageId
-          ? { ...message, pinned: data.pinned, favorited: data.favorited }
+          ? { ...message, pinned: data.pinned, pinnedUntil: data.pinnedUntil, favorited: data.favorited }
           : message
       ));
     }
@@ -919,13 +919,25 @@ export function useChat() {
     }
   }
 
-  async function updateMessageFlags(messageId: number, flags: { pinned?: boolean; favorited?: boolean }) {
+  async function updateMessageFlags(messageId: number, flags: { pinned?: boolean; pinDurationHours?: 24 | 168 | 720; favorited?: boolean }) {
     const previous = messages.find((message) => message.id === messageId);
     setMessages((current) => current.map((message) =>
-      message.id === messageId ? { ...message, ...flags } : message
+      message.id === messageId ? {
+        ...message,
+        ...(flags.pinned === undefined ? {} : {
+          pinned: flags.pinned,
+          pinnedUntil: flags.pinned
+            ? new Date(Date.now() + (flags.pinDurationHours ?? 168) * 60 * 60 * 1000).toISOString()
+            : null,
+        }),
+        ...(flags.favorited === undefined ? {} : { favorited: flags.favorited }),
+      } : message
     ));
     try {
-      await updateMessageFlagsRequest(messageId, flags);
+      const updated = await updateMessageFlagsRequest(messageId, flags);
+      setMessages((current) => current.map((message) =>
+        message.id === messageId ? { ...message, pinned: updated.pinned, pinnedUntil: updated.pinnedUntil, favorited: updated.favorited } : message
+      ));
     } catch (error) {
       if (previous) {
         setMessages((current) => current.map((message) =>
@@ -973,8 +985,15 @@ export function useChat() {
     try {
       setClosing(true);
 
-      await closeConversationWithBot(
+      const { contact } = await closeConversationWithBot(
         selectedContact.id
+      );
+
+      setContacts((current) => current.map((item) =>
+        item.id === contact.id ? { ...item, assignedUserIds: [] } : item
+      ));
+      setSelectedContact((current) =>
+        current?.id === contact.id ? { ...current, assignedUserIds: [] } : current
       );
 
     } catch (error) {

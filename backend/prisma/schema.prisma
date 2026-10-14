@@ -89,6 +89,7 @@ model Message {
   sentByUserId            String?
   private                 Boolean          @default(false)
   pinned                  Boolean          @default(false)
+  pinnedUntil             DateTime?
   favorited               Boolean          @default(false)
   deletedAt               DateTime?
   viewOnce                Boolean          @default(false)

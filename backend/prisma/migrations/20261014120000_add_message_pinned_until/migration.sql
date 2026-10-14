@@ -1,0 +1,2 @@
+ALTER TABLE `Message`
+  ADD COLUMN `pinnedUntil` DATETIME(3) NULL;

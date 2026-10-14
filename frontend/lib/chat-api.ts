@@ -34,10 +34,20 @@ export async function saveContact(name: string, phone: string, companyName: stri
 }
 
 export type ContactAssignee = { id: string; name: string; image: string | null };
-
+export type GroupParticipant = {
+  phone: string;
+  name: string | null;
+  profilePictureUrl: string | null;
+  isAdmin: boolean;
+};
 export async function getContactAssignees(): Promise<ContactAssignee[]> {
   const response = await fetch(`${API_URL}/contacts/assignees`, { credentials: "include" });
   return parseResponse<ContactAssignee[]>(response, "Não foi possível buscar os usuários");
+}
+
+export async function getGroupParticipants(contactId: number): Promise<GroupParticipant[]> {
+  const response = await fetch(`${API_URL}/contacts/${contactId}/group-participants`, { credentials: "include" });
+  return parseResponse<GroupParticipant[]>(response, "Não foi possível carregar os participantes do grupo");
 }
 
 export async function setContactAssignment(contactId: number, assignedUserIds: string[]): Promise<Contact> {
@@ -102,7 +112,7 @@ export async function reactToMessage(messageId: number, reaction: string): Promi
 
 export async function updateMessageFlags(
   messageId: number,
-  flags: { pinned?: boolean; favorited?: boolean },
+  flags: { pinned?: boolean; pinDurationHours?: 24 | 168 | 720; favorited?: boolean },
 ): Promise<Message> {
   const response = await fetch(`${API_URL}/messages/${messageId}/flags`, {
     method: "PATCH",
@@ -177,13 +187,13 @@ export async function rewriteMessage(text: string): Promise<string> {
 }
 
 // Solicita ao backend o encerramento com a pesquisa de satisfação do bot.
-export async function closeConversationWithBot(contactId: number) {
+export async function closeConversationWithBot(contactId: number): Promise<{ message: Message; contact: Contact }> {
   const response = await fetch(
     `${API_URL}/contacts/${contactId}/close-with-bot`,
     { method: "POST", credentials: "include" }
   );
 
-  return parseResponse(response, "Erro ao encerrar chamado com o bot");
+  return parseResponse<{ message: Message; contact: Contact }>(response, "Erro ao encerrar chamado com o bot");
 }
 
 

@@ -1,10 +1,15 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { Check, ChevronDown, Pencil, UserRound, X } from "lucide-react";
+import { Bot, Check, ChevronDown, LoaderCircle, MessageCircle, Pencil, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ContactPhoto } from "@/components/chat/contact-photo";
-import { getContactAssignees, type ContactAssignee } from "@/lib/chat-api";
+import {
+  getContactAssignees,
+  getGroupParticipants,
+  type ContactAssignee,
+  type GroupParticipant,
+} from "@/lib/chat-api";
 import { contactPriorities } from "@/lib/contact-priority";
 import type { Contact } from "@/types/chat";
 
@@ -21,6 +26,10 @@ function UserAvatar({ name, image }: { name: string; image?: string | null }) {
   );
 }
 
+function formatParticipantPhone(phone: string) {
+  return phone ? `+${phone}` : "Número indisponível";
+}
+
 export function ContactInfoPanel({
   contact,
   onClose,
@@ -28,6 +37,9 @@ export function ContactInfoPanel({
   onRenameContact,
   onSetContactAssignment,
   onSetContactPriority,
+  onCloseWithBot,
+  onStartConversation,
+  closing,
 }: {
   contact: Contact;
   onClose: () => void;
@@ -35,6 +47,9 @@ export function ContactInfoPanel({
   onRenameContact: (contactId: number, name: string, companyName?: string) => Promise<void>;
   onSetContactAssignment: (contactId: number, assignedUserIds: string[]) => Promise<void>;
   onSetContactPriority: (contactId: number, priority: NonNullable<Contact["priority"]>) => Promise<void>;
+  onCloseWithBot: () => void;
+  onStartConversation: (participant: GroupParticipant) => Promise<void>;
+  closing: boolean;
 }) {
   const reduceMotion = useReducedMotion();
   const [editing, setEditing] = useState(false);
@@ -50,6 +65,12 @@ export function ContactInfoPanel({
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [prioritySaving, setPrioritySaving] = useState(false);
   const [priorityError, setPriorityError] = useState<string | null>(null);
+  const [groupParticipants, setGroupParticipants] = useState<GroupParticipant[]>([]);
+  const [participantsLoading, setParticipantsLoading] = useState(contact.isGroup);
+  const [participantsError, setParticipantsError] = useState<string | null>(null);
+  const [participantsReloadKey, setParticipantsReloadKey] = useState(0);
+  const [startingParticipantPhone, setStartingParticipantPhone] = useState<string | null>(null);
+  const [startConversationError, setStartConversationError] = useState<string | null>(null);
   const selectedPriority = contact.priority ?? "NONE";
   const assigneeMenuRef = useRef<HTMLDivElement>(null);
   const assigneeTriggerRef = useRef<HTMLButtonElement>(null);
@@ -72,6 +93,21 @@ export function ContactInfoPanel({
       .finally(() => { if (active) setAssigneesLoading(false); });
     return () => { active = false; };
   }, [contact.isGroup]);
+
+  useEffect(() => {
+    if (!contact.isGroup) return;
+    let active = true;
+    void getGroupParticipants(contact.id)
+      .then((participants) => { if (active) setGroupParticipants(participants); })
+      .catch((requestError: unknown) => {
+        if (active) {
+          setGroupParticipants([]);
+          setParticipantsError(requestError instanceof Error ? requestError.message : "Não foi possível carregar os participantes.");
+        }
+      })
+      .finally(() => { if (active) setParticipantsLoading(false); });
+    return () => { active = false; };
+  }, [contact.id, contact.isGroup, participantsReloadKey]);
 
   useEffect(() => {
     if (!assigneeOpen) return;
@@ -132,6 +168,19 @@ export function ContactInfoPanel({
     }
   }
 
+  async function startParticipantConversation(participant: GroupParticipant) {
+    if (startingParticipantPhone) return;
+    setStartingParticipantPhone(participant.phone);
+    setStartConversationError(null);
+    try {
+      await onStartConversation(participant);
+    } catch (requestError) {
+      setStartConversationError(requestError instanceof Error ? requestError.message : "Não foi possível iniciar a conversa.");
+    } finally {
+      setStartingParticipantPhone(null);
+    }
+  }
+
   function startEditing() {
     const [first = "", ...rest] = contact.name.trim().split(/\s+/);
     setFirstName(first);
@@ -160,10 +209,10 @@ export function ContactInfoPanel({
 
   return (
     <motion.aside
-      initial={reduceMotion ? false : { opacity: 0, x: 24 }}
+      initial={reduceMotion ? false : { opacity: 0, x: 28 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 24 }}
-      transition={{ duration: reduceMotion ? 0 : 0.25, ease: [0.22, 1, 0.36, 1] }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       aria-label="Informações do contato"
       className="absolute inset-0 z-40 flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden bg-black
         @min-[1024px]:relative @min-[1024px]:inset-auto @min-[1024px]:z-auto @min-[1024px]:h-full @min-[1024px]:w-[min(24rem,40%)]"
@@ -180,7 +229,7 @@ export function ContactInfoPanel({
         <h2 className="text-base font-medium text-white lg:text-sm">Informações do contato</h2>
       </header>
 
-      <div className="relative flex min-h-0 flex-1 flex-col items-center overflow-y-auto overscroll-contain px-6 pt-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
+      <div className="relative flex min-h-0 flex-1 flex-col items-center overflow-y-auto overscroll-contain px-6 pt-8 pb-[max(2rem,env(safe-area-inset-bottom))] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <ContactPhoto contact={contact} />
         <h3 className="mt-4 max-w-full text-center text-2xl font-semibold break-words text-white lg:text-xl">{contact.name}</h3>
         <p className="mt-1 text-base text-zinc-300/80 lg:text-sm">
@@ -268,6 +317,62 @@ export function ContactInfoPanel({
             <dt className="text-sm text-zinc-400 lg:text-xs">Telefone</dt>
             <dd className="mt-1 break-words text-base text-white lg:text-sm">{contact.phone}</dd>
           </div>
+          {contact.isGroup && <div>
+            <dt className="flex items-center justify-between gap-3 text-sm text-zinc-400 lg:text-xs">
+              <span>Participantes</span>
+              {!participantsLoading && !participantsError && (
+                <span className="tabular-nums text-zinc-500">{groupParticipants.length}</span>
+              )}
+            </dt>
+            <dd className="mt-2 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025]">
+              {participantsLoading ? (
+                <div role="status" aria-label="Carregando participantes" className="space-y-1 p-2">
+                  {[0, 1, 2].map((item) => <div key={item} className="flex h-12 animate-pulse items-center gap-3 rounded-xl px-2 motion-reduce:animate-none">
+                    <span className="size-8 rounded-full bg-white/[0.08]" />
+                    <span className="h-3 w-32 rounded-full bg-white/[0.08]" />
+                  </div>)}
+                </div>
+              ) : participantsError ? (
+                <div className="px-4 py-5 text-center">
+                  <p role="alert" className="text-xs text-zinc-400">{participantsError}</p>
+                  <button type="button" onClick={() => {
+                    setParticipantsLoading(true);
+                    setParticipantsError(null);
+                    setParticipantsReloadKey((current) => current + 1);
+                  }} className="mt-2 rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/40">
+                    Tentar novamente
+                  </button>
+                </div>
+              ) : groupParticipants.length === 0 ? (
+                <p className="px-4 py-5 text-center text-xs text-zinc-500">Nenhum participante encontrado.</p>
+              ) : (
+                <ul className="max-h-72 divide-y divide-white/[0.06] overflow-y-auto overscroll-contain p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {groupParticipants.map((participant) => {
+                    const displayName = participant.name ?? formatParticipantPhone(participant.phone);
+                    const starting = startingParticipantPhone === participant.phone;
+                    return <li key={participant.phone}>
+                      <button
+                        type="button"
+                        disabled={Boolean(startingParticipantPhone)}
+                        onClick={() => void startParticipantConversation(participant)}
+                        aria-label={`Iniciar conversa com ${displayName}`}
+                        className="group flex min-h-12 w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-white/[0.055] focus-visible:bg-white/[0.055] focus-visible:outline-2 focus-visible:outline-white/30 disabled:cursor-wait disabled:opacity-60"
+                      >
+                        <UserAvatar name={displayName} image={participant.profilePictureUrl} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm text-zinc-100">{displayName}</span>
+                          {participant.name && <span className="block truncate text-[11px] text-zinc-500">{formatParticipantPhone(participant.phone)}</span>}
+                        </span>
+                        {participant.isAdmin && <span className="shrink-0 rounded-full bg-white/[0.07] px-2 py-1 text-[10px] font-medium text-zinc-400">Admin</span>}
+                        {starting ? <LoaderCircle className="size-4 shrink-0 animate-spin text-zinc-400 motion-reduce:animate-none" aria-hidden="true" /> : <MessageCircle className="size-4 shrink-0 text-zinc-600 transition-colors group-hover:text-zinc-300" aria-hidden="true" />}
+                      </button>
+                    </li>;
+                  })}
+                </ul>
+              )}
+            </dd>
+            {startConversationError && <p role="alert" className="mt-1.5 text-xs text-red-300">{startConversationError}</p>}
+          </div>}
           {!contact.isGroup && contact.companyName && <div>
             <dt className="text-sm text-zinc-400 lg:text-xs">Empresa</dt>
             <dd className="mt-1 break-words text-base text-white lg:text-sm">{contact.companyName}</dd>
@@ -346,6 +451,23 @@ export function ContactInfoPanel({
             </dd>
           </div>
         </dl>
+
+        {!contact.isGroup && (
+          <button
+            type="button"
+            onClick={onCloseWithBot}
+            disabled={closing}
+            aria-busy={closing}
+            className="mt-7 flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-red-400/25 bg-red-400/[0.08] px-4 py-3 text-sm font-medium text-red-200 transition hover:border-red-400/40 hover:bg-red-400/[0.13] focus-visible:outline-2 focus-visible:outline-red-300/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {closing ? (
+              <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            ) : (
+              <Bot className="size-4" aria-hidden="true" />
+            )}
+            {closing ? "Encerrando chamado..." : "Encerrar chamado"}
+          </button>
+        )}
 
         <button
           type="button"

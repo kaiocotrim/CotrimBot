@@ -45,6 +45,7 @@ export type Message = {
   // Observação interna visível apenas no CotrimBot.
   private?: boolean;
   pinned?: boolean;
+  pinnedUntil?: string | null;
   favorited?: boolean;
   deletedAt?: string | null;
   viewOnce?: boolean;

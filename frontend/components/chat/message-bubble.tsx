@@ -19,7 +19,6 @@ import {
 } from "@phosphor-icons/react";
 import { AudioMessage } from "@/components/chat/audio-message";
 import { DocumentMessage } from "@/components/chat/document-message";
-import { DeleteMessageAnimation } from "@/components/chat/delete-message-animation";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { ImageMessage } from "@/components/chat/image-message";
 import { MessageText } from "@/components/chat/message-text";
@@ -35,7 +34,7 @@ type MessageBubbleProps = {
   contacts: Contact[];
   mediaMessages: Message[];
   onReact: (messageId: number, reaction: string) => Promise<void>;
-  onUpdateFlags: (messageId: number, flags: { pinned?: boolean; favorited?: boolean }) => Promise<void>;
+  onUpdateFlags: (messageId: number, flags: { pinned?: boolean; pinDurationHours?: 24 | 168 | 720; favorited?: boolean }) => Promise<void>;
   onDelete: (messageId: number, scope: "me" | "everyone") => Promise<void>;
   onForwardMessage: (message: Message, target: Contact) => void;
   onReply: (message: Message) => void;
@@ -77,6 +76,8 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
   const [actionsOpen, setActionsOpen] = useState(false);
   const [choosingContact, setChoosingContact] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pinDialogOpen, setPinDialogOpen] = useState(false);
+  const [pinDurationHours, setPinDurationHours] = useState<24 | 168 | 720>(168);
   const [deleting, setDeleting] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -305,7 +306,7 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
     }
   }
 
-  async function updateFlag(flags: { pinned?: boolean; favorited?: boolean }) {
+  async function updateFlag(flags: { pinned?: boolean; pinDurationHours?: 24 | 168 | 720; favorited?: boolean }) {
     if (updatingFlags) return;
     setUpdatingFlags(true);
     setActionError(null);
@@ -313,6 +314,7 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
     try {
       await onUpdateFlags(message.id, flags);
       setActionsOpen(false);
+      if (flags.pinned) setPinDialogOpen(false);
     } catch {
       setActionError("Não foi possível atualizar a mensagem");
     } finally {
@@ -380,7 +382,7 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
         event.preventDefault();
         event.stopPropagation();
       }}
-      className={`group/message relative min-w-0 max-w-[86%] text-base leading-[1.45] lg:max-w-[min(62%,620px)] lg:text-[13.5px] lg:leading-[1.4] font-normal [overflow-wrap:anywhere] ${isPrivate ? "text-zinc-900" : "text-white"} ${message.reaction ? "mb-3" : ""} ${
+      className={`group/message relative min-w-0 max-w-[86%] text-base leading-[1.45] transition-[background-color,box-shadow] duration-300 lg:max-w-[min(62%,620px)] lg:text-[13.5px] lg:leading-[1.4] font-normal [overflow-wrap:anywhere] ${isPrivate ? "text-zinc-900" : "text-white"} ${message.reaction ? "mb-3" : ""} ${
         isPrivate
           ? "rounded-[24px] bg-zinc-100 px-3.5 py-2.5 shadow-[0_4px_16px_rgba(24,24,27,0.12)]"
           : isSticker
@@ -392,7 +394,7 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
           : isImage
             ? `rounded-[18px] p-[3px] shadow-[0_3px_12px_rgba(0,0,0,0.16)] bg-zinc-800`
             : `rounded-[24px] px-3.5 py-2.5 bg-zinc-800`
-      }`}
+      } ${message.favorited ? "!bg-amber-300/[0.10] shadow-[0_8px_24px_rgba(245,158,11,0.08)]" : ""}`}
     >
       <AnimatePresence>
         {pinAnimationKey > 0 && (
@@ -411,11 +413,11 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
       {(message.pinned || message.favorited) && (
         <motion.span
           layout
-          initial={reduceMotion ? false : { opacity: 0, y: 5, scale: 0.72 }}
+          initial={reduceMotion ? false : { opacity: 0, y: 3, scale: 0.86 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 3, scale: 0.8 }}
-          transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 24, mass: 0.65 }}
-          className={`absolute -top-2 z-20 flex h-5 items-center gap-1 rounded-full border border-white/10 bg-zinc-900 px-1.5 text-amber-300 shadow-md ${outgoing ? "left-3" : "right-3"}`}
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 2, scale: 0.9 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          className={`absolute -top-1 z-20 flex h-5 items-center gap-1 text-amber-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.75)] ${outgoing ? "-left-1" : "-right-1"}`}
           title={[message.pinned ? "Mensagem fixada" : "", message.favorited ? "Mensagem favorita" : ""].filter(Boolean).join(" e ")}
         >
           <AnimatePresence initial={false}>
@@ -432,7 +434,18 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
               </motion.span>
             )}
           </AnimatePresence>
-          {message.favorited && <Star size={11} weight="fill" aria-hidden="true" />}
+          {message.favorited && (
+            <motion.span
+              key="favorited"
+              initial={reduceMotion ? false : { opacity: 0, scale: 0.75, rotate: -12 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.8 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="flex"
+            >
+              <Star size={14} weight="fill" aria-hidden="true" />
+            </motion.span>
+          )}
         </motion.span>
       )}
       </AnimatePresence>
@@ -533,7 +546,16 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
                       <span>Encaminhar</span>
                     </button>
                   )}
-                  <button type="button" role="menuitem" disabled={updatingFlags} onClick={() => void updateFlag({ pinned: !message.pinned })} className={`${menuButtonClass} disabled:opacity-50`}>
+                  <button type="button" role="menuitem" disabled={updatingFlags} onClick={() => {
+                    if (message.pinned) {
+                      void updateFlag({ pinned: false });
+                      return;
+                    }
+                    setActionsOpen(false);
+                    setActionError(null);
+                    setPinDurationHours(168);
+                    setPinDialogOpen(true);
+                  }} className={`${menuButtonClass} disabled:opacity-50`}>
                     <PushPin size={15} weight={message.pinned ? "fill" : "bold"} className="shrink-0 text-zinc-200" />
                     <span>{message.pinned ? "Desafixar" : "Fixar"}</span>
                   </button>
@@ -563,6 +585,55 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
         )}
         </AnimatePresence>
       </div>
+      {pinDialogOpen && (
+        <Dialog.Root open onOpenChange={(open) => {
+          if (updatingFlags) return;
+          setPinDialogOpen(open);
+          if (!open) setActionError(null);
+        }}>
+          <Dialog.Portal>
+            <Dialog.Backdrop className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-sm transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
+            <div className="pointer-events-none fixed inset-0 z-[201] flex items-center justify-center p-4">
+              <Dialog.Popup className="pointer-events-auto w-full max-w-[420px] rounded-3xl border border-white/10 bg-zinc-900 p-6 text-zinc-100 shadow-[0_28px_90px_rgba(0,0,0,0.65)] outline-none transition-[opacity,transform] duration-200 data-[ending-style]:translate-y-2 data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:translate-y-2 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0">
+                <Dialog.Title className="max-w-[340px] text-lg font-semibold leading-6 tracking-[-0.01em]">
+                  Por quanto tempo deseja fixar esta mensagem?
+                </Dialog.Title>
+                <Dialog.Description className="mt-2 text-sm text-zinc-400">
+                  Você pode desafixá-la quando quiser.
+                </Dialog.Description>
+
+                <div className="mt-6 space-y-1" role="radiogroup" aria-label="Tempo de fixação">
+                  {([
+                    [24, "24 horas"],
+                    [168, "7 dias"],
+                    [720, "30 dias"],
+                  ] as const).map(([hours, label]) => {
+                    const selected = pinDurationHours === hours;
+                    return (
+                      <button key={hours} type="button" role="radio" aria-checked={selected} onClick={() => setPinDurationHours(hours)} className={`flex h-11 w-full items-center gap-3 rounded-xl px-2 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-white/50 ${selected ? "bg-white/[0.06] text-white" : "text-zinc-300 hover:bg-white/[0.035]"}`}>
+                        <span className={`flex size-5 items-center justify-center rounded-full border ${selected ? "border-white" : "border-zinc-600"}`}>
+                          {selected && <span className="size-2.5 rounded-full bg-white" />}
+                        </span>
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-7 flex justify-end gap-2">
+                  <button type="button" disabled={updatingFlags} onClick={() => setPinDialogOpen(false)} className="h-10 rounded-xl px-4 text-sm font-medium text-zinc-400 transition hover:bg-white/[0.05] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-50">
+                    Cancelar
+                  </button>
+                  <button type="button" disabled={updatingFlags} onClick={() => void updateFlag({ pinned: true, pinDurationHours })} className="h-10 rounded-xl bg-zinc-100 px-5 text-sm font-semibold text-zinc-950 transition hover:bg-white focus-visible:outline-2 focus-visible:outline-white/60 active:scale-[0.99] disabled:opacity-50">
+                    {updatingFlags ? "Fixando…" : "Fixar"}
+                  </button>
+                </div>
+                {actionError && <p role="alert" className="mt-3 text-right text-xs text-red-300">{actionError}</p>}
+              </Dialog.Popup>
+            </div>
+          </Dialog.Portal>
+        </Dialog.Root>
+      )}
       {deleteDialogOpen && (
         <Dialog.Root open onOpenChange={(open) => {
           if (deleting) return;
@@ -572,25 +643,23 @@ export function MessageBubble({ message, quotedMessage, contact, contacts, media
           <Dialog.Portal>
             <Dialog.Backdrop className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-md transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
             <div className="pointer-events-none fixed inset-0 z-[201] flex items-center justify-center p-4">
-              <Dialog.Popup className="pointer-events-auto w-full max-w-[420px] overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-b from-zinc-900 to-[#111113] p-5 text-zinc-100 shadow-[0_28px_90px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition-[opacity,transform] duration-200 data-[ending-style]:translate-y-2 data-[ending-style]:scale-[0.97] data-[ending-style]:opacity-0 data-[starting-style]:translate-y-3 data-[starting-style]:scale-[0.96] data-[starting-style]:opacity-0">
+              <Dialog.Popup className="pointer-events-auto w-full max-w-[360px] overflow-hidden rounded-3xl border border-white/10 bg-zinc-900 p-5 text-zinc-100 shadow-[0_28px_90px_rgba(0,0,0,0.65)] outline-none transition-[opacity,transform] duration-200 data-[ending-style]:translate-y-2 data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:translate-y-2 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0">
                 <div className="flex flex-col items-center text-center">
-                  <div className="flex h-24 items-center justify-center">
-                    <DeleteMessageAnimation />
+                  <div className="flex size-11 items-center justify-center rounded-full bg-red-500/10 text-red-300">
+                    <Trash size={20} weight="regular" aria-hidden="true" />
                   </div>
-                  <Dialog.Title className="mt-2 text-lg font-semibold tracking-[-0.01em]">Apagar mensagem?</Dialog.Title>
-                  <Dialog.Description className="mt-1 max-w-[290px] text-xs leading-5 text-zinc-400">
-                    Escolha onde esta mensagem deve ser removida. Essa ação não poderá ser desfeita.
+                  <Dialog.Title className="mt-4 text-base font-semibold tracking-[-0.01em]">Apagar mensagem?</Dialog.Title>
+                  <Dialog.Description className="mt-1 text-xs text-zinc-400">
+                    Essa ação não poderá ser desfeita.
                   </Dialog.Description>
                 </div>
-                <div className="mt-5 grid grid-cols-2 gap-2.5">
-                  <button type="button" disabled={deleting} onClick={() => void deleteSelected("me")} className="group flex min-h-28 w-full flex-col items-start gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3.5 py-3 text-left transition-[background-color,border-color,transform] hover:border-white/[0.14] hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 active:scale-[0.985] disabled:pointer-events-none disabled:opacity-50">
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-zinc-300"><Trash size={16} weight="regular" aria-hidden="true" /></span>
-                    <span><strong className="block text-[13px] font-medium text-zinc-100">Apagar para mim</strong><span className="mt-0.5 block text-[11px] text-zinc-500">Remove somente do seu histórico</span></span>
+                <div className="mt-5 flex flex-col gap-2">
+                  <button type="button" disabled={deleting} onClick={() => void deleteSelected("me")} className="flex h-11 w-full items-center justify-center rounded-xl bg-white/[0.07] px-4 text-sm font-medium text-zinc-100 transition hover:bg-white/[0.11] focus-visible:outline-2 focus-visible:outline-white/60 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50">
+                    Apagar para mim
                   </button>
                   {!message.deletedAt && (
-                    <button type="button" disabled={deleting} onClick={() => void deleteSelected("everyone")} className="group flex min-h-28 w-full flex-col items-start gap-2.5 rounded-2xl border border-red-400/15 bg-red-500/[0.055] px-3.5 py-3 text-left transition-[background-color,border-color,transform] hover:border-red-400/30 hover:bg-red-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-300/70 active:scale-[0.985] disabled:pointer-events-none disabled:opacity-50">
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-300"><Trash size={16} weight="fill" aria-hidden="true" /></span>
-                      <span><strong className="block text-[13px] font-medium text-red-200">Apagar para todos</strong><span className="mt-0.5 block text-[11px] text-red-200/45">Tenta remover também no WhatsApp</span></span>
+                    <button type="button" disabled={deleting} onClick={() => void deleteSelected("everyone")} className="flex h-11 w-full items-center justify-center rounded-xl bg-red-500/12 px-4 text-sm font-medium text-red-200 transition hover:bg-red-500/18 focus-visible:outline-2 focus-visible:outline-red-300/60 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50">
+                      Apagar para todos
                     </button>
                   )}
                 </div>
