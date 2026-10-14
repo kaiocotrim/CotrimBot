@@ -179,6 +179,9 @@ model User {
   notifications      Notification[]
   pushSubscriptions  PushSubscription[]
   organizationMessages OrganizationMessage[]
+  internalConversationParticipants InternalConversationParticipant[]
+  internalMessages InternalMessage[]
+  internalMessageReactions InternalMessageReaction[]
 }
 
 model Session {
@@ -240,6 +243,7 @@ model Organization {
   invitations Invitation[]
   groups      OrganizationGroup[]
   internalMessages OrganizationMessage[]
+  internalConversations InternalConversation[]
 }
 
 model OrganizationMessage {
@@ -270,8 +274,98 @@ model Member {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   groupMemberships OrganizationGroupMember[]
+  internalConversationParticipants InternalConversationParticipant[]
 
   @@index([organizationId])
+  @@index([userId])
+  @@unique([organizationId, userId])
+}
+
+enum InternalConversationType {
+  DIRECT
+  GROUP
+}
+
+enum InternalParticipantRole {
+  MEMBER
+  ADMIN
+}
+
+enum InternalMessageType {
+  TEXT
+  FILE
+}
+
+model InternalConversation {
+  id             String                   @id @default(cuid())
+  organizationId String
+  type           InternalConversationType
+  name           String?                  @db.VarChar(100)
+  avatarUrl      String?                  @db.Text
+  directKey      String?                  @db.VarChar(255)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  organization Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  participants InternalConversationParticipant[]
+  messages     InternalMessage[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, directKey])
+  @@index([organizationId, updatedAt])
+}
+
+model InternalConversationParticipant {
+  conversationId String
+  organizationId String
+  userId         String
+  role           InternalParticipantRole @default(MEMBER)
+  joinedAt       DateTime                @default(now())
+  lastReadAt     DateTime?
+
+  conversation InternalConversation @relation(fields: [organizationId, conversationId], references: [organizationId, id], onDelete: Cascade)
+  member       Member               @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([organizationId, userId])
+  @@index([userId, lastReadAt])
+}
+
+model InternalMessage {
+  id                   Int                @id @default(autoincrement())
+  organizationId       String
+  conversationId       String
+  senderId             String
+  content              String             @db.Text
+  type                 InternalMessageType @default(TEXT)
+  clientId             String?            @db.VarChar(80)
+  replyToMessageId     Int?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  deletedAt            DateTime?
+
+  conversation InternalConversation @relation(fields: [organizationId, conversationId], references: [organizationId, id], onDelete: Cascade)
+  sender       User                @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  replyTo      InternalMessage?    @relation("InternalMessageReply", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies      InternalMessage[]    @relation("InternalMessageReply")
+  reactions    InternalMessageReaction[]
+
+  @@unique([conversationId, clientId])
+  @@index([organizationId, conversationId, id])
+  @@index([senderId])
+}
+
+model InternalMessageReaction {
+  messageId Int
+  userId    String
+  emoji     String   @db.VarChar(32)
+  createdAt DateTime @default(now())
+
+  message InternalMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
   @@index([userId])
 }
 

@@ -24,6 +24,7 @@ import { aiRouter } from "./routes/ai.routes.js";
 import { invitationRouter } from "./routes/invitation.routes.js";
 import { organizationRouter } from "./routes/organization.routes.js";
 import { evolutionRouter } from "./routes/evolution.routes.js";
+import { internalConversationRouter } from "./routes/internal-conversation.routes.js";
 
 // Cria a aplicação Express.
 export const app = express();
@@ -53,6 +54,7 @@ app.use("/api", requireAuth, pushRouter);
 app.use("/api", requireAuth, messageRouter);
 app.use("/api", requireAuth, transcriptionRouter);
 app.use("/api", requireAuth, aiRouter);
+app.use("/api", requireAuth, internalConversationRouter);
 
 // Compatibilidade com instalações da Evolution que ainda usam a URL antiga.
 app.use(webhookRoutes);
@@ -95,6 +97,35 @@ io.on("connection", (socket) => {
     "Cliente conectado ao WebSocket:",
     socket.id
   );
+
+  async function relayTyping(event: "internal:typing:start" | "internal:typing:stop", payload: unknown) {
+    if (!socket.data.userId || !payload || typeof payload !== "object") return;
+    const input = payload as { organizationId?: unknown; conversationId?: unknown };
+    if (typeof input.organizationId !== "string" || typeof input.conversationId !== "string") return;
+    const participant = await prisma.internalConversationParticipant.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        conversationId: input.conversationId,
+        userId: socket.data.userId,
+      },
+      select: { conversationId: true },
+    });
+    if (!participant) return;
+    const recipients = await prisma.internalConversationParticipant.findMany({
+      where: { organizationId: input.organizationId, conversationId: input.conversationId, userId: { not: socket.data.userId } },
+      select: { userId: true },
+    });
+    for (const recipient of recipients) {
+      io.to(userRoom(recipient.userId)).emit(event, {
+        organizationId: input.organizationId,
+        conversationId: input.conversationId,
+        userId: socket.data.userId,
+      });
+    }
+  }
+
+  socket.on("internal:typing:start", (payload) => void relayTyping("internal:typing:start", payload));
+  socket.on("internal:typing:stop", (payload) => void relayTyping("internal:typing:stop", payload));
 
   // Detecta quando o cliente fecha a conexão.
   socket.on("disconnect", () => {

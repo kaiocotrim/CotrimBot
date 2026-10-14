@@ -113,7 +113,7 @@ export function NotificationCenter({
                       </span>
                       <span className="mt-1 line-clamp-2 block text-xs leading-5 text-zinc-500">{notification.body}</span>
                     </span>
-                    {!notification.readAt && <span aria-label="Não lida" className="mt-3 size-2 shrink-0 rounded-full bg-violet-400" />}
+                    {!notification.readAt && <span aria-label="Não lida" className="mt-3 size-2 shrink-0 rounded-full bg-zinc-400" />}
                   </button>
                 </li>
               );

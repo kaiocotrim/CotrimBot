@@ -86,7 +86,7 @@ export function ChatNavigationRail({
               </span>
             )}
             {id === "notifications" && notificationUnreadCount > 0 && (
-              <span aria-hidden="true" className="absolute -top-0.5 -right-1 flex size-5 min-w-5 items-center justify-center rounded-full border border-[#1a1a1a] bg-violet-300 px-1 text-[10px] font-semibold leading-none text-zinc-950">
+              <span aria-hidden="true" className="absolute -top-0.5 -right-1 flex size-5 min-w-5 items-center justify-center rounded-full border border-[#1a1a1a] bg-zinc-300 px-1 text-[10px] font-semibold leading-none text-zinc-950">
                 {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
               </span>
             )}
@@ -122,7 +122,7 @@ export function ChatNavigationRail({
           <>
             <span aria-hidden="true" className="my-2 h-px w-7 shrink-0 bg-white/[0.1]" />
             <Link
-              href="/empresa"
+              href="/chat-interno"
               aria-label={`Abrir empresa ${company.name}`}
               title={company.name}
               className="flex size-11 shrink-0 items-center justify-center rounded-xl text-zinc-400 transition-colors hover:bg-white/[0.07] hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70"
