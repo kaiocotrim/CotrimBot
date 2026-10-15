@@ -71,9 +71,10 @@ export function useNotifications({ selectedContactId, onOpenContact, onOpenInter
     function handleCreated(notification: AppNotification) {
       setNotifications((current) => [notification, ...current].slice(0, 50));
       setUnreadCount((current) => current + 1);
-      if (isNotificationSoundEnabled()) playNotificationSound();
+      const isAppInBackground = document.visibilityState !== "visible" || !document.hasFocus();
+      if (isAppInBackground && isNotificationSoundEnabled()) playNotificationSound();
 
-      if ("Notification" in window && window.Notification.permission === "granted") {
+      if (isAppInBackground && "Notification" in window && window.Notification.permission === "granted") {
         const desktopNotification = new window.Notification(notification.title, {
           body: notification.body,
           tag: `cotrimbot-${notification.id}`,

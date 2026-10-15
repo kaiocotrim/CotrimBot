@@ -10,7 +10,14 @@ import { EvolutionConnectionSettings } from "@/components/chat/evolution-connect
 import { authClient } from "@/lib/auth-client";
 import { readNotificationPermission } from "@/hooks/use-notifications";
 import { usePushSubscription } from "@/hooks/use-push-subscription";
-import { isNotificationSoundEnabled, playNotificationSound, setNotificationSoundEnabled } from "@/lib/notification-sound";
+import {
+  getNotificationSoundPath,
+  isNotificationSoundEnabled,
+  NOTIFICATION_SOUND_OPTIONS,
+  playNotificationSound,
+  setNotificationSoundEnabled,
+  setNotificationSoundPath,
+} from "@/lib/notification-sound";
 import { PWA_ENABLED, removePushSubscription } from "@/lib/pwa";
 import styles from "./account-settings.module.css";
 
@@ -336,6 +343,7 @@ function SettingsContent({ user }: { user: SettingsUser }) {
 function NotificationSettings() {
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(readNotificationPermission);
   const [soundEnabled, setSoundEnabled] = useState(isNotificationSoundEnabled);
+  const [soundPath, setSoundPath] = useState(getNotificationSoundPath);
 
   async function requestPermission() {
     if (!("Notification" in window)) return "unsupported" as const;
@@ -355,6 +363,12 @@ function NotificationSettings() {
     setNotificationSoundEnabled(next);
     setSoundEnabled(next);
     if (next) playNotificationSound();
+  }
+
+  function changeSound(path: string) {
+    setNotificationSoundPath(path);
+    setSoundPath(path);
+    if (soundEnabled) playNotificationSound();
   }
 
   function sendTest() {
@@ -396,6 +410,14 @@ function NotificationSettings() {
       <section className={styles.card}>
         <h3>Som</h3>
         <p>Toca um aviso sonoro ao receber uma nova notificação.</p>
+        <label className={styles.soundField}>
+          <span>Áudio da notificação</span>
+          <select value={soundPath} onChange={(event) => changeSound(event.target.value)}>
+            {NOTIFICATION_SOUND_OPTIONS.map((option) => (
+              <option key={option.path} value={option.path}>{option.label}</option>
+            ))}
+          </select>
+        </label>
         <button type="button" role="switch" aria-checked={soundEnabled} className={styles.primaryButton} onClick={toggleSound}>
           {soundEnabled ? "Desativar som" : "Ativar som"}
         </button>
