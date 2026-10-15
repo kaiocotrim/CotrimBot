@@ -1,9 +1,10 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
+import { Select } from "@base-ui/react/select";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
-import { BadgeCheck, Bell, Building2, Camera, QrCode, UserRound, X } from "lucide-react";
+import { BadgeCheck, Bell, Building2, Camera, Check, ChevronDown, QrCode, UserRound, Volume2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { EvolutionConnectionSettings } from "@/components/chat/evolution-connection-settings";
@@ -410,17 +411,61 @@ function NotificationSettings() {
       <section className={styles.card}>
         <h3>Som</h3>
         <p>Toca um aviso sonoro ao receber uma nova notificação.</p>
-        <label className={styles.soundField}>
-          <span>Áudio da notificação</span>
-          <select value={soundPath} onChange={(event) => changeSound(event.target.value)}>
-            {NOTIFICATION_SOUND_OPTIONS.map((option) => (
-              <option key={option.path} value={option.path}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-        <button type="button" role="switch" aria-checked={soundEnabled} className={styles.primaryButton} onClick={toggleSound}>
-          {soundEnabled ? "Desativar som" : "Ativar som"}
-        </button>
+        <div className={styles.soundSettings}>
+          <Select.Root
+            items={NOTIFICATION_SOUND_OPTIONS.map((option) => ({ value: option.path, label: option.label }))}
+            value={soundPath}
+            onValueChange={(value) => {
+              if (value) changeSound(value);
+            }}
+          >
+            <div className={styles.soundField}>
+              <Select.Label className={styles.soundLabel}>Áudio da notificação</Select.Label>
+              <Select.Trigger className={styles.soundTrigger}>
+                <Volume2 aria-hidden="true" className={styles.soundTriggerIcon} />
+                <Select.Value className={styles.soundValue} />
+                <Select.Icon className={styles.soundChevron}>
+                  <ChevronDown aria-hidden="true" />
+                </Select.Icon>
+              </Select.Trigger>
+            </div>
+            <Select.Portal>
+              <Select.Positioner sideOffset={8} align="start" alignItemWithTrigger={false} className={styles.soundPositioner}>
+                <Select.Popup className={styles.soundPopup}>
+                  <Select.List className={styles.soundList}>
+                    {NOTIFICATION_SOUND_OPTIONS.map((option) => (
+                      <Select.Item key={option.path} value={option.path} className={styles.soundOption}>
+                        <Select.ItemText>{option.label}</Select.ItemText>
+                        <Select.ItemIndicator className={styles.soundOptionIndicator}>
+                          <Check aria-hidden="true" />
+                        </Select.ItemIndicator>
+                      </Select.Item>
+                    ))}
+                  </Select.List>
+                </Select.Popup>
+              </Select.Positioner>
+            </Select.Portal>
+          </Select.Root>
+
+          <div className={styles.soundToggleRow}>
+            <div>
+              <span className={styles.soundToggleTitle}>Reproduzir sons</span>
+              <span className={styles.soundToggleHint}>
+                {soundEnabled ? "Ativado para novas notificações" : "Nenhum som será reproduzido"}
+              </span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={soundEnabled}
+              aria-label={soundEnabled ? "Desativar som" : "Ativar som"}
+              className={styles.soundSwitch}
+              onClick={toggleSound}
+            >
+              <span className={styles.soundSwitchThumb} />
+            </button>
+          </div>
+        </div>
       </section>
     </>
   );
