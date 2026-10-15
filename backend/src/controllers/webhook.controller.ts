@@ -11,6 +11,7 @@ import {
   isViewOnceMessage,
   unwrapWhatsAppMessage,
 } from "../utils/whatsapp-message.js";
+import { normalizeWhatsAppJid, whatsAppJidIdentifier } from "../utils/whatsapp-jid.js";
 
 // Impede que sincronizações da Evolution repovoem o banco com o histórico antigo.
 // Mantemos uma pequena tolerância para mensagens que estavam em trânsito no reinício.
@@ -158,12 +159,13 @@ export async function whatsappWebhook(req: Request, res: Response) {
       const jids = getPresenceJids(update);
       if (!presence || !jids.length) continue;
 
-      const phones = jids.map((jid) => jid.endsWith("@g.us") ? jid : jid.replace("@s.whatsapp.net", ""));
+      const normalizedJids = jids.map(normalizeWhatsAppJid);
+      const phones = normalizedJids.map(whatsAppJidIdentifier);
       const contact = await prisma.contact.findFirst({
         where: {
           OR: [
             { phone: { in: phones } },
-            { whatsappLid: { in: jids } },
+            { whatsappLid: { in: normalizedJids } },
           ],
         },
       });
@@ -182,13 +184,11 @@ export async function whatsappWebhook(req: Request, res: Response) {
   if (body.event === "chats.update" || body.event === "chats.upsert") {
     const chats = Array.isArray(body.data) ? body.data : [body.data];
     for (const chat of chats) {
-      const remoteJid = chat?.id ?? chat?.remoteJid;
+      const rawRemoteJid = chat?.id ?? chat?.remoteJid;
       const archived = chat?.archive ?? chat?.archived;
-      if (typeof remoteJid !== "string" || typeof archived !== "boolean") continue;
+      if (typeof rawRemoteJid !== "string" || typeof archived !== "boolean") continue;
 
-      const phone = remoteJid.endsWith("@g.us")
-        ? remoteJid
-        : remoteJid.replace("@s.whatsapp.net", "");
+      const phone = whatsAppJidIdentifier(rawRemoteJid);
       const contact = await prisma.contact.findUnique({ where: { phone } });
       if (!contact || contact.archived === archived) continue;
 
@@ -267,8 +267,10 @@ export async function whatsappWebhook(req: Request, res: Response) {
     ? getQuotedContent(replyContextInfo.quotedMessage)
     : null;
 
-  const remoteJid = data.key?.remoteJid;
-  const remoteJidAlt = data.key?.remoteJidAlt;
+  const rawRemoteJid = data.key?.remoteJid;
+  const rawRemoteJidAlt = data.key?.remoteJidAlt;
+  const remoteJid = typeof rawRemoteJid === "string" ? normalizeWhatsAppJid(rawRemoteJid) : null;
+  const remoteJidAlt = typeof rawRemoteJidAlt === "string" ? normalizeWhatsAppJid(rawRemoteJidAlt) : null;
   const fromMe = data.key?.fromMe === true;
 
   // Ignora mensagens sem identificação.
@@ -325,8 +327,14 @@ export async function whatsappWebhook(req: Request, res: Response) {
   const externalId = data.key?.id;
 
   const isGroup = contactJid.endsWith("@g.us");
-  const primaryParticipantJid = isGroup ? data.key?.participant ?? data.participant : null;
-  const alternateParticipantJid = isGroup ? data.key?.participantAlt : null;
+  const rawPrimaryParticipantJid = isGroup ? data.key?.participant ?? data.participant : null;
+  const rawAlternateParticipantJid = isGroup ? data.key?.participantAlt : null;
+  const primaryParticipantJid = typeof rawPrimaryParticipantJid === "string"
+    ? normalizeWhatsAppJid(rawPrimaryParticipantJid)
+    : null;
+  const alternateParticipantJid = typeof rawAlternateParticipantJid === "string"
+    ? normalizeWhatsAppJid(rawAlternateParticipantJid)
+    : null;
   const participantJid = typeof primaryParticipantJid === "string"
     && primaryParticipantJid.endsWith("@lid")
     && typeof alternateParticipantJid === "string"
@@ -334,15 +342,15 @@ export async function whatsappWebhook(req: Request, res: Response) {
       ? alternateParticipantJid
       : primaryParticipantJid ?? alternateParticipantJid;
   const senderPhone = typeof participantJid === "string"
-    ? participantJid.replace("@s.whatsapp.net", "").replace("@lid", "")
+    ? whatsAppJidIdentifier(participantJid)
     : null;
   const senderIdentifiers = [...new Set([
     senderPhone,
     typeof primaryParticipantJid === "string"
-      ? primaryParticipantJid.replace("@s.whatsapp.net", "").replace("@lid", "")
+      ? whatsAppJidIdentifier(primaryParticipantJid)
       : null,
     typeof alternateParticipantJid === "string"
-      ? alternateParticipantJid.replace("@s.whatsapp.net", "").replace("@lid", "")
+      ? whatsAppJidIdentifier(alternateParticipantJid)
       : null,
   ].filter((identifier): identifier is string => Boolean(identifier)))];
   const savedSender = isGroup && !fromMe && senderPhone
@@ -447,7 +455,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
   }
 
   // Contatos usam somente o número; grupos preservam o JID necessário para responder.
-  const phone = isGroup ? contactJid : contactJid.replace("@s.whatsapp.net", "");
+  const phone = whatsAppJidIdentifier(contactJid);
 
   // Ignora mensagens sem ID.
   if (!externalId) {
@@ -478,7 +486,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
         : null;
       const contact = await prisma.contact.findUnique({ where: { id: existingMessage.contactId } });
       const quotedParticipant = typeof replyContextInfo.participant === "string"
-        ? replyContextInfo.participant.replace("@s.whatsapp.net", "").replace("@lid", "")
+        ? whatsAppJidIdentifier(replyContextInfo.participant)
         : null;
       const quotedSenderName = quotedMessage
         ? quotedMessage.direction === "OUTGOING" ? "Você" : quotedMessage.senderName ?? (contact ? contactDisplayName(contact) : null)
@@ -553,7 +561,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
     ? await prisma.message.findFirst({ where: { externalId: quotedExternalId, contactId: contact.id } })
     : null;
   const quotedParticipant = replyContextInfo && typeof replyContextInfo.participant === "string"
-    ? replyContextInfo.participant.replace("@s.whatsapp.net", "").replace("@lid", "")
+    ? whatsAppJidIdentifier(replyContextInfo.participant)
     : null;
   const quotedSenderName = replyContextInfo
     ? quotedMessage
