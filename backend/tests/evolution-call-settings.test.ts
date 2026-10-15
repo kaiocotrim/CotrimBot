@@ -71,7 +71,9 @@ test("salva a recusa sem alterar as demais configurações e confirma a persist�
     const body = init?.body ? JSON.parse(String(init.body)) as typeof currentSettings : undefined;
     calls.push({ url: String(input), method, ...(body ? { body } : {}) });
     if (method === "POST" && body) persisted = body;
-    return Response.json(method === "POST" ? { settings: persisted } : persisted, { status: method === "POST" ? 201 : 200 });
+    return method === "POST"
+      ? new Response(null, { status: 201 })
+      : Response.json(persisted);
   };
 
   try {

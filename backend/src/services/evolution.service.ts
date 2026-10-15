@@ -545,6 +545,11 @@ async function requestEvolutionSettings(method: "GET" | "POST", body?: Evolution
       throw new EvolutionSettingsError(code, `A Evolution API recusou a operação (${response.status}).`);
     }
 
+    // O endpoint /settings/set pode confirmar com 201 e corpo vazio em algumas
+    // instalações da Evolution 2.3.7. O resultado efetivo é validado pelo GET
+    // executado logo depois, portanto não dependemos do corpo do POST.
+    if (method === "POST") return null;
+
     return await response.json() as unknown;
   } catch (error) {
     if (error instanceof EvolutionSettingsError) throw error;
