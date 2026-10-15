@@ -423,3 +423,172 @@ export async function sendWhatsAppMedia({
 
   return response.json();
 }
+
+const EVOLUTION_SETTINGS_TIMEOUT_MS = 10_000;
+
+export const DEFAULT_CALL_REJECTION_MESSAGE =
+  "Olá! Agradecemos seu contato. No momento, nosso atendimento é realizado exclusivamente por mensagens, por isso não recebemos ligações. Por favor, envie sua solicitação por aqui.";
+
+type EvolutionInstanceSettings = {
+  rejectCall: boolean;
+  msgCall?: string;
+  groupsIgnore: boolean;
+  alwaysOnline: boolean;
+  readMessages: boolean;
+  readStatus: boolean;
+  syncFullHistory: boolean;
+  wavoipToken?: string;
+};
+
+export type WhatsAppCallSettings = {
+  rejectCall: boolean;
+  msgCall: string;
+};
+
+export type EvolutionSettingsErrorCode =
+  | "configuration"
+  | "authentication"
+  | "timeout"
+  | "unavailable"
+  | "invalid_response"
+  | "not_confirmed";
+
+export class EvolutionSettingsError extends Error {
+  constructor(public readonly code: EvolutionSettingsErrorCode, message: string) {
+    super(message);
+    this.name = "EvolutionSettingsError";
+  }
+}
+
+function getEvolutionSettingsConfig() {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE;
+
+  if (!apiUrl || !apiKey || !instance) {
+    throw new EvolutionSettingsError("configuration", "Configuração da Evolution API incompleta.");
+  }
+
+  return { apiUrl: apiUrl.replace(/\/$/, ""), apiKey, instance };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseEvolutionSettings(value: unknown): EvolutionInstanceSettings {
+  const candidate = isRecord(value) && isRecord(value.settings) ? value.settings : value;
+  if (!isRecord(candidate)) {
+    throw new EvolutionSettingsError("invalid_response", "A Evolution API retornou configurações inválidas.");
+  }
+
+  const requiredBooleans = [
+    "rejectCall",
+    "groupsIgnore",
+    "alwaysOnline",
+    "readMessages",
+    "readStatus",
+    "syncFullHistory",
+  ] as const;
+
+  for (const field of requiredBooleans) {
+    if (typeof candidate[field] !== "boolean") {
+      throw new EvolutionSettingsError(
+        "invalid_response",
+        `A Evolution API não retornou a configuração obrigatória ${field}.`,
+      );
+    }
+  }
+
+  if (candidate.msgCall !== undefined && typeof candidate.msgCall !== "string") {
+    throw new EvolutionSettingsError("invalid_response", "A Evolution API retornou uma mensagem de chamada inválida.");
+  }
+  if (candidate.wavoipToken !== undefined && typeof candidate.wavoipToken !== "string") {
+    throw new EvolutionSettingsError("invalid_response", "A Evolution API retornou uma configuração de chamada inválida.");
+  }
+
+  return {
+    rejectCall: candidate.rejectCall as boolean,
+    groupsIgnore: candidate.groupsIgnore as boolean,
+    alwaysOnline: candidate.alwaysOnline as boolean,
+    readMessages: candidate.readMessages as boolean,
+    readStatus: candidate.readStatus as boolean,
+    syncFullHistory: candidate.syncFullHistory as boolean,
+    ...(candidate.msgCall !== undefined ? { msgCall: candidate.msgCall } : {}),
+    ...(candidate.wavoipToken !== undefined ? { wavoipToken: candidate.wavoipToken } : {}),
+  };
+}
+
+async function requestEvolutionSettings(method: "GET" | "POST", body?: EvolutionInstanceSettings) {
+  const { apiUrl, apiKey, instance } = getEvolutionSettingsConfig();
+
+  try {
+    const response = await fetch(
+      `${apiUrl}/settings/${method === "GET" ? "find" : "set"}/${encodeURIComponent(instance)}`,
+      {
+        method,
+        headers: {
+          apikey: apiKey,
+          ...(body ? { "Content-Type": "application/json" } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        signal: AbortSignal.timeout(EVOLUTION_SETTINGS_TIMEOUT_MS),
+      },
+    );
+
+    if (!response.ok) {
+      const code = response.status === 401 || response.status === 403
+        ? "authentication"
+        : response.status >= 500
+          ? "unavailable"
+          : "invalid_response";
+      throw new EvolutionSettingsError(code, `A Evolution API recusou a operação (${response.status}).`);
+    }
+
+    return await response.json() as unknown;
+  } catch (error) {
+    if (error instanceof EvolutionSettingsError) throw error;
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      throw new EvolutionSettingsError("timeout", "A Evolution API demorou demais para responder.");
+    }
+    throw new EvolutionSettingsError("unavailable", "Não foi possível conectar à Evolution API.");
+  }
+}
+
+async function findEvolutionSettings() {
+  return parseEvolutionSettings(await requestEvolutionSettings("GET"));
+}
+
+export async function getWhatsAppCallSettings(): Promise<WhatsAppCallSettings> {
+  const settings = await findEvolutionSettings();
+  return {
+    rejectCall: settings.rejectCall,
+    msgCall: settings.msgCall ?? "",
+  };
+}
+
+export async function updateWhatsAppCallSettings(
+  input: WhatsAppCallSettings,
+): Promise<WhatsAppCallSettings> {
+  // A Evolution 2.3.7 exige todos os booleanos do objeto de configurações.
+  // Ler e mesclar antes do POST evita redefinir preferências não relacionadas.
+  const current = await findEvolutionSettings();
+  const next: EvolutionInstanceSettings = {
+    ...current,
+    rejectCall: input.rejectCall,
+    msgCall: input.msgCall,
+  };
+
+  await requestEvolutionSettings("POST", next);
+
+  // O painel só recebe sucesso depois de reler o valor persistido pela Evolution.
+  const confirmed = await getWhatsAppCallSettings();
+  if (confirmed.rejectCall !== input.rejectCall || confirmed.msgCall !== input.msgCall) {
+    throw new EvolutionSettingsError(
+      "not_confirmed",
+      "A Evolution API não confirmou as configurações de chamadas.",
+    );
+  }
+
+  return confirmed;
+}

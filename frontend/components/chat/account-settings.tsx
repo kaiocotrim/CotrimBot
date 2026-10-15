@@ -4,10 +4,11 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Select } from "@base-ui/react/select";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
-import { BadgeCheck, Bell, Building2, Camera, Check, ChevronDown, QrCode, UserRound, Volume2, X } from "lucide-react";
+import { BadgeCheck, Bell, Building2, Camera, Check, ChevronDown, PhoneOff, QrCode, UserRound, Volume2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { EvolutionConnectionSettings } from "@/components/chat/evolution-connection-settings";
+import { EvolutionCallSettings } from "@/components/chat/evolution-call-settings";
 import { authClient } from "@/lib/auth-client";
 import { readNotificationPermission } from "@/hooks/use-notifications";
 import { usePushSubscription } from "@/hooks/use-push-subscription";
@@ -79,6 +80,7 @@ const sections = [
   { value: "notifications", label: "Notificações", icon: Bell },
   { value: "pro", label: "Conta Pro", icon: BadgeCheck },
   { value: "whatsapp", label: "WhatsApp", icon: QrCode },
+  { value: "calls", label: "Chamadas", icon: PhoneOff },
   { value: "business", label: "Empresa", icon: Building2 },
 ] as const;
 
@@ -133,7 +135,7 @@ function SettingsContent({ user }: { user: SettingsUser }) {
   const accountChanged = nameChanged || avatarChanged;
   const availableSections = user.role === "admin"
     ? sections
-    : sections.filter((item) => item.value !== "whatsapp");
+    : sections.filter((item) => item.value !== "whatsapp" && item.value !== "calls");
 
   function changeSection(value: Section) {
     if (value === "business") {
@@ -332,6 +334,12 @@ function SettingsContent({ user }: { user: SettingsUser }) {
           {user.role === "admin" && (
             <Tabs.Panel value="whatsapp" className={styles.panel}>
               <EvolutionConnectionSettings />
+            </Tabs.Panel>
+          )}
+
+          {user.role === "admin" && (
+            <Tabs.Panel value="calls" className={styles.panel}>
+              <EvolutionCallSettings />
             </Tabs.Panel>
           )}
 
