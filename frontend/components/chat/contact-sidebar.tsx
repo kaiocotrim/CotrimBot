@@ -14,7 +14,9 @@ import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
 import { authClient, useSession } from "@/lib/auth-client";
 import { getMessages } from "@/lib/chat-api";
 import { getContactPriorityDetails } from "@/lib/contact-priority";
+import { preloadInternalChat, setInternalChatIdentity } from "@/lib/internal-chat-api";
 import type { AppNotification } from "@/lib/notification-api";
+import { systemMessageLabel } from "@/lib/system-message";
 import type { Contact, Message } from "@/types/chat";
 
 type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string, jobTitle?: string) => Promise<Contact[]>; onArchiveContact: (contact: Contact, archived: boolean) => Promise<void>; onPinContact: (contact: Contact, pinned: boolean) => Promise<void>; headerActions?: ReactNode; mobileOpen: boolean; revealForSwipe: boolean; onMobileOpenChange: (open: boolean) => void; notifications: AppNotification[]; notificationUnreadCount: number; notificationPermission: NotificationPermission | "unsupported"; onRequestNotificationPermission: () => void; onOpenNotification: (notification: AppNotification) => void; onMarkAllNotificationsRead: () => void; onClearNotifications: () => void };
@@ -104,17 +106,28 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   const archivedCount = contacts.filter((contact) => contact.archived).length;
 
   useEffect(() => {
+    if (activeOrganizationId) {
+      setInternalChatIdentity({ userId, activeOrganizationId });
+      void preloadInternalChat(activeOrganizationId).catch(() => undefined);
+    }
+  }, [activeOrganizationId, userId]);
+
+  useEffect(() => {
     let active = true;
     void authClient.organization.list().then(({ data }) => {
       if (!active) return;
       const organizations = (data ?? []) as Array<{ id: string; name: string; logo?: string | null }>;
       const organization = organizations.find((item) => item.id === activeOrganizationId) ?? organizations[0];
       setCompanyBrand(organization ? { name: organization.name, logo: organization.logo ?? null } : null);
+      if (organization) {
+        setInternalChatIdentity({ userId, activeOrganizationId: organization.id });
+        void preloadInternalChat(organization.id).catch(() => undefined);
+      }
     }).catch(() => {
       if (active) setCompanyBrand(null);
     });
     return () => { active = false; };
-  }, [activeOrganizationId]);
+  }, [activeOrganizationId, userId]);
 
   useEffect(() => {
     if (conversationMenuContactId === null) return;
@@ -930,7 +943,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                       <div className="mt-0.5 flex items-center gap-2 pr-7">
                         <p className="min-w-0 flex-1 truncate text-sm leading-tight font-normal text-zinc-400 lg:text-[12px] lg:text-zinc-500">
                           {lastMessage && !lastMessage.deletedAt && lastMessage.direction === "OUTGOING" && "✓✓ "}
-                          <MessageText content={lastMessage ? lastMessage.deletedAt ? "Mensagem apagada" : lastMessage.content : "Nenhuma mensagem"} showSignature={Boolean(lastMessage && !lastMessage.deletedAt && !lastMessage.private && lastMessage.direction === "OUTGOING")} linkify={false} />
+                          <MessageText content={lastMessage ? lastMessage.deletedAt ? "Mensagem apagada" : lastMessage.type === "SYSTEM" ? systemMessageLabel(lastMessage.content, userId) : lastMessage.content : "Nenhuma mensagem"} showSignature={Boolean(lastMessage && !lastMessage.deletedAt && !lastMessage.private && lastMessage.direction === "OUTGOING")} linkify={false} />
                         </p>
                         {unread && (
                           <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-zinc-300 px-1.5 text-[10px] font-semibold text-zinc-950">
@@ -1058,6 +1071,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
         </CompactScrollArea>
         <QuickConversationPreview
           contact={previewContact}
+          userId={userId}
           messages={previewMessages}
           loading={previewLoading}
           error={previewError}

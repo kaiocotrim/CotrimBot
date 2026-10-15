@@ -31,6 +31,19 @@ export type InternalConversation = {
   archived?: boolean;
 };
 
+export type InternalChatBootstrap = {
+  conversations: InternalConversation[];
+  members: InternalMember[];
+  initialConversationId: string | null;
+  initialMessages: InternalMessage[];
+  initialMessagesHasMore: boolean;
+};
+
+export type InternalChatIdentity = {
+  userId: string;
+  activeOrganizationId: string | null;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -62,11 +75,47 @@ function base(organizationId: string) {
   return `/organizations/${encodeURIComponent(organizationId)}/internal-conversations`;
 }
 
+const bootstrapCache = new Map<string, InternalChatBootstrap>();
+const bootstrapRequests = new Map<string, Promise<InternalChatBootstrap>>();
+let internalChatIdentity: InternalChatIdentity | null = null;
+
+export function getInternalChatIdentity() {
+  return internalChatIdentity;
+}
+
+export function setInternalChatIdentity(identity: InternalChatIdentity | null) {
+  internalChatIdentity = identity;
+}
+
+export function getCachedInternalChatBootstrap(organizationId?: string | null) {
+  return organizationId ? bootstrapCache.get(organizationId) ?? null : null;
+}
+
+export function preloadInternalChat(organizationId: string, force = false) {
+  if (!force) {
+    const cached = bootstrapCache.get(organizationId);
+    if (cached) return Promise.resolve(cached);
+    const pending = bootstrapRequests.get(organizationId);
+    if (pending) return pending;
+  }
+  const pending = request<InternalChatBootstrap>(`${base(organizationId)}/bootstrap`)
+    .then((result) => {
+      bootstrapCache.set(organizationId, result);
+      return result;
+    })
+    .finally(() => bootstrapRequests.delete(organizationId));
+  bootstrapRequests.set(organizationId, pending);
+  return pending;
+}
+
 export function internalMediaUrl(organizationId: string, conversationId: string, messageId: number) {
   return `${API_URL}${base(organizationId)}/${conversationId}/messages/${messageId}/media`;
 }
 
 export const internalChatApi = {
+  bootstrap(organizationId: string, force = false) {
+    return preloadInternalChat(organizationId, force);
+  },
   list(organizationId: string) {
     return request<{ conversations: InternalConversation[] }>(base(organizationId));
   },
@@ -115,6 +164,9 @@ export const internalChatApi = {
   },
   preferences(organizationId: string, conversationId: string, input: { pinned?: boolean; archived?: boolean }) {
     return request<{ pinned: boolean; archived: boolean }>(`${base(organizationId)}/${conversationId}/preferences`, { method: "PATCH", body: JSON.stringify(input) });
+  },
+  avatar(organizationId: string, conversationId: string, avatarUrl: string | null) {
+    return request<{ conversation: InternalConversation }>(`${base(organizationId)}/${conversationId}/avatar`, { method: "PATCH", body: JSON.stringify({ avatarUrl }) });
   },
   deleteMessage(organizationId: string, conversationId: string, messageId: number) {
     return request<{ messageId: number }>(`${base(organizationId)}/${conversationId}/messages/${messageId}`, { method: "DELETE" });

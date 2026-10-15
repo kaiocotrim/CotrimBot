@@ -4,10 +4,12 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { RefObject } from "react";
 import { Avatar } from "@/components/chat/avatar";
 import { MessageText } from "@/components/chat/message-text";
+import { systemMessageLabel } from "@/lib/system-message";
 import type { Contact, Message } from "@/types/chat";
 
 type QuickConversationPreviewProps = {
   contact: Contact | null;
+  userId: string;
   messages: Message[];
   loading: boolean;
   error: string | null;
@@ -15,7 +17,7 @@ type QuickConversationPreviewProps = {
   onOpenConversation: (contact: Contact) => void;
 };
 
-export function QuickConversationPreview({ contact, messages, loading, error, panelRef, onOpenConversation }: QuickConversationPreviewProps) {
+export function QuickConversationPreview({ contact, userId, messages, loading, error, panelRef, onOpenConversation }: QuickConversationPreviewProps) {
   const reduceMotion = useReducedMotion();
 
   return (
@@ -62,7 +64,7 @@ export function QuickConversationPreview({ contact, messages, loading, error, pa
                     return (
                       <div key={message.id} className={`flex ${outgoing ? "justify-end" : "justify-start"}`}>
                         <p className={`line-clamp-2 max-w-[88%] rounded-xl bg-zinc-800 px-3 py-2 text-[12px] leading-[1.35] text-white ${outgoing ? "rounded-br-sm" : "rounded-bl-sm"}`}>
-                          <MessageText content={message.deletedAt ? "Mensagem apagada" : message.content} showSignature={outgoing && !message.deletedAt && !message.private} linkify={false} />
+                          <MessageText content={message.deletedAt ? "Mensagem apagada" : message.type === "SYSTEM" ? systemMessageLabel(message.content, userId) : message.content} showSignature={outgoing && !message.deletedAt && !message.private} linkify={false} />
                         </p>
                       </div>
                     );

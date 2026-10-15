@@ -122,6 +122,62 @@ function emitToParticipants(conversation: { participants: Array<{ userId: string
   }
 }
 
+internalConversationRouter.get("/organizations/:organizationId/internal-conversations/bootstrap", async (request, response) => {
+  const { organizationId } = request.params;
+  const userId = request.user?.id;
+  if (!userId) return response.status(401).json({ error: "Não autenticado." });
+  if (!await membership(organizationId, userId)) return response.status(403).json({ error: "Você não pertence a esta empresa." });
+
+  const [members, conversations] = await Promise.all([
+    prisma.member.findMany({
+      where: { organizationId },
+      orderBy: [{ displayName: "asc" }, { createdAt: "asc" }],
+      select: {
+        userId: true,
+        displayName: true,
+        role: true,
+        user: { select: { id: true, name: true, email: true, image: true } },
+      },
+    }),
+    prisma.internalConversation.findMany({
+      where: { organizationId, participants: { some: { userId } } },
+      orderBy: { updatedAt: "desc" },
+      include: conversationInclude,
+    }),
+  ]);
+
+  const initialConversationId = conversations[0]?.id ?? null;
+  const initialMessageRows = initialConversationId
+    ? await prisma.internalMessage.findMany({
+        where: { organizationId, conversationId: initialConversationId },
+        orderBy: { id: "desc" },
+        take: 51,
+        include: messageInclude,
+      })
+    : [];
+  const initialMessagesHasMore = initialMessageRows.length > 50;
+
+  return response.json({
+    members,
+    conversations: conversations.map((conversation) => {
+      const item = publicConversation(conversation);
+      const participant = conversation.participants.find((entry) => entry.userId === userId);
+      const lastMessage = conversation.messages[0];
+      return {
+        ...item,
+        pinned: participant?.pinned ?? false,
+        archived: participant?.archived ?? false,
+        unreadCount: participant?.lastReadAt && lastMessage
+          ? (lastMessage.createdAt > participant.lastReadAt ? 1 : 0)
+          : lastMessage && lastMessage.senderId !== userId ? 1 : 0,
+      };
+    }),
+    initialConversationId,
+    initialMessages: initialMessageRows.slice(0, 50).reverse(),
+    initialMessagesHasMore,
+  });
+});
+
 internalConversationRouter.get("/organizations/:organizationId/internal-conversations/members", async (request, response) => {
   const { organizationId } = request.params;
   const userId = request.user?.id;
@@ -187,6 +243,34 @@ internalConversationRouter.patch("/organizations/:organizationId/internal-conver
     select: { pinned: true, archived: true },
   });
   return response.json(participant);
+});
+
+internalConversationRouter.patch("/organizations/:organizationId/internal-conversations/:conversationId/avatar", async (request, response) => {
+  const { organizationId, conversationId } = request.params;
+  const userId = request.user?.id;
+  const avatarUrl = request.body?.avatarUrl;
+  if (!userId) return response.status(401).json({ error: "Não autenticado." });
+  if (avatarUrl !== null && typeof avatarUrl !== "string") {
+    return response.status(400).json({ error: "Foto inválida." });
+  }
+  if (typeof avatarUrl === "string") {
+    const match = avatarUrl.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/);
+    if (!match || avatarUrl.length > 60_000 || Buffer.from(match[2]!, "base64").byteLength > 45_000) {
+      return response.status(400).json({ error: "Use uma imagem JPG, PNG ou WebP de até 5 MB." });
+    }
+  }
+
+  const conversation = await conversationAccess(organizationId, conversationId, userId);
+  if (!conversation) return response.status(404).json({ error: "Conversa não encontrada." });
+  const participant = conversation.participants.find((item) => item.userId === userId);
+  if (conversation.type !== "GROUP" || participant?.role !== "ADMIN") {
+    return response.status(403).json({ error: "Apenas administradores podem alterar a foto do grupo." });
+  }
+
+  await prisma.internalConversation.update({ where: { id: conversationId }, data: { avatarUrl } });
+  const updated = await prisma.internalConversation.findUniqueOrThrow({ where: { id: conversationId }, include: conversationInclude });
+  emitToParticipants(updated, "internal:conversation:updated", { organizationId, conversationId });
+  return response.json({ conversation: publicConversation(updated) });
 });
 
 internalConversationRouter.post("/organizations/:organizationId/internal-conversations", async (request, response) => {
