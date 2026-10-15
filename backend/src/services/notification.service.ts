@@ -18,7 +18,7 @@ export function userRoom(userId: string) {
 
 type NewNotification = {
   userId: string;
-  type: Exclude<NotificationType, "NEW_MESSAGE">;
+  type: NotificationType;
   title: string;
   body: string;
   contactId?: number;
@@ -174,13 +174,13 @@ export function notifyIncomingMessage(
 
       const preview = message.content.trim() || `[${message.type.toLowerCase()}]`;
       const body = preview.length > 140 ? `${preview.slice(0, 137)}...` : preview;
-      // Mensagens são apenas push: não entram na central de notificações.
+      // Além do push, cria a notificação para o socket tocar o som com o app aberto.
       await processInBatches(
         recipients,
         ({ userId }) =>
           safely(
-            sendPushToUser(userId, {
-              id: null,
+            createNotification({
+              userId,
               type: "NEW_MESSAGE",
               title: contactDisplayName(contact),
               body,

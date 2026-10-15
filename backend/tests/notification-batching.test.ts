@@ -137,8 +137,16 @@ test("mensagem recebida limita também a concorrência dos lotes aninhados de pu
 
   assert.equal(peak, 5);
   assert.deepEqual(queriedUsers, users);
-  assert.equal(createdUsers.length, 0);
-  assert.ok(delivered.every((delivery) => delivery.payload === JSON.stringify(payload)));
+  assert.deepEqual(createdUsers, users);
+  assert.deepEqual(emittedRooms, users.map((userId) => `user:${userId}`));
+  assert.ok(delivered.every((delivery) => {
+    const deliveredPayload = JSON.parse(delivery.payload) as Record<string, unknown>;
+    return deliveredPayload.id === 1
+      && deliveredPayload.type === "NEW_MESSAGE"
+      && deliveredPayload.title === contact.name
+      && deliveredPayload.body === payload.body
+      && deliveredPayload.contactId === contact.id;
+  }));
 });
 
 test("resposta gera notificação sonora para o autor da mensagem original", async () => {
@@ -196,7 +204,7 @@ test("falha de banco para um destinatário não interrompe os próximos destinat
   await waitForDeliveries((users.length - 1) * subscriptions.length);
 
   assert.equal(peak, 5);
-  assert.deepEqual(queriedUsers, users);
+  assert.deepEqual(queriedUsers, users.filter((userId) => userId !== failedUser));
   assert.equal(logged.mock.callCount(), 1);
 });
 
