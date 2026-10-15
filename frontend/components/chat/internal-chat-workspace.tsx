@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { Dialog } from "@base-ui/react/dialog";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Archive, ArchiveRestore, ArrowDown, ArrowLeft, Camera, CheckCheck, ChevronDown, Copy, EllipsisVertical, Info, LockKeyhole, MessageCircle, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Reply, Search, Trash2, UserRoundPlus, UsersRound, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Archive, ArchiveRestore, ArrowDown, ArrowLeft, Camera, CheckCheck, ChevronDown, Copy, EllipsisVertical, Forward, Info, LockKeyhole, MessageCircle, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Reply, Search, Send, Smile, Star, Trash2, UserRoundPlus, UsersRound, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
 import { EmptyChatAnimation } from "@/components/chat/empty-chat-animation";
+import { EmojiText } from "@/components/chat/emoji-text";
 import { MessageText } from "@/components/chat/message-text";
 import { MessageComposer } from "@/components/chat/message-composer";
 import { InternalMediaContent } from "@/components/chat/internal-media-content";
@@ -54,6 +57,10 @@ function sidebarDate(value: string) {
   return label === "Hoje" ? timeFormatter.format(new Date(value)) : label;
 }
 
+function isMessagePinned(message: InternalMessage) {
+  return Boolean(message.pinned && (!message.pinnedUntil || new Date(message.pinnedUntil).getTime() > Date.now()));
+}
+
 function composerReply(message: InternalMessage | null, userId?: string): Pick<Message, "id" | "type" | "content" | "direction" | "senderName" | "private"> | null {
   if (!message) return null;
   const mime = message.media?.mimeType ?? "";
@@ -61,7 +68,7 @@ function composerReply(message: InternalMessage | null, userId?: string): Pick<M
   return { id: message.id, type, content: message.content, direction: message.senderId === userId ? "OUTGOING" : "INCOMING", senderName: message.sender.name, private: message.private };
 }
 
-const menuItemClass = "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.07] focus-visible:outline-none";
+const menuItemClass = "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-zinc-200 transition-colors hover:bg-white/[0.08] focus-visible:bg-white/[0.08] focus-visible:outline-none";
 
 function MemberContactRow({ member, collapsed, onOpen }: { member: InternalMember; collapsed: boolean; onOpen: () => void }) {
   const name = member.displayName || member.user.name;
@@ -146,6 +153,16 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [rowMenuId, setRowMenuId] = useState<string | null>(null);
   const [messageMenuId, setMessageMenuId] = useState<number | null>(null);
+  const [reactionMenuId, setReactionMenuId] = useState<number | null>(null);
+  const [reactionPosition, setReactionPosition] = useState({ top: 0, left: 0 });
+  const [reactingMessageId, setReactingMessageId] = useState<number | null>(null);
+  const [forwardingMessage, setForwardingMessage] = useState<InternalMessage | null>(null);
+  const [pinningMessage, setPinningMessage] = useState<InternalMessage | null>(null);
+  const [pinDurationHours, setPinDurationHours] = useState<24 | 168 | 720>(168);
+  const [forwardTargetId, setForwardTargetId] = useState<string | null>(null);
+  const [forwardQuery, setForwardQuery] = useState("");
+  const [messageActionBusy, setMessageActionBusy] = useState<number | null>(null);
+  const [forwarding, setForwarding] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [groupAvatarError, setGroupAvatarError] = useState<string | null>(null);
   const [updatingGroupAvatar, setUpdatingGroupAvatar] = useState(false);
@@ -163,6 +180,7 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
   const suppressConversationClickRef = useRef<string | null>(null);
   const previewRequestRef = useRef(0);
   const previewPanelRef = useRef<HTMLElement>(null);
+  const reactionPickerRef = useRef<HTMLDivElement>(null);
   const groupAvatarInputRef = useRef<HTMLInputElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const headerRef = useRef<HTMLElement>(null);
@@ -317,6 +335,9 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
         setHeaderMenuOpen(false);
         setRowMenuId(null);
         setMessageMenuId(null);
+        setReactionMenuId(null);
+        setForwardingMessage(null);
+        setPinningMessage(null);
         setSearchOpen(false);
         setInfoOpen(false);
         setGroupOpen(false);
@@ -326,6 +347,39 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
     window.addEventListener("keydown", closeMenus);
     return () => window.removeEventListener("keydown", closeMenus);
   }, []);
+
+  useEffect(() => {
+    if (messageMenuId === null) return;
+    function closeMessageMenu(event: PointerEvent) {
+      if (!(event.target as Element).closest("[data-internal-message-menu]")) {
+        setMessageMenuId(null);
+        setReactionMenuId(null);
+      }
+    }
+    document.addEventListener("pointerdown", closeMessageMenu);
+    return () => document.removeEventListener("pointerdown", closeMessageMenu);
+  }, [messageMenuId]);
+
+  useEffect(() => {
+    if (reactionMenuId === null) return;
+    function closeReactionPicker(event: PointerEvent) {
+      if (!reactionPickerRef.current?.contains(event.target as Node)) setReactionMenuId(null);
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setReactionMenuId(null);
+    }
+    function closeOnScroll() { setReactionMenuId(null); }
+    document.addEventListener("pointerdown", closeReactionPicker);
+    document.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("scroll", closeOnScroll, true);
+    window.addEventListener("resize", closeOnScroll);
+    return () => {
+      document.removeEventListener("pointerdown", closeReactionPicker);
+      document.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("scroll", closeOnScroll, true);
+      window.removeEventListener("resize", closeOnScroll);
+    };
+  }, [reactionMenuId]);
 
   useEffect(() => {
     function handleSidebarShortcut(event: KeyboardEvent) {
@@ -374,6 +428,11 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
     && chat.selected.participants.some((participant) => participant.user.id === userId && participant.role === "ADMIN");
   const firstMessageId = chat.messages[0]?.id;
   const searchResults = useMemo(() => chat.messages.filter((message) => searchText.trim() && message.content.toLocaleLowerCase("pt-BR").includes(searchText.trim().toLocaleLowerCase("pt-BR"))), [chat.messages, searchText]);
+  const pinnedMessage = useMemo(() => chat.messages.findLast(isMessagePinned) ?? null, [chat.messages]);
+  const forwardTargets = useMemo(() => {
+    const search = forwardQuery.trim().toLocaleLowerCase("pt-BR");
+    return chat.conversations.filter((conversation) => !conversation.archived && (!search || conversationName(conversation, userId, chat.members).toLocaleLowerCase("pt-BR").includes(search)));
+  }, [chat.conversations, chat.members, forwardQuery, userId]);
 
   useEffect(() => {
     const target = searchResults[searchIndex];
@@ -541,6 +600,98 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
     }
   }
 
+  async function updateMessageFlags(message: InternalMessage, flags: { pinned?: boolean; pinDurationHours?: 24 | 168 | 720; favorited?: boolean }) {
+    setMessageActionBusy(message.id);
+    try {
+      await chat.updateMessageFlags(message.id, flags);
+      setMessageMenuId(null);
+      setActionError(null);
+      return true;
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Não foi possível atualizar a mensagem.");
+      return false;
+    } finally {
+      setMessageActionBusy(null);
+    }
+  }
+
+  function openPinDialog(message: InternalMessage) {
+    setMessageMenuId(null);
+    setReactionMenuId(null);
+    setPinDurationHours(168);
+    setPinningMessage(message);
+  }
+
+  async function confirmPinMessage() {
+    if (!pinningMessage) return;
+    if (await updateMessageFlags(pinningMessage, { pinned: true, pinDurationHours })) setPinningMessage(null);
+  }
+
+  function openForward(message: InternalMessage) {
+    setMessageMenuId(null);
+    setReactionMenuId(null);
+    setForwardingMessage(message);
+    setForwardTargetId(null);
+    setForwardQuery("");
+  }
+
+  function openReactionPicker(message: InternalMessage, triggerElement: HTMLElement) {
+    const trigger = triggerElement.getBoundingClientRect();
+    const pickerWidth = 250;
+    const pickerHeight = 42;
+    const gap = 5;
+    const own = message.senderId === userId;
+    const left = own ? trigger.right - pickerWidth : trigger.left;
+    setReactionPosition({
+      left: Math.max(8, Math.min(left, window.innerWidth - pickerWidth - 8)),
+      top: trigger.top >= pickerHeight + gap + 8
+        ? trigger.top - pickerHeight - gap
+        : Math.max(8, Math.min(trigger.bottom + gap, window.innerHeight - pickerHeight - 8)),
+    });
+    setMessageMenuId(null);
+    setReactionMenuId(message.id);
+  }
+
+  async function chooseReaction(messageId: number, emoji: string) {
+    if (reactingMessageId !== null) return;
+    setReactingMessageId(messageId);
+    try {
+      await chat.react(messageId, emoji);
+      setReactionMenuId(null);
+      setActionError(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Não foi possível reagir à mensagem.");
+    } finally {
+      setReactingMessageId(null);
+    }
+  }
+
+  async function forwardMessage() {
+    if (!forwardingMessage || !forwardTargetId || !chat.organizationId || !chat.selectedId || forwarding) return;
+    setForwarding(true);
+    try {
+      if (forwardingMessage.type === "FILE" && forwardingMessage.media) {
+        const response = await fetch(internalMediaUrl(chat.organizationId, chat.selectedId, forwardingMessage.id), { credentials: "include" });
+        if (!response.ok) throw new Error("Não foi possível carregar o arquivo para encaminhar.");
+        const file = new File([await response.blob()], forwardingMessage.media.fileName, { type: forwardingMessage.media.mimeType });
+        await internalChatApi.sendMedia(chat.organizationId, forwardTargetId, file, forwardingMessage.content, undefined, false);
+      } else {
+        await internalChatApi.send(chat.organizationId, forwardTargetId, {
+          content: forwardingMessage.content,
+          clientId: crypto.randomUUID(),
+          includeSignature: false,
+        });
+      }
+      setForwardingMessage(null);
+      setForwardTargetId(null);
+      setActionError(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Não foi possível encaminhar a mensagem.");
+    } finally {
+      setForwarding(false);
+    }
+  }
+
   async function loadOlderMessages() {
     const element = scrollRef.current;
     if (!element || !chat.hasOlderMessages || chat.loadingOlderMessages || prependHeightRef.current !== null) return;
@@ -554,9 +705,43 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
   }
 
   const sidebarVisible = mobileListOpen || !chat.selected;
+  const reactionMessage = reactionMenuId === null ? null : chat.messages.find((message) => message.id === reactionMenuId) ?? null;
+  const selectedReaction = reactionMessage?.reactions.find((reaction) => reaction.userId === userId)?.emoji;
 
   return (
     <main className="flex h-dvh overflow-hidden bg-zinc-950 text-white">
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {reactionMessage && (
+            <motion.div
+              ref={reactionPickerRef}
+              initial={reduceMotion ? false : { opacity: 0, y: 8, scale: 0.92 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 5, scale: 0.96 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed z-[100] origin-bottom rounded-full border border-white/10 bg-zinc-900/90 px-1.5 py-1 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+              style={reactionPosition}
+            >
+              <div className="flex w-max items-center gap-0.5">
+                {["👍", "❤️", "😂", "😮", "😢", "🙏"].map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    disabled={reactingMessageId !== null}
+                    onClick={() => void chooseReaction(reactionMessage.id, emoji)}
+                    aria-label={`${selectedReaction === emoji ? "Remover" : "Reagir com"} ${emoji}`}
+                    className={`flex size-8 items-center justify-center rounded-full text-[19px] transition-transform hover:scale-125 focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-50 ${selectedReaction === emoji ? "bg-white/10" : ""}`}
+                  >
+                    <EmojiText content={emoji} />
+                  </button>
+                ))}
+                <button type="button" aria-label="Mais reações" className="flex size-8 items-center justify-center rounded-full text-xl leading-none text-zinc-200 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/50">+</button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
       <div id="chat-sidebar" className={`fixed inset-0 z-40 flex bg-zinc-950 lg:static lg:h-full lg:w-auto lg:shrink-0 ${sidebarVisible ? "visible" : "invisible lg:visible"}`}>
         <nav aria-label="Sair do chat interno" className="hidden h-full w-[60px] shrink-0 flex-col items-center border-r border-white/[0.08] bg-[#1a1a1a] px-2 py-3 lg:flex">
           <Link href="/" aria-label="Voltar ao atendimento" title="Voltar ao atendimento" className="flex size-11 items-center justify-center rounded-xl text-zinc-300 transition-colors hover:bg-white/[0.1] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70">
@@ -578,7 +763,7 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
           </header>
           <CompactScrollArea className="flex-1" label={membersOpen ? "Membros da empresa" : "Lista de conversas"}><div className={collapsed ? "space-y-1 py-3 pr-1 pl-3" : "px-2 pb-2"}>
             <AnimatePresence initial={false} mode="popLayout">
-            {membersOpen ? <>{!chat.loading && memberResults.map((member, index) => <AnimatedMemberContactRow key={member.userId} member={member} collapsed={collapsed} index={index} onOpen={() => void startDirect(member.userId)} />)}{!chat.loading && !memberResults.length && <p className="py-10 text-center text-[13px] text-zinc-500">Nenhum membro encontrado</p>}</> : <>{!chat.loading && conversations.map((conversation, index) => { const name = conversationName(conversation, userId, chat.members); const selected = conversation.id === chat.selectedId; return <motion.div layout="position" key={conversation.id} initial={reduceMotion ? false : { opacity: 0, y: 6, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.985 }} whileHover={reduceMotion ? undefined : { x: 2 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.2, delay: Math.min(index, 6) * 0.018, ease: [0.22, 1, 0.36, 1], layout: { type: "spring", stiffness: 460, damping: 38 } }} className={`group relative rounded-none border-b border-white/[0.08] transition-colors lg:rounded-xl lg:border-b-0 ${selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"}`}><button type="button"
+            {membersOpen ? <>{!chat.loading && memberResults.map((member, index) => <AnimatedMemberContactRow key={member.userId} member={member} collapsed={collapsed} index={index} onOpen={() => void startDirect(member.userId)} />)}{!chat.loading && !memberResults.length && <p className="py-10 text-center text-[13px] text-zinc-500">Nenhum membro encontrado</p>}</> : <>{!chat.loading && conversations.map((conversation, index) => { const name = conversationName(conversation, userId, chat.members); const selected = conversation.id === chat.selectedId; const rowMenuOpen = rowMenuId === conversation.id; return <motion.div layout="position" key={conversation.id} initial={reduceMotion ? false : { opacity: 0, y: 6, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.985 }} whileHover={reduceMotion ? undefined : { x: 2 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.2, delay: Math.min(index, 6) * 0.018, ease: [0.22, 1, 0.36, 1], layout: { type: "spring", stiffness: 460, damping: 38 } }} className={`group relative rounded-none border-b border-white/[0.08] transition-colors lg:rounded-xl lg:border-b-0 ${rowMenuOpen ? "z-[60]" : "z-0"} ${selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"}`}><button type="button"
                     onMouseDown={(event) => startPreviewHold(conversation, event)}
                     onMouseLeave={() => cancelPreviewHold(conversation.id)}
                     onPointerDown={(event) => startTouchPreviewHold(conversation, event)}
@@ -623,9 +808,126 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
         {!chat.selected ? <div className="flex flex-1 flex-col items-center justify-center gap-4 text-zinc-500"><EmptyChatAnimation /><p>Selecione uma conversa para começar</p></div> : <>
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/mesh-gradient2.png')" }} /><div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-zinc-950/50" />
           <header className="pointer-events-auto relative z-20 flex h-[calc(64px+env(safe-area-inset-top))] shrink-0 items-center gap-1.5 px-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-2 sm:gap-3 sm:px-4"><div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[200px] bg-gradient-to-b from-black/65 via-black/30 to-transparent [mask-image:linear-gradient(to_bottom,black_0%,black_35%,transparent_100%)]" />{searchOpen ? <><label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3"><Search className="size-4 text-zinc-400" /><input autoFocus type="search" value={searchText} onChange={(event) => { setSearchText(event.target.value); setSearchIndex(0); }} placeholder="Localizar mensagem..." className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-zinc-500" /></label><span className="text-xs text-zinc-400">{searchResults.length ? searchIndex + 1 : 0}/{searchResults.length}</span><button type="button" onClick={() => setSearchIndex((index) => (index - 1 + searchResults.length) % searchResults.length)} disabled={!searchResults.length} aria-label="Resultado anterior" className="rounded-full p-2 hover:bg-white/10">↑</button><button type="button" onClick={() => setSearchIndex((index) => (index + 1) % searchResults.length)} disabled={!searchResults.length} aria-label="Próximo resultado" className="rounded-full p-2 hover:bg-white/10">↓</button><button type="button" onClick={() => { setSearchOpen(false); setSearchText(""); }} aria-label="Fechar busca" className="rounded-full p-2 hover:bg-white/10"><X className="size-5" /></button></> : <><button type="button" onClick={() => setMobileListOpen(true)} aria-label="Voltar para conversas" className="flex size-10 items-center justify-center rounded-full text-zinc-200 hover:bg-white/[0.07] lg:hidden"><ArrowLeft className="size-5" /></button><button type="button" onClick={() => setInfoOpen(true)} aria-label={`Abrir informações de ${selectedName}`} className="flex min-w-0 flex-1 items-center gap-2 rounded-xl text-left sm:gap-3"><Avatar name={selectedName} image={selectedImage} group={chat.selected.type === "GROUP"} /><span className="min-w-0 flex-1"><span className="block truncate text-base font-medium lg:text-[15px]">{selectedName}</span>{chat.typingUserId ? <TypingIndicator label="digitando…" className="text-zinc-300" /> : <span className="block truncate text-xs text-zinc-400">{chat.selected.type === "GROUP" ? `${chat.selected.participants.length} participantes` : (selectedContact?.email || "Conversa individual")}</span>}</span></button><div className="ml-auto flex h-11 shrink-0 items-center rounded-full border border-white/10 bg-white/[0.035] px-1"><button type="button" onClick={openAddMembers} aria-label={chat.selected.type === "GROUP" ? "Adicionar participantes" : "Criar grupo com esta pessoa"} title={chat.selected.type === "GROUP" ? "Adicionar participantes" : "Criar grupo com esta pessoa"} className="flex size-9 items-center justify-center rounded-full text-zinc-300 hover:bg-white/[0.07]"><UserRoundPlus className="size-5" /></button><div className="relative"><button type="button" onClick={() => setHeaderMenuOpen((open) => !open)} aria-label="Mais opções" aria-expanded={headerMenuOpen} className="flex size-9 items-center justify-center rounded-full text-zinc-300 hover:bg-white/[0.07]"><EllipsisVertical className="size-5" /></button><AnimatePresence>{headerMenuOpen && <motion.div role="menu" initial={reduceMotion ? false : { opacity: 0, y: -5, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -3, scale: 0.99 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.16, ease: [0.22, 1, 0.36, 1] }} style={{ transformOrigin: "top right" }} className="absolute top-[calc(100%+0.55rem)] right-0 z-50 w-56 rounded-xl border border-white/10 bg-zinc-950 p-1.5 text-sm shadow-2xl"><button type="button" role="menuitem" onClick={() => { setSearchOpen(true); setHeaderMenuOpen(false); }} className={menuItemClass}><Search className="size-4 text-zinc-400" /> Localizar mensagem</button><button type="button" role="menuitem" onClick={() => { setInfoOpen(true); setHeaderMenuOpen(false); }} className={menuItemClass}><Info className="size-4 text-zinc-400" /> Informações da conversa</button></motion.div>}</AnimatePresence></div><button type="button" onClick={() => setInfoOpen(true)} aria-label="Informações da conversa" className="flex size-9 items-center justify-center rounded-full text-zinc-300 hover:bg-white/[0.07]"><Info className="size-5" /></button></div></>}</header>
-          <div ref={scrollRef} onScroll={(event) => { const target = event.currentTarget; const distance = target.scrollHeight - target.clientHeight - target.scrollTop; nearBottomRef.current = distance < 80; setShowScrollButton(distance > 180); if (target.scrollTop < 80) void loadOlderMessages(); }} className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-none"><div className="flex min-h-full flex-col gap-2 px-2 pt-2 pb-28 sm:px-5">{chat.loadingOlderMessages && <p className="py-2 text-center text-xs text-zinc-400">Carregando mensagens anteriores...</p>}{chat.loadingMessages && <p className="py-2 text-center text-xs text-zinc-400">Carregando histórico...</p>}{chat.messages.map((message, index) => { const own = message.senderId === userId; const previous = chat.messages[index - 1]; const separator = !previous || dayFormatter.format(new Date(previous.createdAt)) !== dayFormatter.format(new Date(message.createdAt)); const cascadeStart = Math.max(0, chat.messages.length - 12); const cascadeOrder = Math.max(0, index - cascadeStart); return <motion.div key={message.id} id={`internal-message-${message.id}`} initial={reduceMotion || initiallyHydratedMessageIds.has(message.id) ? false : { opacity: 0, x: own ? 10 : -10, y: 14, rotate: own ? 2.5 : -2.5, scale: 0.97 }} animate={{ opacity: 1, x: 0, y: 0, rotate: 0, scale: 1 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.22, delay: Math.min(cascadeOrder, 4) * 0.018, ease: [0.16, 1, 0.3, 1] }} style={{ transformOrigin: own ? "bottom right" : "bottom left" }} className="relative flex w-full flex-col gap-2"><>{separator && <div role="separator" aria-label={dateLabel(message.createdAt)} className="flex justify-center py-1"><span className="rounded-md border border-white/[0.06] bg-zinc-900/90 px-2.5 py-1 text-xs font-medium text-zinc-300 shadow-sm lg:text-[10px]">{dateLabel(message.createdAt)}</span></div>}</><div className={`group/message flex items-end gap-2 ${own ? "justify-end" : "justify-start"}`}>{!own && <Avatar name={message.sender.name} image={message.sender.image} className="size-8 lg:size-9" />}<div className={`relative min-w-0 max-w-[86%] text-base leading-[1.45] [overflow-wrap:anywhere] lg:max-w-[min(62%,620px)] lg:text-[13.5px] lg:leading-[1.4] ${message.private ? "rounded-[24px] bg-zinc-100 px-3.5 py-2.5 text-zinc-900" : message.type === "FILE" && !message.deletedAt ? "rounded-[18px] bg-zinc-800 p-[3px] text-white shadow-[0_3px_12px_rgba(0,0,0,0.16)]" : "rounded-[24px] bg-zinc-800 px-3.5 py-2.5 text-white"}`} onContextMenu={(event) => { event.preventDefault(); setMessageMenuId(message.id); }}>{message.private && <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-zinc-600"><LockKeyhole className="size-3" /> Privado</p>}{chat.selected?.type === "GROUP" && !own && <p className="mb-1 text-[11px] font-semibold text-zinc-300">{message.sender.name}</p>}{message.replyTo && <button type="button" onClick={() => document.getElementById(`internal-message-${message.replyTo?.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })} className="mb-2 block w-full rounded border-l-2 border-zinc-400 bg-black/15 px-2 py-1 text-left text-xs"><span className="block font-medium text-zinc-300">{message.replyTo.sender.name}</span><span className="block truncate text-zinc-400">{message.replyTo.content}</span></button>}{message.type === "FILE" && message.media && !message.deletedAt && chat.organizationId && chat.selectedId
-  ? <InternalMediaContent message={message} messages={chat.messages} organizationId={chat.organizationId} conversationId={chat.selectedId} currentUserId={userId} />
-  : <div className="whitespace-pre-wrap break-words"><MessageText content={message.deletedAt ? "Mensagem apagada" : message.content} showSignature={own && !message.private} /></div>}<div className={message.type === "FILE" && !message.deletedAt && /^(image|video)\//.test(message.media?.mimeType ?? "") ? "absolute right-2 bottom-2 flex items-center justify-end gap-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[9px] text-white/85" : message.private ? "mt-1 flex items-center justify-end gap-1.5 text-[9px] text-zinc-500" : "mt-1 flex items-center justify-end gap-1.5 text-[9px] text-white/55"}><time dateTime={message.createdAt}>{timeFormatter.format(new Date(message.createdAt))}</time>{own && <CheckCheck className="size-3" />}</div>{message.reactions.length > 0 && <div className="absolute -bottom-3 right-2 flex gap-0.5 rounded-full border border-white/10 bg-zinc-900 px-1.5 py-0.5 text-xs">{message.reactions.map((reaction) => <button key={reaction.userId} type="button" onClick={() => void chat.react(message.id, reaction.emoji)} aria-label={`Reagir com ${reaction.emoji}`}>{reaction.emoji}</button>)}</div>}<AnimatePresence>{messageMenuId === message.id && <motion.div role="menu" initial={reduceMotion ? false : { opacity: 0, y: -5, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -3, scale: 0.985 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.16, ease: [0.22, 1, 0.36, 1] }} className="absolute top-full right-0 z-30 mt-2 w-48 rounded-xl border border-white/10 bg-zinc-950 p-1.5 text-sm shadow-2xl"><div className="flex gap-1 px-1 pb-1">{["👍", "❤️", "😂", "😮", "😢", "🙏"].map((emoji) => <button key={emoji} type="button" onClick={() => { void chat.react(message.id, emoji); setMessageMenuId(null); }} className="rounded-full p-1 hover:bg-white/10">{emoji}</button>)}</div><button type="button" role="menuitem" onClick={() => { setReplyTo(message); setMessageMenuId(null); }} className={menuItemClass}><Reply className="size-4" /> Responder</button><button type="button" role="menuitem" onClick={() => { void navigator.clipboard.writeText(message.content); setMessageMenuId(null); }} className={menuItemClass}><Copy className="size-4" /> Copiar</button>{own && <button type="button" role="menuitem" onClick={() => void deleteMessage(message)} className={menuItemClass}><Trash2 className="size-4" /> Apagar mensagem</button>}</motion.div>}</AnimatePresence></div>{own && <Avatar name={message.sender.name} image={message.sender.image} className="size-8 lg:size-9" />}<button type="button" onClick={() => setMessageMenuId(messageMenuId === message.id ? null : message.id)} aria-label="Ações da mensagem" className="self-center rounded-full p-1 text-zinc-500 opacity-0 hover:bg-white/10 group-hover/message:opacity-100 focus-visible:opacity-100"><ChevronDown className="size-4" /></button></div></motion.div>; })}{chat.typingUserId && <motion.div initial={reduceMotion ? false : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 3 }} className="self-start rounded-full bg-white/[0.05] px-3 py-1"><TypingIndicator label="digitando…" className="text-zinc-400" /></motion.div>}</div></div>
+          <AnimatePresence initial={false}>
+            {pinnedMessage && !searchOpen && (
+              <motion.div
+                key={pinnedMessage.id}
+                initial={reduceMotion ? false : { opacity: 0, y: -7 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                className="pointer-events-auto relative z-20 mx-2 mt-1 flex h-12 shrink-0 items-center overflow-hidden rounded-xl border border-white/10 bg-zinc-950/90 shadow-[0_10px_30px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:mx-4"
+              >
+                <button
+                  type="button"
+                  onClick={() => document.getElementById(`internal-message-${pinnedMessage.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                  className="flex min-w-0 flex-1 items-center gap-3 px-3 text-left focus-visible:outline-2 focus-visible:outline-white/50"
+                >
+                  <span className="h-7 w-0.5 shrink-0 rounded-full bg-zinc-300" />
+                  <Pin className="size-4 shrink-0 text-zinc-400" strokeWidth={1.8} aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <strong className="block text-[11px] font-medium text-zinc-300">Mensagem fixada</strong>
+                    <span className="block truncate text-xs text-zinc-500">{pinnedMessage.content || "Mídia"}</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  disabled={messageActionBusy === pinnedMessage.id}
+                  onClick={() => void updateMessageFlags(pinnedMessage, { pinned: false })}
+                  aria-label="Desafixar mensagem"
+                  title="Desafixar mensagem"
+                  className="mr-1 flex size-9 shrink-0 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-40"
+                >
+                  <X className="size-4" aria-hidden="true" />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <div
+            ref={scrollRef}
+            onScroll={(event) => {
+              const target = event.currentTarget;
+              const distance = target.scrollHeight - target.clientHeight - target.scrollTop;
+              nearBottomRef.current = distance < 80;
+              setShowScrollButton(distance > 180);
+              if (target.scrollTop < 80) void loadOlderMessages();
+            }}
+            className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-none"
+          >
+            <div className="flex min-h-full flex-col gap-2 px-2 pt-2 pb-28 sm:px-5">
+              {chat.loadingOlderMessages && <p className="py-2 text-center text-xs text-zinc-400">Carregando mensagens anteriores...</p>}
+              {chat.loadingMessages && <p className="py-2 text-center text-xs text-zinc-400">Carregando histórico...</p>}
+              {chat.messages.map((message, index) => {
+                const own = message.senderId === userId;
+                const previous = chat.messages[index - 1];
+                const separator = !previous || dayFormatter.format(new Date(previous.createdAt)) !== dayFormatter.format(new Date(message.createdAt));
+                const cascadeStart = Math.max(0, chat.messages.length - 12);
+                const cascadeOrder = Math.max(0, index - cascadeStart);
+                const mediaTime = message.type === "FILE" && !message.deletedAt && /^(image|video)\//.test(message.media?.mimeType ?? "");
+                const openMenuUpward = index >= chat.messages.length - 4;
+                const messagePinned = isMessagePinned(message);
+                return (
+                  <motion.div
+                    key={message.id}
+                    id={`internal-message-${message.id}`}
+                    initial={reduceMotion || initiallyHydratedMessageIds.has(message.id) ? false : { opacity: 0, x: own ? 10 : -10, y: 14, rotate: own ? 2.5 : -2.5, scale: 0.97 }}
+                    animate={{ opacity: 1, x: 0, y: 0, rotate: 0, scale: 1 }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.22, delay: Math.min(cascadeOrder, 4) * 0.018, ease: [0.16, 1, 0.3, 1] }}
+                    style={{ transformOrigin: own ? "bottom right" : "bottom left" }}
+                    className="relative flex w-full flex-col gap-2"
+                  >
+                    {separator && <div role="separator" aria-label={dateLabel(message.createdAt)} className="flex justify-center py-1"><span className="rounded-md border border-white/[0.06] bg-zinc-900/90 px-2.5 py-1 text-xs font-medium text-zinc-300 shadow-sm lg:text-[10px]">{dateLabel(message.createdAt)}</span></div>}
+                    <div className={`group/message flex items-end gap-2 ${own ? "justify-end" : "justify-start"}`}>
+                      {!own && <Avatar name={message.sender.name} image={message.sender.image} className="size-8 lg:size-9" />}
+                      <div
+                        className={`relative min-w-0 max-w-[86%] text-base leading-[1.45] [overflow-wrap:anywhere] lg:max-w-[min(62%,620px)] lg:text-[13.5px] lg:leading-[1.4] ${message.private ? "rounded-[24px] bg-zinc-100 px-3.5 py-2.5 text-zinc-900" : message.type === "FILE" && !message.deletedAt ? "rounded-[18px] bg-zinc-800 p-[3px] text-white shadow-[0_3px_12px_rgba(0,0,0,0.16)]" : "rounded-[24px] bg-zinc-800 px-3.5 py-2.5 text-white"}`}
+                        onContextMenu={(event) => { event.preventDefault(); setMessageMenuId(message.id); setReactionMenuId(null); }}
+                      >
+                        {message.private && <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-zinc-600"><LockKeyhole className="size-3" /> Privado</p>}
+                        {chat.selected?.type === "GROUP" && !own && <p className="mb-1 text-[11px] font-semibold text-zinc-300">{message.sender.name}</p>}
+                        {message.replyTo && <button type="button" onClick={() => document.getElementById(`internal-message-${message.replyTo?.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })} className="mb-2 block w-full rounded border-l-2 border-zinc-400 bg-black/15 px-2 py-1 text-left text-xs"><span className="block font-medium text-zinc-300">{message.replyTo.sender.name}</span><span className="block truncate text-zinc-400">{message.replyTo.content}</span></button>}
+                        {message.type === "FILE" && message.media && !message.deletedAt && chat.organizationId && chat.selectedId
+                          ? <InternalMediaContent message={message} messages={chat.messages} organizationId={chat.organizationId} conversationId={chat.selectedId} currentUserId={userId} />
+                          : <div className="whitespace-pre-wrap break-words"><MessageText content={message.deletedAt ? "Mensagem apagada" : message.content} showSignature={own && !message.private} /></div>}
+                        <div className={mediaTime ? "absolute right-2 bottom-2 flex items-center justify-end gap-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[9px] text-white/85" : message.private ? "mt-1 flex items-center justify-end gap-1.5 text-[9px] text-zinc-500" : "mt-1 flex items-center justify-end gap-1.5 text-[9px] text-white/55"}>
+                          {messagePinned && <Pin className="size-3" fill="currentColor" aria-label="Mensagem fixada" />}
+                          {message.favorited && <Star className="size-3" fill="currentColor" aria-label="Mensagem favorita" />}
+                          <time dateTime={message.createdAt}>{timeFormatter.format(new Date(message.createdAt))}</time>
+                          {own && <CheckCheck className="size-3" />}
+                        </div>
+                        {message.reactions.length > 0 && <div className="absolute -bottom-3 right-2 flex gap-0.5 rounded-full border border-white/10 bg-zinc-900 px-1.5 py-0.5 text-xs">{message.reactions.map((reaction) => <button key={reaction.userId} type="button" onClick={() => void chat.react(message.id, reaction.emoji)} aria-label={`Reagir com ${reaction.emoji}`}>{reaction.emoji}</button>)}</div>}
+                        <AnimatePresence>
+                          {messageMenuId === message.id && (
+                            <motion.div
+                              role="menu"
+                              aria-label="Ações da mensagem"
+                              data-internal-message-menu
+                              initial={reduceMotion ? false : { opacity: 0, y: -5, scale: 0.97 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                              transition={reduceMotion ? { duration: 0 } : { duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                              className={`absolute z-50 w-[178px] overflow-hidden rounded-xl border border-white/10 bg-zinc-900/95 p-1 text-[12px] font-medium leading-tight text-zinc-100 shadow-xl backdrop-blur-xl ${openMenuUpward ? "bottom-full mb-2 origin-bottom" : "top-full mt-2 origin-top"} ${own ? "right-0" : "left-0"}`}
+                            >
+                              <button type="button" role="menuitem" onClick={() => { setReplyTo(message); setMessageMenuId(null); }} className={menuItemClass}><Reply className="size-4" /> Responder</button>
+                              <button type="button" role="menuitem" disabled={!message.content || Boolean(message.deletedAt)} onClick={() => { void navigator.clipboard.writeText(message.content); setMessageMenuId(null); }} className={`${menuItemClass} disabled:opacity-40`}><Copy className="size-4" /> Copiar</button>
+                              <button type="button" role="menuitem" disabled={Boolean(message.deletedAt)} onClick={(event) => openReactionPicker(message, event.currentTarget)} className={`${menuItemClass} disabled:opacity-40`}><Smile className="size-4" /> Reagir</button>
+                              <button type="button" role="menuitem" disabled={Boolean(message.deletedAt)} onClick={() => openForward(message)} className={`${menuItemClass} disabled:opacity-40`}><Forward className="size-4" /> Encaminhar</button>
+                              <button type="button" role="menuitem" disabled={messageActionBusy === message.id || Boolean(message.deletedAt)} onClick={() => messagePinned ? void updateMessageFlags(message, { pinned: false }) : openPinDialog(message)} className={`${menuItemClass} disabled:opacity-40`}><Pin className="size-4" fill={messagePinned ? "currentColor" : "none"} /> {messagePinned ? "Desafixar" : "Fixar"}</button>
+                              <button type="button" role="menuitem" disabled={messageActionBusy === message.id || Boolean(message.deletedAt)} onClick={() => void updateMessageFlags(message, { favorited: !message.favorited })} className={`${menuItemClass} disabled:opacity-40`}><Star className="size-4" fill={message.favorited ? "currentColor" : "none"} /> {message.favorited ? "Desfavoritar" : "Favoritar"}</button>
+                              {own && <><div className="my-1 border-t border-white/10" /><button type="button" role="menuitem" onClick={() => void deleteMessage(message)} className={menuItemClass}><Trash2 className="size-4" /> Apagar</button></>}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                      {own && <Avatar name={message.sender.name} image={message.sender.image} className="size-8 lg:size-9" />}
+                      <button type="button" data-internal-message-menu onClick={() => { setMessageMenuId(messageMenuId === message.id ? null : message.id); setReactionMenuId(null); }} aria-label="Ações da mensagem" aria-expanded={messageMenuId === message.id} className="self-center rounded-full p-1 text-zinc-500 opacity-0 hover:bg-white/10 group-hover/message:opacity-100 focus-visible:opacity-100"><ChevronDown className="size-4" /></button>
+                    </div>
+                  </motion.div>
+                );
+              })}
+              {chat.typingUserId && <motion.div initial={reduceMotion ? false : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 3 }} className="self-start rounded-full bg-white/[0.05] px-3 py-1"><TypingIndicator label="digitando…" className="text-zinc-400" /></motion.div>}
+            </div>
+          </div>
           {showScrollButton && <button type="button" onClick={() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })} aria-label="Ir para a mensagem mais recente" className="absolute bottom-24 left-1/2 z-20 flex size-9 -translate-x-1/2 items-center justify-center rounded-full border border-white/15 bg-zinc-900/90 text-zinc-200 shadow-lg"><ArrowDown className="size-5" /></button>}
           <MessageComposer
             key={chat.selectedId}
@@ -651,6 +953,105 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
             focusRequestKey={0}
           />
         </>}
+        {pinningMessage && (
+          <Dialog.Root open onOpenChange={(open) => {
+            if (messageActionBusy === pinningMessage.id) return;
+            if (!open) setPinningMessage(null);
+          }}>
+            <Dialog.Portal>
+              <Dialog.Backdrop className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-sm transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
+              <div className="pointer-events-none fixed inset-0 z-[201] flex items-center justify-center p-4">
+                <Dialog.Popup className="pointer-events-auto w-full max-w-[420px] rounded-3xl border border-white/10 bg-zinc-900 p-6 text-zinc-100 shadow-[0_28px_90px_rgba(0,0,0,0.65)] outline-none transition-[opacity,transform] duration-200 data-[ending-style]:translate-y-2 data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:translate-y-2 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0">
+                  <Dialog.Title className="max-w-[340px] text-lg font-semibold leading-6 tracking-[-0.01em]">
+                    Por quanto tempo deseja fixar esta mensagem?
+                  </Dialog.Title>
+                  <Dialog.Description className="mt-2 text-sm text-zinc-400">
+                    Você pode desafixá-la quando quiser.
+                  </Dialog.Description>
+
+                  <div className="mt-6 space-y-1" role="radiogroup" aria-label="Tempo de fixação">
+                    {([
+                      [24, "24 horas"],
+                      [168, "7 dias"],
+                      [720, "30 dias"],
+                    ] as const).map(([hours, label]) => {
+                      const selected = pinDurationHours === hours;
+                      return (
+                        <button key={hours} type="button" role="radio" aria-checked={selected} onClick={() => setPinDurationHours(hours)} className={`flex h-11 w-full items-center gap-3 rounded-xl px-2 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-white/50 ${selected ? "bg-white/[0.06] text-white" : "text-zinc-300 hover:bg-white/[0.035]"}`}>
+                          <span className={`flex size-5 items-center justify-center rounded-full border ${selected ? "border-white" : "border-zinc-600"}`}>
+                            {selected && <span className="size-2.5 rounded-full bg-white" />}
+                          </span>
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-7 flex justify-end gap-2">
+                    <button type="button" disabled={messageActionBusy === pinningMessage.id} onClick={() => setPinningMessage(null)} className="h-10 rounded-xl px-4 text-sm font-medium text-zinc-400 transition hover:bg-white/[0.05] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-50">
+                      Cancelar
+                    </button>
+                    <button type="button" disabled={messageActionBusy === pinningMessage.id} onClick={() => void confirmPinMessage()} className="h-10 rounded-xl bg-zinc-100 px-5 text-sm font-semibold text-zinc-950 transition hover:bg-white focus-visible:outline-2 focus-visible:outline-white/60 active:scale-[0.99] disabled:opacity-50">
+                      {messageActionBusy === pinningMessage.id ? "Fixando…" : "Fixar"}
+                    </button>
+                  </div>
+                </Dialog.Popup>
+              </div>
+            </Dialog.Portal>
+          </Dialog.Root>
+        )}
+        <AnimatePresence>
+          {forwardingMessage && (
+            <motion.div
+              className="absolute inset-0 z-50 flex justify-end bg-black/65 backdrop-blur-[2px]"
+              initial={reduceMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onMouseDown={(event) => { if (event.target === event.currentTarget && !forwarding) setForwardingMessage(null); }}
+            >
+              <motion.section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="internal-forward-title"
+                initial={reduceMotion ? false : { opacity: 0, x: 28 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className="flex h-full w-full max-w-[430px] flex-col border-l border-white/10 bg-zinc-950 shadow-[-24px_0_70px_rgba(0,0,0,0.45)]"
+              >
+                <header className="flex h-16 shrink-0 items-center gap-3 border-b border-white/[0.07] px-4">
+                  <button type="button" disabled={forwarding} onClick={() => setForwardingMessage(null)} aria-label="Fechar encaminhamento" className="flex size-9 items-center justify-center rounded-full text-zinc-400 hover:bg-white/[0.07] hover:text-white disabled:opacity-40"><X className="size-5" /></button>
+                  <h2 id="internal-forward-title" className="text-base font-semibold text-zinc-100">Encaminhar mensagem para</h2>
+                </header>
+                <div className="shrink-0 px-4 pt-4 pb-3">
+                  <label className="flex h-11 items-center gap-3 rounded-xl border border-white/15 bg-white/[0.04] px-3 focus-within:border-white/40">
+                    <Search className="size-[18px] shrink-0 text-zinc-500" />
+                    <input autoFocus value={forwardQuery} onChange={(event) => setForwardQuery(event.target.value)} placeholder="Pesquisar conversa" className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-zinc-500" />
+                  </label>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <p className="px-3 py-3 text-xs font-medium text-zinc-500">Conversas internas</p>
+                  <div className="space-y-1">
+                    {forwardTargets.map((conversation) => {
+                      const name = conversationName(conversation, userId, chat.members);
+                      const selected = forwardTargetId === conversation.id;
+                      return <button key={conversation.id} type="button" onClick={() => setForwardTargetId(conversation.id)} aria-pressed={selected} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${selected ? "bg-white/[0.09]" : "hover:bg-white/[0.05]"}`}>
+                        <span className={`flex size-5 shrink-0 items-center justify-center rounded-[5px] border ${selected ? "border-white bg-white text-zinc-950" : "border-zinc-600 text-transparent"}`}><CheckCheck className="size-3.5" /></span>
+                        <Avatar name={name} image={conversationImage(conversation, userId)} group={conversation.type === "GROUP"} className="size-10" />
+                        <span className="min-w-0 flex-1"><strong className="block truncate text-sm font-medium text-zinc-100">{name}</strong><span className="block truncate text-xs text-zinc-500">{conversation.type === "GROUP" ? "Grupo interno" : "Conversa individual"}</span></span>
+                      </button>;
+                    })}
+                    {!forwardTargets.length && <p className="px-3 py-10 text-center text-sm text-zinc-500">Nenhuma conversa encontrada.</p>}
+                  </div>
+                </div>
+                <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-white/[0.07] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                  <span className="text-xs text-zinc-500">{forwardTargetId ? "1 destino selecionado" : "Selecione um destino"}</span>
+                  <button type="button" onClick={() => void forwardMessage()} disabled={!forwardTargetId || forwarding} className="flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-zinc-950 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-35"><Send className="size-4" />{forwarding ? "Enviando…" : "Encaminhar"}</button>
+                </footer>
+              </motion.section>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <AnimatePresence>{infoOpen && chat.selected && <motion.div initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.18 }} className="absolute inset-0 z-40 flex justify-end bg-black/50" onClick={(event) => { if (event.target === event.currentTarget) setInfoOpen(false); }}>
           <motion.aside initial={reduceMotion ? false : { opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }} className="h-full w-full max-w-[360px] overflow-y-auto border-l border-white/10 bg-zinc-950 p-5">
             <button type="button" onClick={() => setInfoOpen(false)} aria-label="Fechar informações" className="ml-auto flex size-9 items-center justify-center rounded-full hover:bg-white/10"><X className="size-5" /></button>

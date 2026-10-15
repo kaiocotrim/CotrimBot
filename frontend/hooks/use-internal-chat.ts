@@ -128,11 +128,18 @@ export function useInternalChat({ activeOrganizationId, currentUserId }: Interna
         return { ...message, reactions: payload.reaction ? [...reactions, payload.reaction] : reactions };
       }));
     };
+    const handleMessageFlags = (payload: { conversationId: string; messageId: number; pinned: boolean; pinnedUntil: string | null; favorited: boolean }) => {
+      if (payload.conversationId !== selectedId) return;
+      setMessages((current) => current.map((message) => message.id === payload.messageId
+        ? { ...message, pinned: payload.pinned, pinnedUntil: payload.pinnedUntil, favorited: payload.favorited }
+        : message));
+    };
     socket.on("internal:message:new", addMessage);
     socket.on("internal:message:deleted", handleDeleted);
     socket.on("internal:typing:start", handleTyping);
     socket.on("internal:typing:stop", () => setTypingUserId(null));
     socket.on("internal:reaction:updated", handleReaction);
+    socket.on("internal:message:flags", handleMessageFlags);
     const handleConversationUpdated = (payload: { organizationId: string }) => {
       if (payload.organizationId === organizationId) void reload();
     };
@@ -144,6 +151,7 @@ export function useInternalChat({ activeOrganizationId, currentUserId }: Interna
       socket.off("internal:typing:start", handleTyping);
       socket.off("internal:typing:stop");
       socket.off("internal:reaction:updated", handleReaction);
+      socket.off("internal:message:flags", handleMessageFlags);
       socket.off("internal:conversation:updated", handleConversationUpdated);
     };
   }, [organizationId, selectedId, reload]);
@@ -248,5 +256,11 @@ export function useInternalChat({ activeOrganizationId, currentUserId }: Interna
     setConversations((current) => current.map((conversation) => conversation.id === selectedId && conversation.lastMessage?.id === messageId ? { ...conversation, lastMessage: null } : conversation));
   }, [organizationId, selectedId]);
 
-  return { organizationId, conversations, members, selected, selectedId, messages, loading, loadingMessages, loadingOlderMessages, hasOlderMessages, sending, error, typingUserId, reload, selectConversation, startDirect, startGroup, addParticipants, updatePreferences, updateAvatar, loadOlderMessages, sendMessage, sendMedia, sendTyping, react, deleteMessage };
+  const updateMessageFlags = useCallback(async (messageId: number, flags: { pinned?: boolean; pinDurationHours?: 24 | 168 | 720; favorited?: boolean }) => {
+    if (!organizationId || !selectedId) return;
+    const result = await internalChatApi.messageFlags(organizationId, selectedId, messageId, flags);
+    setMessages((current) => current.map((message) => message.id === messageId ? { ...message, ...result } : message));
+  }, [organizationId, selectedId]);
+
+  return { organizationId, conversations, members, selected, selectedId, messages, loading, loadingMessages, loadingOlderMessages, hasOlderMessages, sending, error, typingUserId, reload, selectConversation, startDirect, startGroup, addParticipants, updatePreferences, updateAvatar, loadOlderMessages, sendMessage, sendMedia, sendTyping, react, deleteMessage, updateMessageFlags };
 }

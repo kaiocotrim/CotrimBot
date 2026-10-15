@@ -11,6 +11,9 @@ export type InternalMessage = {
   clientId?: string | null;
   createdAt: string;
   deletedAt?: string | null;
+  pinned?: boolean;
+  pinnedUntil?: string | null;
+  favorited?: boolean;
   sender: InternalUser;
   media?: { mimeType: string; fileName: string } | null;
   replyTo?: { id: number; content: string; sender: { id: string; name: string } } | null;
@@ -176,5 +179,8 @@ export const internalChatApi = {
   },
   removeReaction(organizationId: string, conversationId: string, messageId: number) {
     return request<void>(`${base(organizationId)}/${conversationId}/messages/${messageId}/reactions`, { method: "DELETE" });
+  },
+  messageFlags(organizationId: string, conversationId: string, messageId: number, flags: { pinned?: boolean; pinDurationHours?: 24 | 168 | 720; favorited?: boolean }) {
+    return request<{ pinned: boolean; pinnedUntil: string | null; favorited: boolean }>(`${base(organizationId)}/${conversationId}/messages/${messageId}/flags`, { method: "PATCH", body: JSON.stringify(flags) });
   },
 };

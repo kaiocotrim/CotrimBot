@@ -557,6 +557,41 @@ internalConversationRouter.delete("/organizations/:organizationId/internal-conve
   return response.status(204).send();
 });
 
+internalConversationRouter.patch("/organizations/:organizationId/internal-conversations/:conversationId/messages/:messageId/flags", async (request, response) => {
+  const { organizationId, conversationId } = request.params;
+  const messageId = Number(request.params.messageId);
+  const userId = request.user?.id;
+  if (!userId) return response.status(401).json({ error: "Não autenticado." });
+  if (!Number.isInteger(messageId) || messageId <= 0) return response.status(400).json({ error: "Mensagem inválida." });
+  const conversation = await conversationAccess(organizationId, conversationId, userId);
+  if (!conversation) return response.status(404).json({ error: "Conversa não encontrada." });
+
+  const data: { pinned?: boolean; pinnedUntil?: Date | null; favorited?: boolean } = {};
+  if (typeof request.body?.pinned === "boolean") {
+    data.pinned = request.body.pinned;
+    if (request.body.pinned) {
+      const durationHours = Number(request.body.pinDurationHours ?? 168);
+      if (![24, 168, 720].includes(durationHours)) {
+        return response.status(400).json({ error: "Prazo de fixação inválido." });
+      }
+      data.pinnedUntil = new Date(Date.now() + durationHours * 60 * 60 * 1000);
+    } else {
+      data.pinnedUntil = null;
+    }
+  }
+  if (typeof request.body?.favorited === "boolean") data.favorited = request.body.favorited;
+  if (data.pinned === undefined && data.favorited === undefined) {
+    return response.status(400).json({ error: "Nenhuma alteração informada." });
+  }
+
+  const existing = await prisma.internalMessage.findFirst({ where: { id: messageId, organizationId, conversationId, deletedAt: null } });
+  if (!existing) return response.status(404).json({ error: "Mensagem não encontrada." });
+  const message = await prisma.internalMessage.update({ where: { id: messageId }, data });
+  const flags = { pinned: message.pinned, pinnedUntil: message.pinnedUntil, favorited: message.favorited };
+  emitToParticipants(conversation, "internal:message:flags", { organizationId, conversationId, messageId, ...flags });
+  return response.json(flags);
+});
+
 internalConversationRouter.delete("/organizations/:organizationId/internal-conversations/:conversationId/messages/:messageId", async (request, response) => {
   const { organizationId, conversationId, messageId } = request.params;
   const userId = request.user?.id;

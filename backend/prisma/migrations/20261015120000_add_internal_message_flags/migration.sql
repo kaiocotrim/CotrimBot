@@ -1,0 +1,4 @@
+ALTER TABLE `InternalMessage`
+  ADD COLUMN `pinned` BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN `pinnedUntil` DATETIME(3) NULL,
+  ADD COLUMN `favorited` BOOLEAN NOT NULL DEFAULT false;
