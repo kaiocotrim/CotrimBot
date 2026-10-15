@@ -3,7 +3,7 @@ import multer from "multer";
 import type { InternalConversationType, InternalParticipantRole } from "../../generated/prisma/client.js";
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
-import { notifyInternalMention, userRoom } from "../services/notification.service.js";
+import { notifyInternalMention, notifyInternalReply, userRoom } from "../services/notification.service.js";
 import { transcribeAudio } from "../services/transcription.service.js";
 import { getSignedOutgoingText } from "../services/user-signature.service.js";
 
@@ -295,9 +295,11 @@ internalConversationRouter.post("/organizations/:organizationId/internal-convers
   if (mentions.some((id) => !conversation.participants.some((participant) => participant.userId === id))) {
     return response.status(400).json({ error: "Um ou mais membros mencionados não participam desta conversa." });
   }
-  if (replyToMessageId !== null) {
-    const reply = await prisma.internalMessage.findFirst({ where: { id: replyToMessageId, organizationId, conversationId } });
-    if (!reply) return response.status(400).json({ error: "A mensagem respondida não pertence a esta conversa." });
+  const repliedMessage = replyToMessageId === null
+    ? null
+    : await prisma.internalMessage.findFirst({ where: { id: replyToMessageId, organizationId, conversationId } });
+  if (replyToMessageId !== null && !repliedMessage) {
+    return response.status(400).json({ error: "A mensagem respondida não pertence a esta conversa." });
   }
 
   const finalContent = isPrivate ? content : await getSignedOutgoingText(userId, organizationId, content, undefined, includeSignature);
@@ -312,6 +314,13 @@ internalConversationRouter.post("/organizations/:organizationId/internal-convers
     conversation.type === "DIRECT" ? message.sender.name : conversation.name || "Grupo interno",
     content,
     mentions,
+    { id: userId, name: message.sender.name },
+  );
+  if (repliedMessage && !mentions.includes(repliedMessage.senderId)) notifyInternalReply(
+    conversationId,
+    conversation.type === "DIRECT" ? message.sender.name : conversation.name || "Grupo interno",
+    content,
+    repliedMessage.senderId,
     { id: userId, name: message.sender.name },
   );
   for (const mentionedUserId of mentions) {
@@ -334,10 +343,11 @@ const receiveMedia = async (request: Request, response: Response) => {
   if (caption.length > MAX_MESSAGE_LENGTH) return response.status(400).json({ error: "Legenda muito longa." });
   const includeSignature = request.body?.includeSignature !== "false";
   const replyToMessageId = request.body?.replyToMessageId ? Number(request.body.replyToMessageId) : null;
-  if (replyToMessageId !== null) {
-    if (!Number.isInteger(replyToMessageId) || !await prisma.internalMessage.findFirst({ where: { id: replyToMessageId, organizationId, conversationId } })) {
-      return response.status(400).json({ error: "A mensagem respondida não pertence a esta conversa." });
-    }
+  const repliedMessage = replyToMessageId === null || !Number.isInteger(replyToMessageId)
+    ? null
+    : await prisma.internalMessage.findFirst({ where: { id: replyToMessageId, organizationId, conversationId } });
+  if (replyToMessageId !== null && !repliedMessage) {
+    return response.status(400).json({ error: "A mensagem respondida não pertence a esta conversa." });
   }
   const content = caption ? await getSignedOutgoingText(userId, organizationId, caption, undefined, includeSignature) : media.label;
   const message = await prisma.internalMessage.create({
@@ -349,6 +359,13 @@ const receiveMedia = async (request: Request, response: Response) => {
   });
   await prisma.internalConversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
   emitToParticipants(conversation, "internal:message:new", { organizationId, conversationId, message });
+  if (repliedMessage) notifyInternalReply(
+    conversationId,
+    conversation.type === "DIRECT" ? message.sender.name : conversation.name || "Grupo interno",
+    content,
+    repliedMessage.senderId,
+    { id: userId, name: message.sender.name },
+  );
   return response.status(201).json({ message });
 };
 internalConversationRouter.post("/organizations/:organizationId/internal-conversations/:conversationId/media", uploadMedia.single("file"), receiveMedia);

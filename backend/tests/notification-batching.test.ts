@@ -13,6 +13,7 @@ const contact = { id: 7, name: "Contato", phone: "5511999999999", isGroup: false
 const payload = { id: null, type: "NEW_MESSAGE", title: "Contato", body: "Olá", contactId: 7 };
 const queriedUsers: string[] = [];
 const createdUsers: string[] = [];
+const createdNotifications: Array<Record<string, unknown>> = [];
 const emittedRooms: string[] = [];
 const deleted: number[] = [];
 const delivered: Array<{ endpoint: string; payload: string }> = [];
@@ -22,6 +23,7 @@ let expireSubscriptions = false;
 let failDelivery = false;
 let failDeletion = false;
 let failedUser: string | undefined;
+let assignedUsers = new Set(users);
 
 mock.module("../src/lib/prisma.ts", {
   namedExports: {
@@ -39,10 +41,13 @@ mock.module("../src/lib/prisma.ts", {
       },
       contactAssignment: {
         findMany: async () => users.map((userId) => ({ userId })),
+        findUnique: async ({ where }: { where: { contactId_userId: { userId: string } } }) =>
+          assignedUsers.has(where.contactId_userId.userId) ? { contactId: contact.id } : null,
       },
       notification: {
-        create: async ({ data }: { data: { userId: string } }) => {
+        create: async ({ data }: { data: { userId: string } & Record<string, unknown> }) => {
           createdUsers.push(data.userId);
+          createdNotifications.push(data);
           if (data.userId === failedUser) throw new Error("falha ao criar notificação");
           return { ...data, id: 1, contactId: contact.id };
         },
@@ -84,7 +89,7 @@ const previousPrivateKey = process.env.VAPID_PRIVATE_KEY;
 process.env.VAPID_PUBLIC_KEY = "test-public-key";
 process.env.VAPID_PRIVATE_KEY = "test-private-key";
 const { sendPushToUser } = await import("../src/services/push.service.js");
-const { notifyAssignment, notifyIncomingMessage } = await import("../src/services/notification.service.js");
+const { notifyAssignment, notifyIncomingMessage, notifyInternalReply, notifyReply } = await import("../src/services/notification.service.js");
 if (previousPublicKey === undefined) delete process.env.VAPID_PUBLIC_KEY;
 else process.env.VAPID_PUBLIC_KEY = previousPublicKey;
 if (previousPrivateKey === undefined) delete process.env.VAPID_PRIVATE_KEY;
@@ -93,6 +98,7 @@ else process.env.VAPID_PRIVATE_KEY = previousPrivateKey;
 function reset() {
   queriedUsers.length = 0;
   createdUsers.length = 0;
+  createdNotifications.length = 0;
   emittedRooms.length = 0;
   deleted.length = 0;
   delivered.length = 0;
@@ -102,6 +108,7 @@ function reset() {
   failDelivery = false;
   failDeletion = false;
   failedUser = undefined;
+  assignedUsers = new Set(users);
 }
 
 async function waitForDeliveries(count: number) {
@@ -132,6 +139,41 @@ test("mensagem recebida limita também a concorrência dos lotes aninhados de pu
   assert.deepEqual(queriedUsers, users);
   assert.equal(createdUsers.length, 0);
   assert.ok(delivered.every((delivery) => delivery.payload === JSON.stringify(payload)));
+});
+
+test("resposta gera notificação sonora para o autor da mensagem original", async () => {
+  reset();
+  notifyReply(contact, { content: "Resposta recebida", type: "TEXT", senderName: "Cliente" }, users[0]!);
+  await waitForDeliveries(subscriptions.length);
+
+  assert.deepEqual(createdUsers, [users[0]]);
+  assert.equal(createdNotifications[0]?.type, "REPLY");
+  assert.equal(createdNotifications[0]?.title, "Cliente respondeu você");
+  assert.deepEqual(emittedRooms, [`user:${users[0]}`]);
+});
+
+test("resposta não notifica um usuário que não está mais atribuído ao contato", async () => {
+  reset();
+  assignedUsers.delete(users[0]!);
+  notifyReply(contact, { content: "Resposta recebida", type: "TEXT", senderName: "Cliente" }, users[0]!);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+
+  assert.equal(createdUsers.length, 0);
+  assert.equal(delivered.length, 0);
+  assert.equal(emittedRooms.length, 0);
+});
+
+test("resposta interna avisa o autor, mas não cria aviso ao responder a si mesmo", async () => {
+  reset();
+  notifyInternalReply("conversation-1", "Equipe", "Pode deixar", users[0]!, { id: users[1]!, name: "Colega" });
+  await waitForDeliveries(subscriptions.length);
+
+  assert.equal(createdNotifications[0]?.type, "INTERNAL_REPLY");
+  assert.equal(createdNotifications[0]?.title, "Colega respondeu você");
+
+  reset();
+  notifyInternalReply("conversation-1", "Equipe", "Complemento", users[0]!, { id: users[0]!, name: "Autor" });
+  assert.equal(createdUsers.length, 0);
 });
 
 test("falha ao remover subscription expirada não interrompe os próximos lotes", async (t) => {

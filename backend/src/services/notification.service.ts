@@ -4,7 +4,13 @@ import { sendPushToUser } from "./push.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
 import { processInBatches } from "../utils/batch.js";
 
-export type NotificationType = "CONVERSATION_ASSIGNED" | "MENTION" | "INTERNAL_MENTION" | "NEW_MESSAGE";
+export type NotificationType =
+  | "CONVERSATION_ASSIGNED"
+  | "MENTION"
+  | "REPLY"
+  | "INTERNAL_MENTION"
+  | "INTERNAL_REPLY"
+  | "NEW_MESSAGE";
 
 export function userRoom(userId: string) {
   return `user:${userId}`;
@@ -107,9 +113,54 @@ export function notifyInternalMention(
   ));
 }
 
+export function notifyReply(
+  contact: { id: number; name: string; phone: string; isGroup: boolean; isSaved: boolean },
+  message: { content: string; type: string; senderName?: string | null },
+  userId: string,
+) {
+  const preview = message.content.trim() || `[${message.type.toLowerCase()}]`;
+  const body = preview.length > 140 ? `${preview.slice(0, 137)}...` : preview;
+  const senderName = message.senderName?.trim() || contactDisplayName(contact);
+  void safely((async () => {
+    // Uma resposta só deve avisar quem continua responsável por essa conversa.
+    const assignment = await prisma.contactAssignment.findUnique({
+      where: { contactId_userId: { contactId: contact.id, userId } },
+      select: { contactId: true },
+    });
+    if (!assignment) return;
+    await createNotification({
+      userId,
+      type: "REPLY",
+      title: `${senderName} respondeu você`,
+      body,
+      contactId: contact.id,
+    });
+  })());
+}
+
+export function notifyInternalReply(
+  conversationId: string,
+  conversationName: string,
+  content: string,
+  userId: string,
+  actor: { id: string; name: string },
+) {
+  if (userId === actor.id) return;
+  const preview = content.trim();
+  const bodyPreview = preview.length > 110 ? `${preview.slice(0, 107)}...` : preview;
+  void safely(createNotification({
+    userId,
+    type: "INTERNAL_REPLY",
+    title: `${actor.name} respondeu você`,
+    body: `${conversationName}: ${bodyPreview}`,
+    internalConversationId: conversationId,
+  }));
+}
+
 export function notifyIncomingMessage(
   contact: { id: number; name: string; phone: string; isGroup: boolean; isSaved: boolean },
   message: { content: string; type: string },
+  excludedUserIds: string[] = [],
 ) {
   safely(
     (async () => {
@@ -117,13 +168,15 @@ export function notifyIncomingMessage(
         where: { contactId: contact.id },
         select: { userId: true },
       });
-      if (!assignments.length) return;
+      const excludedUsers = new Set(excludedUserIds);
+      const recipients = assignments.filter(({ userId }) => !excludedUsers.has(userId));
+      if (!recipients.length) return;
 
       const preview = message.content.trim() || `[${message.type.toLowerCase()}]`;
       const body = preview.length > 140 ? `${preview.slice(0, 137)}...` : preview;
       // Mensagens são apenas push: não entram na central de notificações.
       await processInBatches(
-        assignments,
+        recipients,
         ({ userId }) =>
           safely(
             sendPushToUser(userId, {

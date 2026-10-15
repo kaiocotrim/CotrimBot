@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
-import { notifyIncomingMessage } from "../services/notification.service.js";
+import { notifyIncomingMessage, notifyReply } from "../services/notification.service.js";
 import { getGroupInfo, getMediaMessage } from "../services/evolution.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
 import {
@@ -501,6 +501,9 @@ export async function whatsappWebhook(req: Request, res: Response) {
         quotedContent: updatedMessage.quotedContent,
         quotedSenderName: updatedMessage.quotedSenderName,
       });
+      if (existingMessage.direction === "INCOMING" && quotedMessage?.direction === "OUTGOING" && quotedMessage.sentByUserId && contact) {
+        notifyReply(contact, existingMessage, quotedMessage.sentByUserId);
+      }
     }
 
     console.log("Mensagem já registrada:", externalId);
@@ -603,7 +606,13 @@ export async function whatsappWebhook(req: Request, res: Response) {
     message: incomingMessage,
     contact: { ...contact, name: contactDisplayName(contact) },
   });
-  if (!contact.isGroup && !fromMe) notifyIncomingMessage(contact, incomingMessage);
+  const repliedUserId = !fromMe && quotedMessage?.direction === "OUTGOING"
+    ? quotedMessage.sentByUserId
+    : null;
+  if (!contact.isGroup && !fromMe) notifyIncomingMessage(contact, incomingMessage, repliedUserId ? [repliedUserId] : []);
+  if (repliedUserId) {
+    notifyReply(contact, incomingMessage, repliedUserId);
+  }
   for (const reply of waitingReplies) {
     io.emit("message_reply_resolved", { messageId: reply.id, quotedMessageId: incomingMessage.id });
   }
