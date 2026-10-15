@@ -135,7 +135,7 @@ function SettingsContent({ user }: { user: SettingsUser }) {
   const accountChanged = nameChanged || avatarChanged;
   const availableSections = user.role === "admin"
     ? sections
-    : sections.filter((item) => item.value !== "whatsapp" && item.value !== "calls");
+    : sections.filter((item) => item.value !== "whatsapp");
 
   function changeSection(value: Section) {
     if (value === "business") {
@@ -337,11 +337,9 @@ function SettingsContent({ user }: { user: SettingsUser }) {
             </Tabs.Panel>
           )}
 
-          {user.role === "admin" && (
-            <Tabs.Panel value="calls" className={styles.panel}>
-              <EvolutionCallSettings />
-            </Tabs.Panel>
-          )}
+          <Tabs.Panel value="calls" className={styles.panel}>
+            <EvolutionCallSettings />
+          </Tabs.Panel>
 
         </div>
       </div>

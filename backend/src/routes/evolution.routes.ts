@@ -100,9 +100,7 @@ evolutionRouter.delete("/evolution/connection", async (request, response) => {
   }
 });
 
-evolutionRouter.get("/evolution/call-settings", async (request, response) => {
-  if (!requireAdminRole(request, response)) return;
-
+evolutionRouter.get("/evolution/call-settings", async (_request, response) => {
   try {
     const settings = await getWhatsAppCallSettings();
     response.json({ ...settings, suggestedMessage: DEFAULT_CALL_REJECTION_MESSAGE });
@@ -112,8 +110,6 @@ evolutionRouter.get("/evolution/call-settings", async (request, response) => {
 });
 
 evolutionRouter.put("/evolution/call-settings", async (request, response) => {
-  if (!requireAdminRole(request, response)) return;
-
   const rejectCall = isRecord(request.body) ? request.body.rejectCall : undefined;
   const rawMessage = isRecord(request.body) ? request.body.msgCall : undefined;
   if (typeof rejectCall !== "boolean" || typeof rawMessage !== "string") {

@@ -20,12 +20,13 @@ services:
     env_file:
       - .env
 
-    # Dentro do Docker, os serviços são acessados pelos nomes do Compose.
+    # Mantém a URL configurável para funcionar tanto no Compose local quanto
+    # quando CotrimBot e Evolution estão em projetos/redes separados no Dockploy.
     environment:
       DATABASE_URL: mysql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT}/${DATABASE_NAME}
       DATABASE_HOST: ${DATABASE_HOST}
       DATABASE_PORT: ${DATABASE_PORT}
-      EVOLUTION_API_URL: http://evolution-api:8080
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL}
       TRANSCRIPTION_SERVICE_URL: http://transcription:5000
 
   # Banco principal do CotrimBot

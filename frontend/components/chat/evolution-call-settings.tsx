@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, LoaderCircle, PhoneOff, RotateCcw } from "lucide-react";
+import styles from "./evolution-call-settings.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
@@ -153,10 +154,10 @@ export function EvolutionCallSettings() {
           role="switch"
           aria-checked={rejectCall}
           aria-label={rejectCall ? "Desativar recusa automática" : "Ativar recusa automática"}
-          className={`relative ml-auto mt-1 h-7 w-12 shrink-0 rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 ${rejectCall ? "border-white bg-white" : "border-zinc-700 bg-zinc-800"}`}
+          className={styles.callSwitch}
           onClick={toggleRejectCalls}
         >
-          <span className={`absolute top-[3px] size-5 rounded-full shadow-sm transition-transform ${rejectCall ? "translate-x-[22px] bg-black" : "translate-x-[3px] bg-zinc-400"}`} />
+          <span className={styles.callSwitchThumb} aria-hidden="true" />
         </button>
       </div>
 
