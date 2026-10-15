@@ -107,7 +107,7 @@ export function NotificationsPopover({
               ) : notifications.map((notification) => {
                 const Icon = notification.type === "CONVERSATION_ASSIGNED"
                   ? UserRoundPlus
-                  : notification.type === "MENTION" || notification.type === "PRIVATE_MENTION" ? AtSign : MessageSquare;
+                  : notification.type === "MENTION" || notification.type === "PRIVATE_MENTION" || notification.type === "INTERNAL_MENTION" ? AtSign : MessageSquare;
                 return (
                   <li key={notification.id}>
                     <button

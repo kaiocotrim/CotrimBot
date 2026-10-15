@@ -15,6 +15,7 @@ import { ensurePushSubscription } from "@/lib/pwa";
 type Options = {
   selectedContactId?: number;
   onOpenContact: (contactId: number) => void;
+  onOpenInternalConversation?: (conversationId: string) => void;
 };
 
 export function readNotificationPermission(): NotificationPermission | "unsupported" {
@@ -22,7 +23,7 @@ export function readNotificationPermission(): NotificationPermission | "unsuppor
   return window.Notification.permission;
 }
 
-export function useNotifications({ selectedContactId, onOpenContact }: Options) {
+export function useNotifications({ selectedContactId, onOpenContact, onOpenInternalConversation }: Options) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(readNotificationPermission);
@@ -30,10 +31,12 @@ export function useNotifications({ selectedContactId, onOpenContact }: Options) 
   // Os listeners do socket são registrados uma vez; os valores atuais ficam em refs.
   const selectedContactIdRef = useRef(selectedContactId);
   const onOpenContactRef = useRef(onOpenContact);
+  const onOpenInternalConversationRef = useRef(onOpenInternalConversation);
   const notificationsRef = useRef(notifications);
   useEffect(() => {
     selectedContactIdRef.current = selectedContactId;
     onOpenContactRef.current = onOpenContact;
+    onOpenInternalConversationRef.current = onOpenInternalConversation;
     notificationsRef.current = notifications;
   });
 
@@ -80,6 +83,7 @@ export function useNotifications({ selectedContactId, onOpenContact }: Options) 
           window.focus();
           desktopNotification.close();
           if (notification.contactId) onOpenContactRef.current(notification.contactId);
+          if (notification.internalConversationId) onOpenInternalConversationRef.current?.(notification.internalConversationId);
           markRead(notification.id);
         };
       }
@@ -95,9 +99,10 @@ export function useNotifications({ selectedContactId, onOpenContact }: Options) 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     function handleMessage(event: MessageEvent) {
-      const data = event.data as { type?: string; notificationId?: unknown; contactId?: unknown } | null;
+      const data = event.data as { type?: string; notificationId?: unknown; contactId?: unknown; internalConversationId?: unknown } | null;
       if (data?.type !== "cotrimbot:notification-click") return;
       if (typeof data.contactId === "number") onOpenContactRef.current(data.contactId);
+      if (typeof data.internalConversationId === "string") onOpenInternalConversationRef.current?.(data.internalConversationId);
       if (typeof data.notificationId === "number") {
         const item = notificationsRef.current.find((notification) => notification.id === data.notificationId);
         if (item && !item.readAt) markRead(item.id);

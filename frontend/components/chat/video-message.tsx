@@ -18,7 +18,7 @@ type VideoMessageProps = {
   content: string;
   showSignature: boolean;
   // Dados exibidos no cabeçalho do visualizador.
-  contact: Contact;
+  contact: Pick<Contact, "name" | "profilePictureUrl">;
   createdAt: string;
   // Imagens e vídeos disponíveis para navegação no visualizador.
   gallery: Array<{ id: number; type: "IMAGE" | "VIDEO"; mediaUrl: string; content: string; showSignature: boolean; createdAt: string }>;

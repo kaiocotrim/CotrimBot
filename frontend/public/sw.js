@@ -117,6 +117,7 @@ self.addEventListener("push", (event) => {
     id: typeof payload.id === "number" ? payload.id : null,
     type: payload.type ?? null,
     contactId: typeof payload.contactId === "number" ? payload.contactId : null,
+    internalConversationId: typeof payload.internalConversationId === "string" ? payload.internalConversationId : null,
   };
 
   event.waitUntil((async () => {
@@ -138,22 +139,23 @@ self.addEventListener("push", (event) => {
 // Ao clicar, foca uma janela do app (ou abre uma nova) e abre a conversa.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const { id, contactId } = event.notification.data ?? {};
+  const { id, contactId, internalConversationId } = event.notification.data ?? {};
 
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     const client = windows.find((item) => new URL(item.url).origin === self.location.origin);
 
     if (client) {
-      client.postMessage({ type: "cotrimbot:notification-click", notificationId: id ?? null, contactId: contactId ?? null });
+      client.postMessage({ type: "cotrimbot:notification-click", notificationId: id ?? null, contactId: contactId ?? null, internalConversationId: internalConversationId ?? null });
       await client.focus().catch(() => undefined);
       return;
     }
 
     const params = new URLSearchParams();
     if (contactId) params.set("contactId", String(contactId));
+    if (internalConversationId) params.set("conversationId", String(internalConversationId));
     if (id) params.set("notificationId", String(id));
     const query = params.toString();
-    await self.clients.openWindow(query ? `/?${query}` : "/");
+    await self.clients.openWindow(`${internalConversationId ? "/chat-interno/" : "/"}${query ? `?${query}` : ""}`);
   })());
 });

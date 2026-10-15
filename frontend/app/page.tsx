@@ -41,9 +41,16 @@ export default function Home() {
     if (contact) selectContact(contact);
   }
 
+  function openNotification(notification: import("@/lib/notification-api").AppNotification) {
+    if (!notification.readAt) notifications.markRead(notification.id);
+    if (notification.internalConversationId) router.push(`/chat-interno/?conversationId=${encodeURIComponent(notification.internalConversationId)}`);
+    else if (notification.contactId) openContactById(notification.contactId);
+  }
+
   const notifications = useNotifications({
     selectedContactId: chat.selectedContact?.id,
     onOpenContact: openContactById,
+    onOpenInternalConversation: (conversationId) => router.push(`/chat-interno/?conversationId=${encodeURIComponent(conversationId)}`),
   });
 
   // O app aberto por um clique em notificação push chega com ?contactId=; abre a conversa
@@ -94,10 +101,7 @@ export default function Home() {
         onRequestNotificationPermission={() => void notifications.requestPermission()}
         onMarkAllNotificationsRead={notifications.markAllRead}
         onClearNotifications={notifications.clearAll}
-        onOpenNotification={(notification) => {
-          if (!notification.readAt) notifications.markRead(notification.id);
-          if (notification.contactId) openContactById(notification.contactId);
-        }}
+        onOpenNotification={openNotification}
         headerActions={
           <NotificationsPopover
             notifications={notifications.notifications}
@@ -106,10 +110,7 @@ export default function Home() {
             onRequestPermission={() => void notifications.requestPermission()}
             onMarkAllRead={notifications.markAllRead}
             onClear={notifications.clearAll}
-            onOpenNotification={(notification) => {
-              if (!notification.readAt) notifications.markRead(notification.id);
-              if (notification.contactId) openContactById(notification.contactId);
-            }}
+            onOpenNotification={openNotification}
           />
         }
       />

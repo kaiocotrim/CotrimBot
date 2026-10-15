@@ -34,6 +34,7 @@ export function ChatNavigationRail({
   user,
   onNavigate,
   onOpenSettings,
+  unifiedConversations = false,
 }: {
   activeSection: ChatRailSection;
   unreadCount: number;
@@ -42,6 +43,7 @@ export function ChatNavigationRail({
   user?: RailUser | null;
   onNavigate: (section: ChatRailSection) => void;
   onOpenSettings: () => void;
+  unifiedConversations?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export function ChatNavigationRail({
   return (
     <nav aria-label="Navegação principal" className="flex h-full w-[60px] shrink-0 flex-col items-center border-r border-white/[0.08] bg-[#1a1a1a] px-2 py-3 text-zinc-400">
       <div className="flex w-full flex-col items-center gap-1">
-        {sections.map(({ id, label, icon: Icon }) => (
+        {sections.filter(({ id }) => !unifiedConversations || (id !== "contacts" && id !== "groups" && id !== "mine")).map(({ id, label, icon: Icon }) => (
           <motion.button
             key={id}
             type="button"

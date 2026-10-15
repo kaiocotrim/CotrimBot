@@ -8,6 +8,7 @@ export type PushPayload = {
   title: string;
   body: string;
   contactId: number | null;
+  internalConversationId?: string | null;
 };
 
 const publicKey = process.env.VAPID_PUBLIC_KEY;

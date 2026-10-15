@@ -13,34 +13,56 @@ export function useInternalChat() {
   const [messages, setMessages] = useState<InternalMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [typingUserId, setTypingUserId] = useState<string | null>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentUserId = useRef<string | null>(null);
+  const selectedIdRef = useRef<string | null>(null);
 
   const selected = useMemo(() => conversations.find((conversation) => conversation.id === selectedId) ?? null, [conversations, selectedId]);
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
 
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const organizations = (await authClient.organization.list()).data as Array<{ id: string }> | null;
-      const organization = organizations?.[0];
+      const [organizationResponse, sessionResponse] = await Promise.all([
+        authClient.organization.list(),
+        authClient.getSession(),
+      ]);
+      if (organizationResponse.error) {
+        throw new Error(organizationResponse.error.message || "Não foi possível carregar as empresas.");
+      }
+      const organizations = organizationResponse.data as Array<{ id: string }> | null;
+      const activeOrganizationId = (sessionResponse.data?.session as { activeOrganizationId?: string | null } | undefined)?.activeOrganizationId;
+      const organization = organizations?.find((item) => item.id === activeOrganizationId) ?? organizations?.[0];
       if (!organization) {
         setOrganizationId(null);
         setConversations([]);
         setMembers([]);
+        setError("Você ainda não participa de uma empresa. Entre em uma empresa para ver os contatos internos.");
         return;
       }
       setOrganizationId(organization.id);
-      const [conversationResult, memberResult] = await Promise.all([
-        internalChatApi.list(organization.id),
+      const [memberResult, conversationResult] = await Promise.allSettled([
         internalChatApi.members(organization.id),
+        internalChatApi.list(organization.id),
       ]);
-      setConversations(conversationResult.conversations);
-      setMembers(memberResult.members);
-      setSelectedId((current) => current ?? conversationResult.conversations[0]?.id ?? null);
+      if (memberResult.status === "fulfilled") setMembers(memberResult.value.members);
+      if (conversationResult.status === "fulfilled") {
+        setConversations(conversationResult.value.conversations);
+        const requestedId = new URLSearchParams(window.location.search).get("conversationId");
+        const requested = conversationResult.value.conversations.find((item) => item.id === requestedId);
+        setSelectedId((current) => requested?.id ?? current ?? conversationResult.value.conversations[0]?.id ?? null);
+      }
+      const failed = [memberResult, conversationResult].filter((result) => result.status === "rejected");
+      if (failed.length) {
+        const reason = failed[0].reason;
+        setError(reason instanceof Error ? reason.message : "Não foi possível carregar o chat interno.");
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Não foi possível carregar o chat interno.");
     } finally {
@@ -64,9 +86,9 @@ export function useInternalChat() {
       return;
     }
     let active = true;
-    queueMicrotask(() => { if (active) setLoadingMessages(true); });
+    queueMicrotask(() => { if (active) { setLoadingMessages(true); setMessages([]); setHasOlderMessages(false); } });
     void internalChatApi.messages(organizationId, selectedId)
-      .then((result) => { if (active) setMessages(result.messages); })
+      .then((result) => { if (active) { setMessages(result.messages); setHasOlderMessages(result.hasMore); } })
       .catch((loadError) => { if (active) setError(loadError instanceof Error ? loadError.message : "Não foi possível carregar as mensagens."); })
       .finally(() => { if (active) setLoadingMessages(false); });
     void internalChatApi.read(organizationId, selectedId).catch(() => undefined);
@@ -85,7 +107,8 @@ export function useInternalChat() {
       void internalChatApi.read(organizationId, selectedId).catch(() => undefined);
     };
     const handleDeleted = (payload: { conversationId: string; messageId: number }) => {
-      if (payload.conversationId === selectedId) setMessages((current) => current.filter((message) => message.id !== payload.messageId));
+      if (payload.conversationId === selectedId) setMessages((current) => current.map((message) => message.id === payload.messageId ? { ...message, content: "", deletedAt: new Date().toISOString() } : message));
+      setConversations((current) => current.map((conversation) => conversation.id === payload.conversationId && conversation.lastMessage?.id === payload.messageId ? { ...conversation, lastMessage: null } : conversation));
     };
     const handleTyping = (payload: { organizationId: string; conversationId: string; userId: string }) => {
       if (payload.organizationId !== organizationId || payload.conversationId !== selectedId || payload.userId === currentUserId.current) return;
@@ -108,6 +131,10 @@ export function useInternalChat() {
     socket.on("internal:typing:start", handleTyping);
     socket.on("internal:typing:stop", () => setTypingUserId(null));
     socket.on("internal:reaction:updated", handleReaction);
+    const handleConversationUpdated = (payload: { organizationId: string }) => {
+      if (payload.organizationId === organizationId) void reload();
+    };
+    socket.on("internal:conversation:updated", handleConversationUpdated);
     if (!socket.connected) socket.connect();
     return () => {
       socket.off("internal:message:new", addMessage);
@@ -115,10 +142,12 @@ export function useInternalChat() {
       socket.off("internal:typing:start", handleTyping);
       socket.off("internal:typing:stop");
       socket.off("internal:reaction:updated", handleReaction);
+      socket.off("internal:conversation:updated", handleConversationUpdated);
     };
-  }, [organizationId, selectedId]);
+  }, [organizationId, selectedId, reload]);
 
   const selectConversation = useCallback((conversationId: string) => {
+    selectedIdRef.current = conversationId;
     setSelectedId(conversationId);
     setConversations((current) => current.map((conversation) => conversation.id === conversationId ? { ...conversation, unreadCount: 0 } : conversation));
   }, []);
@@ -127,16 +156,64 @@ export function useInternalChat() {
     if (!organizationId) return;
     const result = await internalChatApi.create(organizationId, { type: "DIRECT", participantIds: [userId] });
     setConversations((current) => current.some((conversation) => conversation.id === result.conversation.id) ? current : [result.conversation, ...current]);
+    selectedIdRef.current = result.conversation.id;
     setSelectedId(result.conversation.id);
   }, [organizationId]);
 
-  const sendMessage = useCallback(async (content: string, replyToMessageId?: number) => {
+  const startGroup = useCallback(async (name: string, participantIds: string[]) => {
+    if (!organizationId) return;
+    const result = await internalChatApi.create(organizationId, { type: "GROUP", name, participantIds });
+    setConversations((current) => [result.conversation, ...current.filter((conversation) => conversation.id !== result.conversation.id)]);
+    selectedIdRef.current = result.conversation.id;
+    setSelectedId(result.conversation.id);
+  }, [organizationId]);
+
+  const addParticipants = useCallback(async (participantIds: string[]) => {
+    if (!organizationId || !selectedId) return;
+    const result = await internalChatApi.addParticipants(organizationId, selectedId, participantIds);
+    setConversations((current) => current.map((conversation) => conversation.id === selectedId ? { ...result.conversation, pinned: conversation.pinned, archived: conversation.archived, unreadCount: conversation.unreadCount } : conversation));
+  }, [organizationId, selectedId]);
+
+  const updatePreferences = useCallback(async (conversationId: string, preferences: { pinned?: boolean; archived?: boolean }) => {
+    if (!organizationId) return;
+    const result = await internalChatApi.preferences(organizationId, conversationId, preferences);
+    setConversations((current) => current.map((conversation) => conversation.id === conversationId ? { ...conversation, ...result } : conversation));
+  }, [organizationId]);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!organizationId || !selectedId || !hasOlderMessages || loadingOlderMessages || !messages[0]) return 0;
+    setLoadingOlderMessages(true);
+    try {
+      const result = await internalChatApi.messages(organizationId, selectedId, messages[0].id);
+      const older = result.messages.filter((message) => !messages.some((item) => item.id === message.id));
+      setMessages((current) => [...older.filter((message) => !current.some((item) => item.id === message.id)), ...current]);
+      setHasOlderMessages(result.hasMore);
+      return older.length;
+    } finally {
+      setLoadingOlderMessages(false);
+    }
+  }, [organizationId, selectedId, hasOlderMessages, loadingOlderMessages, messages]);
+
+  const sendMessage = useCallback(async (content: string, replyToMessageId?: number, options: { private?: boolean; includeSignature?: boolean; mentionedUserIds?: string[] } = {}) => {
     if (!organizationId || !selectedId || !content.trim() || sending) return;
     const clientId = crypto.randomUUID();
     setSending(true);
     try {
-      const result = await internalChatApi.send(organizationId, selectedId, { content: content.trim(), clientId, ...(replyToMessageId ? { replyToMessageId } : {}) });
-      setMessages((current) => current.some((message) => message.id === result.message.id || message.clientId === clientId) ? current : [...current, result.message]);
+      const result = await internalChatApi.send(organizationId, selectedId, { content: content.trim(), clientId, ...(replyToMessageId ? { replyToMessageId } : {}), ...options });
+      if (selectedIdRef.current === selectedId) setMessages((current) => current.some((message) => message.id === result.message.id || message.clientId === clientId) ? current : [...current, result.message]);
+    } finally {
+      setSending(false);
+    }
+  }, [organizationId, selectedId, sending]);
+
+  const sendMedia = useCallback(async (files: File[], caption: string, replyToMessageId?: number, includeSignature = true) => {
+    if (!organizationId || !selectedId || !files.length || sending) return;
+    setSending(true);
+    try {
+      for (const [index, file] of files.entries()) {
+        const result = await internalChatApi.sendMedia(organizationId, selectedId, file, index === 0 ? caption : "", index === 0 ? replyToMessageId : undefined, includeSignature);
+        if (selectedIdRef.current === selectedId) setMessages((current) => current.some((message) => message.id === result.message.id) ? current : [...current, result.message]);
+      }
     } finally {
       setSending(false);
     }
@@ -154,5 +231,12 @@ export function useInternalChat() {
     else await internalChatApi.react(organizationId, selectedId, messageId, emoji);
   }, [messages, organizationId, selectedId]);
 
-  return { organizationId, conversations, members, selected, selectedId, messages, loading, loadingMessages, sending, error, typingUserId, reload, selectConversation, startDirect, sendMessage, sendTyping, react };
+  const deleteMessage = useCallback(async (messageId: number) => {
+    if (!organizationId || !selectedId) return;
+    await internalChatApi.deleteMessage(organizationId, selectedId, messageId);
+    setMessages((current) => current.map((message) => message.id === messageId ? { ...message, content: "", deletedAt: new Date().toISOString() } : message));
+    setConversations((current) => current.map((conversation) => conversation.id === selectedId && conversation.lastMessage?.id === messageId ? { ...conversation, lastMessage: null } : conversation));
+  }, [organizationId, selectedId]);
+
+  return { organizationId, conversations, members, selected, selectedId, messages, loading, loadingMessages, loadingOlderMessages, hasOlderMessages, sending, error, typingUserId, reload, selectConversation, startDirect, startGroup, addParticipants, updatePreferences, loadOlderMessages, sendMessage, sendMedia, sendTyping, react, deleteMessage };
 }

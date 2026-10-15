@@ -42,6 +42,7 @@ model Notification {
   title     String
   body      String    @db.Text
   contactId Int?
+  internalConversationId String? @db.VarChar(191)
   readAt    DateTime?
   createdAt DateTime  @default(now())
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -49,6 +50,7 @@ model Notification {
 
   @@index([userId, readAt])
   @@index([userId, createdAt])
+  @@index([internalConversationId])
 }
 
 // Assinaturas Web Push (PWA) de cada navegador/dispositivo do usuário.
@@ -322,6 +324,8 @@ model InternalConversationParticipant {
   role           InternalParticipantRole @default(MEMBER)
   joinedAt       DateTime                @default(now())
   lastReadAt     DateTime?
+  pinned         Boolean                 @default(false)
+  archived       Boolean                 @default(false)
 
   conversation InternalConversation @relation(fields: [organizationId, conversationId], references: [organizationId, id], onDelete: Cascade)
   member       Member               @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
@@ -339,6 +343,7 @@ model InternalMessage {
   senderId             String
   content              String             @db.Text
   type                 InternalMessageType @default(TEXT)
+  private              Boolean            @default(false)
   clientId             String?            @db.VarChar(80)
   replyToMessageId     Int?
   createdAt            DateTime           @default(now())
@@ -350,10 +355,20 @@ model InternalMessage {
   replyTo      InternalMessage?    @relation("InternalMessageReply", fields: [replyToMessageId], references: [id], onDelete: SetNull)
   replies      InternalMessage[]    @relation("InternalMessageReply")
   reactions    InternalMessageReaction[]
+  media        InternalMessageMedia?
 
   @@unique([conversationId, clientId])
   @@index([organizationId, conversationId, id])
   @@index([senderId])
+}
+
+model InternalMessageMedia {
+  messageId Int    @id
+  mimeType  String @db.VarChar(100)
+  fileName  String @db.VarChar(255)
+  data      Bytes  @db.LongBlob
+
+  message InternalMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 }
 
 model InternalMessageReaction {

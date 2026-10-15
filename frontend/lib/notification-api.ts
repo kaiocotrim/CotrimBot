@@ -2,10 +2,11 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 export type AppNotification = {
   id: number;
-  type: "CONVERSATION_ASSIGNED" | "MENTION" | "PRIVATE_MENTION" | "NEW_MESSAGE";
+  type: "CONVERSATION_ASSIGNED" | "MENTION" | "PRIVATE_MENTION" | "INTERNAL_MENTION" | "NEW_MESSAGE";
   title: string;
   body: string;
   contactId: number | null;
+  internalConversationId: string | null;
   readAt: string | null;
   createdAt: string;
 };

@@ -1,7 +1,7 @@
 import type { Contact } from "@/types/chat";
 
 // Exibe a foto do WhatsApp ou a inicial quando não há imagem disponível.
-export function Avatar({ contact, className = "h-10 w-10" }: { contact: Contact; className?: string }) {
+export function Avatar({ contact, className = "h-10 w-10" }: { contact: Pick<Contact, "name" | "profilePictureUrl">; className?: string }) {
   if (contact.profilePictureUrl) {
     return (
       // A URL é externa e dinâmica, por isso não passa pelo otimizador do Next.

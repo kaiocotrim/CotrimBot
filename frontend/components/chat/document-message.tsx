@@ -5,15 +5,17 @@ type DocumentMessageProps = {
   mediaUrl: string;
   content: string;
   showSignature: boolean;
+  fileName?: string;
 };
 
 function withDownloadParameter(mediaUrl: string) {
   return `${mediaUrl}${mediaUrl.includes("?") ? "&" : "?"}download=1`;
 }
 
-export function DocumentMessage({ mediaUrl, content, showSignature }: DocumentMessageProps) {
+export function DocumentMessage({ mediaUrl, content, showSignature, fileName: explicitFileName }: DocumentMessageProps) {
   const signedDocument = showSignature && splitMessageSignatures(content).signatures.length > 0;
-  const fileName = content !== "[Documento]" ? content : "Documento";
+  const fileName = explicitFileName ?? (content !== "[Documento]" ? content : "Documento");
+  const caption = explicitFileName && content !== explicitFileName && content !== "[Documento]" ? content : null;
 
   return (
     <div className="flex min-w-[min(280px,62vw)] max-w-[min(420px,72vw)] items-center gap-3 rounded-xl bg-black/20 p-3">
@@ -24,10 +26,11 @@ export function DocumentMessage({ mediaUrl, content, showSignature }: DocumentMe
         </svg>
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold" title={signedDocument ? "Documento" : fileName}>
-          {signedDocument ? "Documento" : fileName}
+        <p className="truncate text-sm font-semibold" title={explicitFileName ? fileName : signedDocument ? "Documento" : fileName}>
+          {explicitFileName ? fileName : signedDocument ? "Documento" : fileName}
         </p>
         {signedDocument && <p className="mt-1 break-words whitespace-pre-wrap text-xs text-white/75 [overflow-wrap:anywhere]"><MessageText content={content} showSignature /></p>}
+        {caption && !signedDocument && <p className="mt-1 break-words whitespace-pre-wrap text-xs text-white/75 [overflow-wrap:anywhere]"><MessageText content={caption} /></p>}
         <a
           href={mediaUrl}
           target="_blank"

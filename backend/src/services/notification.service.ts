@@ -4,7 +4,7 @@ import { sendPushToUser } from "./push.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
 import { processInBatches } from "../utils/batch.js";
 
-export type NotificationType = "CONVERSATION_ASSIGNED" | "MENTION" | "NEW_MESSAGE";
+export type NotificationType = "CONVERSATION_ASSIGNED" | "MENTION" | "INTERNAL_MENTION" | "NEW_MESSAGE";
 
 export function userRoom(userId: string) {
   return `user:${userId}`;
@@ -16,6 +16,7 @@ type NewNotification = {
   title: string;
   body: string;
   contactId?: number;
+  internalConversationId?: string;
 };
 
 async function createNotification(data: NewNotification) {
@@ -28,6 +29,7 @@ async function createNotification(data: NewNotification) {
     title: notification.title,
     body: notification.body,
     contactId: notification.contactId,
+    internalConversationId: notification.internalConversationId,
   }));
   return notification;
 }
@@ -81,6 +83,28 @@ export function notifyMention(
       1,
     ),
   );
+}
+
+export function notifyInternalMention(
+  conversationId: string,
+  conversationName: string,
+  content: string,
+  userIds: string[],
+  actor: { id: string; name: string },
+) {
+  const preview = content.trim();
+  const bodyPreview = preview.length > 110 ? `${preview.slice(0, 107)}...` : preview;
+  void safely(processInBatches(
+    [...new Set(userIds)].filter((userId) => userId !== actor.id),
+    (userId) => safely(createNotification({
+      userId,
+      type: "INTERNAL_MENTION",
+      title: `${actor.name} mencionou você`,
+      body: `${conversationName}: ${bodyPreview}`,
+      internalConversationId: conversationId,
+    })),
+    1,
+  ));
 }
 
 export function notifyIncomingMessage(

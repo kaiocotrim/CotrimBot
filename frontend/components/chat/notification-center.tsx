@@ -18,7 +18,7 @@ function formatRelativeTime(value: string, now: number) {
 }
 
 function isMention(notification: AppNotification) {
-  return notification.type === "MENTION" || notification.type === "PRIVATE_MENTION";
+  return notification.type === "MENTION" || notification.type === "PRIVATE_MENTION" || notification.type === "INTERNAL_MENTION";
 }
 
 export function NotificationCenter({

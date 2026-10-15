@@ -13,7 +13,7 @@ type ImageMessageProps = {
   content: string;
   showSignature: boolean;
   viewOnce: boolean;
-  contact: Contact;
+  contact: Pick<Contact, "name" | "profilePictureUrl">;
   createdAt: string;
   gallery: Array<{ id: number; mediaUrl: string; content: string; showSignature: boolean; createdAt: string; viewOnce: boolean }>;
 };

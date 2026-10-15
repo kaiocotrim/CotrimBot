@@ -16,6 +16,9 @@ import type { Message } from "@/types/chat";
 type MessageComposerProps = {
   userId: string;
   dropZoneContainer: HTMLElement | null;
+  mode?: "external" | "internal";
+  internalMentionUsers?: ContactAssignee[];
+  replyMediaUrl?: (messageId: number) => string;
   text: string;
   sending: boolean;
   closing: boolean;
@@ -25,7 +28,7 @@ type MessageComposerProps = {
   onCloseWithBot: () => void;
   allowCloseWithBot?: boolean;
   focusRequestKey: number;
-  replyingTo: Message | null;
+  replyingTo: Pick<Message, "id" | "type" | "content" | "direction" | "senderName" | "private"> | null;
   onCancelReply: () => void;
 
   onSendMedia: (
@@ -60,7 +63,7 @@ function normalizeMentionSearch(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
 }
 
-function replyPreview(message: Message) {
+function replyPreview(message: Pick<Message, "type" | "content" | "direction" | "private">) {
   const labels: Partial<Record<Message["type"], string>> = {
     AUDIO: "Áudio",
     IMAGE: "Imagem",
@@ -101,6 +104,9 @@ const privateButtonClassName = "border-zinc-300 bg-zinc-100 !text-zinc-700 hover
 export function MessageComposer({
   userId,
   dropZoneContainer,
+  mode = "external",
+  internalMentionUsers,
+  replyMediaUrl,
   text,
   sending,
   closing,
@@ -132,7 +138,7 @@ export function MessageComposer({
   const [mentionMatch, setMentionMatch] = useState<MentionMatch | null>(null);
   const [activeMentionIndex, setActiveMentionIndex] = useState(0);
   const [selectedMentions, setSelectedMentions] = useState<Record<string, string>>({});
-  const signaturePreferenceKey = `cotrimbot:include-signature:${userId}`;
+  const signaturePreferenceKey = `cotrimbot:include-signature:${mode === "internal" ? "internal:" : ""}${userId}`;
   const [includeSignature, setIncludeSignature] = useState(() => {
     if (typeof window === "undefined") return true;
     try {
@@ -190,10 +196,10 @@ export function MessageComposer({
   const filteredMentionUsers = useMemo(() => {
     if (!mentionMatch) return [];
     const query = normalizeMentionSearch(mentionMatch.query);
-    return mentionableUsers
+    return (mode === "internal" ? internalMentionUsers ?? [] : mentionableUsers)
       .filter((user) => user.id !== userId && (!query || normalizeMentionSearch(user.name).includes(query)))
       .slice(0, 6);
-  }, [mentionMatch, mentionableUsers, userId]);
+  }, [internalMentionUsers, mentionMatch, mentionableUsers, mode, userId]);
 
   async function loadMentionableUsers() {
     if (mentionsLoaded || mentionsLoading) return;
@@ -218,7 +224,7 @@ export function MessageComposer({
     }
     setMentionMatch({ start: beforeCaret.lastIndexOf("@"), end: caret, query: match[1] ?? "" });
     setActiveMentionIndex(0);
-    void loadMentionableUsers();
+    if (mode === "external") void loadMentionableUsers();
   }
 
   function changeText(nextValue: string, caret: number) {
@@ -422,7 +428,7 @@ export function MessageComposer({
       onTextChange("");
     } catch (error) {
       console.error("Erro ao enviar anexo:", error);
-      setAttachmentError("Não foi possível enviar o arquivo. Tente novamente.");
+      setAttachmentError(error instanceof Error ? error.message : "Não foi possível enviar o arquivo. Tente novamente.");
     }
   }
   async function startRecording() {
@@ -762,7 +768,7 @@ export function MessageComposer({
                   </span>
                   <span className="flex min-w-0 items-center gap-2">
                     {replyingTo.type === "IMAGE" && (
-                      <Image unoptimized src={`${API_URL}/messages/${replyingTo.id}/media`} alt="" width={32} height={32} className="size-8 shrink-0 rounded-md object-cover" />
+                      <Image unoptimized src={replyMediaUrl?.(replyingTo.id) ?? `${API_URL}/messages/${replyingTo.id}/media`} alt="" width={32} height={32} className="size-8 shrink-0 rounded-md object-cover" />
                     )}
                     <span className="block truncate text-xs text-zinc-300">{replyPreview(replyingTo)}</span>
                   </span>
@@ -878,9 +884,9 @@ export function MessageComposer({
                 style={{ bottom: fieldHeight + 8, right: isStacked ? 0 : 56 }}
                 className={`absolute left-0 z-[80] max-h-64 overflow-y-auto rounded-2xl border p-1.5 shadow-[0_18px_55px_rgba(0,0,0,0.55)] backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${isPrivateMode ? "border-zinc-300 bg-zinc-100/98 text-zinc-900" : "border-white/10 bg-zinc-900/98 text-zinc-100"}`}
               >
-                <p className={`px-3 py-2 text-[11px] font-medium ${isPrivateMode ? "text-zinc-600" : "text-zinc-500"}`}>Mencionar técnico</p>
-                {mentionsLoading && <p role="status" className={`px-3 py-4 text-center text-xs ${isPrivateMode ? "text-zinc-600" : "text-zinc-500"}`}>Carregando técnicos...</p>}
-                {!mentionsLoading && mentionError && <p role="alert" className={`px-3 py-3 text-xs ${isPrivateMode ? "text-red-700" : "text-red-300"}`}>{mentionError}</p>}
+                <p className={`px-3 py-2 text-[11px] font-medium ${isPrivateMode ? "text-zinc-600" : "text-zinc-500"}`}>{mode === "internal" ? "Mencionar membro" : "Mencionar técnico"}</p>
+                {mode === "external" && mentionsLoading && <p role="status" className={`px-3 py-4 text-center text-xs ${isPrivateMode ? "text-zinc-600" : "text-zinc-500"}`}>Carregando técnicos...</p>}
+                {mode === "external" && !mentionsLoading && mentionError && <p role="alert" className={`px-3 py-3 text-xs ${isPrivateMode ? "text-red-700" : "text-red-300"}`}>{mentionError}</p>}
                 {!mentionsLoading && !mentionError && filteredMentionUsers.map((user, index) => (
                   <button
                     key={user.id}
@@ -897,8 +903,8 @@ export function MessageComposer({
                     <span className="min-w-0 flex-1 truncate text-sm">{user.name}</span>
                   </button>
                 ))}
-                {!mentionsLoading && !mentionError && mentionsLoaded && !filteredMentionUsers.length && (
-                  <p className={`px-3 py-4 text-center text-xs ${isPrivateMode ? "text-zinc-600" : "text-zinc-500"}`}>Nenhum técnico encontrado.</p>
+                {!mentionsLoading && !mentionError && (mode === "internal" || mentionsLoaded) && !filteredMentionUsers.length && (
+                  <p className={`px-3 py-4 text-center text-xs ${isPrivateMode ? "text-zinc-600" : "text-zinc-500"}`}>{mode === "internal" ? "Nenhum membro encontrado." : "Nenhum técnico encontrado."}</p>
                 )}
               </motion.div>
             )}

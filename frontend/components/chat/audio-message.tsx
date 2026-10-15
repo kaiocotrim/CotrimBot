@@ -8,6 +8,7 @@ import { TranscriptionSettings } from "@/components/chat/transcription-settings"
 type AudioMessageProps = {
   mediaUrl: string;
   messageId: number;
+  onTranscribe?: (messageId: number) => Promise<string>;
 };
 
 const PLAYBACK_RATES = [1, 1.5, 2] as const;
@@ -22,7 +23,7 @@ function formatTime(seconds: number) {
   return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 }
 
-export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
+export function AudioMessage({ mediaUrl, messageId, onTranscribe }: AudioMessageProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   // Player
@@ -85,9 +86,9 @@ export function AudioMessage({ mediaUrl, messageId }: AudioMessageProps) {
       setTranscribing(true);
       setError(null);
 
-      const result = await transcribeMessage(messageId);
+      const transcription = onTranscribe ? await onTranscribe(messageId) : (await transcribeMessage(messageId)).transcription;
 
-      setTranscription(result.transcription);
+      setTranscription(transcription);
       setShowTranscription(true);
     } catch (err) {
       console.error("Erro ao transcrever:", err);
