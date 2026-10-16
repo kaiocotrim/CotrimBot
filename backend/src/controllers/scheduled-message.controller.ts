@@ -54,3 +54,24 @@ export async function createScheduledMessage(request: Request, response: Respons
   });
   return response.status(201).json({ scheduledMessage });
 }
+
+export async function deleteScheduledMessage(request: Request, response: Response) {
+  const id = request.params.id;
+  if (typeof id !== "string" || !id) return response.status(400).json({ error: "Identificador da mensagem inválido." });
+  const scheduledMessage = await prisma.scheduledMessage.findFirst({
+    where: { id, userId: request.user!.id },
+    select: { id: true, status: true },
+  });
+
+  if (!scheduledMessage) return response.status(404).json({ error: "Mensagem programada não encontrada." });
+  if (scheduledMessage.status === "PROCESSING") {
+    return response.status(409).json({ error: "Esta mensagem está sendo enviada e não pode ser excluída agora." });
+  }
+
+  const deleted = await prisma.scheduledMessage.deleteMany({
+    where: { id, userId: request.user!.id, status: { not: "PROCESSING" } },
+  });
+  if (!deleted.count) return response.status(409).json({ error: "Esta mensagem começou a ser enviada e não pode mais ser excluída." });
+
+  return response.status(204).send();
+}

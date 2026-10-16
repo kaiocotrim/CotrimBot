@@ -504,6 +504,593 @@
   margin-top: 0;
 }
 
+.clientForm {
+  display: flex;
+  max-width: 620px;
+  flex-direction: column;
+  gap: 22px;
+  margin-top: 24px;
+  padding: 26px;
+  border: 0;
+  border-radius: 20px;
+  background: linear-gradient(155deg, #121212 0%, #0c0c0c 72%);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 18%);
+  animation: clientCardIn 280ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes clientCardIn {
+  from {
+    transform: translateY(10px) scale(.985);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.clientForm > .primaryButton {
+  margin-top: 0;
+}
+
+.clientForm .field {
+  gap: 8px;
+  color: #a9a9a9;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.clientForm .field > input {
+  min-height: 46px;
+  border-color: #292929;
+  background: #090909;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.clientForm .field > input:hover:not(:disabled) {
+  border-color: #393939;
+  background: #0b0b0b;
+}
+
+.clientForm .field > input:focus-visible {
+  border-color: #686868;
+  box-shadow: 0 0 0 3px rgb(255 255 255 / 6%);
+}
+
+.clientLinks {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding-top: 2px;
+}
+
+.clientLinksHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.clientLinksHeader > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.clientLinksHeader strong {
+  color: #e6e6e6;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.clientLinksHeader span,
+.emptyLinks {
+  color: #777;
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.addLinkButton {
+  display: inline-flex;
+  min-height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid #282828;
+  background: #151515;
+  color: #cfcfcf;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.addLinkButton:hover:not(:disabled) {
+  border-color: #3d3d3d;
+  background: #1b1b1b;
+  color: #fff;
+}
+
+.addLinkButton:disabled,
+.removeLinkButton:disabled {
+  opacity: .45;
+}
+
+.emptyLinks {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px dashed #292929;
+  border-radius: 13px;
+  background: rgb(255 255 255 / 1.5%);
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.emptyLinks:hover {
+  border-color: #444;
+  background: rgb(255 255 255 / 3%);
+  color: #c7c7c7;
+}
+
+.linkList {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.linkRow {
+  display: grid;
+  min-height: 46px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 0 7px 0 14px;
+  border: 1px solid #292929;
+  border-radius: 13px;
+  transition: border-color 150ms ease;
+}
+
+.linkRow:focus-within {
+  border-color: #707070;
+}
+
+.linkIcon {
+  display: inline-flex;
+  color: #777;
+}
+
+.linkRow input {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 0;
+  outline: none;
+  background: transparent;
+  color: #e6e6e6;
+  font-size: 14px;
+}
+
+.linkRow input::placeholder {
+  color: #666;
+}
+
+.removeLinkButton {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: #777;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.removeLinkButton:hover:not(:disabled) {
+  background: rgb(239 68 68 / 10%);
+  color: #fca5a5;
+}
+
+.clientSectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.clientSectionHeader > div {
+  min-width: 0;
+}
+
+.clientSectionHeader p {
+  margin: 7px 0 0;
+  color: #858585;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.newClientButton {
+  display: inline-flex;
+  min-height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border-radius: 11px;
+  background: #f2f2f2;
+  color: #0a0a0a;
+  font-size: 13px;
+  font-weight: 600;
+  transition: transform 160ms ease, background-color 160ms ease, opacity 160ms ease;
+}
+
+.newClientButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #fff;
+}
+
+.newClientButton:active:not(:disabled) {
+  transform: scale(.97);
+}
+
+.newClientButton:disabled {
+  cursor: default;
+  opacity: .42;
+}
+
+.clientSearch {
+  display: flex;
+  width: 100%;
+  max-width: 620px;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 0 13px;
+  border-radius: 12px;
+  background: #111;
+  color: #707070;
+  transition: background-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+}
+
+.clientSearch:focus-within {
+  background: #151515;
+  color: #aaa;
+  box-shadow: 0 0 0 1px #383838, 0 0 0 4px rgb(255 255 255 / 4%);
+}
+
+.clientSearch input {
+  width: 100%;
+  min-width: 0;
+  outline: none;
+  background: transparent;
+  color: #e8e8e8;
+  font-size: 13px;
+}
+
+.clientSearch input::placeholder {
+  color: #696969;
+}
+
+.clientSearch input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.clientSearch button {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: #777;
+}
+
+.clientSearch button:hover {
+  background: #242424;
+  color: #ddd;
+}
+
+.noClientResults {
+  display: flex;
+  max-width: 620px;
+  min-height: 170px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #666;
+  text-align: center;
+}
+
+.noClientResults strong {
+  color: #cfcfcf;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.noClientResults span {
+  font-size: 12px;
+}
+
+.clientDraftHeader {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.clientMediaSection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px;
+  border: 0;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 1.6%);
+}
+
+.clientAvatar {
+  display: flex;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid #292929;
+  border-radius: 17px;
+  background: linear-gradient(145deg, #222, #171717);
+  color: #909090;
+}
+
+.clientAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.clientPhotoActions {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.clientPhotoActions strong {
+  color: #f0f0f0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.clientPhotoActions > span {
+  color: #777;
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.clientPhotoActions > div {
+  display: flex;
+  gap: 13px;
+  margin-top: 6px;
+}
+
+.clientPhotoActions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #b9b9b9;
+  font-size: 12px;
+  font-weight: 500;
+  transition: color 150ms ease;
+}
+
+.clientPhotoActions button:hover:not(:disabled) {
+  color: #fff;
+}
+
+.clientImageUrl {
+  margin: 0;
+}
+
+.clientFormActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 2px -26px -26px;
+  padding: 18px 26px;
+  border-top: 0;
+  border-radius: 0 0 20px 20px;
+  background: rgb(0 0 0 / 14%);
+}
+
+.clientFormActions > .primaryButton {
+  align-self: auto;
+  margin-top: 0;
+  padding-inline: 20px;
+}
+
+.cancelClientButton {
+  min-height: 40px;
+  padding: 9px 15px;
+  border-radius: 999px;
+  color: #aaa;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.cancelClientButton:hover:not(:disabled) {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.emptyClients {
+  display: flex;
+  width: 100%;
+  max-width: 620px;
+  min-height: 210px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 24px;
+  border: 1px dashed #292929;
+  border-radius: 18px;
+  color: #d7d7d7;
+  text-align: center;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.emptyClients:hover {
+  transform: translateY(-1px);
+  border-color: #484848;
+  background: #0e0e0e;
+}
+
+.emptyClients > span {
+  display: flex;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  border-radius: 12px;
+  background: #1b1b1b;
+}
+
+.emptyClients strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.emptyClients small,
+.noClientLinks {
+  color: #747474;
+  font-size: 12px;
+}
+
+.clientGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 68px);
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.clientLogoButton {
+  position: relative;
+  display: flex;
+  width: 68px;
+  height: 68px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 19px;
+  outline: none;
+  transition: transform 180ms cubic-bezier(.22, 1, .36, 1), background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.clientLogoButton::after {
+  position: absolute;
+  inset: -3px;
+  border: 1px solid transparent;
+  border-radius: 21px;
+  content: "";
+  transition: border-color 160ms ease;
+}
+
+.clientLogoButton:hover {
+  transform: translateY(-2px) scale(1.025);
+  background: #111;
+  box-shadow: 0 10px 24px rgb(0 0 0 / 22%);
+}
+
+.clientLogoButton:hover::after,
+.clientLogoButton:focus-visible::after {
+  border-color: #343434;
+}
+
+.clientLogoButton:active {
+  transform: scale(.96);
+}
+
+.clientLogoButton .clientAvatar {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+}
+
+.clientCard {
+  display: flex;
+  min-width: 0;
+  gap: 13px;
+  padding: 16px;
+  border: 1px solid #1e1e1e;
+  border-radius: 16px;
+  background: #0e0e0e;
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.clientCard:hover {
+  transform: translateY(-2px);
+  border-color: #303030;
+  background: #111;
+}
+
+.clientCard .clientAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+}
+
+.clientCardContent {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.clientCardContent > strong {
+  overflow: hidden;
+  color: #eee;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.savedClientLinks {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.savedClientLinks a {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: #898989;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.savedClientLinks a:hover {
+  color: #dedede;
+}
+
+.savedClientLinks a span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .profilePhotoRow {
   display: flex;
   align-items: center;
@@ -817,6 +1404,50 @@
     height: 64px;
     flex-basis: 64px;
   }
+
+  .clientSectionHeader {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .newClientButton {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .clientForm {
+    gap: 20px;
+    padding: 17px;
+  }
+
+  .clientMediaSection {
+    padding: 15px;
+  }
+
+  .clientFormActions {
+    margin: 2px -17px -17px;
+    padding: 16px 17px;
+  }
+
+  .clientLinksHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .clientFormActions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .clientFormActions > .primaryButton,
+  .cancelClientButton {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .clientGrid {
+    grid-template-columns: repeat(auto-fill, 68px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -830,5 +1461,9 @@
   .dialog[data-starting-style],
   .dialog[data-ending-style] {
     transform: translate(-50%, -50%);
+  }
+
+  .clientForm {
+    animation: none;
   }
 }

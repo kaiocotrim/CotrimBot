@@ -1,8 +1,9 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { Bot, Check, ChevronDown, LoaderCircle, MessageCircle, Pencil, UserRound, X } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Bot, Building2, Check, ChevronDown, ExternalLink, Link2, LoaderCircle, MessageCircle, Pencil, UserRound, X } from "lucide-react";
+import Image from "next/image";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ContactPhoto } from "@/components/chat/contact-photo";
 import {
   getContactAssignees,
@@ -12,6 +13,10 @@ import {
 } from "@/lib/chat-api";
 import { contactPriorities } from "@/lib/contact-priority";
 import type { Contact } from "@/types/chat";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
+type RegisteredCompany = { id: string; name: string; image: string | null; links: string[] };
+const JOB_TITLE_OPTIONS = ["T.I", "Operador", "Supervisor"] as const;
 
 function UserAvatar({ name, image }: { name: string; image?: string | null }) {
   const [failed, setFailed] = useState(false);
@@ -56,7 +61,14 @@ export function ContactInfoPanel({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [registeredCompanies, setRegisteredCompanies] = useState<RegisteredCompany[]>([]);
+  const [companiesLoading, setCompaniesLoading] = useState(false);
+  const [companyPickerOpen, setCompanyPickerOpen] = useState(false);
+  const [activeCompanyIndex, setActiveCompanyIndex] = useState(0);
   const [jobTitle, setJobTitle] = useState("");
+  const [jobPickerOpen, setJobPickerOpen] = useState(false);
+  const [activeJobIndex, setActiveJobIndex] = useState(0);
   const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +96,39 @@ export function ContactInfoPanel({
     : selectedAssignees.length <= 2
       ? selectedAssignees.map((user) => user.name).join(" e ")
       : `${selectedAssignees[0]?.name}, ${selectedAssignees[1]?.name} e mais ${selectedAssignees.length - 2}`;
+  const matchingCompanies = useMemo(() => {
+    const search = companyName.trim().toLocaleLowerCase("pt-BR");
+    if (!search || selectedCompanyId) return registeredCompanies;
+    return registeredCompanies.filter((company) => company.name.toLocaleLowerCase("pt-BR").includes(search));
+  }, [companyName, registeredCompanies, selectedCompanyId]);
+  const contactCompany = useMemo(() => registeredCompanies.find((company) => (
+    company.name.localeCompare(contact.companyName ?? "", "pt-BR", { sensitivity: "base" }) === 0
+  )) ?? null, [contact.companyName, registeredCompanies]);
+  const matchingJobTitles = JOB_TITLE_OPTIONS.filter((option) => (
+    !jobTitle.trim() || option.toLocaleLowerCase("pt-BR").includes(jobTitle.trim().toLocaleLowerCase("pt-BR"))
+  ));
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch(`${API_URL}/clients`, { credentials: "include", cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({})) as {
+          clients?: Array<{ id?: string; name?: string; image?: string | null; links?: string[] }>;
+        };
+        if (!response.ok || !Array.isArray(payload.clients)) return;
+        setRegisteredCompanies(payload.clients
+          .filter((client): client is { id: string; name: string; image?: string | null; links?: string[] } => Boolean(client.id && client.name?.trim()))
+          .map((client) => ({
+            id: client.id,
+            name: client.name.trim(),
+            image: client.image ?? null,
+            links: Array.isArray(client.links) ? client.links : [],
+          }))
+          .sort((first, second) => first.name.localeCompare(second.name, "pt-BR", { sensitivity: "base" })));
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [contact.id]);
 
   useEffect(() => {
     if (contact.isGroup) return;
@@ -189,16 +234,53 @@ export function ContactInfoPanel({
     setFirstName(first);
     setLastName(rest.join(" "));
     setCompanyName(contact.companyName ?? "");
+    setSelectedCompanyId(null);
+    setCompanyPickerOpen(false);
+    setActiveCompanyIndex(0);
+    setCompaniesLoading(true);
     setJobTitle(contact.jobTitle ?? "");
+    setJobPickerOpen(false);
+    setActiveJobIndex(0);
     setPhone(contact.phone);
     setError(null);
     setEditing(true);
+    void fetch(`${API_URL}/clients`, { credentials: "include", cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({})) as {
+          clients?: Array<{ id?: string; name?: string; image?: string | null; links?: string[] }>;
+          error?: string;
+        };
+        if (!response.ok || !Array.isArray(payload.clients)) {
+          throw new Error(payload.error || "Não foi possível carregar as empresas cadastradas.");
+        }
+        const companies = payload.clients
+          .filter((client): client is { id: string; name: string; image?: string | null; links?: string[] } => Boolean(client.id && client.name?.trim()))
+          .map((client) => ({
+            id: client.id,
+            name: client.name.trim(),
+            image: client.image ?? null,
+            links: Array.isArray(client.links) ? client.links : [],
+          }))
+          .sort((first, second) => first.name.localeCompare(second.name, "pt-BR", { sensitivity: "base" }));
+        setRegisteredCompanies(companies);
+        const currentCompany = companies.find((company) => company.name.localeCompare(contact.companyName ?? "", "pt-BR", { sensitivity: "base" }) === 0);
+        setSelectedCompanyId(currentCompany?.id ?? null);
+      })
+      .catch((requestError: unknown) => {
+        setRegisteredCompanies([]);
+        setError(requestError instanceof Error ? requestError.message : "Não foi possível carregar as empresas cadastradas.");
+      })
+      .finally(() => setCompaniesLoading(false));
     if (focusPhone) requestAnimationFrame(() => phoneInputRef.current?.focus());
   }
 
   async function saveName(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving || !firstName.trim()) return;
+    if (!selectedCompanyId || !companyName.trim()) {
+      setError("Selecione uma empresa cadastrada.");
+      return;
+    }
 
     const name = `${firstName.trim()} ${lastName.trim()}`.trim().replace(/\s+/g, " ");
     const normalizedPhone = phone.replace(/\D/g, "");
@@ -242,7 +324,10 @@ export function ContactInfoPanel({
 
       <div className="relative flex min-h-0 flex-1 flex-col items-center overflow-y-auto overscroll-contain px-6 pt-8 pb-[max(2rem,env(safe-area-inset-bottom))] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <ContactPhoto contact={contact} />
-        <h3 className="mt-4 max-w-full text-center text-2xl font-semibold break-words text-white lg:text-xl">{contact.name}</h3>
+        <h3 className="mt-4 max-w-full text-center text-2xl font-semibold break-words text-white lg:text-xl">
+          {contact.name}
+          {contact.jobTitle && <span className="font-normal text-zinc-400"> - {contact.jobTitle}</span>}
+        </h3>
         <p className="mt-1 text-base text-zinc-300/80 lg:text-sm">
           {contact.isGroup ? "Grupo do WhatsApp" : contact.phone}
         </p>
@@ -276,28 +361,160 @@ export function ContactInfoPanel({
                 className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-base text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50 lg:text-sm"
               />
             </label>
-            <label className="block text-sm text-zinc-300/80 lg:text-xs">
-              Empresa
-              <input
-                autoComplete="organization"
-                maxLength={191}
-                value={companyName}
-                onChange={(event) => setCompanyName(event.target.value)}
-                disabled={saving}
-                className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-base text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50 lg:text-sm"
-              />
-            </label>
-            <label className="block text-sm text-zinc-300/80 lg:text-xs">
-              Cargo
-              <input
-                autoComplete="organization-title"
-                maxLength={191}
-                value={jobTitle}
-                onChange={(event) => setJobTitle(event.target.value)}
-                disabled={saving}
-                className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-base text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50 lg:text-sm"
-              />
-            </label>
+            <div className="relative block text-sm text-zinc-300/80 lg:text-xs">
+              <span>Empresa</span>
+              <div className="mt-1.5 flex min-h-10 w-full items-center gap-2 rounded-xl bg-zinc-900 px-3 text-white focus-within:ring-2 focus-within:ring-white/40">
+                {selectedCompanyId && (() => {
+                  const company = registeredCompanies.find((item) => item.id === selectedCompanyId);
+                  return company ? (
+                    <span aria-hidden="true" className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/[0.07] text-zinc-500">
+                      <Building2 className="size-4" strokeWidth={1.7} />
+                      {company.image && <Image src={company.image} alt="" width={28} height={28} unoptimized className="absolute inset-0 size-full object-contain p-0.5" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
+                    </span>
+                  ) : null;
+                })()}
+                <input
+                  required
+                  type="text"
+                  role="combobox"
+                  aria-label="Pesquisar empresa cadastrada"
+                  aria-autocomplete="list"
+                  aria-expanded={companyPickerOpen}
+                  aria-controls="contact-company-options"
+                  aria-activedescendant={companyPickerOpen && matchingCompanies[activeCompanyIndex] ? `contact-company-${matchingCompanies[activeCompanyIndex].id}` : undefined}
+                  autoComplete="off"
+                  maxLength={191}
+                  value={companyName}
+                  onFocus={() => setCompanyPickerOpen(true)}
+                  onBlur={() => window.setTimeout(() => setCompanyPickerOpen(false), 120)}
+                  onChange={(event) => {
+                    setCompanyName(event.target.value);
+                    setSelectedCompanyId(null);
+                    setActiveCompanyIndex(0);
+                    setCompanyPickerOpen(true);
+                    setError(null);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowDown") {
+                      event.preventDefault();
+                      setCompanyPickerOpen(true);
+                      setActiveCompanyIndex((current) => Math.max(0, Math.min(current + 1, matchingCompanies.length - 1)));
+                    } else if (event.key === "ArrowUp") {
+                      event.preventDefault();
+                      setActiveCompanyIndex((current) => Math.max(current - 1, 0));
+                    } else if (event.key === "Enter" && companyPickerOpen && matchingCompanies[activeCompanyIndex]) {
+                      event.preventDefault();
+                      const company = matchingCompanies[activeCompanyIndex];
+                      setSelectedCompanyId(company.id);
+                      setCompanyName(company.name);
+                      setCompanyPickerOpen(false);
+                    } else if (event.key === "Escape") {
+                      setCompanyPickerOpen(false);
+                    }
+                  }}
+                  disabled={saving || companiesLoading || registeredCompanies.length === 0}
+                  placeholder={companiesLoading ? "Carregando empresas..." : registeredCompanies.length ? "Digite o nome da empresa" : "Nenhuma empresa cadastrada"}
+                  className="min-w-0 flex-1 bg-transparent py-2 text-base text-white outline-none placeholder:text-zinc-600 disabled:opacity-50 lg:text-sm"
+                />
+                <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-zinc-500 transition-transform ${companyPickerOpen ? "rotate-180" : ""}`} strokeWidth={1.8} />
+              </div>
+              {companyPickerOpen && !companiesLoading && registeredCompanies.length > 0 && (
+                <div id="contact-company-options" role="listbox" aria-label="Empresas cadastradas" className="absolute inset-x-0 top-full z-50 mt-2 max-h-60 overflow-y-auto rounded-xl border border-white/[0.09] bg-zinc-900 p-1.5 shadow-2xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {matchingCompanies.length ? matchingCompanies.map((company, index) => (
+                    <button
+                      id={`contact-company-${company.id}`}
+                      key={company.id}
+                      type="button"
+                      role="option"
+                      aria-selected={company.id === selectedCompanyId}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onMouseEnter={() => setActiveCompanyIndex(index)}
+                      onClick={() => {
+                        setSelectedCompanyId(company.id);
+                        setCompanyName(company.name);
+                        setCompanyPickerOpen(false);
+                        setError(null);
+                      }}
+                      className={["flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors", index === activeCompanyIndex ? "bg-white/[0.09]" : "hover:bg-white/[0.06]"].join(" ")}
+                    >
+                      <span aria-hidden="true" className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/[0.07] text-zinc-500">
+                        <Building2 className="size-4" strokeWidth={1.7} />
+                        {company.image && <Image src={company.image} alt="" width={36} height={36} unoptimized className="absolute inset-0 size-full object-contain p-1" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-100">{company.name}</span>
+                      {company.id === selectedCompanyId && <Check aria-hidden="true" className="size-4 text-emerald-400" />}
+                    </button>
+                  )) : (
+                    <p className="px-3 py-4 text-center text-xs text-zinc-500">Nenhuma empresa encontrada.</p>
+                  )}
+                </div>
+              )}
+              {!companiesLoading && registeredCompanies.length === 0 && (
+                <span className="mt-1 block text-[11px] text-zinc-500">Cadastre primeiro a empresa em Configurações → Cliente.</span>
+              )}
+            </div>
+            <div className="relative block text-sm text-zinc-300/80 lg:text-xs">
+              <span>Cargo <span className="text-zinc-600">(opcional)</span></span>
+              <div className="mt-1.5 flex min-h-10 w-full items-center gap-2 rounded-xl bg-zinc-900 px-3 text-white focus-within:ring-2 focus-within:ring-white/40">
+                <input
+                  autoComplete="off"
+                  maxLength={191}
+                  value={jobTitle}
+                  onFocus={() => setJobPickerOpen(true)}
+                  onBlur={() => window.setTimeout(() => setJobPickerOpen(false), 120)}
+                  onChange={(event) => {
+                    setJobTitle(event.target.value);
+                    setActiveJobIndex(0);
+                    setJobPickerOpen(true);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowDown") {
+                      event.preventDefault();
+                      setJobPickerOpen(true);
+                      setActiveJobIndex((current) => Math.max(0, Math.min(current + 1, matchingJobTitles.length - 1)));
+                    } else if (event.key === "ArrowUp") {
+                      event.preventDefault();
+                      setActiveJobIndex((current) => Math.max(current - 1, 0));
+                    } else if (event.key === "Enter" && jobPickerOpen && matchingJobTitles[activeJobIndex]) {
+                      event.preventDefault();
+                      setJobTitle(matchingJobTitles[activeJobIndex]);
+                      setJobPickerOpen(false);
+                    } else if (event.key === "Escape") {
+                      setJobPickerOpen(false);
+                    }
+                  }}
+                  role="combobox"
+                  aria-label="Cargo opcional"
+                  aria-autocomplete="list"
+                  aria-expanded={jobPickerOpen}
+                  aria-controls="edit-contact-job-options"
+                  disabled={saving}
+                  placeholder="Selecione ou digite um cargo"
+                  className="min-w-0 flex-1 bg-transparent py-2 text-base text-white outline-none placeholder:text-zinc-600 disabled:opacity-50 lg:text-sm"
+                />
+                <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-zinc-500 transition-transform ${jobPickerOpen ? "rotate-180" : ""}`} strokeWidth={1.8} />
+              </div>
+              {jobPickerOpen && (
+                <div id="edit-contact-job-options" role="listbox" aria-label="Cargos sugeridos" className="absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-white/[0.09] bg-zinc-900 p-1.5 shadow-2xl">
+                  {matchingJobTitles.length ? matchingJobTitles.map((option, index) => (
+                    <button
+                      key={option}
+                      type="button"
+                      role="option"
+                      aria-selected={jobTitle === option}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onMouseEnter={() => setActiveJobIndex(index)}
+                      onClick={() => { setJobTitle(option); setJobPickerOpen(false); }}
+                      className={["flex w-full items-center rounded-lg px-3 py-2.5 text-left text-sm transition-colors", index === activeJobIndex ? "bg-white/[0.09] text-white" : "text-zinc-300 hover:bg-white/[0.06]"].join(" ")}
+                    >
+                      {option}
+                    </button>
+                  )) : (
+                    <p className="px-3 py-3 text-xs text-zinc-500">O cargo digitado será salvo.</p>
+                  )}
+                </div>
+              )}
+            </div>
             {!contact.isGroup && <label className="block text-sm text-zinc-300/80 lg:text-xs">
               Telefone
               <input
@@ -327,7 +544,7 @@ export function ContactInfoPanel({
               </button>
               <button
                 type="submit"
-                disabled={saving || !firstName.trim()}
+                disabled={saving || !firstName.trim() || !selectedCompanyId}
                 className="rounded-xl bg-zinc-900 px-3 py-2 text-sm text-white transition hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-white/50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving ? "Salvando..." : "Salvar"}
@@ -424,11 +641,62 @@ export function ContactInfoPanel({
           </div>}
           {!contact.isGroup && contact.companyName && <div>
             <dt className="text-sm text-zinc-400 lg:text-xs">Empresa</dt>
-            <dd className="mt-1 break-words text-base text-white lg:text-sm">{contact.companyName}</dd>
+            <dd className="mt-1.5 flex items-center gap-2.5 text-base text-white lg:text-sm">
+              {contactCompany && (
+                <span aria-hidden="true" className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/[0.06] text-zinc-500">
+                  <Building2 className="size-4" strokeWidth={1.7} />
+                  {contactCompany.image && (
+                    <Image
+                      src={contactCompany.image}
+                      alt=""
+                      width={36}
+                      height={36}
+                      unoptimized
+                      className="absolute inset-0 size-full object-contain p-1"
+                      onError={(event) => { event.currentTarget.style.display = "none"; }}
+                    />
+                  )}
+                </span>
+              )}
+              <span className="min-w-0 break-words font-medium">{contact.companyName}</span>
+            </dd>
           </div>}
           {!contact.isGroup && contact.jobTitle && <div>
             <dt className="text-sm text-zinc-400 lg:text-xs">Cargo</dt>
             <dd className="mt-1 break-words text-base text-white lg:text-sm">{contact.jobTitle}</dd>
+          </div>}
+          {!contact.isGroup && contactCompany && contactCompany.links.length > 0 && <div>
+            <dt className="flex items-center gap-2 text-sm text-zinc-400 lg:text-xs">
+              <Link2 aria-hidden="true" className="size-3.5" strokeWidth={1.8} />
+              Links da empresa
+            </dt>
+            <dd className="mt-2 space-y-1.5">
+              {contactCompany.links.map((link) => {
+                let label = link;
+                try {
+                  const url = new URL(link);
+                  label = url.hostname.replace(/^www\./, "") + (url.pathname === "/" ? "" : url.pathname);
+                } catch {
+                  label = link;
+                }
+                return (
+                  <a
+                    key={link}
+                    href={link}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={link}
+                    className="group flex min-h-11 w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 text-left transition-colors hover:border-white/[0.14] hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/40"
+                  >
+                    <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-zinc-500 transition-colors group-hover:text-zinc-300">
+                      <Link2 className="size-3.5" strokeWidth={1.8} />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm text-zinc-300">{label}</span>
+                    <ExternalLink aria-hidden="true" className="size-3.5 shrink-0 text-zinc-600 transition-colors group-hover:text-zinc-300" strokeWidth={1.8} />
+                  </a>
+                );
+              })}
+            </dd>
           </div>}
           {!contact.isGroup && <div>
             <dt className="text-sm text-zinc-400 lg:text-xs">Responsáveis</dt>
@@ -511,7 +779,7 @@ export function ContactInfoPanel({
             onClick={onCloseWithBot}
             disabled={closing}
             aria-busy={closing}
-            className="mt-7 flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-red-400/25 bg-red-400/[0.08] px-4 py-3 text-sm font-medium text-red-200 transition hover:border-red-400/40 hover:bg-red-400/[0.13] focus-visible:outline-2 focus-visible:outline-red-300/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-7 flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-red-400/[0.08] px-4 py-3 text-sm font-medium text-red-200 transition hover:bg-red-400/[0.13] focus-visible:outline-2 focus-visible:outline-red-300/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {closing ? (
               <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />

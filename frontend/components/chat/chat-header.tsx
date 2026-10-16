@@ -149,7 +149,10 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
           <button type="button" onClick={onOpenContactInfo} aria-label={`Abrir informações de ${contact.name}`} className="flex min-w-0 flex-1 items-center gap-2 rounded-xl sm:gap-3 text-left focus-visible:outline-2 focus-visible:outline-white/50">
             <Avatar contact={contact} className="size-10" />
             <span key={contact.id} className="min-w-0 flex-1">
-              <span className="block truncate text-base font-medium lg:text-[15px]">{contact.name}</span>
+              <span className="block truncate text-base font-medium lg:text-[15px]">
+                {contact.name}
+                {contact.jobTitle && <span className="font-normal text-zinc-400"> - {contact.jobTitle}</span>}
+              </span>
               {isTyping
                 ? <span role="status" aria-label={`${contact.name} está digitando`} className="block h-4 truncate text-[13px] text-zinc-300 lg:text-xs">digitando…</span>
                 : <span className={`${styles.subtitle} block truncate text-[13px] text-zinc-400 lg:text-xs`}>{contact.isGroup ? "Grupo do WhatsApp" : contact.phone}</span>}

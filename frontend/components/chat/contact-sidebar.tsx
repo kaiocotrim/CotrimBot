@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Archive, ArchiveRestore, ArrowLeft, Building2, ChevronDown, Copy, MessageCircle, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Phone, Search, UserRound, UserRoundPlus, X } from "lucide-react";
 import { getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/min";
+import Image from "next/image";
 import { Avatar } from "@/components/chat/avatar";
 import { ChatNavigationRail, type ChatRailSection } from "@/components/chat/chat-navigation-rail";
 import { CountryCodePicker } from "@/components/chat/country-code-picker";
@@ -21,16 +22,19 @@ import type { Contact, Message } from "@/types/chat";
 
 type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string, jobTitle?: string) => Promise<Contact[]>; onArchiveContact: (contact: Contact, archived: boolean) => Promise<void>; onPinContact: (contact: Contact, pinned: boolean) => Promise<void>; headerActions?: ReactNode; mobileOpen: boolean; revealForSwipe: boolean; onMobileOpenChange: (open: boolean) => void; notifications: AppNotification[]; notificationUnreadCount: number; notificationPermission: NotificationPermission | "unsupported"; onRequestNotificationPermission: () => void; onOpenNotification: (notification: AppNotification) => void; onMarkAllNotificationsRead: () => void; onClearNotifications: () => void };
 type ConversationFilter = "conversations" | "groups" | "mine";
+type RegisteredCompany = { id: string; name: string; image: string | null };
 const PREVIEW_HOLD_DURATION = 1_000;
 const MOBILE_PREVIEW_HOLD_DURATION = 500;
 const PREVIEW_MOVE_TOLERANCE = 12;
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
+const JOB_TITLE_OPTIONS = ["T.I", "Operador", "Supervisor"] as const;
 const dayKeyFormatter = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: CHAT_TIME_ZONE });
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: CHAT_TIME_ZONE });
 const weekdayFormatter = new Intl.DateTimeFormat("pt-BR", { weekday: "long", timeZone: CHAT_TIME_ZONE });
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: CHAT_TIME_ZONE });
 // Mesmo breakpoint "lg" do Tailwind: abaixo dele a lista vira uma tela completa.
 const DESKTOP_QUERY = "(min-width: 1024px)";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 function subscribeToDesktopQuery(callback: () => void) {
   const query = window.matchMedia(DESKTOP_QUERY);
@@ -76,7 +80,14 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   const [newContactFirstName, setNewContactFirstName] = useState("");
   const [newContactLastName, setNewContactLastName] = useState("");
   const [newContactCompany, setNewContactCompany] = useState("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [registeredCompanies, setRegisteredCompanies] = useState<RegisteredCompany[]>([]);
+  const [companiesLoading, setCompaniesLoading] = useState(false);
+  const [companyPickerOpen, setCompanyPickerOpen] = useState(false);
+  const [activeCompanyIndex, setActiveCompanyIndex] = useState(0);
   const [newContactJobTitle, setNewContactJobTitle] = useState("");
+  const [jobPickerOpen, setJobPickerOpen] = useState(false);
+  const [activeJobIndex, setActiveJobIndex] = useState(0);
   const [newContactCountry, setNewContactCountry] = useState<CountryCode>("BR");
   const [newContactPhone, setNewContactPhone] = useState("");
   const [savingContact, setSavingContact] = useState(false);
@@ -130,6 +141,40 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   }, [activeOrganizationId, userId]);
 
   useEffect(() => {
+    if (!showNewContact) return;
+    const controller = new AbortController();
+    void fetch(`${API_URL}/clients`, {
+      credentials: "include",
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({})) as {
+          clients?: Array<{ id?: string; name?: string; image?: string | null }>;
+          error?: string;
+        };
+        if (!response.ok || !Array.isArray(payload.clients)) {
+          throw new Error(payload.error || "Não foi possível carregar as empresas cadastradas.");
+        }
+        const companies = payload.clients
+          .filter((client): client is { id: string; name: string; image?: string | null } => Boolean(client.id && client.name?.trim()))
+          .map((client) => ({ id: client.id, name: client.name.trim(), image: client.image ?? null }))
+          .sort((first, second) => first.name.localeCompare(second.name, "pt-BR", { sensitivity: "base" }));
+        setRegisteredCompanies(companies);
+        setSelectedCompanyId((current) => current && !companies.some((company) => company.id === current) ? null : current);
+      })
+      .catch((requestError: unknown) => {
+        if (controller.signal.aborted) return;
+        setRegisteredCompanies([]);
+        setSavedActionError(requestError instanceof Error ? requestError.message : "Não foi possível carregar as empresas cadastradas.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCompaniesLoading(false);
+      });
+    return () => controller.abort();
+  }, [showNewContact]);
+
+  useEffect(() => {
     if (conversationMenuContactId === null) return;
     function closeConversationMenu(event: PointerEvent) {
       if (!conversationMenuRef.current?.contains(event.target as Node)) {
@@ -164,11 +209,34 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
     }).sort((first, second) => Number(Boolean(second.pinned)) - Number(Boolean(first.pinned)));
   }, [contacts, conversationFilter, query, selectedContactId, showArchived, userId]);
 
+  const matchingCompanies = useMemo(() => {
+    const search = newContactCompany.trim().toLocaleLowerCase("pt-BR");
+    if (!search || selectedCompanyId) return registeredCompanies;
+    return registeredCompanies.filter((company) => company.name.toLocaleLowerCase("pt-BR").includes(search));
+  }, [newContactCompany, registeredCompanies, selectedCompanyId]);
+  const matchingJobTitles = JOB_TITLE_OPTIONS.filter((jobTitle) => (
+    !newContactJobTitle.trim() || jobTitle.toLocaleLowerCase("pt-BR").includes(newContactJobTitle.trim().toLocaleLowerCase("pt-BR"))
+  ));
+
   const visibleSavedContacts = useMemo(() => {
-    const search = savedQuery.trim().toLocaleLowerCase("pt-BR");
-    const phoneSearch = search.replace(/\D/g, "");
+    const terms = savedQuery
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("pt-BR")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
     return savedContacts
-      .filter((contact) => !search || contact.name.toLocaleLowerCase("pt-BR").includes(search) || (phoneSearch.length > 0 && contact.phone.includes(phoneSearch)))
+      .filter((contact) => {
+        if (!terms.length) return true;
+        const searchable = [contact.name, contact.phone, contact.companyName, contact.jobTitle]
+          .filter(Boolean)
+          .join(" ")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLocaleLowerCase("pt-BR");
+        return terms.every((term) => searchable.includes(term));
+      })
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }));
   }, [savedContacts, savedQuery]);
 
@@ -222,6 +290,10 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   async function handleSaveContact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (savingContact) return;
+    if (!selectedCompanyId || !newContactCompany) {
+      setSavedActionError("Selecione uma empresa cadastrada.");
+      return;
+    }
     const callingCode = getCountryCallingCode(newContactCountry);
     const enteredDigits = newContactPhone.replace(/\D/g, "");
     if (newContactPhone.trim().startsWith("+") && !enteredDigits.startsWith(callingCode)) {
@@ -250,6 +322,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
       setNewContactFirstName("");
       setNewContactLastName("");
       setNewContactCompany("");
+      setSelectedCompanyId(null);
       setNewContactJobTitle("");
       setNewContactCountry("BR");
       setNewContactPhone("");
@@ -623,14 +696,157 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
             <div className="mt-10 flex gap-4">
               <Building2 aria-hidden="true" className="mt-3 size-5 shrink-0 text-zinc-500" strokeWidth={1.8} />
               <div className="min-w-0 flex-1 space-y-7">
-                <label className="block border-b border-zinc-600 focus-within:border-white">
+                <div className="relative border-b border-zinc-600 focus-within:border-white">
                   <span className="sr-only">Empresa</span>
-                  <input autoComplete="organization" maxLength={191} value={newContactCompany} onChange={(event) => setNewContactCompany(event.target.value)} placeholder="Empresa" className="h-11 w-full bg-transparent text-base text-white outline-none placeholder:text-zinc-500 lg:text-sm" />
-                </label>
-                <label className="block border-b border-zinc-600 focus-within:border-white">
-                  <span className="sr-only">Cargo</span>
-                  <input autoComplete="organization-title" maxLength={191} value={newContactJobTitle} onChange={(event) => setNewContactJobTitle(event.target.value)} placeholder="Cargo" className="h-11 w-full bg-transparent text-base text-white outline-none placeholder:text-zinc-500 lg:text-sm" />
-                </label>
+                  <div className="flex h-11 items-center gap-2">
+                    {selectedCompanyId && (() => {
+                      const company = registeredCompanies.find((item) => item.id === selectedCompanyId);
+                      return company ? (
+                        <span aria-hidden="true" className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/[0.07] text-zinc-500">
+                          <Building2 className="size-4" strokeWidth={1.7} />
+                          {company.image && <Image src={company.image} alt="" width={28} height={28} unoptimized className="absolute inset-0 size-full object-contain p-0.5" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
+                        </span>
+                      ) : null;
+                    })()}
+                    <input
+                    required
+                    type="text"
+                    role="combobox"
+                    aria-label="Pesquisar empresa cadastrada"
+                    aria-autocomplete="list"
+                    aria-expanded={companyPickerOpen}
+                    aria-controls="registered-company-options"
+                    aria-activedescendant={companyPickerOpen && matchingCompanies[activeCompanyIndex] ? `registered-company-${matchingCompanies[activeCompanyIndex].id}` : undefined}
+                    autoComplete="off"
+                    value={newContactCompany}
+                    onFocus={() => setCompanyPickerOpen(true)}
+                    onBlur={() => window.setTimeout(() => setCompanyPickerOpen(false), 120)}
+                    onChange={(event) => {
+                      setNewContactCompany(event.target.value);
+                      setSelectedCompanyId(null);
+                      setActiveCompanyIndex(0);
+                      setCompanyPickerOpen(true);
+                      setSavedActionError(null);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "ArrowDown") {
+                        event.preventDefault();
+                        setCompanyPickerOpen(true);
+                        setActiveCompanyIndex((current) => Math.min(current + 1, matchingCompanies.length - 1));
+                      } else if (event.key === "ArrowUp") {
+                        event.preventDefault();
+                        setActiveCompanyIndex((current) => Math.max(current - 1, 0));
+                      } else if (event.key === "Enter" && companyPickerOpen && matchingCompanies[activeCompanyIndex]) {
+                        event.preventDefault();
+                        const company = matchingCompanies[activeCompanyIndex];
+                        setSelectedCompanyId(company.id);
+                        setNewContactCompany(company.name);
+                        setCompanyPickerOpen(false);
+                      } else if (event.key === "Escape") {
+                        setCompanyPickerOpen(false);
+                      }
+                    }}
+                    placeholder={companiesLoading ? "Carregando empresas..." : "Digite o nome da empresa"}
+                    disabled={companiesLoading || registeredCompanies.length === 0}
+                    className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-zinc-500 disabled:text-zinc-500 lg:text-sm"
+                  />
+                    <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-zinc-500 transition-transform ${companyPickerOpen ? "rotate-180" : ""}`} strokeWidth={1.8} />
+                  </div>
+                  {companyPickerOpen && !companiesLoading && registeredCompanies.length > 0 && (
+                    <div id="registered-company-options" role="listbox" aria-label="Empresas cadastradas" className="absolute inset-x-0 top-full z-30 mt-2 max-h-60 overflow-y-auto rounded-xl border border-white/[0.09] bg-zinc-900 p-1.5 shadow-2xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {matchingCompanies.length ? matchingCompanies.map((company, index) => (
+                        <button
+                          id={`registered-company-${company.id}`}
+                          key={company.id}
+                          type="button"
+                          role="option"
+                          aria-selected={company.id === selectedCompanyId}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onMouseEnter={() => setActiveCompanyIndex(index)}
+                          onClick={() => {
+                            setSelectedCompanyId(company.id);
+                            setNewContactCompany(company.name);
+                            setCompanyPickerOpen(false);
+                            setSavedActionError(null);
+                          }}
+                          className={["flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors", index === activeCompanyIndex ? "bg-white/[0.09]" : "hover:bg-white/[0.06]"].join(" ")}
+                        >
+                          <span aria-hidden="true" className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/[0.07] text-zinc-500">
+                            <Building2 className="size-4" strokeWidth={1.7} />
+                            {company.image && <Image src={company.image} alt="" width={36} height={36} unoptimized className="absolute inset-0 size-full object-contain p-1" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-100">{company.name}</span>
+                          {company.id === selectedCompanyId && <span className="text-xs text-emerald-400">Selecionada</span>}
+                        </button>
+                      )) : (
+                        <p className="px-3 py-4 text-center text-xs text-zinc-500">Nenhuma empresa encontrada.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {!companiesLoading && registeredCompanies.length === 0 && (
+                  <p className="-mt-5 text-xs leading-5 text-zinc-500">Cadastre primeiro a empresa em Configurações → Cliente.</p>
+                )}
+                <div className="relative border-b border-zinc-600 focus-within:border-white">
+                  <div className="flex h-11 items-center gap-2">
+                    <input
+                      autoComplete="off"
+                      maxLength={191}
+                      value={newContactJobTitle}
+                      onFocus={() => setJobPickerOpen(true)}
+                      onBlur={() => window.setTimeout(() => setJobPickerOpen(false), 120)}
+                      onChange={(event) => {
+                        setNewContactJobTitle(event.target.value);
+                        setActiveJobIndex(0);
+                        setJobPickerOpen(true);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "ArrowDown") {
+                          event.preventDefault();
+                          setJobPickerOpen(true);
+                          setActiveJobIndex((current) => Math.max(0, Math.min(current + 1, matchingJobTitles.length - 1)));
+                        } else if (event.key === "ArrowUp") {
+                          event.preventDefault();
+                          setActiveJobIndex((current) => Math.max(current - 1, 0));
+                        } else if (event.key === "Enter" && jobPickerOpen && matchingJobTitles[activeJobIndex]) {
+                          event.preventDefault();
+                          setNewContactJobTitle(matchingJobTitles[activeJobIndex]);
+                          setJobPickerOpen(false);
+                        } else if (event.key === "Escape") {
+                          setJobPickerOpen(false);
+                        }
+                      }}
+                      role="combobox"
+                      aria-label="Cargo opcional"
+                      aria-autocomplete="list"
+                      aria-expanded={jobPickerOpen}
+                      aria-controls="new-contact-job-options"
+                      placeholder="Cargo (opcional)"
+                      className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-zinc-500 lg:text-sm"
+                    />
+                    <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-zinc-500 transition-transform ${jobPickerOpen ? "rotate-180" : ""}`} strokeWidth={1.8} />
+                  </div>
+                  {jobPickerOpen && (
+                    <div id="new-contact-job-options" role="listbox" aria-label="Cargos sugeridos" className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-white/[0.09] bg-zinc-900 p-1.5 shadow-2xl">
+                      {matchingJobTitles.length ? matchingJobTitles.map((jobTitle, index) => (
+                        <button
+                          key={jobTitle}
+                          type="button"
+                          role="option"
+                          aria-selected={newContactJobTitle === jobTitle}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onMouseEnter={() => setActiveJobIndex(index)}
+                          onClick={() => { setNewContactJobTitle(jobTitle); setJobPickerOpen(false); }}
+                          className={["flex w-full items-center rounded-lg px-3 py-2.5 text-left text-sm transition-colors", index === activeJobIndex ? "bg-white/[0.09] text-white" : "text-zinc-300 hover:bg-white/[0.06]"].join(" ")}
+                        >
+                          {jobTitle}
+                        </button>
+                      )) : (
+                        <p className="px-3 py-3 text-xs text-zinc-500">Pressione Tab para usar o cargo digitado.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <div className="mt-12 flex gap-4">
@@ -649,7 +865,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
             {savedActionError && <p role="alert" className="mt-6 pl-9 text-sm text-red-300">{savedActionError}</p>}
           </div>
           <div className="shrink-0 border-t border-white/[0.08] px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:pb-4">
-            <button type="submit" disabled={savingContact || !newContactFirstName.trim() || !newContactPhone.trim()} className="w-full rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:bg-zinc-700 disabled:text-zinc-400">
+            <button type="submit" disabled={savingContact || !newContactFirstName.trim() || !selectedCompanyId || !newContactPhone.trim()} className="w-full rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:bg-zinc-700 disabled:text-zinc-400">
               {savingContact ? "Salvando..." : "Salvar contato"}
             </button>
           </div>
@@ -678,11 +894,11 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
         </header>
         <label className="mx-4 mb-3 flex h-10 shrink-0 items-center gap-2.5 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 text-zinc-500 transition-colors focus-within:border-white/40 focus-within:text-zinc-300">
           <Search aria-hidden="true" className="size-4 shrink-0" strokeWidth={1.8} />
-          <input autoFocus type="search" aria-label="Pesquisar contatos salvos" value={savedQuery} onChange={(event) => setSavedQuery(event.target.value)} placeholder="Pesquisar nome ou número" className="min-w-0 flex-1 bg-transparent text-[13px] text-zinc-100 outline-none placeholder:text-zinc-500" />
+          <input autoFocus type="search" aria-label="Pesquisar contatos salvos" value={savedQuery} onChange={(event) => setSavedQuery(event.target.value)} placeholder="Pesquisar nome, empresa ou número" className="min-w-0 flex-1 bg-transparent text-[13px] text-zinc-100 outline-none placeholder:text-zinc-500" />
         </label>
         <CompactScrollArea className="flex-1" label="Contatos salvos">
           <div className="px-2 pt-1">
-            <motion.button type="button" onClick={() => { setSavedActionError(null); setShowNewContact(true); }} whileTap={reduceMotion ? undefined : { scale: 0.98 }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-2 focus-visible:outline-white">
+            <motion.button type="button" onClick={() => { setSavedActionError(null); setCompaniesLoading(true); setShowNewContact(true); }} whileTap={reduceMotion ? undefined : { scale: 0.98 }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-2 focus-visible:outline-white">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-zinc-800 text-zinc-100">
                 <UserRoundPlus aria-hidden="true" className="size-5" strokeWidth={1.8} />
               </span>
@@ -713,7 +929,10 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                   <button type="button" onClick={() => { onSelectContact(contact); setShowSavedContacts(false); }} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left focus-visible:bg-white/[0.07] focus-visible:outline-none">
                     <Avatar contact={contact} className="size-10" />
                     <span className="min-w-0 flex-1 py-1">
-                      <span className="block truncate text-sm font-medium">{contact.name}</span>
+                      <span className="block truncate text-sm font-medium">
+                        {contact.name}
+                        {contact.jobTitle && <span className="font-normal text-zinc-400"> - {contact.jobTitle}</span>}
+                      </span>
                       <span className="mt-0.5 block truncate text-xs text-zinc-500">{contact.phone}</span>
                     </span>
                   </button>
@@ -933,7 +1152,10 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                     </span>
                     <div className={collapsed ? "hidden" : "min-w-0 flex-1 py-3 lg:py-2"}>
                       <div className="flex items-baseline justify-between gap-3">
-                        <p className="min-w-0 flex-1 truncate text-base leading-tight font-medium tracking-[-0.01em] text-zinc-50 lg:text-[14px]">{contact.name}</p>
+                        <p className="min-w-0 flex-1 truncate text-base leading-tight font-medium tracking-[-0.01em] text-zinc-50 lg:text-[14px]">
+                          {contact.name}
+                          {contact.jobTitle && <span className="font-normal text-zinc-400"> - {contact.jobTitle}</span>}
+                        </p>
                         {lastMessage && (
                           <time dateTime={lastMessage.createdAt} className={`shrink-0 text-xs leading-tight lg:text-[11px] ${unread ? "font-medium text-zinc-300" : "font-normal text-zinc-500"}`}>
                             {formatSidebarDate(lastMessage.createdAt)}

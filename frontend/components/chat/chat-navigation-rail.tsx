@@ -1,12 +1,11 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { Archive, Bell, Building2, CalendarDays, ContactRound, MessagesSquare, UserRound, UserRoundCheck, UsersRound } from "lucide-react";
 import { useState } from "react";
 import { AccountSettings } from "@/components/chat/account-settings";
-import { CalendarModal } from "@/components/chat/calendar-modal";
 
 export type ChatRailSection = "notifications" | "conversations" | "contacts" | "groups" | "mine" | "archived";
 
@@ -48,7 +47,6 @@ export function ChatNavigationRail({
 }) {
   const reduceMotion = useReducedMotion();
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
-  const [calendarOpen, setCalendarOpen] = useState(false);
 
   return (
     <nav aria-label="Navegação principal" className="flex h-full w-[60px] shrink-0 flex-col items-center border-r border-white/[0.08] bg-[#1a1a1a] px-2 py-3 text-zinc-400">
@@ -89,20 +87,14 @@ export function ChatNavigationRail({
             )}
           </motion.button>
         ))}
-        <div className="relative">
-          <motion.button
-            type="button"
-            aria-label="Calendário"
-            aria-expanded={calendarOpen}
-            title="Calendário"
-            onClick={() => setCalendarOpen(true)}
-            whileTap={reduceMotion ? undefined : { scale: 0.9 }}
-            className={`flex size-11 items-center justify-center rounded-xl transition-colors hover:bg-white/[0.07] hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70 ${calendarOpen ? "bg-white/[0.12] text-zinc-50" : "text-zinc-400"}`}
-          >
-            <CalendarDays aria-hidden="true" className="size-5" strokeWidth={1.8} />
-          </motion.button>
-        </div>
-        <AnimatePresence>{calendarOpen && <CalendarModal key="calendar-modal" onClose={() => setCalendarOpen(false)} />}</AnimatePresence>
+        <Link
+          href="/calendario"
+          aria-label="Calendário"
+          title="Calendário"
+          className="flex size-11 items-center justify-center rounded-xl text-zinc-400 transition-[background-color,color,transform] hover:bg-white/[0.07] hover:text-zinc-100 active:scale-90 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70"
+        >
+          <CalendarDays aria-hidden="true" className="size-5" strokeWidth={1.8} />
+        </Link>
         {company && (
           <>
             <span aria-hidden="true" className="my-2 h-px w-7 shrink-0 bg-white/[0.1]" />

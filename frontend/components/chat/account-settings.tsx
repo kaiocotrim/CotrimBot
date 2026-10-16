@@ -4,7 +4,8 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Select } from "@base-ui/react/select";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
-import { BadgeCheck, Bell, Building2, Camera, Check, ChevronDown, PhoneOff, QrCode, UserRound, Volume2, X } from "lucide-react";
+import { BadgeCheck, Bell, Building2, Camera, Check, ChevronDown, ContactRound, Link2, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { EvolutionConnectionSettings } from "@/components/chat/evolution-connection-settings";
@@ -33,6 +34,7 @@ type SettingsUser = {
 
 const AVATAR_MAX_FILE_SIZE = 5 * 1024 * 1024;
 const AVATAR_MAX_DATA_URL_LENGTH = 56_000;
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 async function prepareAvatar(file: File): Promise<string> {
   if (!file.type.match(/^image\/(jpeg|png|webp)$/)) {
@@ -77,6 +79,7 @@ async function prepareAvatar(file: File): Promise<string> {
 
 const sections = [
   { value: "account", label: "Conta", icon: UserRound },
+  { value: "client", label: "Cliente", icon: ContactRound },
   { value: "notifications", label: "Notificações", icon: Bell },
   { value: "pro", label: "Conta Pro", icon: BadgeCheck },
   { value: "whatsapp", label: "WhatsApp", icon: QrCode },
@@ -323,6 +326,10 @@ function SettingsContent({ user }: { user: SettingsUser }) {
             <NotificationSettings />
           </Tabs.Panel>
 
+          <Tabs.Panel value="client" className={styles.panel}>
+            <ClientSettings />
+          </Tabs.Panel>
+
           <Tabs.Panel value="pro" className={styles.panel}>
             <section className={styles.card}>
               <h3>Assinatura Pro</h3>
@@ -344,6 +351,528 @@ function SettingsContent({ user }: { user: SettingsUser }) {
         </div>
       </div>
     </Tabs.Root>
+  );
+}
+
+type ClientProfile = {
+  companyName: string;
+  links: string[];
+};
+
+function LegacyClientSettings() {
+  const [companyName, setCompanyName] = useState("");
+  const [links, setLinks] = useState<string[]>([]);
+  const [savedProfile, setSavedProfile] = useState<ClientProfile>({ companyName: "", links: [] });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const normalizedLinks = links.map((link) => link.trim()).filter(Boolean);
+  const changed = companyName.trim() !== savedProfile.companyName
+    || JSON.stringify(normalizedLinks) !== JSON.stringify(savedProfile.links);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadProfile() {
+      try {
+        const response = await fetch(`${API_URL}/client-profile`, {
+          credentials: "include",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => ({})) as { profile?: ClientProfile; error?: string };
+        if (!response.ok || !payload.profile) throw new Error(payload.error || "Não foi possível carregar os dados do cliente.");
+        if (controller.signal.aborted) return;
+        const profile = {
+          companyName: payload.profile.companyName ?? "",
+          links: Array.isArray(payload.profile.links) ? payload.profile.links : [],
+        };
+        setCompanyName(profile.companyName);
+        setLinks(profile.links);
+        setSavedProfile(profile);
+      } catch (cause) {
+        if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Não foi possível carregar os dados do cliente.");
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+    void loadProfile();
+    return () => controller.abort();
+  }, []);
+
+  async function saveClientProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextCompanyName = companyName.trim();
+    if (saving || !changed || !nextCompanyName) return;
+    setSaving(true);
+    setError(null);
+    setFeedback(null);
+    try {
+      const response = await fetch(`${API_URL}/client-profile`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyName: nextCompanyName, links: normalizedLinks }),
+      });
+      const payload = await response.json().catch(() => ({})) as { profile?: ClientProfile; error?: string };
+      if (!response.ok || !payload.profile) throw new Error(payload.error || "Não foi possível salvar os dados do cliente.");
+      const profile = { companyName: payload.profile.companyName, links: payload.profile.links };
+      setCompanyName(profile.companyName);
+      setLinks(profile.links);
+      setSavedProfile(profile);
+      setFeedback("Dados do cliente salvos.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível salvar os dados do cliente.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function updateLink(index: number, value: string) {
+    setLinks((current) => current.map((link, linkIndex) => linkIndex === index ? value : link));
+    setFeedback(null);
+    setError(null);
+  }
+
+  return (
+    <section className={styles.card} aria-labelledby="client-settings-title">
+      <h3 id="client-settings-title">Cliente</h3>
+      <p>Cadastre a empresa do cliente e os links importantes usados durante o atendimento.</p>
+      {loading ? (
+        <p role="status" className={styles.hint}>Carregando dados…</p>
+      ) : (
+        <form className={styles.clientForm} onSubmit={(event) => void saveClientProfile(event)}>
+          <label className={styles.field}>
+            <span>Nome da empresa</span>
+            <input
+              type="text"
+              value={companyName}
+              onChange={(event) => {
+                setCompanyName(event.target.value);
+                setFeedback(null);
+                setError(null);
+              }}
+              placeholder="Ex.: Cotrim Tecnologia"
+              autoComplete="organization"
+              maxLength={191}
+              required
+              disabled={saving}
+            />
+          </label>
+
+          <div className={styles.clientLinks}>
+            <div className={styles.clientLinksHeader}>
+              <div>
+                <strong>Links</strong>
+                <span>Sites, documentos ou páginas importantes.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (links.length >= 20) return;
+                  setLinks((current) => [...current, ""]);
+                  setFeedback(null);
+                }}
+                disabled={saving || links.length >= 20}
+                aria-label="Adicionar link"
+                title="Adicionar link"
+                className={styles.addLinkButton}
+              >
+                <Plus size={17} strokeWidth={2} aria-hidden="true" />
+                Adicionar link
+              </button>
+            </div>
+
+            {links.length === 0 ? (
+              <p className={styles.emptyLinks}>Nenhum link adicionado.</p>
+            ) : (
+              <div className={styles.linkList}>
+                {links.map((link, index) => (
+                  <div key={index} className={styles.linkRow}>
+                    <span aria-hidden="true" className={styles.linkIcon}><Link2 size={17} strokeWidth={1.8} /></span>
+                    <input
+                      type="url"
+                      value={link}
+                      onChange={(event) => updateLink(index, event.target.value)}
+                      placeholder="https://exemplo.com"
+                      aria-label={`Link ${index + 1}`}
+                      maxLength={2048}
+                      disabled={saving}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLinks((current) => current.filter((_, linkIndex) => linkIndex !== index));
+                        setFeedback(null);
+                        setError(null);
+                      }}
+                      disabled={saving}
+                      aria-label={`Remover link ${index + 1}`}
+                      title="Remover link"
+                      className={styles.removeLinkButton}
+                    >
+                      <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {changed && (
+            <button type="submit" className={styles.primaryButton} disabled={saving || !companyName.trim()}>
+              {saving ? "Salvando…" : "Salvar dados"}
+            </button>
+          )}
+          {feedback && <p role="status" className={styles.feedback}>{feedback}</p>}
+          {error && <p role="alert" className={styles.error}>{error}</p>}
+        </form>
+      )}
+    </section>
+  );
+}
+
+void LegacyClientSettings;
+
+type SavedClient = {
+  id: string;
+  name: string;
+  image: string | null;
+  links: string[];
+};
+
+type ClientDraft = Omit<SavedClient, "id">;
+
+function ClientSettings() {
+  const [clients, setClients] = useState<SavedClient[]>([]);
+  const [draft, setDraft] = useState<ClientDraft | null>(null);
+  const [editingClientId, setEditingClientId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [processingImage, setProcessingImage] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [clientQuery, setClientQuery] = useState("");
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const normalizedClientQuery = clientQuery.trim().toLocaleLowerCase("pt-BR");
+  const filteredClients = normalizedClientQuery
+    ? clients.filter((client) => client.name.toLocaleLowerCase("pt-BR").includes(normalizedClientQuery)
+      || client.links.some((link) => link.toLocaleLowerCase("pt-BR").includes(normalizedClientQuery)))
+    : clients;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadClients() {
+      try {
+        const response = await fetch(`${API_URL}/clients`, {
+          credentials: "include",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => ({})) as { clients?: SavedClient[]; error?: string };
+        if (!response.ok || !Array.isArray(payload.clients)) {
+          throw new Error(payload.error || "Não foi possível carregar os clientes.");
+        }
+        if (!controller.signal.aborted) setClients(payload.clients);
+      } catch (cause) {
+        if (!controller.signal.aborted) {
+          setError(cause instanceof Error ? cause.message : "Não foi possível carregar os clientes.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+    void loadClients();
+    return () => controller.abort();
+  }, []);
+
+  function startClientRegistration() {
+    setDraft({ name: "", image: null, links: [] });
+    setEditingClientId(null);
+    setImageUrl("");
+    setFeedback(null);
+    setError(null);
+  }
+
+  function openClient(client: SavedClient) {
+    setDraft({ name: client.name, image: client.image, links: [...client.links] });
+    setEditingClientId(client.id);
+    setImageUrl(client.image?.startsWith("http://") || client.image?.startsWith("https://") ? client.image : "");
+    setFeedback(null);
+    setError(null);
+  }
+
+  async function selectClientImage(file: File | undefined) {
+    if (!file || !draft) return;
+    setProcessingImage(true);
+    setError(null);
+    try {
+      const image = await prepareAvatar(file);
+      setDraft((current) => current ? { ...current, image } : current);
+      setImageUrl("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível preparar a imagem.");
+    } finally {
+      setProcessingImage(false);
+      if (imageInputRef.current) imageInputRef.current.value = "";
+    }
+  }
+
+  async function saveClient(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!draft || saving || !draft.name.trim()) return;
+    setSaving(true);
+    setError(null);
+    setFeedback(null);
+    try {
+      const response = await fetch(editingClientId ? `${API_URL}/clients/${encodeURIComponent(editingClientId)}` : `${API_URL}/clients`, {
+        method: editingClientId ? "PUT" : "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: draft.name.trim(),
+          image: draft.image,
+          links: draft.links.map((link) => link.trim()).filter(Boolean),
+        }),
+      });
+      const payload = await response.json().catch(() => ({})) as { client?: SavedClient; error?: string };
+      if (!response.ok || !payload.client) {
+        throw new Error(payload.error || "Não foi possível cadastrar o cliente.");
+      }
+      setClients((current) => editingClientId
+        ? current.map((client) => client.id === editingClientId ? payload.client! : client)
+        : [payload.client!, ...current]);
+      setDraft(null);
+      setEditingClientId(null);
+      setFeedback(editingClientId ? "Informações atualizadas com sucesso." : "Cliente cadastrado com sucesso.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível cadastrar o cliente.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function updateDraftLink(index: number, value: string) {
+    setDraft((current) => current ? {
+      ...current,
+      links: current.links.map((link, linkIndex) => linkIndex === index ? value : link),
+    } : current);
+    setFeedback(null);
+    setError(null);
+  }
+
+  return (
+    <section className={styles.card} aria-labelledby="client-settings-title">
+      <div className={styles.clientSectionHeader}>
+        <div>
+          <h3 id="client-settings-title">Clientes</h3>
+          <p>Organize as informações e os links importantes de cada cliente.</p>
+        </div>
+        {!draft && (
+          <button type="button" className={styles.newClientButton} onClick={startClientRegistration}>
+            <Plus size={17} strokeWidth={2} aria-hidden="true" />
+            Novo cliente
+          </button>
+        )}
+      </div>
+
+      {!draft && clients.length > 0 && (
+        <label className={styles.clientSearch}>
+          <Search size={17} strokeWidth={1.8} aria-hidden="true" />
+          <input
+            type="search"
+            value={clientQuery}
+            onChange={(event) => setClientQuery(event.target.value)}
+            placeholder="Pesquisar cliente ou link"
+            aria-label="Pesquisar clientes"
+          />
+          {clientQuery && (
+            <button type="button" onClick={() => setClientQuery("")} aria-label="Limpar pesquisa" title="Limpar pesquisa">
+              <X size={15} strokeWidth={1.8} aria-hidden="true" />
+            </button>
+          )}
+        </label>
+      )}
+
+      {loading ? (
+        <p role="status" className={styles.hint}>Carregando clientes…</p>
+      ) : draft ? (
+        <form className={styles.clientForm} onSubmit={(event) => void saveClient(event)}>
+          <label className={styles.field}>
+            <span>Nome da empresa</span>
+            <input
+              type="text"
+              value={draft.name}
+              onChange={(event) => setDraft((current) => current ? { ...current, name: event.target.value } : current)}
+              placeholder="Ex.: Cotrim Tecnologia"
+              autoComplete="organization"
+              maxLength={191}
+              required
+              disabled={saving}
+            />
+          </label>
+
+          <div className={styles.clientMediaSection}>
+            <div className={styles.clientDraftHeader}>
+              <div className={styles.clientAvatar} aria-hidden="true">
+                {draft.image ? <Image src={draft.image} alt="" width={64} height={64} unoptimized /> : <Building2 size={26} strokeWidth={1.6} />}
+              </div>
+              <div className={styles.clientPhotoActions}>
+                <strong>Logo da empresa</strong>
+                <span>JPG, PNG ou WebP de até 5 MB.</span>
+                <div>
+                  <button type="button" onClick={() => imageInputRef.current?.click()} disabled={processingImage || saving}>
+                    <Camera size={15} strokeWidth={1.8} aria-hidden="true" />
+                    {processingImage ? "Processando…" : draft.image ? "Trocar imagem" : "Escolher imagem"}
+                  </button>
+                  {draft.image && (
+                    <button type="button" onClick={() => {
+                      setDraft((current) => current ? { ...current, image: null } : current);
+                      setImageUrl("");
+                    }} disabled={saving}>
+                      Remover
+                    </button>
+                  )}
+                </div>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  hidden
+                  onChange={(event) => void selectClientImage(event.target.files?.[0])}
+                />
+              </div>
+            </div>
+
+            <label className={`${styles.field} ${styles.clientImageUrl}`}>
+              <span>URL da imagem</span>
+              <input
+                type="url"
+                value={imageUrl}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setImageUrl(value);
+                  setDraft((current) => current ? {
+                    ...current,
+                    image: /^https?:\/\//i.test(value.trim()) ? value.trim() : null,
+                  } : current);
+                  setError(null);
+                }}
+                placeholder="https://exemplo.com/logo.png"
+                maxLength={2048}
+                disabled={saving || processingImage}
+              />
+            </label>
+          </div>
+
+          <div className={styles.clientLinks}>
+            <div className={styles.clientLinksHeader}>
+              <div>
+                <strong>Links</strong>
+                <span>Sites, documentos ou páginas importantes.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDraft((current) => current && current.links.length < 20
+                  ? { ...current, links: [...current.links, ""] }
+                  : current)}
+                disabled={saving || draft.links.length >= 20}
+                className={styles.addLinkButton}
+              >
+                <Plus size={17} strokeWidth={2} aria-hidden="true" />
+                Adicionar link
+              </button>
+            </div>
+
+            {draft.links.length === 0 ? (
+              <button
+                type="button"
+                className={styles.emptyLinks}
+                onClick={() => setDraft((current) => current ? { ...current, links: [""] } : current)}
+              >
+                <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+                Adicione o primeiro link da empresa
+              </button>
+            ) : (
+              <div className={styles.linkList}>
+                {draft.links.map((link, index) => (
+                  <div key={index} className={styles.linkRow}>
+                    <span aria-hidden="true" className={styles.linkIcon}><Link2 size={17} strokeWidth={1.8} /></span>
+                    <input
+                      type="url"
+                      value={link}
+                      onChange={(event) => updateDraftLink(index, event.target.value)}
+                      placeholder="https://exemplo.com"
+                      aria-label={`Link ${index + 1}`}
+                      maxLength={2048}
+                      disabled={saving}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setDraft((current) => current ? {
+                        ...current,
+                        links: current.links.filter((_, linkIndex) => linkIndex !== index),
+                      } : current)}
+                      disabled={saving}
+                      aria-label={`Remover link ${index + 1}`}
+                      title="Remover link"
+                      className={styles.removeLinkButton}
+                    >
+                      <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className={styles.clientFormActions}>
+            <button type="button" className={styles.cancelClientButton} onClick={() => {
+              setDraft(null);
+              setEditingClientId(null);
+              setImageUrl("");
+            }} disabled={saving}>
+              Cancelar
+            </button>
+            <button type="submit" className={styles.primaryButton} disabled={saving || processingImage || !draft.name.trim()}>
+              {saving ? "Salvando…" : editingClientId ? "Salvar alterações" : "Cadastrar cliente"}
+            </button>
+          </div>
+        </form>
+      ) : clients.length === 0 ? (
+        <button type="button" className={styles.emptyClients} onClick={startClientRegistration}>
+          <span><Plus size={20} strokeWidth={1.8} aria-hidden="true" /></span>
+          <strong>Cadastre seu primeiro cliente</strong>
+          <small>Adicione uma imagem, o nome e os links importantes.</small>
+        </button>
+      ) : filteredClients.length === 0 ? (
+        <div className={styles.noClientResults}>
+          <Search size={20} strokeWidth={1.7} aria-hidden="true" />
+          <strong>Nenhum cliente encontrado</strong>
+          <span>Tente pesquisar por outro nome ou link.</span>
+        </div>
+      ) : (
+        <div className={styles.clientGrid}>
+          {filteredClients.map((client) => (
+            <button
+              key={client.id}
+              type="button"
+              className={styles.clientLogoButton}
+              onClick={() => openClient(client)}
+              aria-label={`Ver e editar informações de ${client.name}`}
+              title={client.name}
+            >
+              <span className={styles.clientAvatar} aria-hidden="true">
+                {client.image ? <Image src={client.image} alt="" width={64} height={64} unoptimized /> : <Building2 size={25} strokeWidth={1.6} />}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {feedback && <p role="status" className={styles.feedback}>{feedback}</p>}
+      {error && <p role="alert" className={styles.error}>{error}</p>}
+    </section>
   );
 }
 

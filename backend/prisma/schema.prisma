@@ -87,6 +87,20 @@ model ScheduledMessage {
   @@index([userId, scheduledAt])
 }
 
+model Client {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String   @db.VarChar(191)
+  image       String?  @db.Text
+  links       Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("ClientProfile")
+}
+
 enum ScheduledMessageStatus {
   PENDING
   PROCESSING
@@ -230,6 +244,7 @@ model User {
   notifications      Notification[]
   calendarEvents     CalendarEvent[]
   scheduledMessages  ScheduledMessage[]
+  clients            Client[]
   pushSubscriptions  PushSubscription[]
   organizationMessages OrganizationMessage[]
   internalConversationParticipants InternalConversationParticipant[]

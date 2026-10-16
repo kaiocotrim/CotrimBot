@@ -27,6 +27,7 @@ import { evolutionRouter } from "./routes/evolution.routes.js";
 import { internalConversationRouter } from "./routes/internal-conversation.routes.js";
 import { calendarEventRouter } from "./routes/calendar-event.routes.js";
 import { scheduledMessageRouter } from "./routes/scheduled-message.routes.js";
+import { clientRouter } from "./routes/client-profile.routes.js";
 import { startScheduledMessageWorker } from "./services/scheduled-message.service.js";
 
 // Cria a aplicação Express.
@@ -60,6 +61,7 @@ app.use("/api", requireAuth, aiRouter);
 app.use("/api", requireAuth, internalConversationRouter);
 app.use("/api", requireAuth, calendarEventRouter);
 app.use("/api", requireAuth, scheduledMessageRouter);
+app.use("/api", requireAuth, clientRouter);
 
 // Compatibilidade com instalações da Evolution que ainda usam a URL antiga.
 app.use(webhookRoutes);

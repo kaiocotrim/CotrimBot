@@ -1133,8 +1133,8 @@ export function MessageComposer({
               transition={transition}
               whileHover={reduceMotion || rewriting ? undefined : { scale: 1.06 }}
               whileTap={reduceMotion || rewriting ? undefined : { scale: 0.9 }}
-              aria-label="Resumir e melhorar texto com IA"
-              title={rewriteError ?? "Resumir e melhorar com IA"}
+              aria-label="Deixar mensagem profissional com IA"
+              title={rewriteError ?? "Deixar mensagem profissional com IA"}
               aria-hidden={!text.trim()}
               tabIndex={text.trim() ? 0 : -1}
               disabled={!text.trim() || rewriting || sending}
@@ -1160,7 +1160,7 @@ export function MessageComposer({
                 </>
               )}
             </motion.button>
-            <span className="sr-only" role="status" aria-live="polite">{rewriteError ?? (rewriting ? "Reformulando mensagem" : "")}</span>
+            <span className="sr-only" role="status" aria-live="polite">{rewriteError ?? (rewriting ? "Aprimorando mensagem com IA" : "")}</span>
             <motion.button
               type="button"
               initial={false}

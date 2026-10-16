@@ -6,6 +6,18 @@ type GeminiResponse = {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
 };
 
+const professionalRewriteInstruction = `Você é especialista em comunicação profissional para atendimento por WhatsApp.
+Reescreva a mensagem em português do Brasil com clareza, cordialidade e profissionalismo, mantendo um tom humano e natural.
+
+Regras:
+- Corrija gramática, ortografia, pontuação e organização das ideias.
+- Preserve a intenção e todos os dados do texto original, incluindo nomes, datas, horários, valores, links, números e compromissos.
+- Seja objetivo, mas não resuma nem remova informações relevantes.
+- Não invente informações, promessas, prazos, saudações ou despedidas que não estejam implícitos no texto.
+- Evite formalidade excessiva, jargões, clichês e linguagem robótica.
+- Preserve parágrafos ou listas quando eles ajudarem na leitura.
+- Retorne somente a mensagem final, sem explicações, títulos, comentários ou aspas.`;
+
 aiRouter.post("/ai/rewrite", async (request, response) => {
   const text = typeof request.body?.text === "string" ? request.body.text.trim() : "";
 
@@ -35,10 +47,10 @@ aiRouter.post("/ai/rewrite", async (request, response) => {
       },
       body: JSON.stringify({
         systemInstruction: {
-          parts: [{ text: "Reformule a mensagem em português do Brasil de forma clara, natural e resumida. Preserve o sentido, nomes e informações importantes. Retorne somente a mensagem final, sem explicações e sem aspas." }],
+          parts: [{ text: professionalRewriteInstruction }],
         },
         contents: [{ role: "user", parts: [{ text }] }],
-        generationConfig: { maxOutputTokens: 500, temperature: 0.3 },
+        generationConfig: { maxOutputTokens: 1500, temperature: 0.2 },
       }),
     });
 

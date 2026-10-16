@@ -80,3 +80,15 @@ export async function setCalendarEventCompleted(request: Request, response: Resp
   });
   return response.json({ event: withCreator(event) });
 }
+
+export async function deleteCalendarEvent(request: Request, response: Response) {
+  const id = request.params.id;
+  if (typeof id !== "string" || !id) return response.status(400).json({ error: "Identificador do compromisso inválido." });
+
+  const result = await prisma.calendarEvent.deleteMany({
+    where: { id, userId: request.user!.id },
+  });
+  if (!result.count) return response.status(404).json({ error: "Compromisso não encontrado." });
+
+  return response.status(204).send();
+}
