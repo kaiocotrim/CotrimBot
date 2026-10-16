@@ -424,6 +424,11 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
   const selectedName = chat.selected ? conversationName(chat.selected, userId, chat.members) : "";
   const selectedImage = chat.selected ? conversationImage(chat.selected, userId) : null;
   const selectedContact = chat.selected?.participants.find((participant) => participant.user.id !== userId)?.user;
+  const typingNames = chat.typingUserIds.map((id) => chat.members.find((member) => member.userId === id)?.displayName
+    || chat.selected?.participants.find((participant) => participant.user.id === id)?.user.name || "Um membro");
+  const typingLabel = typingNames.length === 1 ? `${typingNames[0]} está digitando`
+    : typingNames.length === 2 ? `${typingNames[0]} e ${typingNames[1]} estão digitando`
+    : `${typingNames[0]} e mais ${typingNames.length - 1} estão digitando`;
   const canEditSelectedGroupAvatar = chat.selected?.type === "GROUP"
     && chat.selected.participants.some((participant) => participant.user.id === userId && participant.role === "ADMIN");
   const firstMessageId = chat.messages[0]?.id;
@@ -925,10 +930,26 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
                   </motion.div>
                 );
               })}
-              {chat.typingUserId && <motion.div initial={reduceMotion ? false : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 3 }} className="self-start rounded-full bg-white/[0.05] px-3 py-1"><TypingIndicator label="digitando…" className="text-zinc-400" /></motion.div>}
             </div>
           </div>
           {showScrollButton && <button type="button" onClick={() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })} aria-label="Ir para a mensagem mais recente" className="absolute bottom-24 left-1/2 z-20 flex size-9 -translate-x-1/2 items-center justify-center rounded-full border border-white/15 bg-zinc-900/90 text-zinc-200 shadow-lg"><ArrowDown className="size-5" /></button>}
+          <div className="relative shrink-0">
+          <AnimatePresence>
+            {chat.typingUserIds.length > 0 && (
+              <motion.div
+                key={chat.selectedId}
+                initial={reduceMotion ? false : { opacity: 0, y: 6, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: reduceMotion ? 0 : 4 }}
+                transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 32, opacity: { duration: 0.15 } }}
+                className="pointer-events-none absolute inset-x-0 bottom-full z-20 mb-2 flex justify-center px-4"
+              >
+                <div className="max-w-full rounded-full bg-zinc-800/95 px-5 py-2 text-xs font-semibold text-zinc-400 shadow-sm backdrop-blur-md">
+                  <TypingIndicator label={typingLabel} showLabel className="text-zinc-400" />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <MessageComposer
             key={chat.selectedId}
             mode="internal"
@@ -937,7 +958,7 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
             text={text}
             sending={chat.sending}
             closing={false}
-            onTextChange={(value) => { setText(value); chat.sendTyping(Boolean(value)); }}
+            onTextChange={(value) => { setText(value); chat.sendTyping(Boolean(value.trim())); }}
             onSend={(options) => void submitMessage(options)}
             onSendMedia={async (files, caption, includeSignature) => {
               await chat.sendMedia(files, caption ?? "", replyTo?.id, includeSignature);
@@ -952,6 +973,7 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
             onCancelReply={() => setReplyTo(null)}
             focusRequestKey={0}
           />
+          </div>
         </>}
         {pinningMessage && (
           <Dialog.Root open onOpenChange={(open) => {

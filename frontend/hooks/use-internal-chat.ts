@@ -23,8 +23,10 @@ export function useInternalChat({ activeOrganizationId, currentUserId }: Interna
   const [hasOlderMessages, setHasOlderMessages] = useState(cachedBootstrap?.initialMessagesHasMore ?? false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [typingUserId, setTypingUserId] = useState<string | null>(null);
-  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [typingUsers, setTypingUsers] = useState<{ organizationId: string; conversationId: string; userIds: string[] } | null>(null);
+  const outgoingTyping = useRef({ active: false, lastSentAt: 0, timer: null as ReturnType<typeof setTimeout> | null });
+  const typingUserIds = typingUsers?.organizationId === organizationId && typingUsers.conversationId === selectedId ? typingUsers.userIds : [];
+  const typingUserId = typingUserIds[0] ?? null;
   const currentUserIdRef = useRef<string | null>(currentUserId ?? null);
   const selectedIdRef = useRef<string | null>(cachedBootstrap?.initialConversationId ?? null);
   const bootstrappedRef = useRef(Boolean(cachedBootstrap));
@@ -99,12 +101,26 @@ export function useInternalChat({ activeOrganizationId, currentUserId }: Interna
 
   useEffect(() => {
     if (!organizationId) return;
+    const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const removeTypingUser = (userId: string) => {
+      const timer = typingTimers.get(userId);
+      if (timer) clearTimeout(timer);
+      typingTimers.delete(userId);
+      setTypingUsers((current) => current?.organizationId === organizationId && current.conversationId === selectedId
+        ? { ...current, userIds: current.userIds.filter((id) => id !== userId) } : current);
+    };
+    const clearTyping = () => {
+      for (const timer of typingTimers.values()) clearTimeout(timer);
+      typingTimers.clear();
+      setTypingUsers(null);
+    };
     const addMessage = (payload: { organizationId: string; conversationId: string; message: InternalMessage }) => {
       if (payload.organizationId !== organizationId) return;
       setConversations((current) => current.map((conversation) => conversation.id === payload.conversationId
         ? { ...conversation, updatedAt: payload.message.createdAt, lastMessage: payload.message, unreadCount: conversation.id === selectedId ? 0 : (conversation.unreadCount ?? 0) + (payload.message.senderId === currentUserIdRef.current ? 0 : 1) }
         : conversation));
       if (payload.conversationId !== selectedId) return;
+      removeTypingUser(payload.message.senderId);
       setMessages((current) => current.some((message) => message.id === payload.message.id || (message.clientId && message.clientId === payload.message.clientId)) ? current : [...current, payload.message]);
       void internalChatApi.read(organizationId, selectedId).catch(() => undefined);
     };
@@ -114,9 +130,16 @@ export function useInternalChat({ activeOrganizationId, currentUserId }: Interna
     };
     const handleTyping = (payload: { organizationId: string; conversationId: string; userId: string }) => {
       if (payload.organizationId !== organizationId || payload.conversationId !== selectedId || payload.userId === currentUserIdRef.current) return;
-      setTypingUserId(payload.userId);
-      if (typingTimer.current) clearTimeout(typingTimer.current);
-      typingTimer.current = setTimeout(() => setTypingUserId(null), 3_000);
+      setTypingUsers((current) => {
+        const userIds = current?.organizationId === organizationId && current.conversationId === selectedId ? current.userIds : [];
+        return { organizationId, conversationId: payload.conversationId, userIds: userIds.includes(payload.userId) ? userIds : [...userIds, payload.userId] };
+      });
+      const timer = typingTimers.get(payload.userId);
+      if (timer) clearTimeout(timer);
+      typingTimers.set(payload.userId, setTimeout(() => removeTypingUser(payload.userId), 3_500));
+    };
+    const handleTypingStop = (payload: { organizationId: string; conversationId: string; userId: string }) => {
+      if (payload.organizationId === organizationId && payload.conversationId === selectedId) removeTypingUser(payload.userId);
     };
     const handleReaction = (payload: { conversationId: string; messageId: number; reaction: { userId: string; emoji: string } | null; userId?: string }) => {
       if (payload.conversationId !== selectedId) return;
@@ -137,7 +160,8 @@ export function useInternalChat({ activeOrganizationId, currentUserId }: Interna
     socket.on("internal:message:new", addMessage);
     socket.on("internal:message:deleted", handleDeleted);
     socket.on("internal:typing:start", handleTyping);
-    socket.on("internal:typing:stop", () => setTypingUserId(null));
+    socket.on("internal:typing:stop", handleTypingStop);
+    socket.on("disconnect", clearTyping);
     socket.on("internal:reaction:updated", handleReaction);
     socket.on("internal:message:flags", handleMessageFlags);
     const handleConversationUpdated = (payload: { organizationId: string }) => {
@@ -149,7 +173,10 @@ export function useInternalChat({ activeOrganizationId, currentUserId }: Interna
       socket.off("internal:message:new", addMessage);
       socket.off("internal:message:deleted", handleDeleted);
       socket.off("internal:typing:start", handleTyping);
-      socket.off("internal:typing:stop");
+      socket.off("internal:typing:stop", handleTypingStop);
+      socket.off("disconnect", clearTyping);
+      for (const timer of typingTimers.values()) clearTimeout(timer);
+      queueMicrotask(() => setTypingUsers(null));
       socket.off("internal:reaction:updated", handleReaction);
       socket.off("internal:message:flags", handleMessageFlags);
       socket.off("internal:conversation:updated", handleConversationUpdated);
@@ -237,9 +264,34 @@ export function useInternalChat({ activeOrganizationId, currentUserId }: Interna
     }
   }, [organizationId, selectedId, sending]);
 
+  useEffect(() => {
+    const presence = outgoingTyping.current;
+    return () => {
+      if (presence.timer) clearTimeout(presence.timer);
+      if (presence.active && organizationId && selectedId) socket.emit("internal:typing:stop", { organizationId, conversationId: selectedId });
+      presence.active = false;
+      presence.lastSentAt = 0;
+      presence.timer = null;
+    };
+  }, [organizationId, selectedId]);
+
   const sendTyping = useCallback((active: boolean) => {
     if (!organizationId || !selectedId) return;
-    socket.emit(active ? "internal:typing:start" : "internal:typing:stop", { organizationId, conversationId: selectedId });
+    const presence = outgoingTyping.current;
+    if (presence.timer) clearTimeout(presence.timer);
+    const stop = () => {
+      if (presence.active) socket.emit("internal:typing:stop", { organizationId, conversationId: selectedId });
+      presence.active = false;
+      presence.timer = null;
+    };
+    if (!active) { stop(); return; }
+    const now = Date.now();
+    if (!presence.active || now - presence.lastSentAt >= 1_000) {
+      socket.emit("internal:typing:start", { organizationId, conversationId: selectedId });
+      presence.lastSentAt = now;
+    }
+    presence.active = true;
+    presence.timer = setTimeout(stop, 1_800);
   }, [organizationId, selectedId]);
 
   const react = useCallback(async (messageId: number, emoji: string) => {
@@ -262,5 +314,5 @@ export function useInternalChat({ activeOrganizationId, currentUserId }: Interna
     setMessages((current) => current.map((message) => message.id === messageId ? { ...message, ...result } : message));
   }, [organizationId, selectedId]);
 
-  return { organizationId, conversations, members, selected, selectedId, messages, loading, loadingMessages, loadingOlderMessages, hasOlderMessages, sending, error, typingUserId, reload, selectConversation, startDirect, startGroup, addParticipants, updatePreferences, updateAvatar, loadOlderMessages, sendMessage, sendMedia, sendTyping, react, deleteMessage, updateMessageFlags };
+  return { organizationId, conversations, members, selected, selectedId, messages, loading, loadingMessages, loadingOlderMessages, hasOlderMessages, sending, error, typingUserId, typingUserIds, reload, selectConversation, startDirect, startGroup, addParticipants, updatePreferences, updateAvatar, loadOlderMessages, sendMessage, sendMedia, sendTyping, react, deleteMessage, updateMessageFlags };
 }
