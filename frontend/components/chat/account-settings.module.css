@@ -998,8 +998,9 @@
   position: fixed;
   inset: 0;
   z-index: 120;
-  background: rgb(0 0 0 / 72%);
-  backdrop-filter: blur(4px);
+  background: rgb(0 0 0 / 45%);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 .confirmDeleteDialog {
@@ -1012,7 +1013,7 @@
   justify-items: center;
   padding: 26px;
   transform: translate(-50%, -50%);
-  border: 1px solid #292929;
+  border: 0;
   border-radius: 20px;
   outline: none;
   background: #111;

@@ -211,8 +211,8 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
 
   const matchingCompanies = useMemo(() => {
     const search = newContactCompany.trim().toLocaleLowerCase("pt-BR");
-    if (!search || selectedCompanyId) return registeredCompanies;
-    return registeredCompanies.filter((company) => company.name.toLocaleLowerCase("pt-BR").includes(search));
+    const companies = !search || selectedCompanyId ? registeredCompanies : registeredCompanies.filter((company) => company.name.toLocaleLowerCase("pt-BR").includes(search));
+    return [{ id: "__none__", name: "Sem empresa", image: null }, ...companies];
   }, [newContactCompany, registeredCompanies, selectedCompanyId]);
   const matchingJobTitles = JOB_TITLE_OPTIONS.filter((jobTitle) => (
     !newContactJobTitle.trim() || jobTitle.toLocaleLowerCase("pt-BR").includes(newContactJobTitle.trim().toLocaleLowerCase("pt-BR"))
@@ -317,7 +317,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
     setSavedActionError(null);
     try {
       const name = `${newContactFirstName.trim()} ${newContactLastName.trim()}`.trim();
-      setSavedContacts(await onSaveContact(name, internationalPhone.slice(1), newContactCompany.trim(), newContactJobTitle.trim()));
+      setSavedContacts(await onSaveContact(name, internationalPhone.slice(1), selectedCompanyId === "__none__" ? "" : newContactCompany.trim(), newContactJobTitle.trim()));
       setSavedError(null);
       setNewContactFirstName("");
       setNewContactLastName("");
@@ -747,46 +747,45 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                       }
                     }}
                     placeholder={companiesLoading ? "Carregando empresas..." : "Digite o nome da empresa"}
-                    disabled={companiesLoading || registeredCompanies.length === 0}
+                    disabled={companiesLoading}
                     className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-zinc-500 disabled:text-zinc-500 lg:text-sm"
                   />
                     <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-zinc-500 transition-transform ${companyPickerOpen ? "rotate-180" : ""}`} strokeWidth={1.8} />
                   </div>
-                  {companyPickerOpen && !companiesLoading && registeredCompanies.length > 0 && (
-                    <div id="registered-company-options" role="listbox" aria-label="Empresas cadastradas" className="absolute inset-x-0 top-full z-30 mt-2 max-h-60 overflow-y-auto rounded-xl border border-white/[0.09] bg-zinc-900 p-1.5 shadow-2xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {matchingCompanies.length ? matchingCompanies.map((company, index) => (
-                        <button
-                          id={`registered-company-${company.id}`}
-                          key={company.id}
-                          type="button"
-                          role="option"
-                          aria-selected={company.id === selectedCompanyId}
-                          onMouseDown={(event) => event.preventDefault()}
-                          onMouseEnter={() => setActiveCompanyIndex(index)}
-                          onClick={() => {
-                            setSelectedCompanyId(company.id);
-                            setNewContactCompany(company.name);
-                            setCompanyPickerOpen(false);
-                            setSavedActionError(null);
-                          }}
-                          className={["flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors", index === activeCompanyIndex ? "bg-white/[0.09]" : "hover:bg-white/[0.06]"].join(" ")}
-                        >
-                          <span aria-hidden="true" className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/[0.07] text-zinc-500">
-                            <Building2 className="size-4" strokeWidth={1.7} />
-                            {company.image && <Image src={company.image} alt="" width={36} height={36} unoptimized className="absolute inset-0 size-full object-contain p-1" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-100">{company.name}</span>
-                          {company.id === selectedCompanyId && <span className="text-xs text-emerald-400">Selecionada</span>}
-                        </button>
-                      )) : (
-                        <p className="px-3 py-4 text-center text-xs text-zinc-500">Nenhuma empresa encontrada.</p>
-                      )}
-                    </div>
-                  )}
+                  <AnimatePresence>
+                    {companyPickerOpen && !companiesLoading && (
+                      <motion.div initial={reduceMotion ? false : { opacity: 0, y: -6, scale: 0.975 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.985, pointerEvents: "none" }} transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 32, mass: 0.7, opacity: { duration: 0.14 } }} style={{ transformOrigin: "top" }} id="registered-company-options" role="listbox" aria-label="Empresas cadastradas" className="absolute inset-x-0 top-full z-30 mt-2 max-h-60 overflow-y-auto rounded-xl border border-white/[0.09] bg-zinc-900 p-1.5 shadow-2xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        {matchingCompanies.length ? matchingCompanies.map((company, index) => (
+                          <button
+                            id={`registered-company-${company.id}`}
+                            key={company.id}
+                            type="button"
+                            role="option"
+                            aria-selected={company.id === selectedCompanyId}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onMouseEnter={() => setActiveCompanyIndex(index)}
+                            onClick={() => {
+                              setSelectedCompanyId(company.id);
+                              setNewContactCompany(company.name);
+                              setCompanyPickerOpen(false);
+                              setSavedActionError(null);
+                            }}
+                            className={["flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors", index === activeCompanyIndex ? "bg-white/[0.09]" : "hover:bg-white/[0.06]"].join(" ")}
+                          >
+                            <span aria-hidden="true" className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/[0.07] text-zinc-500">
+                              <Building2 className="size-4" strokeWidth={1.7} />
+                              {company.image && <Image src={company.image} alt="" width={36} height={36} unoptimized className="absolute inset-0 size-full object-contain p-1" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-100">{company.name}</span>
+                            {company.id === selectedCompanyId && <span className="text-xs text-zinc-400">Selecionada</span>}
+                          </button>
+                        )) : (
+                          <p className="px-3 py-4 text-center text-xs text-zinc-500">Nenhuma empresa encontrada.</p>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-                {!companiesLoading && registeredCompanies.length === 0 && (
-                  <p className="-mt-5 text-xs leading-5 text-zinc-500">Cadastre primeiro a empresa em Configurações → Cliente.</p>
-                )}
                 <div className="relative border-b border-zinc-600 focus-within:border-white">
                   <div className="flex h-11 items-center gap-2">
                     <input
@@ -826,26 +825,28 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
                     />
                     <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-zinc-500 transition-transform ${jobPickerOpen ? "rotate-180" : ""}`} strokeWidth={1.8} />
                   </div>
-                  {jobPickerOpen && (
-                    <div id="new-contact-job-options" role="listbox" aria-label="Cargos sugeridos" className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-white/[0.09] bg-zinc-900 p-1.5 shadow-2xl">
-                      {matchingJobTitles.length ? matchingJobTitles.map((jobTitle, index) => (
-                        <button
-                          key={jobTitle}
-                          type="button"
-                          role="option"
-                          aria-selected={newContactJobTitle === jobTitle}
-                          onMouseDown={(event) => event.preventDefault()}
-                          onMouseEnter={() => setActiveJobIndex(index)}
-                          onClick={() => { setNewContactJobTitle(jobTitle); setJobPickerOpen(false); }}
-                          className={["flex w-full items-center rounded-lg px-3 py-2.5 text-left text-sm transition-colors", index === activeJobIndex ? "bg-white/[0.09] text-white" : "text-zinc-300 hover:bg-white/[0.06]"].join(" ")}
-                        >
-                          {jobTitle}
-                        </button>
-                      )) : (
-                        <p className="px-3 py-3 text-xs text-zinc-500">Pressione Tab para usar o cargo digitado.</p>
-                      )}
-                    </div>
-                  )}
+                  <AnimatePresence>
+                    {jobPickerOpen && (
+                      <motion.div initial={reduceMotion ? false : { opacity: 0, y: -6, scale: 0.975 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.985, pointerEvents: "none" }} transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 32, mass: 0.7, opacity: { duration: 0.14 } }} style={{ transformOrigin: "top" }} id="new-contact-job-options" role="listbox" aria-label="Cargos sugeridos" className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-white/[0.09] bg-zinc-900 p-1.5 shadow-2xl">
+                        {matchingJobTitles.length ? matchingJobTitles.map((jobTitle, index) => (
+                          <button
+                            key={jobTitle}
+                            type="button"
+                            role="option"
+                            aria-selected={newContactJobTitle === jobTitle}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onMouseEnter={() => setActiveJobIndex(index)}
+                            onClick={() => { setNewContactJobTitle(jobTitle); setJobPickerOpen(false); }}
+                            className={["flex w-full items-center rounded-lg px-3 py-2.5 text-left text-sm transition-colors", index === activeJobIndex ? "bg-white/[0.09] text-white" : "text-zinc-300 hover:bg-white/[0.06]"].join(" ")}
+                          >
+                            {jobTitle}
+                          </button>
+                        )) : (
+                          <p className="px-3 py-3 text-xs text-zinc-500">Pressione Tab para usar o cargo digitado.</p>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
             </div>

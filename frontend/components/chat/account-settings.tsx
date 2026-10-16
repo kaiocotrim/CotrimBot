@@ -5,7 +5,7 @@ import { Select } from "@base-ui/react/select";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
 import { BadgeCheck, Bell, Building2, Camera, Check, ChevronDown, ContactRound, Link2, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "lucide-react";
-import { LayoutGroup, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -706,233 +706,243 @@ function ClientSettings() {
 
   return (
     <section className={styles.card} aria-label="Clientes">
-      {!draft && (
-        <div className={styles.clientSectionHeader}>
-          {(loading || clients.length > 0) && (
-            <label className={styles.clientSearch}>
-              <Search size={17} strokeWidth={1.8} aria-hidden="true" />
-              <input
-                type="search"
-                disabled={loading}
-                value={clientQuery}
-                onChange={(event) => setClientQuery(event.target.value)}
-                placeholder="Pesquisar cliente ou link"
-                aria-label="Pesquisar clientes"
-              />
-              {clientQuery && (
-                <button type="button" onClick={() => setClientQuery("")} aria-label="Limpar pesquisa" title="Limpar pesquisa">
-                  <X size={15} strokeWidth={1.8} aria-hidden="true" />
-                </button>
-              )}
-            </label>
-          )}
-          <motion.button disabled={loading} whileHover={reduceMotion ? undefined : { scale: 1.04 }} whileTap={reduceMotion ? undefined : { scale: 0.94 }} transition={settingsSpring} type="button" className={styles.newClientButton} onClick={startClientRegistration} aria-label="Novo cliente" title="Novo cliente">
-            <Plus size={17} strokeWidth={2} aria-hidden="true" />
-          </motion.button>
-        </div>
-      )}
-
-      {loading ? (
-        <div className={styles.clientGrid} role="status" aria-label="Carregando clientes" aria-busy="true">
-          {[0, 1, 2, 3].map((index) => (
-            <div key={index} className={styles.clientSkeletonSlot} aria-hidden="true">
-              <span className={styles.clientSkeleton} />
-            </div>
-          ))}
-        </div>
-      ) : draft ? (
-        <motion.form initial={reduceMotion ? false : { opacity: 0, y: 10, scale: 0.99 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} className={styles.clientForm} onSubmit={(event) => void saveClient(event)}>
-          <label className={styles.field}>
-            <span>Nome da empresa</span>
-            <input
-              type="text"
-              value={draft.name}
-              onChange={(event) => setDraft((current) => current ? { ...current, name: event.target.value } : current)}
-              placeholder="Ex.: Cotrim Tecnologia"
-              autoComplete="organization"
-              maxLength={191}
-              required
-              disabled={busy}
-            />
-          </label>
-
-          <div className={styles.clientMediaSection}>
-            <div className={styles.clientDraftHeader}>
-              <div className={styles.clientAvatar} aria-hidden="true">
-                {draft.image ? <Image src={draft.image} alt="" width={64} height={64} unoptimized /> : <Building2 size={26} strokeWidth={1.6} />}
-              </div>
-              <div className={styles.clientPhotoActions}>
-                <strong>Logo da empresa</strong>
-                <span>JPG, PNG ou WebP de até 5 MB.</span>
-                <div>
-                  <button type="button" onClick={() => imageInputRef.current?.click()} disabled={processingImage || busy}>
-                    <Camera size={15} strokeWidth={1.8} aria-hidden="true" />
-                    {processingImage ? "Processando…" : draft.image ? "Trocar imagem" : "Escolher imagem"}
-                  </button>
-                  {draft.image && (
-                    <button type="button" onClick={() => {
-                      setDraft((current) => current ? { ...current, image: null } : current);
-                      setImageUrl("");
-                    }} disabled={busy}>
-                      Remover
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={draft ? "client-form" : "client-list"}
+          initial={reduceMotion ? false : { opacity: 0, y: 12, scale: 0.985 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.99, pointerEvents: "none" }}
+          transition={reduceMotion ? { duration: 0 } : { ...settingsSpring, opacity: { duration: 0.16 } }}
+        >
+          {!draft && (
+            <div className={styles.clientSectionHeader}>
+              {(loading || clients.length > 0) && (
+                <label className={styles.clientSearch}>
+                  <Search size={17} strokeWidth={1.8} aria-hidden="true" />
+                  <input
+                    type="search"
+                    disabled={loading}
+                    value={clientQuery}
+                    onChange={(event) => setClientQuery(event.target.value)}
+                    placeholder="Pesquisar cliente ou link"
+                    aria-label="Pesquisar clientes"
+                  />
+                  {clientQuery && (
+                    <button type="button" onClick={() => setClientQuery("")} aria-label="Limpar pesquisa" title="Limpar pesquisa">
+                      <X size={15} strokeWidth={1.8} aria-hidden="true" />
                     </button>
                   )}
-                </div>
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  hidden
-                  onChange={(event) => void selectClientImage(event.target.files?.[0])}
-                />
-              </div>
-            </div>
-
-            <label className={`${styles.field} ${styles.clientImageUrl}`}>
-              <span>URL da imagem</span>
-              <input
-                type="url"
-                value={imageUrl}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setImageUrl(value);
-                  setDraft((current) => current ? {
-                    ...current,
-                    image: /^https?:\/\//i.test(value.trim()) ? value.trim() : null,
-                  } : current);
-                  setError(null);
-                }}
-                placeholder="https://exemplo.com/logo.png"
-                maxLength={2048}
-                disabled={busy || processingImage}
-              />
-            </label>
-          </div>
-
-          <div className={styles.clientLinks}>
-            <div className={styles.clientLinksHeader}>
-              <div>
-                <strong>Links</strong>
-                <span>Sites, documentos ou páginas importantes.</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDraft((current) => current && current.links.length < 20
-                  ? { ...current, links: [...current.links, ""] }
-                  : current)}
-                disabled={busy || draft.links.length >= 20}
-                className={styles.addLinkButton}
-              >
+                </label>
+              )}
+              <motion.button disabled={loading} whileHover={reduceMotion ? undefined : { scale: 1.04 }} whileTap={reduceMotion ? undefined : { scale: 0.94 }} transition={settingsSpring} type="button" className={styles.newClientButton} onClick={startClientRegistration} aria-label="Novo cliente" title="Novo cliente">
                 <Plus size={17} strokeWidth={2} aria-hidden="true" />
-                Adicionar link
-              </button>
+              </motion.button>
             </div>
+          )}
 
-            {draft.links.length === 0 ? (
-              <button
-                type="button"
-                className={styles.emptyLinks}
-                disabled={busy}
-                onClick={() => setDraft((current) => current ? { ...current, links: [""] } : current)}
-              >
-                <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
-                Adicione o primeiro link da empresa
-              </button>
-            ) : (
-              <div className={styles.linkList}>
-                {draft.links.map((link, index) => (
-                  <div key={index} className={styles.linkRow}>
-                    <span aria-hidden="true" className={styles.linkIcon}><Link2 size={17} strokeWidth={1.8} /></span>
-                    <input
-                      type="url"
-                      value={link}
-                      onChange={(event) => updateDraftLink(index, event.target.value)}
-                      placeholder="https://exemplo.com"
-                      aria-label={`Link ${index + 1}`}
-                      maxLength={2048}
-                      disabled={busy}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setDraft((current) => current ? {
-                        ...current,
-                        links: current.links.filter((_, linkIndex) => linkIndex !== index),
-                      } : current)}
-                      disabled={busy}
-                      aria-label={`Remover link ${index + 1}`}
-                      title="Remover link"
-                      className={styles.removeLinkButton}
-                    >
-                      <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />
-                    </button>
+          {loading ? (
+            <div className={styles.clientGrid} role="status" aria-label="Carregando clientes" aria-busy="true">
+              {[0, 1, 2, 3].map((index) => (
+                <div key={index} className={styles.clientSkeletonSlot} aria-hidden="true">
+                  <span className={styles.clientSkeleton} />
+                </div>
+              ))}
+            </div>
+          ) : draft ? (
+            <form className={styles.clientForm} onSubmit={(event) => void saveClient(event)}>
+              <label className={styles.field}>
+                <span>Nome da empresa</span>
+                <input
+                  type="text"
+                  value={draft.name}
+                  onChange={(event) => setDraft((current) => current ? { ...current, name: event.target.value } : current)}
+                  placeholder="Ex.: Cotrim Tecnologia"
+                  autoComplete="organization"
+                  maxLength={191}
+                  required
+                  disabled={busy}
+                />
+              </label>
+
+              <div className={styles.clientMediaSection}>
+                <div className={styles.clientDraftHeader}>
+                  <div className={styles.clientAvatar} aria-hidden="true">
+                    {draft.image ? <Image src={draft.image} alt="" width={64} height={64} unoptimized /> : <Building2 size={26} strokeWidth={1.6} />}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <div className={styles.clientPhotoActions}>
+                    <strong>Logo da empresa</strong>
+                    <span>JPG, PNG ou WebP de até 5 MB.</span>
+                    <div>
+                      <button type="button" onClick={() => imageInputRef.current?.click()} disabled={processingImage || busy}>
+                        <Camera size={15} strokeWidth={1.8} aria-hidden="true" />
+                        {processingImage ? "Processando…" : draft.image ? "Trocar imagem" : "Escolher imagem"}
+                      </button>
+                      {draft.image && (
+                        <button type="button" onClick={() => {
+                          setDraft((current) => current ? { ...current, image: null } : current);
+                          setImageUrl("");
+                        }} disabled={busy}>
+                          Remover
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      hidden
+                      onChange={(event) => void selectClientImage(event.target.files?.[0])}
+                    />
+                  </div>
+                </div>
 
-          <div className={styles.clientFormActions}>
-            {editingClientId && (
-              <button
-                type="button"
-                className={styles.deleteClientButton}
-                onClick={() => setConfirmingDelete(true)}
-                disabled={busy || processingImage}
-                title="Excluir cliente"
-                aria-busy={deleting}
-              >
-                <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />
-                {deleting ? "Excluindo…" : "Excluir cliente"}
-              </button>
-            )}
-            <button type="button" className={styles.cancelClientButton} onClick={() => {
-              setDraft(null);
-              setEditingClientId(null);
-              setImageUrl("");
-            }} disabled={busy}>
-              Cancelar
+                <label className={`${styles.field} ${styles.clientImageUrl}`}>
+                  <span>URL da imagem</span>
+                  <input
+                    type="url"
+                    value={imageUrl}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setImageUrl(value);
+                      setDraft((current) => current ? {
+                        ...current,
+                        image: /^https?:\/\//i.test(value.trim()) ? value.trim() : null,
+                      } : current);
+                      setError(null);
+                    }}
+                    placeholder="https://exemplo.com/logo.png"
+                    maxLength={2048}
+                    disabled={busy || processingImage}
+                  />
+                </label>
+              </div>
+
+              <div className={styles.clientLinks}>
+                <div className={styles.clientLinksHeader}>
+                  <div>
+                    <strong>Links</strong>
+                    <span>Sites, documentos ou páginas importantes.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDraft((current) => current && current.links.length < 20
+                      ? { ...current, links: [...current.links, ""] }
+                      : current)}
+                    disabled={busy || draft.links.length >= 20}
+                    className={styles.addLinkButton}
+                  >
+                    <Plus size={17} strokeWidth={2} aria-hidden="true" />
+                    Adicionar link
+                  </button>
+                </div>
+
+                {draft.links.length === 0 ? (
+                  <button
+                    type="button"
+                    className={styles.emptyLinks}
+                    disabled={busy}
+                    onClick={() => setDraft((current) => current ? { ...current, links: [""] } : current)}
+                  >
+                    <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+                    Adicione o primeiro link da empresa
+                  </button>
+                ) : (
+                  <div className={styles.linkList}>
+                    {draft.links.map((link, index) => (
+                      <div key={index} className={styles.linkRow}>
+                        <span aria-hidden="true" className={styles.linkIcon}><Link2 size={17} strokeWidth={1.8} /></span>
+                        <input
+                          type="url"
+                          value={link}
+                          onChange={(event) => updateDraftLink(index, event.target.value)}
+                          placeholder="https://exemplo.com"
+                          aria-label={`Link ${index + 1}`}
+                          maxLength={2048}
+                          disabled={busy}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setDraft((current) => current ? {
+                            ...current,
+                            links: current.links.filter((_, linkIndex) => linkIndex !== index),
+                          } : current)}
+                          disabled={busy}
+                          aria-label={`Remover link ${index + 1}`}
+                          title="Remover link"
+                          className={styles.removeLinkButton}
+                        >
+                          <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className={styles.clientFormActions}>
+                {editingClientId && (
+                  <button
+                    type="button"
+                    className={styles.deleteClientButton}
+                    onClick={() => setConfirmingDelete(true)}
+                    disabled={busy || processingImage}
+                    title="Excluir cliente"
+                    aria-busy={deleting}
+                  >
+                    <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />
+                    {deleting ? "Excluindo…" : "Excluir cliente"}
+                  </button>
+                )}
+                <button type="button" className={styles.cancelClientButton} onClick={() => {
+                  setDraft(null);
+                  setEditingClientId(null);
+                  setImageUrl("");
+                }} disabled={busy}>
+                  Cancelar
+                </button>
+                <button type="submit" className={styles.primaryButton} disabled={busy || processingImage || !draft.name.trim()}>
+                  {saving ? "Salvando…" : editingClientId ? "Salvar alterações" : "Cadastrar cliente"}
+                </button>
+              </div>
+            </form>
+          ) : clients.length === 0 ? (
+            <button type="button" className={styles.emptyClients} onClick={startClientRegistration}>
+              <span><Plus size={20} strokeWidth={1.8} aria-hidden="true" /></span>
+              <strong>Cadastre seu primeiro cliente</strong>
+              <small>Adicione uma imagem, o nome e os links importantes.</small>
             </button>
-            <button type="submit" className={styles.primaryButton} disabled={busy || processingImage || !draft.name.trim()}>
-              {saving ? "Salvando…" : editingClientId ? "Salvar alterações" : "Cadastrar cliente"}
-            </button>
-          </div>
-        </motion.form>
-      ) : clients.length === 0 ? (
-        <button type="button" className={styles.emptyClients} onClick={startClientRegistration}>
-          <span><Plus size={20} strokeWidth={1.8} aria-hidden="true" /></span>
-          <strong>Cadastre seu primeiro cliente</strong>
-          <small>Adicione uma imagem, o nome e os links importantes.</small>
-        </button>
-      ) : filteredClients.length === 0 ? (
-        <div className={styles.noClientResults}>
-          <Search size={20} strokeWidth={1.7} aria-hidden="true" />
-          <strong>Nenhum cliente encontrado</strong>
-          <span>Tente pesquisar por outro nome ou link.</span>
-        </div>
-      ) : (
-        <div className={styles.clientGrid}>
-          {filteredClients.map((client, index) => (
-            <motion.button
-              layout={reduceMotion ? false : "position"}
-              initial={reduceMotion ? false : { opacity: 0, y: 8, scale: 0.94 }}
-              animate={{ opacity: 1, y: 0, scale: 1, transition: reduceMotion ? { duration: 0 } : { ...settingsSpring, delay: Math.min(index, 7) * 0.045 } }}
-              whileHover={reduceMotion ? undefined : { y: -2, scale: 1.025 }}
-              whileTap={reduceMotion ? undefined : { scale: 0.96 }}
-              transition={reduceMotion ? { duration: 0 } : settingsSpring}
-              key={client.id}
-              type="button"
-              className={styles.clientLogoButton}
-              onClick={() => openClient(client)}
-              aria-label={`Ver e editar informações de ${client.name}`}
-              title={client.name}
-            >
-              <span className={styles.clientAvatar} aria-hidden="true">
-                {client.image ? <Image src={client.image} alt="" width={64} height={64} unoptimized /> : <Building2 size={25} strokeWidth={1.6} />}
-              </span>
-            </motion.button>
-          ))}
-        </div>
-      )}
+          ) : filteredClients.length === 0 ? (
+            <div className={styles.noClientResults}>
+              <Search size={20} strokeWidth={1.7} aria-hidden="true" />
+              <strong>Nenhum cliente encontrado</strong>
+              <span>Tente pesquisar por outro nome ou link.</span>
+            </div>
+          ) : (
+            <div className={styles.clientGrid}>
+              {filteredClients.map((client, index) => (
+                <motion.button
+                  layout={reduceMotion ? false : "position"}
+                  initial={reduceMotion ? false : { opacity: 0, y: 8, scale: 0.94 }}
+                  animate={{ opacity: 1, y: 0, scale: 1, transition: reduceMotion ? { duration: 0 } : { ...settingsSpring, delay: Math.min(index, 7) * 0.045 } }}
+                  whileHover={reduceMotion ? undefined : { y: -2, scale: 1.025 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.96 }}
+                  transition={reduceMotion ? { duration: 0 } : settingsSpring}
+                  key={client.id}
+                  type="button"
+                  className={styles.clientLogoButton}
+                  onClick={() => openClient(client)}
+                  aria-label={`Ver e editar informações de ${client.name}`}
+                  title={client.name}
+                >
+                  <span className={styles.clientAvatar} aria-hidden="true">
+                    {client.image ? <Image src={client.image} alt="" width={64} height={64} unoptimized /> : <Building2 size={25} strokeWidth={1.6} />}
+                  </span>
+                </motion.button>
+              ))}
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
       {feedback && <p role="status" className={styles.feedback}>{feedback}</p>}
       {error && <p role="alert" className={styles.error}>{error}</p>}
 
@@ -943,7 +953,7 @@ function ClientSettings() {
         }}
       >
         <Dialog.Portal>
-          <Dialog.Backdrop className={styles.confirmDeleteBackdrop} />
+          <Dialog.Backdrop forceRender className={styles.confirmDeleteBackdrop} />
           <Dialog.Popup className={styles.confirmDeleteDialog}>
             <span className={styles.confirmDeleteIcon} aria-hidden="true">
               <Trash2 size={20} strokeWidth={1.8} />

@@ -17,6 +17,8 @@ export type CalendarEvent = {
   startsAt: string;
   endsAt: string;
   category: CalendarEventCategory;
+  isPublic: boolean;
+  canManage: boolean;
   completedAt: string | null;
   creator: { name: string; image: string | null };
 };
@@ -44,6 +46,7 @@ export function CalendarEventForm({ date, onDateChange, onCancel, onCreated }: {
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("10:00");
   const [category, setCategory] = useState<CalendarEventCategory>("OTHER");
+  const [isPublic, setIsPublic] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,6 +73,7 @@ export function CalendarEventForm({ date, onDateChange, onCancel, onCreated }: {
           startsAt: startsAt.toISOString(),
           endsAt: endsAt.toISOString(),
           category,
+          isPublic,
         }),
       });
       const payload = await response.json().catch(() => ({})) as { event?: CalendarEvent; error?: string };
@@ -139,6 +143,18 @@ export function CalendarEventForm({ date, onDateChange, onCancel, onCreated }: {
           </Select.Positioner>
         </Select.Portal>
       </Select.Root>
+      <fieldset disabled={saving}>
+        <legend className={labelClass}>Visibilidade</legend>
+        <div className="mt-1.5 inline-flex gap-1 rounded-xl bg-white/[0.035] p-1">
+          {[{ value: false, label: "Privado" }, { value: true, label: "Público" }].map((option) => (
+            <label key={option.label} className="cursor-pointer">
+              <input type="radio" name="visibility" value={String(option.value)} checked={isPublic === option.value} onChange={() => setIsPublic(option.value)} className="peer sr-only" />
+              <span className="block rounded-lg px-4 py-2 text-sm text-zinc-500 transition-colors peer-checked:bg-white/10 peer-checked:text-zinc-100 peer-focus-visible:outline-2 peer-focus-visible:outline-white/60">{option.label}</span>
+            </label>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-zinc-500">{isPublic ? "Todos os usuários podem ver este evento." : "Somente você pode ver este evento."}</p>
+      </fieldset>
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
       <div className="flex justify-end gap-2 pt-4">
         <button type="button" onClick={onCancel} disabled={saving} className="rounded-lg px-4 py-2.5 text-sm font-medium text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-white disabled:opacity-50">Cancelar</button>

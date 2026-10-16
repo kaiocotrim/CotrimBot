@@ -296,7 +296,7 @@ export async function createContact(req: Request, res: Response) {
   const contact = await prisma.contact.upsert({
     where: { phone },
     create: { name, phone, companyName: companyName || null, jobTitle: jobTitle || null, isSaved: true },
-    update: { name, ...(companyName ? { companyName } : {}), ...(jobTitle ? { jobTitle } : {}), isSaved: true },
+    update: { name, ...(typeof req.body?.companyName === "string" ? { companyName: companyName || null } : {}), ...(jobTitle ? { jobTitle } : {}), isSaved: true },
     include: { assignments: { select: { userId: true } } },
   });
   const { assignments, ...savedContact } = contact;

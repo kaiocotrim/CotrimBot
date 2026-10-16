@@ -252,7 +252,7 @@ export function CalendarModal({ onClose, variant = "modal" }: { onClose: () => v
   };
 
   const toggleCompleted = async (event: CalendarEvent) => {
-    if (updatingEventIds.includes(event.id)) return;
+    if (!event.canManage || updatingEventIds.includes(event.id)) return;
     const completed = !event.completedAt;
     setCompletionError(null);
     setCompletionNotice(null);
@@ -574,13 +574,15 @@ export function CalendarModal({ onClose, variant = "modal" }: { onClose: () => v
                     <button
                       key={event.id}
                       type="button"
-                      aria-label={`${completed ? "Marcar como pendente" : "Concluir tarefa"}: ${event.title}`}
-                      aria-pressed={completed}
-                      title={completed ? "Marcar como pendente" : "Concluir tarefa"}
+                      aria-label={event.canManage ? `${completed ? "Marcar como pendente" : "Concluir tarefa"}: ${event.title}` : event.title}
+                      aria-pressed={event.canManage ? completed : undefined}
+                      aria-disabled={!event.canManage}
+                      title={event.canManage ? (completed ? "Marcar como pendente" : "Concluir tarefa") : "Evento público · Somente o criador pode alterar"}
                       disabled={updatingEventIds.includes(event.id) || deletingEventIds.includes(event.id)}
                       onClick={() => void toggleCompleted(event)}
                       onContextMenu={(contextEvent) => {
                         contextEvent.preventDefault();
+                        if (!event.canManage) return;
                         setCalendarContextMenu({
                           target: { kind: "event", event },
                           x: Math.min(Math.max(8, contextEvent.clientX), window.innerWidth - 200),
@@ -602,6 +604,7 @@ export function CalendarModal({ onClose, variant = "modal" }: { onClose: () => v
                       <span className="min-w-0 flex-1">
                         <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-zinc-400">
                           <span>{formatTime(event.startsAt)} – {formatTime(event.endsAt)}</span>
+                          <span>· {event.isPublic ? "Público" : "Privado"}</span>
                           {completed && <span className={["font-medium", colors[color].text].join(" ")}>Tarefa concluída</span>}
                         </span>
                         <span className="mt-1 block font-semibold leading-snug text-zinc-100">{event.title}</span>

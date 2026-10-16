@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import { Bot, Building2, Check, ChevronDown, ExternalLink, Link2, LoaderCircle, MessageCircle, Pencil, UserRound, X } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
@@ -17,6 +17,19 @@ import type { Contact } from "@/types/chat";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 type RegisteredCompany = { id: string; name: string; image: string | null; links: string[] };
 const JOB_TITLE_OPTIONS = ["T.I", "Operador", "Supervisor"] as const;
+
+function formatContactPhone(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 15);
+  if (!digits.startsWith("55") || digits.length > 13) return digits;
+  const country = digits.slice(0, 2);
+  const area = digits.slice(2, 4);
+  const number = digits.slice(4);
+  const prefixLength = number.length > 8 ? 5 : 4;
+  const subscriber = number.length > prefixLength
+    ? `${number.slice(0, prefixLength)}-${number.slice(prefixLength)}`
+    : number;
+  return [country, area, subscriber].filter(Boolean).join(" ");
+}
 
 function UserAvatar({ name, image }: { name: string; image?: string | null }) {
   const [failed, setFailed] = useState(false);
@@ -98,8 +111,8 @@ export function ContactInfoPanel({
       : `${selectedAssignees[0]?.name}, ${selectedAssignees[1]?.name} e mais ${selectedAssignees.length - 2}`;
   const matchingCompanies = useMemo(() => {
     const search = companyName.trim().toLocaleLowerCase("pt-BR");
-    if (!search || selectedCompanyId) return registeredCompanies;
-    return registeredCompanies.filter((company) => company.name.toLocaleLowerCase("pt-BR").includes(search));
+    const companies = !search || selectedCompanyId ? registeredCompanies : registeredCompanies.filter((company) => company.name.toLocaleLowerCase("pt-BR").includes(search));
+    return [{ id: "__none__", name: "Sem empresa", image: null }, ...companies];
   }, [companyName, registeredCompanies, selectedCompanyId]);
   const contactCompany = useMemo(() => registeredCompanies.find((company) => (
     company.name.localeCompare(contact.companyName ?? "", "pt-BR", { sensitivity: "base" }) === 0
@@ -241,7 +254,7 @@ export function ContactInfoPanel({
     setJobTitle(contact.jobTitle ?? "");
     setJobPickerOpen(false);
     setActiveJobIndex(0);
-    setPhone(contact.phone);
+    setPhone(formatContactPhone(contact.phone));
     setError(null);
     setEditing(true);
     void fetch(`${API_URL}/clients`, { credentials: "include", cache: "no-store" })
@@ -291,7 +304,7 @@ export function ContactInfoPanel({
     setSaving(true);
     setError(null);
     try {
-      await onRenameContact(contact.id, name, companyName.trim(), jobTitle.trim(), contact.isGroup ? undefined : normalizedPhone);
+      await onRenameContact(contact.id, name, selectedCompanyId === "__none__" ? "" : companyName.trim(), jobTitle.trim(), contact.isGroup ? undefined : normalizedPhone);
       setEditing(false);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Não foi possível editar o contato");
@@ -332,8 +345,14 @@ export function ContactInfoPanel({
           {contact.isGroup ? "Grupo do WhatsApp" : contact.phone}
         </p>
 
+        <AnimatePresence mode="wait" initial={false}>
         {editing ? (
-          <form
+          <motion.form
+            key="edit-contact"
+            initial={reduceMotion ? false : { opacity: 0, y: 10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: reduceMotion ? 0 : 6 }}
+            transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 380, damping: 32, mass: 0.8, opacity: { duration: 0.15 } }}
             onSubmit={saveName}
             aria-label="Editar contato"
             aria-busy={saving}
@@ -412,46 +431,45 @@ export function ContactInfoPanel({
                       setCompanyPickerOpen(false);
                     }
                   }}
-                  disabled={saving || companiesLoading || registeredCompanies.length === 0}
-                  placeholder={companiesLoading ? "Carregando empresas..." : registeredCompanies.length ? "Digite o nome da empresa" : "Nenhuma empresa cadastrada"}
+                  disabled={saving || companiesLoading}
+                  placeholder={companiesLoading ? "Carregando empresas..." : "Digite o nome da empresa"}
                   className="min-w-0 flex-1 bg-transparent py-2 text-base text-white outline-none placeholder:text-zinc-600 disabled:opacity-50 lg:text-sm"
                 />
                 <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-zinc-500 transition-transform ${companyPickerOpen ? "rotate-180" : ""}`} strokeWidth={1.8} />
               </div>
-              {companyPickerOpen && !companiesLoading && registeredCompanies.length > 0 && (
-                <div id="contact-company-options" role="listbox" aria-label="Empresas cadastradas" className="absolute inset-x-0 top-full z-50 mt-2 max-h-60 overflow-y-auto rounded-xl border border-white/[0.09] bg-zinc-900 p-1.5 shadow-2xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {matchingCompanies.length ? matchingCompanies.map((company, index) => (
-                    <button
-                      id={`contact-company-${company.id}`}
-                      key={company.id}
-                      type="button"
-                      role="option"
-                      aria-selected={company.id === selectedCompanyId}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onMouseEnter={() => setActiveCompanyIndex(index)}
-                      onClick={() => {
-                        setSelectedCompanyId(company.id);
-                        setCompanyName(company.name);
-                        setCompanyPickerOpen(false);
-                        setError(null);
-                      }}
-                      className={["flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors", index === activeCompanyIndex ? "bg-white/[0.09]" : "hover:bg-white/[0.06]"].join(" ")}
-                    >
-                      <span aria-hidden="true" className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/[0.07] text-zinc-500">
-                        <Building2 className="size-4" strokeWidth={1.7} />
-                        {company.image && <Image src={company.image} alt="" width={36} height={36} unoptimized className="absolute inset-0 size-full object-contain p-1" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-100">{company.name}</span>
-                      {company.id === selectedCompanyId && <Check aria-hidden="true" className="size-4 text-emerald-400" />}
-                    </button>
-                  )) : (
-                    <p className="px-3 py-4 text-center text-xs text-zinc-500">Nenhuma empresa encontrada.</p>
-                  )}
-                </div>
-              )}
-              {!companiesLoading && registeredCompanies.length === 0 && (
-                <span className="mt-1 block text-[11px] text-zinc-500">Cadastre primeiro a empresa em Configurações → Cliente.</span>
-              )}
+              <AnimatePresence>
+                {companyPickerOpen && !companiesLoading && (
+                  <motion.div initial={reduceMotion ? false : { opacity: 0, y: -6, scale: 0.975 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.985, pointerEvents: "none" }} transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 32, mass: 0.7, opacity: { duration: 0.14 } }} style={{ transformOrigin: "top" }} id="contact-company-options" role="listbox" aria-label="Empresas cadastradas" className="absolute inset-x-0 top-full z-50 mt-2 max-h-60 overflow-y-auto rounded-xl border border-white/[0.09] bg-zinc-900 p-1.5 shadow-2xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {matchingCompanies.length ? matchingCompanies.map((company, index) => (
+                      <button
+                        id={`contact-company-${company.id}`}
+                        key={company.id}
+                        type="button"
+                        role="option"
+                        aria-selected={company.id === selectedCompanyId}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onMouseEnter={() => setActiveCompanyIndex(index)}
+                        onClick={() => {
+                          setSelectedCompanyId(company.id);
+                          setCompanyName(company.name);
+                          setCompanyPickerOpen(false);
+                          setError(null);
+                        }}
+                        className={["flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors", index === activeCompanyIndex ? "bg-white/[0.09]" : "hover:bg-white/[0.06]"].join(" ")}
+                      >
+                        <span aria-hidden="true" className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/[0.07] text-zinc-500">
+                          <Building2 className="size-4" strokeWidth={1.7} />
+                          {company.image && <Image src={company.image} alt="" width={36} height={36} unoptimized className="absolute inset-0 size-full object-contain p-1" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-100">{company.name}</span>
+                        {company.id === selectedCompanyId && <Check aria-hidden="true" className="size-4 text-zinc-400" />}
+                      </button>
+                    )) : (
+                      <p className="px-3 py-4 text-center text-xs text-zinc-500">Nenhuma empresa encontrada.</p>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
             <div className="relative block text-sm text-zinc-300/80 lg:text-xs">
               <span>Cargo <span className="text-zinc-600">(opcional)</span></span>
@@ -494,26 +512,28 @@ export function ContactInfoPanel({
                 />
                 <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-zinc-500 transition-transform ${jobPickerOpen ? "rotate-180" : ""}`} strokeWidth={1.8} />
               </div>
-              {jobPickerOpen && (
-                <div id="edit-contact-job-options" role="listbox" aria-label="Cargos sugeridos" className="absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-white/[0.09] bg-zinc-900 p-1.5 shadow-2xl">
-                  {matchingJobTitles.length ? matchingJobTitles.map((option, index) => (
-                    <button
-                      key={option}
-                      type="button"
-                      role="option"
-                      aria-selected={jobTitle === option}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onMouseEnter={() => setActiveJobIndex(index)}
-                      onClick={() => { setJobTitle(option); setJobPickerOpen(false); }}
-                      className={["flex w-full items-center rounded-lg px-3 py-2.5 text-left text-sm transition-colors", index === activeJobIndex ? "bg-white/[0.09] text-white" : "text-zinc-300 hover:bg-white/[0.06]"].join(" ")}
-                    >
-                      {option}
-                    </button>
-                  )) : (
-                    <p className="px-3 py-3 text-xs text-zinc-500">O cargo digitado será salvo.</p>
-                  )}
-                </div>
-              )}
+              <AnimatePresence>
+                {jobPickerOpen && (
+                  <motion.div initial={reduceMotion ? false : { opacity: 0, y: -6, scale: 0.975 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.985, pointerEvents: "none" }} transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 32, mass: 0.7, opacity: { duration: 0.14 } }} style={{ transformOrigin: "top" }} id="edit-contact-job-options" role="listbox" aria-label="Cargos sugeridos" className="absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-white/[0.09] bg-zinc-900 p-1.5 shadow-2xl">
+                    {matchingJobTitles.length ? matchingJobTitles.map((option, index) => (
+                      <button
+                        key={option}
+                        type="button"
+                        role="option"
+                        aria-selected={jobTitle === option}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onMouseEnter={() => setActiveJobIndex(index)}
+                        onClick={() => { setJobTitle(option); setJobPickerOpen(false); }}
+                        className={["flex w-full items-center rounded-lg px-3 py-2.5 text-left text-sm transition-colors", index === activeJobIndex ? "bg-white/[0.09] text-white" : "text-zinc-300 hover:bg-white/[0.06]"].join(" ")}
+                      >
+                        {option}
+                      </button>
+                    )) : (
+                      <p className="px-3 py-3 text-xs text-zinc-500">O cargo digitado será salvo.</p>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
             {!contact.isGroup && <label className="block text-sm text-zinc-300/80 lg:text-xs">
               Telefone
@@ -525,9 +545,33 @@ export function ContactInfoPanel({
                 required
                 maxLength={24}
                 value={phone}
-                onChange={(event) => setPhone(event.target.value)}
+                onChange={(event) => {
+                  const input = event.currentTarget;
+                  const digitsBeforeCursor = input.value.slice(0, input.selectionStart ?? input.value.length).replace(/\D/g, "").length;
+                  const formatted = formatContactPhone(input.value);
+                  setPhone(formatted);
+                  requestAnimationFrame(() => {
+                    let cursor = 0;
+                    let digits = 0;
+                    while (cursor < formatted.length && digits < digitsBeforeCursor) {
+                      if (/\d/.test(formatted[cursor])) digits++;
+                      cursor++;
+                    }
+                    input.setSelectionRange(cursor, cursor);
+                  });
+                }}
+                onKeyDown={(event) => {
+                  const input = event.currentTarget;
+                  const cursor = input.selectionStart ?? 0;
+                  if (cursor !== input.selectionEnd) return;
+                  if (event.key === "Backspace" && cursor > 0 && /\D/.test(input.value[cursor - 1])) {
+                    input.setSelectionRange(Math.max(0, cursor - 2), cursor);
+                  } else if (event.key === "Delete" && cursor < input.value.length && /\D/.test(input.value[cursor])) {
+                    input.setSelectionRange(cursor, cursor + 2);
+                  }
+                }}
                 disabled={saving}
-                placeholder="Ex.: 5511999999999"
+                placeholder="55 11 99999-9999"
                 className="mt-1.5 w-full rounded-xl bg-zinc-900 px-3 py-2 text-base text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-50 lg:text-sm"
               />
               <span className="mt-1 block text-[11px] text-zinc-500">Inclua o código do país e o DDD.</span>
@@ -550,19 +594,26 @@ export function ContactInfoPanel({
                 {saving ? "Salvando..." : "Salvar"}
               </button>
             </div>
-          </form>
+          </motion.form>
         ) : (
-          <button
+          <motion.button
+            key="edit-contact-trigger"
+            initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: reduceMotion ? 0 : -4 }}
+            whileTap={reduceMotion ? undefined : { scale: 0.96 }}
+            transition={{ duration: reduceMotion ? 0 : 0.15 }}
             type="button"
             onClick={() => startEditing()}
             className="mt-3 flex min-h-11 items-center gap-2 rounded-full px-3 py-1.5 text-sm text-zinc-300/80 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 lg:min-h-0 lg:text-xs"
           >
             <Pencil className="size-3.5" aria-hidden="true" />
             Editar contato
-          </button>
+          </motion.button>
         )}
+        </AnimatePresence>
 
-        <dl className="mt-8 w-full shrink-0 space-y-5 px-1">
+        <motion.dl layout={reduceMotion ? false : "position"} transition={{ type: "spring", stiffness: 380, damping: 34 }} className="mt-8 w-full shrink-0 space-y-5 px-1">
           <div>
             <dt className="text-sm text-zinc-400 lg:text-xs">Tipo</dt>
             <dd className="mt-1 text-base text-white lg:text-sm">
@@ -573,14 +624,6 @@ export function ContactInfoPanel({
             <dt className="text-sm text-zinc-400 lg:text-xs">Telefone</dt>
             <dd className="mt-1 flex items-center gap-2 text-base text-white lg:text-sm">
               <span className="min-w-0 break-all">{contact.phone}</span>
-              {!contact.isGroup && <button
-                type="button"
-                onClick={() => startEditing(true)}
-                aria-label="Editar telefone"
-                className="flex size-8 shrink-0 items-center justify-center rounded-full text-zinc-500 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50"
-              >
-                <Pencil className="size-3.5" aria-hidden="true" />
-              </button>}
             </dd>
           </div>
           {contact.isGroup && <div>
@@ -731,7 +774,7 @@ export function ContactInfoPanel({
                   const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
                   options[next]?.focus();
                 }}
-                className="mt-2 max-h-60 space-y-0.5 overflow-y-auto rounded-2xl border border-white/10 bg-zinc-900 p-1.5 shadow-[0_14px_36px_rgba(0,0,0,0.35)]"
+                className="mt-2 max-h-60 space-y-0.5 overflow-y-auto rounded-2xl border border-white/10 bg-zinc-900 p-1.5 shadow-[0_14px_36px_rgba(0,0,0,0.35)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
                 <button type="button" role="menuitemcheckbox" aria-checked={assignedUserIds.length === 0} onClick={() => void changeAssignees([])} className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.08] focus-visible:outline-none">
                   <UserAvatar name="" />
@@ -750,19 +793,24 @@ export function ContactInfoPanel({
           </div>}
           <div>
             <dt className="text-sm text-zinc-400 lg:text-xs">Prioridade</dt>
+            <LayoutGroup>
             <dd className="mt-2 grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-white/[0.025] p-1">
-              {contactPriorities.map((option) => <button
+              {contactPriorities.map((option) => <motion.button
                 key={option.value}
+                whileTap={reduceMotion ? undefined : { scale: 0.96 }}
+                transition={{ type: "spring", stiffness: 420, damping: 32 }}
                 type="button"
                 aria-pressed={selectedPriority === option.value}
                 disabled={prioritySaving}
                 onClick={() => void changePriority(selectedPriority === option.value ? "NONE" : option.value)}
-                className={`flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-white/40 disabled:opacity-60 lg:h-9 lg:text-xs ${selectedPriority === option.value ? "bg-white/[0.1] text-zinc-100 shadow-sm" : "text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200"}`}
+                className={`relative isolate flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-white/40 disabled:opacity-60 lg:h-9 lg:text-xs ${selectedPriority === option.value ? "text-zinc-100" : "text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200"}`}
               >
+                {selectedPriority === option.value && <motion.span aria-hidden="true" layoutId="contact-priority" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 32 }} className="pointer-events-none absolute inset-0 -z-10 rounded-lg bg-white/[0.1] shadow-sm" />}
                 <span aria-hidden="true" className={`size-1.5 rounded-full ${option.dot}`} />
                 {option.label}
-              </button>)}
+              </motion.button>)}
             </dd>
+            </LayoutGroup>
             {priorityError && <p role="alert" className="mt-1 text-xs text-red-300">{priorityError}</p>}
           </div>
           <div>
@@ -771,7 +819,7 @@ export function ContactInfoPanel({
               {contact.archived ? "Arquivado" : "Ativo"}
             </dd>
           </div>
-        </dl>
+        </motion.dl>
 
         {!contact.isGroup && (
           <button
