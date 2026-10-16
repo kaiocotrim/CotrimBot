@@ -1,9 +1,21 @@
 import { spawn, spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const backendDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const require = createRequire(import.meta.url);
+const prismaCli = require.resolve("prisma/build/index.js");
 const typescriptCli = path.join(backendDirectory, "node_modules", "typescript", "bin", "tsc");
+
+const clientGeneration = spawnSync(process.execPath, [prismaCli, "generate", "--config", "prisma.config.ts"], {
+  cwd: backendDirectory,
+  stdio: "inherit",
+});
+
+if (clientGeneration.status !== 0) {
+  process.exit(clientGeneration.status ?? 1);
+}
 
 // Garante que o servidor tenha uma saída atual antes de iniciar os dois watchers.
 const initialBuild = spawnSync(process.execPath, [typescriptCli], {

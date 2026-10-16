@@ -67,6 +67,29 @@ export async function getContacts(req: Request, res: Response) {
   return res.json(result);
 }
 
+export async function searchSavedContacts(req: Request, res: Response) {
+  const query = typeof req.query.query === "string" ? req.query.query.trim().slice(0, 100) : "";
+  if (query.length < 2) return res.json({ contacts: [] });
+
+  const digits = query.replace(/\D/g, "");
+  const contacts = await prisma.contact.findMany({
+    where: {
+      isSaved: true,
+      isGroup: false,
+      OR: [
+        { name: { contains: query } },
+        { companyName: { contains: query } },
+        ...(digits.length >= 2 ? [{ phone: { contains: digits } }] : []),
+      ],
+    },
+    select: { id: true, name: true, phone: true, companyName: true, profilePictureUrl: true },
+    orderBy: { name: "asc" },
+    take: 8,
+  });
+
+  return res.json({ contacts });
+}
+
 // GET /contacts/:id - Retorna um contato especifico pelo ID
 export async function getContactById(req: Request, res: Response) {
   const id = Number(req.params.id);

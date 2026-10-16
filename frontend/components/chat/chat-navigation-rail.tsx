@@ -4,8 +4,9 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { Archive, Bell, Building2, CalendarDays, ContactRound, MessagesSquare, UserRound, UserRoundCheck, UsersRound } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AccountSettings } from "@/components/chat/account-settings";
+import { CalendarModal } from "@/components/chat/calendar-modal";
 
 export type ChatRailSection = "notifications" | "conversations" | "contacts" | "groups" | "mine" | "archived";
 
@@ -47,13 +48,7 @@ export function ChatNavigationRail({
 }) {
   const reduceMotion = useReducedMotion();
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
-  const [calendarNoticeVisible, setCalendarNoticeVisible] = useState(false);
-
-  useEffect(() => {
-    if (!calendarNoticeVisible) return;
-    const timeout = window.setTimeout(() => setCalendarNoticeVisible(false), 3_000);
-    return () => window.clearTimeout(timeout);
-  }, [calendarNoticeVisible]);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   return (
     <nav aria-label="Navegação principal" className="flex h-full w-[60px] shrink-0 flex-col items-center border-r border-white/[0.08] bg-[#1a1a1a] px-2 py-3 text-zinc-400">
@@ -98,28 +93,16 @@ export function ChatNavigationRail({
           <motion.button
             type="button"
             aria-label="Calendário"
+            aria-expanded={calendarOpen}
             title="Calendário"
-            onClick={() => setCalendarNoticeVisible(true)}
+            onClick={() => setCalendarOpen(true)}
             whileTap={reduceMotion ? undefined : { scale: 0.9 }}
-            className="flex size-11 items-center justify-center rounded-xl text-zinc-400 transition-colors hover:bg-white/[0.07] hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70"
+            className={`flex size-11 items-center justify-center rounded-xl transition-colors hover:bg-white/[0.07] hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70 ${calendarOpen ? "bg-white/[0.12] text-zinc-50" : "text-zinc-400"}`}
           >
             <CalendarDays aria-hidden="true" className="size-5" strokeWidth={1.8} />
           </motion.button>
-          <AnimatePresence>
-            {calendarNoticeVisible && (
-              <motion.span
-                role="status"
-                initial={reduceMotion ? false : { opacity: 0, x: -6 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -6 }}
-                transition={reduceMotion ? { duration: 0 } : { duration: 0.18 }}
-                className="pointer-events-none absolute top-1 left-[calc(100%+12px)] z-50 whitespace-nowrap rounded-xl border border-white/[0.12] bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-100 shadow-xl"
-              >
-                Funcionalidade em breve
-              </motion.span>
-            )}
-          </AnimatePresence>
         </div>
+        <AnimatePresence>{calendarOpen && <CalendarModal key="calendar-modal" onClose={() => setCalendarOpen(false)} />}</AnimatePresence>
         {company && (
           <>
             <span aria-hidden="true" className="my-2 h-px w-7 shrink-0 bg-white/[0.1]" />

@@ -7,6 +7,7 @@ import {
   getContactById,
   getContactGroupParticipants,
   getContacts,
+  searchSavedContacts,
   setContactArchived,
   setContactPinned,
   setContactAssignment,
@@ -20,6 +21,7 @@ export const contactRouter = Router();
 
 // GET /contacts - Retorna todos os contatos
 contactRouter.get("/contacts", getContacts);
+contactRouter.get("/contacts/search", searchSavedContacts);
 contactRouter.get("/contacts/assignees", getContactAssignees);
 
 // GET /contacts/:id/avatar - Busca a foto do contato na Evolution API

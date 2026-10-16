@@ -53,6 +53,55 @@ model Notification {
   @@index([internalConversationId])
 }
 
+model CalendarEvent {
+  id          String                @id @default(cuid())
+  userId      String
+  title       String                @db.VarChar(191)
+  companyName String?               @db.VarChar(191)
+  description String?               @db.Text
+  startsAt    DateTime
+  endsAt      DateTime
+  category    CalendarEventCategory @default(OTHER)
+  completedAt DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startsAt])
+}
+
+model ScheduledMessage {
+  id          String                 @id @default(cuid())
+  userId      String
+  phone       String                 @db.VarChar(64)
+  content     String                 @db.Text
+  scheduledAt DateTime
+  status      ScheduledMessageStatus @default(PENDING)
+  sentAt      DateTime?
+  error       String?                @db.Text
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledAt])
+  @@index([userId, scheduledAt])
+}
+
+enum ScheduledMessageStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+enum CalendarEventCategory {
+  MEETING
+  TRAINING
+  DEADLINE
+  APPOINTMENT
+  OTHER
+}
+
 // Assinaturas Web Push (PWA) de cada navegador/dispositivo do usuário.
 model PushSubscription {
   id        Int      @id @default(autoincrement())
@@ -179,6 +228,8 @@ model User {
   sentMessages     Message[]
   contactAssignments ContactAssignment[]
   notifications      Notification[]
+  calendarEvents     CalendarEvent[]
+  scheduledMessages  ScheduledMessage[]
   pushSubscriptions  PushSubscription[]
   organizationMessages OrganizationMessage[]
   internalConversationParticipants InternalConversationParticipant[]
