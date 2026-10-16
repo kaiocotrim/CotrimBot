@@ -388,6 +388,8 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           ? "rounded-[24px] bg-zinc-100 px-3.5 py-2.5 shadow-[0_4px_16px_rgba(24,24,27,0.12)]"
           : isSticker
           ? "overflow-visible bg-transparent p-0"
+          : message.type === "CONTACT"
+          ? "rounded-[20px] bg-zinc-800 p-3"
           : isAudio
           ? "relative w-[min(380px,70vw)] overflow-visible sm:w-[min(380px,62vw)] rounded-[24px] bg-zinc-800 px-3.5 py-3"
           : isVideo

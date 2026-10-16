@@ -8,7 +8,8 @@ import { BadgeCheck, Bell, Building2, Camera, Check, ChevronDown, ContactRound, 
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { SuccessConfetti } from "@/components/chat/success-confetti";
 import { EvolutionConnectionSettings } from "@/components/chat/evolution-connection-settings";
 import { EvolutionCallSettings } from "@/components/chat/evolution-call-settings";
 import { authClient } from "@/lib/auth-client";
@@ -554,6 +555,15 @@ type ClientDraft = Omit<SavedClient, "id" | "canDelete">;
 
 function ClientSettings() {
   const reduceMotion = useReducedMotion();
+  const [celebration, setCelebration] = useState(0);
+  const [celebrationClientId, setCelebrationClientId] = useState<string | null>(null);
+  const [celebrationOrigin, setCelebrationOrigin] = useState<{ x: number; y: number } | null>(null);
+  const celebrationIcon = useRef<HTMLSpanElement>(null);
+  const finishCelebration = useCallback(() => {
+    setCelebration(0);
+    setCelebrationClientId(null);
+    setCelebrationOrigin(null);
+  }, []);
   const [clients, setClients] = useState<SavedClient[]>([]);
   const [draft, setDraft] = useState<ClientDraft | null>(null);
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
@@ -659,7 +669,15 @@ function ClientSettings() {
         : [payload.client!, ...current]);
       setDraft(null);
       setEditingClientId(null);
-      setFeedback(editingClientId ? "Informações atualizadas com sucesso." : "Cliente cadastrado com sucesso.");
+      setFeedback(editingClientId ? "Informações atualizadas com sucesso." : null);
+      if (!editingClientId) {
+        setClientQuery("");
+        if (!reduceMotion) {
+          setCelebrationOrigin(null);
+          setCelebrationClientId(payload.client.id);
+          setCelebration((current) => current + 1);
+        }
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível cadastrar o cliente.");
     } finally {
@@ -687,7 +705,6 @@ function ClientSettings() {
       setDraft(null);
       setEditingClientId(null);
       setImageUrl("");
-      setFeedback("Cliente excluído com sucesso.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível excluir o cliente.");
     } finally {
@@ -706,6 +723,7 @@ function ClientSettings() {
 
   return (
     <section className={styles.card} aria-label="Clientes">
+      {celebration > 0 && celebrationOrigin && <SuccessConfetti key={celebration} origin={celebrationOrigin} onComplete={finishCelebration} />}
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={draft ? "client-form" : "client-list"}
@@ -713,6 +731,11 @@ function ClientSettings() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.99, pointerEvents: "none" }}
           transition={reduceMotion ? { duration: 0 } : { ...settingsSpring, opacity: { duration: 0.16 } }}
+          onAnimationComplete={() => {
+            if (draft || !celebration || celebrationOrigin || !celebrationIcon.current) return;
+            const bounds = celebrationIcon.current.getBoundingClientRect();
+            setCelebrationOrigin({ x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 });
+          }}
         >
           {!draft && (
             <div className={styles.clientSectionHeader}>
@@ -934,7 +957,7 @@ function ClientSettings() {
                   aria-label={`Ver e editar informações de ${client.name}`}
                   title={client.name}
                 >
-                  <span className={styles.clientAvatar} aria-hidden="true">
+                  <span ref={client.id === celebrationClientId ? celebrationIcon : undefined} className={styles.clientAvatar} aria-hidden="true">
                     {client.image ? <Image src={client.image} alt="" width={64} height={64} unoptimized /> : <Building2 size={25} strokeWidth={1.6} />}
                   </span>
                 </motion.button>

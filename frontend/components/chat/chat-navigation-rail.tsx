@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Archive, Bell, Building2, CalendarDays, ContactRound, MessagesSquare, UserRound, UserRoundCheck, UsersRound } from "lucide-react";
 import { useState } from "react";
 import { AccountSettings } from "@/components/chat/account-settings";
+import { MediaLibrary } from "@/components/chat/media-library";
 
 export type ChatRailSection = "notifications" | "conversations" | "contacts" | "groups" | "mine" | "archived";
 
@@ -114,8 +115,9 @@ export function ChatNavigationRail({
         )}
       </div>
 
-      {user && (
-        <div className="mt-auto pb-1">
+      <div className="mt-auto flex flex-col items-center gap-2 pb-1">
+        <MediaLibrary />
+        {user && (
           <AccountSettings user={user} onOpen={onOpenSettings}>
             <span aria-hidden="true" className="flex size-9 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-zinc-700 text-zinc-200">
               {user.image && user.image !== failedAvatarUrl ? (
@@ -125,8 +127,8 @@ export function ChatNavigationRail({
               ) : <UserRound className="size-4" strokeWidth={1.8} />}
             </span>
           </AccountSettings>
-        </div>
-      )}
+        )}
+      </div>
     </nav>
   );
 }

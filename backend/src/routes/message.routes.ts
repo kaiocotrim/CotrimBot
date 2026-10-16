@@ -3,6 +3,7 @@ import { Router } from "express";
 
 // Multer processa multipart/form-data e disponibiliza o arquivo em req.file.
 import { upload } from "../middlewares/upload.js";
+import { getMediaLibrary } from "../controllers/media-library.controller.js";
 
 // Cada controller recebe req e res, executa a operação e responde ao frontend.
 // A extensão .js nos imports é necessária para os módulos ESM/NodeNext do projeto.
@@ -22,6 +23,7 @@ import {
 } from "../controllers/message.controller.js";
 
 export const messageRouter = Router();
+messageRouter.get("/media-library", getMediaLibrary);
 
 // :id é um parâmetro da URL, recebido pelo controller em req.params.id.
 // Em /contacts ele identifica o contato; em /messages identifica a mensagem.
