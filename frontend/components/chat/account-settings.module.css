@@ -930,6 +930,35 @@
   color: #fff;
 }
 
+.deleteClientButton {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-right: auto;
+  padding: 9px 12px;
+  border-radius: 999px;
+  color: #f87171;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.deleteClientButton:hover:not(:disabled) {
+  background: rgb(239 68 68 / 10%);
+  color: #fca5a5;
+}
+
+.deleteClientButton:focus-visible {
+  outline: 2px solid #f87171;
+  outline-offset: 2px;
+}
+
+.deleteClientButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .emptyClients {
   display: flex;
   width: 100%;
@@ -1440,6 +1469,7 @@
   }
 
   .clientFormActions > .primaryButton,
+  .deleteClientButton,
   .cancelClientButton {
     width: 100%;
     justify-content: center;

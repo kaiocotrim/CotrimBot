@@ -1,7 +1,7 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
+import type { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../lib/prisma.js";
-
-export const clientRouter = Router();
+import { ClientAccessError, getClientAccess, type ClientAccess } from "../services/client-access.service.js";
 
 function normalizeLinks(value: unknown) {
   if (!Array.isArray(value) || value.length > 20) return null;
@@ -40,81 +40,126 @@ function normalizeImage(value: unknown) {
 
 const clientSelect = {
   id: true,
+  userId: true,
   name: true,
   image: true,
   links: true,
   createdAt: true,
 } as const;
 
-clientRouter.get("/clients", async (request, response) => {
-  const clients = await prisma.client.findMany({
-    where: { userId: request.user!.id },
-    orderBy: { createdAt: "desc" },
-    select: clientSelect,
-  });
-  response.json({
-    clients: clients.map((client) => ({
-      ...client,
-      links: Array.isArray(client.links) ? client.links : [],
-    })),
-  });
-});
+function presentClient(client: Prisma.ClientGetPayload<{ select: typeof clientSelect }>) {
+  const { userId, ...data } = client;
+  return {
+    ...data,
+    links: Array.isArray(client.links) ? client.links : [],
+    canDelete: true,
+  };
+}
 
-clientRouter.post("/clients", async (request, response) => {
-  const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
-  const image = normalizeImage(request.body?.image);
-  const links = normalizeLinks(request.body?.links);
+type ClientDatabase = Pick<typeof prisma, "client" | "member">;
 
-  if (!name || name.length > 191) {
-    return response.status(400).json({ error: "Informe um nome de até 191 caracteres." });
-  }
-  if (image === undefined) {
-    return response.status(400).json({ error: "A imagem enviada não é válida." });
-  }
-  if (!links) {
-    return response.status(400).json({ error: "Informe até 20 links válidos começando com http:// ou https://." });
-  }
+export function createClientRouter(database: ClientDatabase = prisma) {
+  const router = Router();
 
-  const client = await prisma.client.create({
-    data: { userId: request.user!.id, name, image, links },
-    select: clientSelect,
-  });
-  return response.status(201).json({ client });
-});
-
-clientRouter.put("/clients/:id", async (request, response) => {
-  const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
-  const image = normalizeImage(request.body?.image);
-  const links = normalizeLinks(request.body?.links);
-
-  if (!name || name.length > 191) {
-    return response.status(400).json({ error: "Informe um nome de até 191 caracteres." });
-  }
-  if (image === undefined) {
-    return response.status(400).json({ error: "A imagem enviada não é válida." });
-  }
-  if (!links) {
-    return response.status(400).json({ error: "Informe até 20 links válidos começando com http:// ou https://." });
+  async function authorize(request: Request, response: Response): Promise<ClientAccess | null> {
+    if (!request.user) {
+      response.status(401).json({ error: "Não autenticado." });
+      return null;
+    }
+    try {
+      return await getClientAccess(request.user.id, request.activeOrganizationId, (userId, organizationId) => (
+        database.member.findMany({
+          where: { userId, ...(organizationId ? { organizationId } : {}) },
+          select: { organizationId: true },
+          take: 2,
+        })
+      ));
+    } catch (error) {
+      if (!(error instanceof ClientAccessError)) throw error;
+      response.status(error.status).json({ error: error.message });
+      return null;
+    }
   }
 
-  const existing = await prisma.client.findFirst({
-    where: { id: request.params.id, userId: request.user!.id },
-    select: { id: true },
+  router.get("/clients", async (request, response) => {
+    const access = await authorize(request, response);
+    if (!access) return;
+    const clients = await database.client.findMany({
+      where: access.where,
+      orderBy: { createdAt: "desc" },
+      select: clientSelect,
+    });
+    response.json({
+      clients: clients.map((client) => presentClient(client)),
+    });
   });
-  if (!existing) return response.status(404).json({ error: "Cliente não encontrado." });
 
-  const client = await prisma.client.update({
-    where: { id: existing.id },
-    data: { name, image, links },
-    select: clientSelect,
-  });
-  return response.json({ client });
-});
+  router.post("/clients", async (request, response) => {
+    const access = await authorize(request, response);
+    if (!access) return;
+    const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
+    const image = normalizeImage(request.body?.image);
+    const links = normalizeLinks(request.body?.links);
 
-clientRouter.delete("/clients/:id", async (request, response) => {
-  const deleted = await prisma.client.deleteMany({
-    where: { id: request.params.id, userId: request.user!.id },
+    if (!name || name.length > 191) {
+      return response.status(400).json({ error: "Informe um nome de até 191 caracteres." });
+    }
+    if (image === undefined) {
+      return response.status(400).json({ error: "A imagem enviada não é válida." });
+    }
+    if (!links) {
+      return response.status(400).json({ error: "Informe até 20 links válidos começando com http:// ou https://." });
+    }
+
+    const client = await database.client.create({
+      data: { userId: request.user!.id, organizationId: access.organizationId, name, image, links },
+      select: clientSelect,
+    });
+    return response.status(201).json({ client: presentClient(client) });
   });
-  if (!deleted.count) return response.status(404).json({ error: "Cliente não encontrado." });
-  return response.status(204).send();
-});
+
+  router.put("/clients/:id", async (request, response) => {
+    const access = await authorize(request, response);
+    if (!access) return;
+    const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
+    const image = normalizeImage(request.body?.image);
+    const links = normalizeLinks(request.body?.links);
+
+    if (!name || name.length > 191) {
+      return response.status(400).json({ error: "Informe um nome de até 191 caracteres." });
+    }
+    if (image === undefined) {
+      return response.status(400).json({ error: "A imagem enviada não é válida." });
+    }
+    if (!links) {
+      return response.status(400).json({ error: "Informe até 20 links válidos começando com http:// ou https://." });
+    }
+
+    const existing = await database.client.findFirst({
+      where: { ...access.where, id: request.params.id },
+      select: { id: true },
+    });
+    if (!existing) return response.status(404).json({ error: "Cliente não encontrado." });
+
+    const client = await database.client.update({
+      where: { ...access.where, id: existing.id },
+      data: { name, image, links },
+      select: clientSelect,
+    });
+    return response.json({ client: presentClient(client) });
+  });
+
+  router.delete("/clients/:id", async (request, response) => {
+    const access = await authorize(request, response);
+    if (!access) return;
+    const deleted = await database.client.deleteMany({
+      where: { ...access.where, id: request.params.id },
+    });
+    if (!deleted.count) return response.status(404).json({ error: "Cliente não encontrado." });
+    return response.status(204).send();
+  });
+
+  return router;
+}
+
+export const clientRouter = createClientRouter();

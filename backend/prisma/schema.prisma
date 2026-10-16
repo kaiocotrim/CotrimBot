@@ -88,16 +88,19 @@ model ScheduledMessage {
 }
 
 model Client {
-  id          String   @id @default(cuid())
-  userId      String
-  name        String   @db.VarChar(191)
-  image       String?  @db.Text
-  links       Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  userId         String
+  organizationId String?
+  name           String        @db.VarChar(191)
+  image          String?       @db.Text
+  links          Json
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([organizationId])
   @@map("ClientProfile")
 }
 
@@ -312,6 +315,7 @@ model Organization {
   groups      OrganizationGroup[]
   internalMessages OrganizationMessage[]
   internalConversations InternalConversation[]
+  clients     Client[]
 }
 
 model OrganizationMessage {

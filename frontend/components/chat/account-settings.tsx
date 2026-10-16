@@ -539,9 +539,10 @@ type SavedClient = {
   name: string;
   image: string | null;
   links: string[];
+  canDelete?: boolean;
 };
 
-type ClientDraft = Omit<SavedClient, "id">;
+type ClientDraft = Omit<SavedClient, "id" | "canDelete">;
 
 function ClientSettings() {
   const [clients, setClients] = useState<SavedClient[]>([]);
@@ -549,12 +550,15 @@ function ClientSettings() {
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [processingImage, setProcessingImage] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [clientQuery, setClientQuery] = useState("");
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const busy = saving || deleting;
+  const editingClient = clients.find((client) => client.id === editingClientId);
   const normalizedClientQuery = clientQuery.trim().toLocaleLowerCase("pt-BR");
   const filteredClients = normalizedClientQuery
     ? clients.filter((client) => client.name.toLocaleLowerCase("pt-BR").includes(normalizedClientQuery)
@@ -621,7 +625,7 @@ function ClientSettings() {
 
   async function saveClient(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!draft || saving || !draft.name.trim()) return;
+    if (!draft || busy || !draft.name.trim()) return;
     setSaving(true);
     setError(null);
     setFeedback(null);
@@ -650,6 +654,34 @@ function ClientSettings() {
       setError(cause instanceof Error ? cause.message : "Não foi possível cadastrar o cliente.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function deleteClient() {
+    if (!editingClient || busy || processingImage) return;
+    const client = editingClient;
+    if (!window.confirm(`Excluir o cliente “${client.name}”? Esta ação é permanente e removerá o cadastro para toda a equipe.`)) return;
+    setDeleting(true);
+    setError(null);
+    setFeedback(null);
+    try {
+      const response = await fetch(`${API_URL}/clients/${encodeURIComponent(client.id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(payload?.error || "Não foi possível excluir o cliente.");
+      }
+      setClients((current) => current.filter((item) => item.id !== client.id));
+      setDraft(null);
+      setEditingClientId(null);
+      setImageUrl("");
+      setFeedback("Cliente excluído com sucesso.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível excluir o cliente.");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -709,7 +741,7 @@ function ClientSettings() {
               autoComplete="organization"
               maxLength={191}
               required
-              disabled={saving}
+              disabled={busy}
             />
           </label>
 
@@ -722,7 +754,7 @@ function ClientSettings() {
                 <strong>Logo da empresa</strong>
                 <span>JPG, PNG ou WebP de até 5 MB.</span>
                 <div>
-                  <button type="button" onClick={() => imageInputRef.current?.click()} disabled={processingImage || saving}>
+                  <button type="button" onClick={() => imageInputRef.current?.click()} disabled={processingImage || busy}>
                     <Camera size={15} strokeWidth={1.8} aria-hidden="true" />
                     {processingImage ? "Processando…" : draft.image ? "Trocar imagem" : "Escolher imagem"}
                   </button>
@@ -730,7 +762,7 @@ function ClientSettings() {
                     <button type="button" onClick={() => {
                       setDraft((current) => current ? { ...current, image: null } : current);
                       setImageUrl("");
-                    }} disabled={saving}>
+                    }} disabled={busy}>
                       Remover
                     </button>
                   )}
@@ -761,7 +793,7 @@ function ClientSettings() {
                 }}
                 placeholder="https://exemplo.com/logo.png"
                 maxLength={2048}
-                disabled={saving || processingImage}
+                disabled={busy || processingImage}
               />
             </label>
           </div>
@@ -777,7 +809,7 @@ function ClientSettings() {
                 onClick={() => setDraft((current) => current && current.links.length < 20
                   ? { ...current, links: [...current.links, ""] }
                   : current)}
-                disabled={saving || draft.links.length >= 20}
+                disabled={busy || draft.links.length >= 20}
                 className={styles.addLinkButton}
               >
                 <Plus size={17} strokeWidth={2} aria-hidden="true" />
@@ -789,6 +821,7 @@ function ClientSettings() {
               <button
                 type="button"
                 className={styles.emptyLinks}
+                disabled={busy}
                 onClick={() => setDraft((current) => current ? { ...current, links: [""] } : current)}
               >
                 <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
@@ -806,7 +839,7 @@ function ClientSettings() {
                       placeholder="https://exemplo.com"
                       aria-label={`Link ${index + 1}`}
                       maxLength={2048}
-                      disabled={saving}
+                      disabled={busy}
                     />
                     <button
                       type="button"
@@ -814,7 +847,7 @@ function ClientSettings() {
                         ...current,
                         links: current.links.filter((_, linkIndex) => linkIndex !== index),
                       } : current)}
-                      disabled={saving}
+                      disabled={busy}
                       aria-label={`Remover link ${index + 1}`}
                       title="Remover link"
                       className={styles.removeLinkButton}
@@ -828,14 +861,27 @@ function ClientSettings() {
           </div>
 
           <div className={styles.clientFormActions}>
+            {editingClientId && (
+              <button
+                type="button"
+                className={styles.deleteClientButton}
+                onClick={() => void deleteClient()}
+                disabled={busy || processingImage}
+                title="Excluir cliente"
+                aria-busy={deleting}
+              >
+                <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />
+                {deleting ? "Excluindo…" : "Excluir cliente"}
+              </button>
+            )}
             <button type="button" className={styles.cancelClientButton} onClick={() => {
               setDraft(null);
               setEditingClientId(null);
               setImageUrl("");
-            }} disabled={saving}>
+            }} disabled={busy}>
               Cancelar
             </button>
-            <button type="submit" className={styles.primaryButton} disabled={saving || processingImage || !draft.name.trim()}>
+            <button type="submit" className={styles.primaryButton} disabled={busy || processingImage || !draft.name.trim()}>
               {saving ? "Salvando…" : editingClientId ? "Salvar alterações" : "Cadastrar cliente"}
             </button>
           </div>
