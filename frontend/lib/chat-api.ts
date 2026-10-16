@@ -23,7 +23,7 @@ export async function getContacts(): Promise<Contact[]> {
   return parseResponse<Contact[]>(response, "Erro ao buscar contatos");
 }
 
-export async function saveContact(name: string, phone: string, companyName: string, jobTitle?: string): Promise<Contact> {
+export async function saveContact(name: string, phone: string, companyName?: string, jobTitle?: string): Promise<Contact> {
   const response = await fetch(`${API_URL}/contacts`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

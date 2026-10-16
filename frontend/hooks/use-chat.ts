@@ -662,6 +662,11 @@ export function useChat() {
     return savedContacts;
   }
 
+  async function saveSharedContact(name: string, phone: string): Promise<void> {
+    await saveContactRequest(name, phone);
+    await loadSavedContacts();
+  }
+
   async function archiveContact(contact: Contact, archived: boolean) {
     setContacts((current) => current.map((item) => item.id === contact.id ? { ...item, archived } : item));
     try {
@@ -1079,6 +1084,7 @@ export function useChat() {
     selectContact,
     loadSavedContacts,
     saveContact,
+    saveSharedContact,
     archiveContact,
     pinContact,
     renameContact,

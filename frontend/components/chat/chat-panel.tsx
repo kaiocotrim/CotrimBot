@@ -47,6 +47,7 @@ type ChatPanelProps = {
   onCloseWithBot: () => void;
   onSelectContact: (contact: Contact) => void;
   onSaveContact: (name: string, phone: string, companyName: string, jobTitle?: string) => Promise<Contact[]>;
+  onSaveSharedContact: (name: string, phone: string) => Promise<void>;
   onRenameContact: (contactId: number, name: string, companyName?: string, jobTitle?: string, phone?: string) => Promise<void>;
   onSetContactAssignment: (contactId: number, assignedUserIds: string[]) => Promise<void>;
   onSetContactPriority: (contactId: number, priority: NonNullable<Contact["priority"]>) => Promise<void>;
@@ -80,6 +81,7 @@ export function ChatPanel({
   onCloseWithBot,
   onSelectContact,
   onSaveContact,
+  onSaveSharedContact,
   onRenameContact,
   onSetContactAssignment,
   onSetContactPriority,
@@ -399,6 +401,7 @@ export function ChatPanel({
             onReplyToMessage={replyToMessage}
             onEnsureMessageLoaded={onEnsureMessageLoaded}
             onToggleMessageSelection={toggleMessageSelection}
+            onSaveSharedContact={onSaveSharedContact}
           />
 
           <MessageComposer

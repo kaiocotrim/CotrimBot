@@ -43,7 +43,8 @@ export type Message = {
   direction: "INCOMING" | "OUTGOING";
 
   // Define como o conteúdo será renderizado: texto, áudio ou outra mídia.
-  type: "TEXT" | "SYSTEM" | "AUDIO" | "IMAGE" | "STICKER" | "VIDEO" | "DOCUMENT";
+  type: "TEXT" | "CONTACT" | "SYSTEM" | "AUDIO" | "IMAGE" | "STICKER" | "VIDEO" | "DOCUMENT";
+  sharedContacts?: SharedContact[] | null;
 
   // Observação interna visível apenas no CotrimBot.
   private?: boolean;
@@ -88,6 +89,8 @@ export type MessagesPage = {
   hasMore: boolean;
   nextCursor: number | null;
 };
+
+export type SharedContact = { name: string; phone: string };
 
 export type ContactAvatar = {
   profilePictureUrl: string | null;

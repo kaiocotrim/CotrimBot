@@ -5,6 +5,7 @@ import { getSocketServer } from "../lib/socket.js";
 import { notifyIncomingMessage, notifyReply } from "../services/notification.service.js";
 import { getGroupInfo, getMediaMessage } from "../services/evolution.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
+import { extractSharedContacts } from "../utils/shared-contact.js";
 import {
   findReplyContextInfo,
   getQuotedContent,
@@ -397,13 +398,18 @@ export async function whatsappWebhook(req: Request, res: Response) {
   const reportedMessageType = String(data.messageType ?? data.type ?? body.messageType ?? "").toLowerCase();
 
   // Tipo da mensagem que será salvo no banco.
-  let messageType: "TEXT" | "AUDIO" | "IMAGE" | "STICKER" | "VIDEO" | "DOCUMENT";
+  let messageType: "TEXT" | "CONTACT" | "AUDIO" | "IMAGE" | "STICKER" | "VIDEO" | "DOCUMENT";
+  const sharedContacts = extractSharedContacts(data.message ?? {});
 
   // Conteúdo exibido no CotrimBot.
   let content: string;
 
   // Mensagem de texto normal.
-  if (data.message?.conversation) {
+  if (data.message?.contactMessage || data.message?.contactsArrayMessage) {
+    messageType = "CONTACT";
+    content = sharedContacts.length ? sharedContacts.map((card) => `${card.name}: +${card.phone}`).join("\n") : "[Contato compartilhado]";
+  }
+  else if (data.message?.conversation) {
     messageType = "TEXT";
     content = data.message.conversation;
   }
@@ -577,6 +583,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
       content,
       direction: fromMe ? "OUTGOING" : "INCOMING",
       type: messageType,
+      ...(messageType === "CONTACT" ? { sharedContacts } : {}),
       contactId: contact.id,
       senderName,
       senderPhone,

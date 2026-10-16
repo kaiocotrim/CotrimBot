@@ -22,6 +22,7 @@ import { EmojiText } from "@/components/chat/emoji-text";
 import { ImageMessage } from "@/components/chat/image-message";
 import { MessageText } from "@/components/chat/message-text";
 import { StickerMessage } from "@/components/chat/sticker-message";
+import { SharedContactMessage } from "@/components/chat/shared-contact-message";
 import { TextMessage } from "@/components/chat/text-message";
 import { VideoMessage } from "@/components/chat/video-message";
 import type { Contact, Message } from "@/types/chat";
@@ -37,6 +38,8 @@ type MessageBubbleProps = {
   onRequestForward: (message: Message) => void;
   onReply: (message: Message) => void;
   onNavigateToMessage: (messageId: number) => Promise<void>;
+  savedContacts: Contact[];
+  onSaveSharedContact: (name: string, phone: string) => Promise<void>;
 };
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
@@ -68,7 +71,7 @@ const messageDateFormatter = new Intl.DateTimeFormat("pt-BR", {
 });
 
 // Mantém o estilo do balão e delega o conteúdo ao componente de cada tipo.
-export function MessageBubble({ message, quotedMessage, contact, mediaMessages, onReact, onUpdateFlags, onDelete, onRequestForward, onReply, onNavigateToMessage }: MessageBubbleProps) {
+export function MessageBubble({ message, quotedMessage, contact, mediaMessages, onReact, onUpdateFlags, onDelete, onRequestForward, onReply, onNavigateToMessage, savedContacts, onSaveSharedContact }: MessageBubbleProps) {
   const [reacting, setReacting] = useState(false);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -111,6 +114,8 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
   // Cada caso seleciona um único componente, sem duplicar o conteúdo da mídia.
   const content = (() => {
     switch (message.type) {
+      case "CONTACT":
+        return message.sharedContacts?.length ? <SharedContactMessage contacts={message.sharedContacts} savedContacts={savedContacts} onSave={onSaveSharedContact} /> : <TextMessage content={message.content} showSignature={false} />;
       case "TEXT":
         return <TextMessage content={message.content} showSignature={showSignature} />;
       case "AUDIO":

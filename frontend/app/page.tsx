@@ -149,6 +149,7 @@ export default function Home() {
           onCloseWithBot={chat.closeWithBot}
           onSelectContact={selectContact}
           onSaveContact={chat.saveContact}
+          onSaveSharedContact={chat.saveSharedContact}
           onRenameContact={chat.renameContact}
           onSetContactAssignment={chat.setContactAssignment}
           onSetContactPriority={chat.setContactPriority}
