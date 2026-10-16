@@ -63,18 +63,15 @@ for (const width of [1280, 390]) {
     await page.screenshot({ path: testInfo.outputPath("delete-client.png") });
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
 
-    page.once("dialog", async (dialog) => {
-      expect(dialog.type()).toBe("confirm");
-      expect(dialog.message()).toContain("Empresa teste");
-      expect(dialog.message()).toContain("toda a equipe");
-      await dialog.dismiss();
-    });
     await deleteButton.click();
+    const confirmation = page.getByRole("dialog", { name: "Excluir cliente?" });
+    await expect(confirmation).toContainText("Empresa teste");
+    await confirmation.getByRole("button", { name: "Cancelar", exact: true }).click();
     await expect(page.getByRole("textbox", { name: "Nome da empresa", exact: true })).toHaveValue("Empresa teste");
     expect(deletes).toHaveLength(0);
 
-    page.once("dialog", (dialog) => dialog.accept());
     await deleteButton.click();
+    await page.getByRole("dialog", { name: "Excluir cliente?" }).getByRole("button", { name: "Excluir", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("Cliente excluído com sucesso.");
     await expect(page.getByRole("button", { name: "Ver e editar informações de Empresa teste", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Ver e editar informações de Empresa compartilhada", exact: true })).toBeVisible();
@@ -89,8 +86,8 @@ test("erro de exclusão mantém o cadastro e bloqueia ações enquanto aguarda",
   control.failDeletion = true;
   let release!: () => void;
   control.beforeDelete = () => new Promise<void>((resolve) => { release = resolve; });
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Excluir cliente", exact: true }).click();
+  await page.getByRole("dialog", { name: "Excluir cliente?" }).getByRole("button", { name: "Excluir", exact: true }).click();
   await expect.poll(() => deletes.length).toBe(1);
   await expect(page.getByRole("button", { name: "Excluindo…", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Salvar alterações", exact: true })).toBeDisabled();
@@ -112,8 +109,8 @@ test("qualquer membro pode excluir um cliente compartilhado", async ({ page }) =
   await expect(form.getByRole("button", { name: "Excluir cliente", exact: true })).toBeVisible();
   await expect(form.getByRole("button", { name: "Excluir cliente", exact: true })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Salvar alterações", exact: true })).toBeEnabled();
-  page.once("dialog", (dialog) => dialog.accept());
   await form.getByRole("button", { name: "Excluir cliente", exact: true }).click();
+  await page.getByRole("dialog", { name: "Excluir cliente?" }).getByRole("button", { name: "Excluir", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Cliente excluído com sucesso.");
   expect(deletes).toEqual(["/api/clients/shared-client"]);
   expect(errors).toEqual([]);
@@ -126,8 +123,8 @@ test("resposta da API sem canDelete não esconde a opção de excluir", async ({
   const deleteButton = form.getByRole("button", { name: "Excluir cliente", exact: true });
   await expect(deleteButton).toBeVisible();
   await expect(deleteButton).toBeEnabled();
-  page.once("dialog", (dialog) => dialog.accept());
   await deleteButton.click();
+  await page.getByRole("dialog", { name: "Excluir cliente?" }).getByRole("button", { name: "Excluir", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Cliente excluído com sucesso.");
   expect(deletes).toEqual(["/api/clients/own-client"]);
   expect(errors).toEqual([]);

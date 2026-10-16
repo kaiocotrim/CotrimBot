@@ -5,6 +5,7 @@ import { Select } from "@base-ui/react/select";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
 import { BadgeCheck, Bell, Building2, Camera, Check, ChevronDown, ContactRound, Link2, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "lucide-react";
+import { LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -87,6 +88,9 @@ const sections = [
   { value: "business", label: "Empresa", icon: Building2 },
 ] as const;
 
+const MotionPanel = motion.create(Tabs.Panel);
+const settingsSpring = { type: "spring", stiffness: 380, damping: 34, mass: 0.8 } as const;
+
 type Section = typeof sections[number]["value"];
 
 export function AccountSettings({ user, children, onOpen }: {
@@ -120,6 +124,7 @@ export function AccountSettings({ user, children, onOpen }: {
 
 function SettingsContent({ user }: { user: SettingsUser }) {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const [section, setSection] = useState<Section>("account");
   const [name, setName] = useState(user.name);
   const [savedName, setSavedName] = useState(user.name);
@@ -205,14 +210,17 @@ function SettingsContent({ user }: { user: SettingsUser }) {
     <Tabs.Root value={section} onValueChange={(value) => changeSection(value as Section)} orientation="vertical" className={styles.layout}>
       <aside className={styles.sidebar}>
         <Dialog.Title className={styles.title}>Configurações</Dialog.Title>
+        <LayoutGroup>
         <Tabs.List aria-label="Seções de configurações" className={styles.navigation}>
           {availableSections.map(({ value, label, icon: Icon }) => (
             <Tabs.Tab key={value} value={value} className={styles.navItem}>
+              {section === value && <motion.span aria-hidden="true" className={styles.navHighlight} layoutId="settings-selection" transition={reduceMotion ? { duration: 0 } : settingsSpring} />}
               <Icon size={21} strokeWidth={1.8} aria-hidden="true" />
               <span>{label}</span>
             </Tabs.Tab>
           ))}
         </Tabs.List>
+        </LayoutGroup>
         <footer className={styles.footer}>
           <span>CotrimBot</span>
           <button type="button" onClick={() => void signOut()} disabled={signingOut}>
@@ -224,14 +232,14 @@ function SettingsContent({ user }: { user: SettingsUser }) {
 
       <div className={styles.main}>
         <header className={styles.header}>
-          <h2 className={styles.title}>{availableSections.find((item) => item.value === section)?.label}</h2>
+          {section !== "client" && <h2 className={styles.title}>{availableSections.find((item) => item.value === section)?.label}</h2>}
           <Dialog.Close aria-label="Fechar configurações" title="Fechar" className={styles.closeButton}>
             <X size={24} strokeWidth={1.8} aria-hidden="true" />
           </Dialog.Close>
         </header>
 
         <div ref={scrollRef} className={styles.scrollArea}>
-          <Tabs.Panel value="account" className={styles.panel}>
+          <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="account" className={styles.panel}>
             <section className={`${styles.card} ${styles.subscription}`} aria-labelledby="subscription-title">
               <h3 id="subscription-title">Assinatura Pro</h3>
               <p>Gerencie sua conta e suas conexões em um só lugar. O plano Pro ainda não está disponível no CotrimBot. Você poderá acompanhar as novidades por aqui.</p>
@@ -320,33 +328,33 @@ function SettingsContent({ user }: { user: SettingsUser }) {
 
             <ConnectedAccounts />
 
-          </Tabs.Panel>
+          </MotionPanel>
 
-          <Tabs.Panel value="notifications" className={styles.panel}>
+          <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="notifications" className={styles.panel}>
             <NotificationSettings />
-          </Tabs.Panel>
+          </MotionPanel>
 
-          <Tabs.Panel value="client" className={styles.panel}>
+          <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="client" data-client-panel="" className={styles.panel}>
             <ClientSettings />
-          </Tabs.Panel>
+          </MotionPanel>
 
-          <Tabs.Panel value="pro" className={styles.panel}>
+          <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="pro" className={styles.panel}>
             <section className={styles.card}>
               <h3>Assinatura Pro</h3>
               <p>O plano Pro ainda não está disponível no CotrimBot. Quando houver planos para contratar, os detalhes e valores aparecerão aqui.</p>
               <button type="button" className={styles.primaryButton} disabled>Em breve</button>
             </section>
-          </Tabs.Panel>
+          </MotionPanel>
 
           {user.role === "admin" && (
-            <Tabs.Panel value="whatsapp" className={styles.panel}>
+            <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="whatsapp" className={styles.panel}>
               <EvolutionConnectionSettings />
-            </Tabs.Panel>
+            </MotionPanel>
           )}
 
-          <Tabs.Panel value="calls" className={styles.panel}>
+          <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="calls" className={styles.panel}>
             <EvolutionCallSettings />
-          </Tabs.Panel>
+          </MotionPanel>
 
         </div>
       </div>
@@ -545,12 +553,14 @@ type SavedClient = {
 type ClientDraft = Omit<SavedClient, "id" | "canDelete">;
 
 function ClientSettings() {
+  const reduceMotion = useReducedMotion();
   const [clients, setClients] = useState<SavedClient[]>([]);
   const [draft, setDraft] = useState<ClientDraft | null>(null);
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [processingImage, setProcessingImage] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -660,7 +670,7 @@ function ClientSettings() {
   async function deleteClient() {
     if (!editingClient || busy || processingImage) return;
     const client = editingClient;
-    if (!window.confirm(`Excluir o cliente “${client.name}”? Esta ação é permanente e removerá o cadastro para toda a equipe.`)) return;
+    setConfirmingDelete(false);
     setDeleting(true);
     setError(null);
     setFeedback(null);
@@ -695,42 +705,43 @@ function ClientSettings() {
   }
 
   return (
-    <section className={styles.card} aria-labelledby="client-settings-title">
-      <div className={styles.clientSectionHeader}>
-        <div>
-          <h3 id="client-settings-title">Clientes</h3>
-          <p>Organize as informações e os links importantes de cada cliente.</p>
-        </div>
-        {!draft && (
-          <button type="button" className={styles.newClientButton} onClick={startClientRegistration}>
-            <Plus size={17} strokeWidth={2} aria-hidden="true" />
-            Novo cliente
-          </button>
-        )}
-      </div>
-
-      {!draft && clients.length > 0 && (
-        <label className={styles.clientSearch}>
-          <Search size={17} strokeWidth={1.8} aria-hidden="true" />
-          <input
-            type="search"
-            value={clientQuery}
-            onChange={(event) => setClientQuery(event.target.value)}
-            placeholder="Pesquisar cliente ou link"
-            aria-label="Pesquisar clientes"
-          />
-          {clientQuery && (
-            <button type="button" onClick={() => setClientQuery("")} aria-label="Limpar pesquisa" title="Limpar pesquisa">
-              <X size={15} strokeWidth={1.8} aria-hidden="true" />
-            </button>
+    <section className={styles.card} aria-label="Clientes">
+      {!draft && (
+        <div className={styles.clientSectionHeader}>
+          {(loading || clients.length > 0) && (
+            <label className={styles.clientSearch}>
+              <Search size={17} strokeWidth={1.8} aria-hidden="true" />
+              <input
+                type="search"
+                disabled={loading}
+                value={clientQuery}
+                onChange={(event) => setClientQuery(event.target.value)}
+                placeholder="Pesquisar cliente ou link"
+                aria-label="Pesquisar clientes"
+              />
+              {clientQuery && (
+                <button type="button" onClick={() => setClientQuery("")} aria-label="Limpar pesquisa" title="Limpar pesquisa">
+                  <X size={15} strokeWidth={1.8} aria-hidden="true" />
+                </button>
+              )}
+            </label>
           )}
-        </label>
+          <motion.button disabled={loading} whileHover={reduceMotion ? undefined : { scale: 1.04 }} whileTap={reduceMotion ? undefined : { scale: 0.94 }} transition={settingsSpring} type="button" className={styles.newClientButton} onClick={startClientRegistration} aria-label="Novo cliente" title="Novo cliente">
+            <Plus size={17} strokeWidth={2} aria-hidden="true" />
+          </motion.button>
+        </div>
       )}
 
       {loading ? (
-        <p role="status" className={styles.hint}>Carregando clientes…</p>
+        <div className={styles.clientGrid} role="status" aria-label="Carregando clientes" aria-busy="true">
+          {[0, 1, 2, 3].map((index) => (
+            <div key={index} className={styles.clientSkeletonSlot} aria-hidden="true">
+              <span className={styles.clientSkeleton} />
+            </div>
+          ))}
+        </div>
       ) : draft ? (
-        <form className={styles.clientForm} onSubmit={(event) => void saveClient(event)}>
+        <motion.form initial={reduceMotion ? false : { opacity: 0, y: 10, scale: 0.99 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} className={styles.clientForm} onSubmit={(event) => void saveClient(event)}>
           <label className={styles.field}>
             <span>Nome da empresa</span>
             <input
@@ -865,7 +876,7 @@ function ClientSettings() {
               <button
                 type="button"
                 className={styles.deleteClientButton}
-                onClick={() => void deleteClient()}
+                onClick={() => setConfirmingDelete(true)}
                 disabled={busy || processingImage}
                 title="Excluir cliente"
                 aria-busy={deleting}
@@ -885,7 +896,7 @@ function ClientSettings() {
               {saving ? "Salvando…" : editingClientId ? "Salvar alterações" : "Cadastrar cliente"}
             </button>
           </div>
-        </form>
+        </motion.form>
       ) : clients.length === 0 ? (
         <button type="button" className={styles.emptyClients} onClick={startClientRegistration}>
           <span><Plus size={20} strokeWidth={1.8} aria-hidden="true" /></span>
@@ -900,8 +911,14 @@ function ClientSettings() {
         </div>
       ) : (
         <div className={styles.clientGrid}>
-          {filteredClients.map((client) => (
-            <button
+          {filteredClients.map((client, index) => (
+            <motion.button
+              layout={reduceMotion ? false : "position"}
+              initial={reduceMotion ? false : { opacity: 0, y: 8, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1, transition: reduceMotion ? { duration: 0 } : { ...settingsSpring, delay: Math.min(index, 7) * 0.045 } }}
+              whileHover={reduceMotion ? undefined : { y: -2, scale: 1.025 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.96 }}
+              transition={reduceMotion ? { duration: 0 } : settingsSpring}
               key={client.id}
               type="button"
               className={styles.clientLogoButton}
@@ -912,12 +929,38 @@ function ClientSettings() {
               <span className={styles.clientAvatar} aria-hidden="true">
                 {client.image ? <Image src={client.image} alt="" width={64} height={64} unoptimized /> : <Building2 size={25} strokeWidth={1.6} />}
               </span>
-            </button>
+            </motion.button>
           ))}
         </div>
       )}
       {feedback && <p role="status" className={styles.feedback}>{feedback}</p>}
       {error && <p role="alert" className={styles.error}>{error}</p>}
+
+      <Dialog.Root
+        open={confirmingDelete}
+        onOpenChange={(open) => {
+          if (!deleting) setConfirmingDelete(open);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Backdrop className={styles.confirmDeleteBackdrop} />
+          <Dialog.Popup className={styles.confirmDeleteDialog}>
+            <span className={styles.confirmDeleteIcon} aria-hidden="true">
+              <Trash2 size={20} strokeWidth={1.8} />
+            </span>
+            <Dialog.Title className={styles.confirmDeleteTitle}>Excluir cliente?</Dialog.Title>
+            <Dialog.Description className={styles.confirmDeleteDescription}>
+              {editingClient?.name}
+            </Dialog.Description>
+            <div className={styles.confirmDeleteActions}>
+              <button type="button" onClick={() => setConfirmingDelete(false)}>Cancelar</button>
+              <button type="button" className={styles.confirmDeleteButton} onClick={() => void deleteClient()} autoFocus>
+                Excluir
+              </button>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
     </section>
   );
 }
@@ -965,9 +1008,13 @@ function NotificationSettings() {
         <p>Receba um aviso no sistema operacional quando uma conversa for atribuída a você ou uma conversa sua receber mensagem.</p>
         {permission === "unsupported" && <p>Este navegador não oferece suporte a notificações.</p>}
         {permission === "denied" && <p role="alert" className={styles.error}>As notificações estão bloqueadas. Libere-as nas configurações do site no navegador.</p>}
-        {permission === "granted" && <span className={styles.badge}>Ativadas</span>}
         {permission === "default" && <button type="button" className={styles.primaryButton} onClick={() => void enableDesktop()}>Ativar notificações</button>}
-        {permission === "granted" && <button type="button" className={styles.primaryButton} onClick={sendTest}>Enviar teste</button>}
+        {permission === "granted" && (
+          <div className={styles.notificationActions}>
+            <span className={styles.notificationStatus}><Check size={15} aria-hidden="true" />Ativadas</span>
+            <button type="button" className={styles.testNotificationButton} onClick={sendTest}>Enviar teste</button>
+          </div>
+        )}
       </section>
       <section className={styles.card}>
         <h3>Notificações push</h3>
