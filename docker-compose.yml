@@ -28,6 +28,7 @@ services:
       DATABASE_PORT: ${DATABASE_PORT}
       EVOLUTION_API_URL: http://evolution-api:8080
       TRANSCRIPTION_SERVICE_URL: http://transcription:5000
+      RESENCE_DEBUG: "${PRESENCE_DEBUG:-false}"
 
   # Banco principal do CotrimBot
   mysql:
