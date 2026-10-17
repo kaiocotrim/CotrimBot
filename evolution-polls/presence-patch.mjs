@@ -63,7 +63,7 @@ import { subscribeNativePresence } from '@api/integrations/channel/whatsapp/cotr
   webhook = webhook.replace('    const webhookLocal = instance?.events;', `    const webhookLocal = instance?.events;
     if (event === 'presence.update') presenceTrace('webhook_config', {
       localEnabled: Boolean(local && instance?.enabled),
-      localEvent: Boolean(instance?.events?.includes('PRESENCE_UPDATE')),
+      localEvent: Array.isArray(webhookLocal) && webhookLocal.includes('PRESENCE_UPDATE'),
       localByEvents: Boolean(instance?.webhookByEvents),
       globalEnabled: Boolean(webhookConfig.GLOBAL?.ENABLED),
       globalEvent: Boolean(webhookConfig.EVENTS?.PRESENCE_UPDATE),
