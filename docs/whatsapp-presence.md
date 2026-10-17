@@ -1,170 +1,244 @@
-# Diagnóstico de presença — Evolution API 2.3.7
+# Presença WhatsApp — diagnóstico e patch da Evolution 2.3.7
 
-## Verificação em 16/10/2026
+## Resultado da investigação em 16/10/2026
 
-Uma consulta somente de leitura à Evolution configurada no ambiente confirmou:
+O teste real informado confirmou: mensagens e Socket.IO funcionam, a assinatura
+retorna sucesso e nenhum `presence.update` chega ao CotrimBot. A investigação
+agora cobre o trecho anterior ao backend. A
+[issue #2569](https://github.com/evolution-foundation/evolution-api/issues/2569)
+relata o mesmo sintoma com LID, mas não apresenta uma causa confirmada ou um
+patch oficial. A issue, sozinha, não identifica o defeito desta instalação.
 
-- Versão `2.3.7` e instância com estado `open`.
-- Webhook da instância habilitado, `PRESENCE_UPDATE` presente e `webhookByEvents=false`.
-- A URL configurada termina na rota existente `/api/webhook/whatsapp`.
-- O Compose já habilita o webhook global e `WEBHOOK_EVENTS_PRESENCE_UPDATE=true`.
+Consultas somente de leitura à instância configurada `cotrimbot` confirmaram:
 
-Isso comprova a configuração consultada, **não a chegada de um evento real**.
-Este ambiente não dispõe do Docker nem dos logs do serviço no Dokploy. Os testes
-HTTP usam eventos sintéticos e dependências simuladas; não geram presença na
-instância de produção. Uma captura controlada no Dokploy ainda é necessária.
-
-## Fluxo existente e ajustes
-
-O fluxo continua sendo `Evolution → webhook.controller.ts → contact_presence
-(Socket.IO) → useChat → ChatHeader`. Não foi criado outro webhook ou canal.
-
-- O ramo de presença aceita `presence.update`, `PRESENCE_UPDATE` e
-  `presence-update`, sem mudar o tratamento de outros eventos.
-- O parser preserva a associação entre pessoa e status em mapas `presences`.
-  Em eventos individuais, considera tanto o JID externo como a chave do mapa,
-  permitindo identificar um telefone quando o identificador externo é um LID.
-- Remove sufixos de dispositivo (`:0`, `:2` etc.) somente na identificação de
-  presença. Telefones `@s.whatsapp.net` são consultados em `phone`; LIDs `@lid`
-  são consultados em `whatsappLid`. Os dígitos de um LID nunca viram telefone.
-- Contatos ausentes ou aliases que apontam para contatos diferentes são
-  ignorados e diagnosticados. Nenhum contato é criado ou alterado por presença.
-- Grupos continuam fora do indicador individual. Eventos explicitamente
-  marcados como enviados pela própria conta são ignorados.
-- `composing` mostra `digitando...`; `recording` mostra `gravando áudio...`, com
-  as mesmas classes e posição do indicador anterior.
-- `paused`, `available` e `unavailable` removem a atividade. Cada atualização
-  renova o prazo de **6 segundos**, preservando o prazo anterior. O fim do prazo
-  e a desconexão do Socket.IO também limpam o indicador.
-- O campo legado `isTyping` continua compatível. Um `presence` explícito tem
-  prioridade sobre ele. O componente de pontos usado no chat interno permanece
-  inalterado.
-
-A assinatura existente em `/contacts/:id/presence-subscription`, renovada a
-cada 30 segundos enquanto a conversa individual está aberta, foi preservada.
-Ela tenta o LID e mantém o telefone como fallback. O `sendPresence` da 2.3.7
-chama `presenceSubscribe` antes de enviar `paused`. Uma resposta de sucesso
-nesse endpoint confirma a tentativa de assinatura, não a emissão posterior
-de presença pelo WhatsApp.
-
-## Logs temporários no Dokploy
-
-No ambiente do serviço **cotrimbot**, configure temporariamente:
-
-```dotenv
-PRESENCE_DEBUG=true
-```
-
-Recrie/republique o serviço para carregar a variável. Filtre os logs por
-`[whatsapp-presence]`. Os registros são JSON, com estas etapas:
-
-| Etapa | Significado |
+| Propriedade | Valor observado |
 | --- | --- |
-| `subscription_attempt` / `subscription_ok` / `subscription_failed` | Tentativa de acompanhar o contato pela assinatura existente. |
-| `webhook_received` com `event=other` | O endpoint recebe outros webhooks, sem registrar seu conteúdo. |
-| `webhook_received` com `event=presence.update` / `received` | Presença chegou ao controller. |
-| `ignored` | Payload inválido, evento próprio, grupo, status ou JID ausente. |
-| `contact_not_found` | Identificadores válidos sem correspondência no cadastro. |
-| `ambiguous_contact` | Telefone e LID apontam para contatos diferentes; não é seguro escolher um. |
-| `emitted` | O evento `contact_presence` foi entregue ao servidor Socket.IO. Não comprova recebimento no navegador. |
+| Evolution | `2.3.7` |
+| Conexão | `open` |
+| Webhook da instância | habilitado |
+| Evento | `PRESENCE_UPDATE` habilitado; `MESSAGES_UPSERT` também |
+| Destino da instância | `http://cotrimbot:3333/api/webhook/whatsapp` |
+| `webhookByEvents` | `false` |
+| `alwaysOnline` | `false`, preservado |
+| `groupsIgnore` | `false`, preservado |
 
-São registrados apenas motivos enumerados, status conhecidos, contagens, ID
-interno do contato e referências HMAC dos identificadores. As referências são
-estáveis apenas durante o processo, com chave aleatória que não é registrada.
-Não são registrados payloads, nomes, telefones, JIDs/LIDs brutos, URLs ou chaves
-da Evolution. Há limite de **120 linhas/minuto por processo**; depois desse
-limite os logs são omitidos até a próxima janela. Ausência de uma linha isolada
-durante uma rajada não comprova ausência do evento.
+O Compose já habilitava o webhook global e o evento. A consulta HTTP acima
+confirma o webhook **da instância**. Os valores globais efetivamente carregados
+no processo serão mostrados pelo novo log `webhook_startup`, mesmo sem evento
+recebido. Não é correto deduzir o ambiente efetivo de um container apenas pelo
+arquivo Compose.
 
-Depois do diagnóstico, remova a variável ou use `PRESENCE_DEBUG=false` e
-republique o serviço. Os logs ficam desligados por padrão.
+## Código exato inspecionado
 
-## Teste controlado depois da publicação
+O Dockerfile usa `evoapicloud/evolution-api:v2.3.7` e reconstrói o commit
+[`cd800f2976e1e5b682fbf86a01ee4d85ae61f370`](https://github.com/evolution-foundation/evolution-api/tree/cd800f2976e1e5b682fbf86a01ee4d85ae61f370).
+Esse código fixa `baileys@7.0.0-rc.9`. Foram inspecionados também os métodos do
+pacote npm exato, sem atualizar a dependência.
 
-1. Abra uma conversa individual no CotrimBot. No navegador, confira a chamada
-   existente `POST /api/contacts/:id/presence-subscription` com resposta `204`.
-2. Usando outra conta WhatsApp, digite **sem enviar**. Espere `received` e
-   `emitted` com `presence=composing` e o texto `digitando...` no cabeçalho.
-3. Grave áudio sem enviar: espere `recording` e `gravando áudio...`.
-4. Pare a atividade: `paused` deve limpar o indicador. Sem evento de parada,
-   ele some seis segundos após a última atualização recebida.
-5. Troque de conversa e confira o isolamento por contato. Repita para um
-   contato identificado por telefone e para outro com `whatsappLid` conhecido.
+O [Baileys rc.9](https://github.com/WhiskeySockets/Baileys/blob/v7.0.0-rc.9/src/Socket/chats.ts)
+recebe `CB:presence` e `CB:chatstate`, transforma áudio em `recording` e emite
+`presence.update`. Nessa versão, um nó `paused` vira estado `available`, que o
+frontend existente já trata como encerramento da atividade. O callback
+`shouldIgnoreJid` da Evolution filtra grupos/broadcast/newsletter conforme as
+configurações; não contém um descarte específico de `@lid`.
 
-Se houver `received` seguido de `contact_not_found`, investigue o vínculo
-JID/LID já armazenado. A presença não inventa nem grava esse vínculo.
-Se houver `emitted`, mas nenhuma atualização no navegador, investigue a
-conexão Socket.IO e o ID da conversa, sem mudar a integração de mensagens.
+A Evolution encaminha a presença para `sendDataWebhook`, que chama o dispatcher
+de integrações. O `WebhookController.emit` possui caminhos separados para
+webhook da instância e webhook global. O global exige `GLOBAL.ENABLED` e
+`EVENTS.PRESENCE_UPDATE`; se `WEBHOOK_BY_EVENTS` estiver ativo, acrescenta
+`/presence-update` ao destino. Essa opção está desligada no Compose atual.
 
-Se outros webhooks chegam, a assinatura responde e **nenhum** evento de
-presença chega durante o teste, compare com os logs da Evolution. Falta do
-evento em ambos os lados sugere falha anterior ao CotrimBot; não comprova,
-sozinha, um defeito específico do Baileys ou da versão.
+### Duas fragilidades reproduzidas
 
-## Compatibilidade da Evolution 2.3.7
+1. **Perda do identificador original na assinatura.** `sendPresence` chama
+   `whatsappNumber`. Quando a entrada LID existe no cache, esse método devolve
+   `cached.remoteJid`, que pode ser o PN. Depois, `sendPresence` assina apenas
+   esse identificador. Portanto, `subscription_ok` pode significar que apenas
+   o telefone foi assinado, apesar de a solicitação ter usado um LID. Um teste
+   executa o método upstream com esse cenário de cache e reproduz a troca.
+2. **Presença dependente da fila de mensagens.** A presença era encaminhada
+   dentro de `eventProcessingQueue`, depois de handlers que aguardam histórico,
+   mensagens e confirmações. Um handler lento retém presença que já chegou ao
+   Baileys. O teste bloqueia essa fila e verifica que o patch entrega a presença
+   imediatamente e uma única vez.
 
-O [código da tag 2.3.7](https://github.com/evolution-foundation/evolution-api/blob/2.3.7/src/api/integrations/channel/whatsapp/whatsapp.baileys.service.ts)
-contém o encaminhamento de `events['presence.update']` para `PRESENCE_UPDATE`
-e a assinatura dentro de `sendPresence`. Portanto, a versão implementa o
-recurso, mas depende de o Baileys/WhatsApp entregar a presença.
+São defeitos corrigíveis no código, mas ainda não demonstram qual deles causou
+**a ausência observada em produção**. Se nenhum nó chegar do WhatsApp após a
+assinatura correta, os dois patches não podem fabricar esse evento.
 
-Existe o [relato upstream #2569](https://github.com/evolution-foundation/evolution-api/issues/2569)
-sobre eventos que não são emitidos na 2.3.7 com endereçamento LID. É um relato
-compatível com o sintoma, não uma confirmação de que essa instância sofre do
-mesmo problema, nem garantia de correção em outra versão.
+## Patch aplicado à imagem personalizada
 
-A [documentação de webhooks](https://github.com/evolution-foundation/evolution-docs/blob/main/docs/02-Configuration/Webhooks.md)
-lista os estados `composing`, `recording`, `paused`, `available` e `unavailable`.
-Não foi alterada a imagem da Evolution, a extensão de enquetes, as configurações
-de mensagens, os bancos ou a autenticação.
+O patch de enquetes existente permanece em `patchEvolutionPolls`. O mesmo
+build passa a executar `patchEvolutionPresence` depois dele, na mesma versão.
+Os pontos de inserção são validados; uma fonte incompatível interrompe o build.
 
-## O que publicar no Dokploy
+- Nova rota `POST /chat/subscribePresence/:instanceName`, sob os mesmos guards
+  do `ChatRouter`. O parâmetro `:instanceName` segue o contrato upstream.
+- Corpo `{ "number": "...@lid", "aliases": ["...@s.whatsapp.net"] }`, com no
+  máximo um alias. O backend envia os identificadores já conhecidos do contato.
+- Os identificadores fornecidos são preservados e normalizados sem converter
+  os dígitos de um LID em telefone. Se um cadastro legado guarda os mesmos
+  dígitos do LID em `phone`, o backend não envia esse valor como um PN inventado
+  e não altera o cadastro. Com apenas um identificador, a extensão
+  pode ler uma correspondência já existente em `authState.keys.get('lid-mapping')`.
+- A extensão **não** chama USync, `onWhatsApp`, `getLIDForPN`, `keys.set`,
+  `sendPresenceUpdate`, relay ou envio de mensagens. Nenhum vínculo é inventado
+  ou gravado. A operação de rede é apenas `presenceSubscribe`.
+- O backend usa essa nova rota. Não faz fallback para `sendPresence`, pois esse
+  fallback voltaria a perder aliases e enviaria `paused` para o contato.
+- Um listener do evento real `client.ev.on('presence.update')` encaminha o mesmo
+  payload fora da fila de mensagens. O ramo antigo dessa presença na fila é
+  removido. A ordem e o conteúdo dos outros handlers permanecem intactos.
+- Os observadores são anexados uma vez por socket e removidos ao fechar a
+  conexão. Os observadores de nós brutos apenas diagnosticam; **não geram
+  eventos, não substituem o parser e não fazem forwarding alternativo**.
+- A implementação atual do webhook, Socket.IO e frontend do CotrimBot é
+  reutilizada. O frontend não precisou de outra alteração nesta etapa.
 
-- **Rebuild/redeploy do serviço `cotrimbot`**: inclui o backend e o frontend
-  estático no Dockerfile existente. Reiniciar a imagem antiga não inclui o código.
-- Ative `PRESENCE_DEBUG=true` apenas durante a captura e desative ao finalizar.
-- **Sem migração de banco, alteração de autenticação, atualização da Evolution
-  ou modificação do Compose para este ajuste.**
-- Se o teste real confirmar ausência na Evolution, registre a versão e os
-  resultados da captura antes de decidir uma atualização da API. Essa decisão
-  deve considerar as compatibilidades existentes de mensagens e enquetes.
+Um sucesso de assinatura confirma a escrita do pedido no socket, não um ACK
+remoto nem a entrega futura de eventos. Não se forçou `alwaysOnline=true` nem
+se modificou a privacidade ou a sessão para tentar produzir presença.
 
-Testes locais de presença:
+## Logs temporários seguros
+
+Configure temporariamente `PRESENCE_DEBUG=true` no ambiente do Compose/Dokploy.
+O serviço `cotrimbot` já recebe o arquivo de ambiente; agora `evolution-api`
+também recebe explicitamente essa variável pelo Compose. Não é necessário
+habilitar `LOG_LEVEL=WEBHOOKS`, que no upstream pode imprimir payloads.
+
+Filtre `[evolution-presence]` e `[whatsapp-presence]`. Ambos ficam desligados
+por padrão e limitam a saída a 120 linhas/minuto por processo. As referências
+HMAC usam uma chave aleatória não registrada, válida apenas naquele processo.
+As referências da Evolution e do CotrimBot são independentes; não são chaves
+de correlação entre containers. Os logs novos não incluem identificadores
+brutos, nomes, payloads, credenciais ou URLs.
+
+| Etapa na Evolution | O que comprova |
+| --- | --- |
+| `webhook_startup` | Flags globais efetivamente carregadas no processo. |
+| `observer_attached` | O socket foi instrumentado pela imagem nova. |
+| `mapping_read` / `mapping_unavailable` | Leitura de vínculo existente quando só um identificador foi fornecido. |
+| `subscription_attempt` / `subscription_written` / `subscription_failed` | Cada pedido de assinatura PN/LID e sua escrita no socket. |
+| `socket_node` | Um nó de presença/chatstate chegou ao socket do Baileys. |
+| `baileys_event` | O parser do Baileys emitiu `presence.update`. |
+| `ignored` | Socket inativo, grupo ignorado ou payload inválido. |
+| `evolution_forward` | O listener encaminhou o evento real ao dispatcher. |
+| `webhook_enter` / `webhook_config` | O dispatcher alcançou o controller; flags local/global carregadas. |
+| `webhook_http_attempt` | Tentativa HTTP, com `scope=local` ou `global`. |
+| `webhook_http_response` | Resposta HTTP e código de status. |
+| `webhook_http_failed` | Falha HTTP/rede/timeout, sem imprimir erro bruto. |
+| `dispatch_returned` / `dispatch_failed` | Retorno/falha do dispatcher; retorno sozinho não comprova sucesso HTTP. |
+
+No CotrimBot, continuam disponíveis `webhook_received`, `received`, `ignored`,
+`contact_not_found`, `ambiguous_contact`, `emitted` e os logs de assinatura.
+`emitted` comprova emissão no servidor Socket.IO, não recebimento no navegador.
+
+Os callbacks de nós e eventos podem registrar linhas em ordem diferente da
+ordem conceitual do fluxo, pois o parser do Baileys já tem listeners registrados.
+O limite de logs pode omitir linhas em uma rajada; evite concluir pela ausência
+de uma linha isolada quando houver saturação.
+
+### Como localizar a interrupção
+
+| Última evidência observada | Próxima investigação |
+| --- | --- |
+| `subscription_written`, mas nenhum `socket_node` durante atividade real | Entrega do WhatsApp, endereçamento, disponibilidade/privacidade da conta; não é perda no webhook do CotrimBot. |
+| `socket_node` para chatstate, mas nenhum `baileys_event` | Parser/filtros do Baileys. Não criar um evento sintético para contornar. |
+| `baileys_event` e `evolution_forward`, sem `webhook_enter` | Dispatcher e integrações anteriores ao webhook. |
+| `webhook_config`, sem tentativa global | Conferir `globalEnabled`, `globalEvent` e filtros. |
+| `webhook_http_failed` | Rede interna, destino e status HTTP. |
+| HTTP 200, sem `received` no CotrimBot | Conferir destino efetivo, serviço/imagem atendendo e filtros dos logs. |
+| `received` sem `emitted` | Motivo do descarte, vínculo PN/LID ou contato ausente/ambíguo. |
+| `emitted`, sem indicador | Socket.IO do navegador e contato selecionado. |
+
+Local e global podem apontar para o mesmo endereço e enviar duas requisições.
+Isso já faz parte da configuração upstream. O listener de Baileys encaminha
+uma vez; o teste confirma que os destinos existentes não geram dois listeners.
+O caminho local upstream pode aguardar retries antes do global; as tentativas
+com `scope` permitem identificar esse atraso. A política de entrega/retry não
+foi substituída por outro webhook.
+
+## Testes automatizados e seus limites
+
+Os testes usam trechos originais da Evolution fixada e o parser/assinatura do
+Baileys npm rc.9, com procedência e licenças em
+`backend/tests/fixtures/evolution-presence/`. As cópias originais recebem o patch
+em diretórios temporários. O teste integrado usa:
+
+`nó de protocolo offline → parser Baileys → Evolution modificada → webhook
+HTTP global → controller existente → Socket.IO real → hook/cabeçalho reais`.
+
+HTTP, Socket.IO e Chrome são reais e locais. O banco, a infraestrutura de
+conexão WhatsApp e o emitter não bufferizado de presença são fixtures. O Axios
+é substituído por um adaptador fetch para o servidor local. Não há conexão ao
+WhatsApp nem injeção de eventos em produção. O teste prova as etapas de software,
+não a emissão do serviço remoto ou a disponibilidade do protocolo em cada conta.
+
+Cobertura adicional: aliases PN/LID, leitura de mapeamentos sem escrita, ausência
+de chatstates enviados pela assinatura, guards da rota, fila bloqueada,
+encaminhamento único, fechamento de socket, configuração global, falha HTTP,
+logs sem segredos, `recording`, fim da atividade e expiração no frontend. Os
+testes existentes de votos nativos e do frontend também foram executados.
+
+Comandos:
 
 ```sh
 cd backend
-npx tsx --test tests/presence.test.ts tests/whatsapp-jid.test.ts
+npx tsx --test --experimental-test-module-mocks tests/*.test.ts
 cd ..
-node --test frontend/tests/whatsapp-presence.test.mjs
+node --test --test-concurrency=1 backend/tests/*.test.mjs frontend/tests/*.test.mjs
+cd backend
+npx tsc --noEmit
 ```
 
-Os testes novos cobrem parsing, identificação, logs, a rota HTTP existente,
-estados do cabeçalho, isolamento por contato, renovação, expiração e limpeza
-na desconexão. Teste sintético não substitui a captura de presença real acima.
+A suíte TypeScript do backend passou com **66 testes**. O comando `.mjs` passou
+com **10 testes**: a rota de enquetes e nove suítes do frontend. O TypeScript do
+backend e da extensão nova passou. O patch também foi aplicado com sucesso ao
+checkout completo do commit fixado. Este ambiente não tem Docker/Podman/Buildah;
+o build completo da imagem com as dependências da Evolution ainda precisa
+acontecer no Dokploy. O Dockerfile já executa o type-check/build upstream.
 
-## Resultados locais desta análise
+Nesta etapa não houve nova execução do Playwright legado `*.spec.ts`: o frontend
+não foi alterado. Na análise anterior, ele registrou 5 aprovações e 10 falhas
+em expectativas de clientes, seletores do painel e mocks de autenticação.
+Essas falhas não foram contornadas por alterações de funcionalidades.
 
-| Verificação | Resultado |
-| --- | --- |
-| `cd backend && npx tsx --test --experimental-test-module-mocks tests/*.test.ts` | 58 testes passaram, incluindo os cinco novos testes de presença. |
-| `node --test backend/tests/*.test.mjs` | 1 teste passou. |
-| `node --test --test-concurrency=1 frontend/tests/*.test.mjs` | 9 testes passaram, incluindo presença no WhatsApp e digitação interna. |
-| `cd frontend && npm run build` | Build e exportação estática concluídos, com verificação TypeScript. |
-| `cd backend && npx tsc --noEmit` | Passou. |
-| ESLint de `use-chat.ts`, `chat-header.tsx`, `app/page.tsx` e `types/chat.ts` | Passou. |
-| `cd frontend && npx playwright test --config=playwright.config.ts` | 5 passaram e 10 falharam na suíte existente, conforme abaixo. |
+## Publicação exata no Dokploy
 
-Falhas encontradas sem modificar esses testes ou suas funcionalidades:
+Reconstruir e publicar **dois serviços**, nesta ordem:
 
-- **Clientes (5):** quatro expectativas por `Cliente excluído com sucesso.`
-  em `role=status` não encontram esse aviso; outro teste usa um seletor global
-  `Cancelar` que encontra dois botões.
-- **Responsividade (3):** o seletor `complementary` com nome `Informações do
-  contato` não encontra o painel esperado nos tamanhos 320, 414 e 768 px.
-- **Digitação (2):** o mock em `typing.spec.ts` rejeita a chamada
-  `/api/auth/organization/list`, antes de concluir o cenário de digitação.
+1. **`evolution-api`** — inclui o patch de enquetes preservado, a rota de
+   assinatura, o encaminhamento de presença e os logs novos.
+2. **`cotrimbot`** — inclui o backend que usa `/chat/subscribePresence` com os
+   aliases. O Dockerfile da aplicação também empacota o frontend existente.
 
-Os testes novos de presença executam o hook e o cabeçalho reais com os estados
-do Socket.IO simulados; todos os seus cenários passaram. Não houve alteração
-das funções de clientes, mensagens, enquetes, bancos ou autenticação para
-contornar as falhas da suíte existente.
+Equivalente no host do Compose:
+
+```sh
+docker compose build evolution-api cotrimbot
+docker compose up -d --no-deps evolution-api
+docker compose up -d --no-deps cotrimbot
+```
+
+Preservar os volumes existentes. Não reconstruir MySQL, PostgreSQL, Redis ou
+transcrição. Nenhuma migração, reset/recriação de sessão, novo QR code ou mudança
+de autenticação faz parte deste ajuste. A versão base e o Baileys permanecem
+fixados. A recriação do container naturalmente reconecta a sessão persistida.
+
+### Verificação que ainda exige WhatsApp real
+
+1. Confirmar `webhook_startup` e `observer_attached` após a publicação.
+2. Abrir uma conversa individual no CotrimBot. Conferir HTTP 204 na assinatura
+   do backend e `subscription_written` para os tipos PN/LID disponíveis.
+3. Em outra conta WhatsApp, digitar sem enviar; depois gravar áudio sem enviar.
+   Procurar os estágios desde `socket_node` até HTTP 200 e `emitted`; conferir
+   `digitando...` e `gravando áudio...` no cabeçalho.
+4. Parar a atividade e verificar limpeza imediata ou expiração em seis segundos.
+5. Repetir em contatos PN e LID conhecidos. Se não houver nó no socket, coletar
+   essa evidência e os tipos de identificador assinados, sem concluir que o
+   backend possa recuperar um evento que o WhatsApp não entregou.
+
+Depois da captura, desativar `PRESENCE_DEBUG` e recriar/republicar os dois
+containers com as mesmas imagens. Mudança só de variável não exige rebuild.
+Rollback deste ajuste deve restaurar a imagem personalizada anterior com suporte
+a enquetes e o backend anterior juntos, pois a nova rota precisa de ambos.

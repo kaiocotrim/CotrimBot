@@ -180,13 +180,10 @@ export async function archiveWhatsAppChat(input: {
 /**
  * Assina as atualizações de presença de um contato no WhatsApp.
  *
- * A Evolution/Baileys só começa a encaminhar eventos como `composing`
- * depois de executar `presenceSubscribe` para aquele contato. Na Evolution
- * 2.3.7 essa assinatura acontece dentro do endpoint sendPresence.
- * Enviamos `paused` por 1 ms para fazer a assinatura sem exibir "digitando"
- * para o contato do outro lado.
+ * Usa a extensão da imagem 2.3.7 para assinar os aliases PN/LID conhecidos.
+ * Não envia estados de digitação ou áudio para o contato.
  */
-export async function subscribeWhatsAppPresence(number: string): Promise<void> {
+export async function subscribeWhatsAppPresence(number: string, aliases: string[] = []): Promise<void> {
   const apiUrl = process.env.EVOLUTION_API_URL;
   const apiKey = process.env.EVOLUTION_API_KEY;
   const instance = process.env.EVOLUTION_INSTANCE;
@@ -195,7 +192,7 @@ export async function subscribeWhatsAppPresence(number: string): Promise<void> {
     throw new Error("Configuração da Evolution API incompleta");
   }
 
-  const response = await fetch(`${apiUrl}/chat/sendPresence/${instance}`, {
+  const response = await fetch(`${apiUrl}/chat/subscribePresence/${encodeURIComponent(instance)}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -203,13 +200,14 @@ export async function subscribeWhatsAppPresence(number: string): Promise<void> {
     },
     body: JSON.stringify({
       number,
-      presence: "paused",
-      delay: 1,
+      aliases: [...new Set(aliases)].filter((alias) => alias !== number).slice(0, 1),
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`Erro ao assinar presença: HTTP ${response.status}`);
+    throw new Error(response.status === 404
+      ? "A imagem Evolution precisa da extensão de assinatura de presença."
+      : `Erro ao assinar presença: HTTP ${response.status}`);
   }
 }
 

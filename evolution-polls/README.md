@@ -1,16 +1,27 @@
-# Native poll votes
+# Evolution 2.3.7: native poll votes and presence
 
-Evolution 2.3.7 receives poll votes but its standard message router does not expose a voting endpoint. This image adds the authenticated `POST /message/sendPollVote/:instance` route to that same upstream version. It uses the existing Baileys connection, poll encryption key and message relay; no second WhatsApp login is required.
+This image keeps upstream commit `cd800f2976e1e5b682fbf86a01ee4d85ae61f370`, the original Baileys dependency and the existing poll vote patch. It adds presence diagnostics and an authenticated subscription route without changing message sending, database schemas, WhatsApp sessions or authentication guards.
 
-The CotrimBot backend calls this route only when the user selects an option. The request contains `number`, `messageId` and `optionIndexes` (an empty array withdraws the vote). The poll is looked up inside the authenticated instance and its chat and option limits are validated before sending.
+The existing `POST /message/sendPollVote/:instanceName` route is preserved. It uses the connected Baileys instance, poll encryption key and native relay. Its routing and encryption regression tests remain in `backend/tests/`.
 
-On the host running the Compose services, build and restart only Evolution:
+Presence changes:
+
+- `POST /chat/subscribePresence/:instanceName` accepts `{number, aliases?: [alternate]}`. It preserves supplied PN/LID identifiers, reads an existing session mapping only when needed, and calls `presenceSubscribe`. It sends no `sendPresenceUpdate`, chatstate or message and writes no session keys.
+- The real `client.ev.on('presence.update')` listener forwards the original payload without waiting for the message processing queue. The old queued presence branch is removed to prevent duplicate forwarding. Other queued handlers and the original `sendPresence` endpoint stay unchanged.
+- Optional `PRESENCE_DEBUG=true` traces the socket node, Baileys event, Evolution dispatch, effective webhook flags and HTTP response. Identifiers are HMAC references; payloads, API keys and URLs are omitted. Logs are capped at 120 lines/minute/process. Presence uses these safe traces instead of the upstream `WEBHOOKS` payload dump.
+
+See [the diagnostic and deployment guide](../docs/whatsapp-presence.md) for the exact observed configuration, limitations, test results and interpretation of each trace stage.
+
+Rebuild and publish **both** services in Dokploy, Evolution first and the application second:
 
 ```sh
-docker compose build evolution-api
+docker compose build evolution-api cotrimbot
 docker compose up -d --no-deps evolution-api
+docker compose up -d --no-deps cotrimbot
 ```
 
-This briefly reconnects the existing WhatsApp session. Persistent volumes and database schemas are preserved. The image build type-checks the patched upstream source. Real WhatsApp delivery must be checked after deployment; local tests use a mocked relay and verify the encryption format without sending messages to contacts.
+The Docker build applies both patches and runs the upstream type-check/build. Source markers are checked before the presence patch writes any file. This development environment has no Docker engine; the complete image build still needs to run in Dokploy.
 
-To roll back, restore `image: evoapicloud/evolution-api:v2.3.7` without the `build` block and recreate only that service.
+Keep the existing volumes. Recreating Evolution reconnects the existing session; this patch does not delete, replace or recreate authentication state. No PostgreSQL, MySQL, Redis or transcription service rebuild is needed.
+
+For rollback, restore the previous **custom Evolution image with poll support** together with the previous CotrimBot application image. The new application subscription route requires the new Evolution extension.

@@ -119,6 +119,8 @@ services:
       WEBHOOK_EVENTS_CHATS_UPSERT: "true"      
       WEBHOOK_EVENTS_SEND_MESSAGE: "true"
       WEBHOOK_EVENTS_PRESENCE_UPDATE: "true"
+      # Temporário: diagnóstico de assinatura, Baileys e entrega HTTP de presença.
+      PRESENCE_DEBUG: "${PRESENCE_DEBUG:-false}"
       
     volumes:
       - evolution_instances:/evolution/instances

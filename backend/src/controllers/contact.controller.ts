@@ -5,6 +5,7 @@ import { getSocketServer } from "../lib/socket.js";
 import { notifyAssignment } from "../services/notification.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
 import { presenceDebug, presenceIdentifiers } from "../utils/whatsapp-presence.js";
+import { normalizeWhatsAppJid, whatsAppJidIdentifier } from "../utils/whatsapp-jid.js";
 import {
   archiveWhatsAppChat,
   getGroupInfo,
@@ -258,13 +259,18 @@ export async function subscribeContactPresence(req: Request, res: Response) {
   try {
     // Contatos Multi-Device publicam presença pelo JID @lid. O telefone
     // continua como fallback para conversas que ainda usam @s.whatsapp.net.
-    const identifiers = [...new Set([contact.whatsappLid, contact.phone].filter(Boolean))] as string[];
+    const lid = contact.whatsappLid ? normalizeWhatsAppJid(contact.whatsappLid) : null;
+    // Cadastros legados podem ter guardado os dígitos do LID no campo phone.
+    // Eles não são um PN conhecido e não devem gerar uma assinatura @s.whatsapp.net.
+    const phoneIsLid = lid && !contact.phone.includes("@")
+      && contact.phone.replace(/\D/g, "") === whatsAppJidIdentifier(lid);
+    const identifiers = [...new Set([lid, ...(!phoneIsLid ? [contact.phone] : [])].filter(Boolean))] as string[];
     let lastError: unknown;
 
     for (const identifier of identifiers) {
       try {
         presenceDebug("subscription_attempt", { contactId: id, identifiers: presenceIdentifiers([identifier]) });
-        await subscribeWhatsAppPresence(identifier);
+        await subscribeWhatsAppPresence(identifier, identifiers);
         presenceDebug("subscription_ok", { contactId: id });
         return res.status(204).send();
       } catch (error) {
