@@ -29,6 +29,10 @@ export type Contact = {
   unreadCount: number;
 };
 
+export type PollVote = { voterId: string; voterName: string | null; optionIndexes: number[]; updatedAt: string };
+export type Poll = { question: string; options: string[]; selectableCount: number; votes?: PollVote[] };
+export type PollResults = { poll: Poll; ownVoterIds: string[]; syncError?: string | null };
+
 export type Message = {
   // ID interno do MySQL/CotrimBot.
   id: number;
@@ -43,8 +47,9 @@ export type Message = {
   direction: "INCOMING" | "OUTGOING";
 
   // Define como o conteúdo será renderizado: texto, áudio ou outra mídia.
-  type: "TEXT" | "CONTACT" | "SYSTEM" | "AUDIO" | "IMAGE" | "STICKER" | "VIDEO" | "DOCUMENT";
+  type: "TEXT" | "CONTACT" | "POLL" | "SYSTEM" | "AUDIO" | "IMAGE" | "STICKER" | "VIDEO" | "DOCUMENT";
   sharedContacts?: SharedContact[] | null;
+  poll?: Poll | null;
 
   // Observação interna visível apenas no CotrimBot.
   private?: boolean;

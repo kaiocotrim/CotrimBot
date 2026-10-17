@@ -149,6 +149,7 @@ model Message {
   id                      Int              @id @default(autoincrement())
   content                 String           @db.Text
   sharedContacts          Json?
+  poll                    Json?
   direction               MessageDirection
   contactId               Int
   createdAt               DateTime         @default(now())
@@ -216,6 +217,7 @@ enum MessageType {
   AUDIO
   DOCUMENT
   CONTACT
+  POLL
 }
 
 enum ContactPriority {

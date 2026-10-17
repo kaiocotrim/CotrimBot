@@ -80,7 +80,9 @@ services:
   evolution-api:
     # A 2.4.0-rc2 remove o contextInfo de respostas de texto no webhook.
     # Fixamos a versão estável que preserva stanzaId/quotedMessage.
-    image: evoapicloud/evolution-api:v2.3.7
+    image: cotrimbot-evolution-polls:2.3.7
+    build:
+      context: ./evolution-polls
     container_name: cotrimbot-evolution
     restart: unless-stopped
 

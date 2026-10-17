@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Archive, ArchiveRestore, ArrowLeft, Building2, ChevronDown, Copy, MessageCircle, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Phone, Search, UserRound, UserRoundPlus, X } from "lucide-react";
 import { getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/min";
@@ -18,9 +18,11 @@ import { getContactPriorityDetails } from "@/lib/contact-priority";
 import { preloadInternalChat, setInternalChatIdentity } from "@/lib/internal-chat-api";
 import type { AppNotification } from "@/lib/notification-api";
 import { systemMessageLabel } from "@/lib/system-message";
-import type { Contact, Message } from "@/types/chat";
+import type { Contact, Message, SharedContact } from "@/types/chat";
 
-type ContactSidebarProps = { userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string, jobTitle?: string) => Promise<Contact[]>; onArchiveContact: (contact: Contact, archived: boolean) => Promise<void>; onPinContact: (contact: Contact, pinned: boolean) => Promise<void>; headerActions?: ReactNode; mobileOpen: boolean; revealForSwipe: boolean; onMobileOpenChange: (open: boolean) => void; notifications: AppNotification[]; notificationUnreadCount: number; notificationPermission: NotificationPermission | "unsupported"; onRequestNotificationPermission: () => void; onOpenNotification: (notification: AppNotification) => void; onMarkAllNotificationsRead: () => void; onClearNotifications: () => void };
+export type ContactSidebarHandle = { openNewContact: (contact: SharedContact) => void };
+
+type ContactSidebarProps = { newContactFormRef?: Ref<ContactSidebarHandle>; userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string, jobTitle?: string, openConversation?: boolean) => Promise<Contact[]>; onArchiveContact: (contact: Contact, archived: boolean) => Promise<void>; onPinContact: (contact: Contact, pinned: boolean) => Promise<void>; headerActions?: ReactNode; mobileOpen: boolean; revealForSwipe: boolean; onMobileOpenChange: (open: boolean) => void; notifications: AppNotification[]; notificationUnreadCount: number; notificationPermission: NotificationPermission | "unsupported"; onRequestNotificationPermission: () => void; onOpenNotification: (notification: AppNotification) => void; onMarkAllNotificationsRead: () => void; onClearNotifications: () => void };
 type ConversationFilter = "conversations" | "groups" | "mine";
 type RegisteredCompany = { id: string; name: string; image: string | null };
 const PREVIEW_HOLD_DURATION = 1_000;
@@ -58,7 +60,7 @@ function formatSidebarDate(value: string) {
   return dateFormatter.format(date);
 }
 
-export function ContactSidebar({ userId, contacts, loading, error, selectedContactId, onSelectContact, onLoadSavedContacts, onSaveContact, onArchiveContact, onPinContact, headerActions, mobileOpen, revealForSwipe, onMobileOpenChange, notifications, notificationUnreadCount, notificationPermission, onRequestNotificationPermission, onOpenNotification, onMarkAllNotificationsRead, onClearNotifications }: ContactSidebarProps) {
+export function ContactSidebar({ newContactFormRef, userId, contacts, loading, error, selectedContactId, onSelectContact, onLoadSavedContacts, onSaveContact, onArchiveContact, onPinContact, headerActions, mobileOpen, revealForSwipe, onMobileOpenChange, notifications, notificationUnreadCount, notificationPermission, onRequestNotificationPermission, onOpenNotification, onMarkAllNotificationsRead, onClearNotifications }: ContactSidebarProps) {
   const reduceMotion = useReducedMotion();
   const { data: session } = useSession();
   const activeOrganizationId = (session?.session as { activeOrganizationId?: string | null } | undefined)?.activeOrganizationId;
@@ -77,6 +79,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   const [savedLoading, setSavedLoading] = useState(false);
   const [savedError, setSavedError] = useState<string | null>(null);
   const [showNewContact, setShowNewContact] = useState(false);
+  const [sharedContactDraft, setSharedContactDraft] = useState(false);
   const [newContactFirstName, setNewContactFirstName] = useState("");
   const [newContactLastName, setNewContactLastName] = useState("");
   const [newContactCompany, setNewContactCompany] = useState("");
@@ -115,6 +118,33 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
   const conversationMenuRef = useRef<HTMLDivElement>(null);
   const restoreCollapseFocusRef = useRef(false);
   const archivedCount = contacts.filter((contact) => contact.archived).length;
+
+  const openNewContact = useCallback((contact?: SharedContact) => {
+    const { name = "", phone = "" } = contact ?? {};
+    const [firstName = "", ...lastName] = name.trim().split(/\s+/);
+    const digits = phone.replace(/\D/g, "");
+    const parsed = parsePhoneNumberFromString(`+${digits}`);
+    setNewContactFirstName(firstName);
+    setNewContactLastName(lastName.join(" "));
+    setNewContactCountry(parsed?.country ?? "BR");
+    setNewContactPhone(parsed?.country ? parsed.nationalNumber : digits ? `+${digits}` : "");
+    setNewContactCompany("");
+    setSelectedCompanyId(null);
+    setCompanyPickerOpen(false);
+    setActiveCompanyIndex(0);
+    setNewContactJobTitle("");
+    setJobPickerOpen(false);
+    setActiveJobIndex(0);
+    setSavedActionError(null);
+    if (!showNewContact) setCompaniesLoading(true);
+    setShowNotifications(false);
+    setIsCollapsed(false);
+    setSharedContactDraft(Boolean(contact));
+    setShowSavedContacts(true);
+    setShowNewContact(true);
+  }, [showNewContact]);
+
+  useImperativeHandle(newContactFormRef, () => ({ openNewContact }), [openNewContact]);
 
   useEffect(() => {
     if (activeOrganizationId) {
@@ -317,7 +347,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
     setSavedActionError(null);
     try {
       const name = `${newContactFirstName.trim()} ${newContactLastName.trim()}`.trim();
-      setSavedContacts(await onSaveContact(name, internationalPhone.slice(1), selectedCompanyId === "__none__" ? "" : newContactCompany.trim(), newContactJobTitle.trim()));
+      setSavedContacts(await onSaveContact(name, internationalPhone.slice(1), selectedCompanyId === "__none__" ? "" : newContactCompany.trim(), newContactJobTitle.trim(), !sharedContactDraft));
       setSavedError(null);
       setNewContactFirstName("");
       setNewContactLastName("");
@@ -329,6 +359,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
       setSavedQuery("");
       setShowNewContact(false);
       setShowSavedContacts(false);
+      onMobileOpenChange(false);
     } catch (actionError) {
       setSavedActionError(actionError instanceof Error ? actionError.message : "Não foi possível salvar o contato");
     } finally {
@@ -344,13 +375,14 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
       if (showNewContact) {
         setSavedActionError(null);
         setShowNewContact(false);
+        if (sharedContactDraft) { setShowSavedContacts(false); onMobileOpenChange(false); }
       } else {
         setShowSavedContacts(false);
       }
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [showNewContact, showSavedContacts]);
+  }, [showNewContact, showSavedContacts, sharedContactDraft, onMobileOpenChange]);
 
   const closePreview = useCallback(() => {
     previewRequestRef.current += 1;
@@ -672,7 +704,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
         className={`flex h-full min-h-0 ${panelWidthClass} shrink-0 flex-col border-r border-white/[0.08] bg-[#111111] text-white`}
       >
         <header className="flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center gap-3 px-4 pt-[env(safe-area-inset-top)] lg:h-16 lg:pt-0">
-          <button type="button" aria-label="Voltar aos contatos" onClick={() => { setSavedActionError(null); setShowNewContact(false); }} className="flex size-10 items-center justify-center rounded-full text-zinc-300 transition-colors lg:size-8 hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-white">
+          <button type="button" aria-label={sharedContactDraft ? "Voltar à conversa" : "Voltar aos contatos"} onClick={() => { setSavedActionError(null); setShowNewContact(false); if (sharedContactDraft) { setShowSavedContacts(false); onMobileOpenChange(false); } }} className="flex size-10 items-center justify-center rounded-full text-zinc-300 transition-colors lg:size-8 hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-white">
             <ArrowLeft aria-hidden="true" className="size-5" strokeWidth={1.8} />
           </button>
           <h2 className="min-w-0 flex-1 truncate text-[16px] font-medium">Novo contato</h2>
@@ -899,7 +931,7 @@ export function ContactSidebar({ userId, contacts, loading, error, selectedConta
         </label>
         <CompactScrollArea className="flex-1" label="Contatos salvos">
           <div className="px-2 pt-1">
-            <motion.button type="button" onClick={() => { setSavedActionError(null); setCompaniesLoading(true); setShowNewContact(true); }} whileTap={reduceMotion ? undefined : { scale: 0.98 }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-2 focus-visible:outline-white">
+            <motion.button type="button" onClick={() => openNewContact()} whileTap={reduceMotion ? undefined : { scale: 0.98 }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-2 focus-visible:outline-white">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-zinc-800 text-zinc-100">
                 <UserRoundPlus aria-hidden="true" className="size-5" strokeWidth={1.8} />
               </span>

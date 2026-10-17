@@ -11,8 +11,10 @@ import {
   getMessages,
   markMessagesAsRead,
   postMessage,
+  postPoll,
   reactToMessage as reactToMessageRequest,
   saveContact as saveContactRequest,
+  startContactConversation as startContactConversationRequest,
   sendMedia as sendMediaRequest,
   setContactAssignment as setContactAssignmentRequest,
   setContactPriority as setContactPriorityRequest,
@@ -26,6 +28,7 @@ import {
 import type {
   Contact,
   Message,
+  Poll,
 } from "@/types/chat";
 
 
@@ -653,18 +656,23 @@ export function useChat() {
     return updated.filter((contact) => contact.isSaved && !contact.isGroup);
   }
 
-  async function saveContact(name: string, phone: string, companyName: string, jobTitle?: string): Promise<Contact[]> {
+  async function saveContact(name: string, phone: string, companyName: string, jobTitle?: string, openConversation = true): Promise<Contact[]> {
     const savedContact = await saveContactRequest(name, phone, companyName, jobTitle);
     const savedContacts = await loadSavedContacts();
     const contactToOpen = savedContacts.find((contact) => contact.id === savedContact.id)
       ?? { ...savedContact, messages: [], unreadCount: 0 };
-    selectContact(contactToOpen);
+    if (openConversation) selectContact(contactToOpen);
     return savedContacts;
   }
 
-  async function saveSharedContact(name: string, phone: string): Promise<void> {
-    await saveContactRequest(name, phone);
-    await loadSavedContacts();
+  async function startContactConversation(phone: string): Promise<Contact> {
+    const digits = phone.replace(/\D/g, "");
+    const existing = contacts.find((item) => !item.isGroup && item.phone.replace(/\D/g, "") === digits);
+    if (existing) return existing;
+    const created = await startContactConversationRequest(digits);
+    const target = { ...created, messages: [], unreadCount: 0 };
+    setContacts((current) => current.some((item) => item.id === target.id) ? current : [...current, target]);
+    return target;
   }
 
   async function archiveContact(contact: Contact, archived: boolean) {
@@ -910,6 +918,19 @@ export function useChat() {
   //
   // O useChat sabe qual contato está aberto,
   // então consegue descobrir para quem enviar.
+  async function sendPoll(poll: Poll) {
+    if (!selectedContact || sending) throw new Error("Aguarde o envio atual antes de enviar a enquete.");
+    const contactId = selectedContact.id;
+    setSending(true);
+    try {
+      const { message } = await postPoll(contactId, poll);
+      if (selectedContactIdRef.current === contactId) {
+        setMessages((current) => current.some((item) => item.externalId === message.externalId) ? current : [...current, message]);
+      }
+      setContacts((current) => current.map((item) => item.id === contactId ? { ...item, messages: [message] } : item));
+    } finally { setSending(false); }
+  }
+
   async function sendMediaMessage(
     files: File[],
     caption?: string,
@@ -1084,7 +1105,7 @@ export function useChat() {
     selectContact,
     loadSavedContacts,
     saveContact,
-    saveSharedContact,
+    startContactConversation,
     archiveContact,
     pinContact,
     renameContact,
@@ -1101,6 +1122,7 @@ export function useChat() {
 
     // Envio de arquivo
     sendMediaMessage,
+    sendPoll,
     updateMessageFlags,
     deleteMessage,
 

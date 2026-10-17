@@ -2,19 +2,20 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Check, LoaderCircle, UserRound, UserRoundPlus } from "lucide-react";
+import { Check, LoaderCircle, MessageCircle, UserRound, UserRoundPlus } from "lucide-react";
 import type { Contact, SharedContact } from "@/types/chat";
 
-function SharedContactCard({ contact, alreadySaved, onSave }: {
+function SharedContactCard({ contact, alreadySaved, onSave, onMessage }: {
   contact: SharedContact;
   alreadySaved: boolean;
   onSave: (name: string, phone: string) => Promise<void>;
+  onMessage: (name: string, phone: string) => Promise<void>;
 }) {
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [opening, setOpening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
-  const isSaved = alreadySaved || saved;
+  const isSaved = alreadySaved;
 
   async function save() {
     if (saving || isSaved) return;
@@ -22,11 +23,23 @@ function SharedContactCard({ contact, alreadySaved, onSave }: {
     setError(null);
     try {
       await onSave(contact.name, contact.phone);
-      setSaved(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível salvar o contato.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function openConversation() {
+    if (opening || saving) return;
+    setOpening(true);
+    setError(null);
+    try {
+      await onMessage(contact.name, contact.phone);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível abrir a conversa.");
+    } finally {
+      setOpening(false);
     }
   }
 
@@ -39,7 +52,7 @@ function SharedContactCard({ contact, alreadySaved, onSave }: {
           <p className="mt-0.5 break-all text-xs text-zinc-400">+{contact.phone}</p>
         </div>
       </div>
-      <motion.button type="button" disabled={saving || isSaved} aria-busy={saving} aria-label={saving ? "Salvando…" : isSaved ? "Contato salvo" : "Salvar contato"} whileTap={reduceMotion || saving || isSaved ? undefined : { scale: 0.97 }} onClick={() => void save()} className="flex min-h-10 w-full items-center justify-center rounded-lg px-3 py-2 text-xs font-medium text-zinc-200 transition-colors enabled:hover:text-white focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white/50 disabled:cursor-default disabled:text-zinc-400">
+      <motion.button type="button" disabled={saving || opening || isSaved} aria-busy={saving} aria-label={saving ? "Abrindo cadastro…" : isSaved ? "Contato salvo" : "Salvar contato"} whileTap={reduceMotion || saving || isSaved ? undefined : { scale: 0.97 }} onClick={() => void save()} className="flex min-h-10 w-full items-center justify-center rounded-lg px-3 py-2 text-xs font-medium text-zinc-200 transition-colors enabled:hover:text-white focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white/50 disabled:cursor-default disabled:text-zinc-400">
         <AnimatePresence mode="wait" initial={false}>
           <motion.span
             key={saving ? "saving" : isSaved ? "saved" : "idle"}
@@ -50,9 +63,13 @@ function SharedContactCard({ contact, alreadySaved, onSave }: {
             className="inline-flex items-center gap-2"
           >
             {saving ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" /> : isSaved ? <Check aria-hidden="true" className="size-4" /> : <UserRoundPlus aria-hidden="true" className="size-4" />}
-            {saving ? "Salvando…" : isSaved ? "Contato salvo" : "Salvar contato"}
+            {saving ? "Abrindo cadastro…" : isSaved ? "Contato salvo" : "Salvar contato"}
           </motion.span>
         </AnimatePresence>
+      </motion.button>
+      <motion.button type="button" disabled={opening || saving} aria-busy={opening} whileTap={reduceMotion || opening ? undefined : { scale: 0.97 }} onClick={() => void openConversation()} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-zinc-200 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white/50 disabled:opacity-50">
+        {opening ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" /> : <MessageCircle aria-hidden="true" className="size-4" />}
+        {opening ? "Abrindo conversa…" : "Mandar mensagem"}
       </motion.button>
       {isSaved && <span role="status" className="sr-only">Contato {contact.name} salvo</span>}
       {error && <p role="alert" className="px-3 py-2 text-xs text-red-300">{error}</p>}
@@ -60,14 +77,15 @@ function SharedContactCard({ contact, alreadySaved, onSave }: {
   );
 }
 
-export function SharedContactMessage({ contacts, savedContacts, onSave }: {
+export function SharedContactMessage({ contacts, savedContacts, onSave, onMessage }: {
   contacts: SharedContact[];
   savedContacts: Contact[];
   onSave: (name: string, phone: string) => Promise<void>;
+  onMessage: (name: string, phone: string) => Promise<void>;
 }) {
   return (
     <div className="flex max-w-full flex-col gap-2">
-      {contacts.map((contact) => <SharedContactCard key={contact.phone} contact={contact} alreadySaved={savedContacts.some((saved) => saved.isSaved && saved.phone === contact.phone)} onSave={onSave} />)}
+      {contacts.map((contact) => <SharedContactCard key={contact.phone} contact={contact} alreadySaved={savedContacts.some((saved) => !saved.isGroup && saved.isSaved && saved.phone.replace(/\D/g, "") === contact.phone.replace(/\D/g, ""))} onSave={onSave} onMessage={onMessage} />)}
     </div>
   );
 }

@@ -1,15 +1,16 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
-export type AttachmentKind = "document" | "video" | "image" | "audio";
+export type AttachmentKind = "document" | "video" | "image" | "audio" | "poll";
 
 const options: { kind: AttachmentKind; label: string; color: string; path: string }[] = [
   { kind: "document", label: "Documento", color: "#60a5fa", path: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6ZM14 2v6h6M8 13h8M8 17h6" },
   { kind: "video", label: "Vídeo", color: "#c4b5fd", path: "M4 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2ZM16 10l6-4v12l-6-4" },
   { kind: "image", label: "Imagem", color: "#fbbf24", path: "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2ZM3 16l5-5 4 4 3-3 6 6M8 7h.01" },
   { kind: "audio", label: "Áudio", color: "#34d399", path: "M9 18V5l12-2v13M9 8l12-2M9 18a3 3 0 1 1-3-3c1.66 0 3 1.34 3 3ZM21 16a3 3 0 1 1-3-3c1.66 0 3 1.34 3 3Z" },
+  { kind: "poll", label: "Enquete", color: "#f472b6", path: "M4 20V10M10 20V4M16 20v-7M22 20H2" },
 ];
 
 type AttachmentMenuProps = {
@@ -20,15 +21,30 @@ type AttachmentMenuProps = {
   closing: boolean;
   onCloseWithBot: () => void;
   allowCloseWithBot: boolean;
+  allowPoll?: boolean;
   signatureEnabled: boolean;
   onToggleSignature: () => void;
   stacked: boolean;
 };
 
 // Fica fora do campo com overflow-hidden para o menu não ser cortado.
-export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, onCloseWithBot, allowCloseWithBot, signatureEnabled, onToggleSignature, stacked }: AttachmentMenuProps) {
+export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, onCloseWithBot, allowCloseWithBot, allowPoll = false, signatureEnabled, onToggleSignature, stacked }: AttachmentMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
+  const [columns, setColumns] = useState(5);
+  const visibleOptions = options.filter((option) => option.kind !== "poll" || allowPoll);
+  const position = (index: number) => ({ x: 22 + (index % columns) * 50, y: -60 - Math.floor(index / columns) * 50 });
+
+  useEffect(() => {
+    if (!open) return;
+    const form = triggerRef.current?.closest("form");
+    if (!form) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setColumns(Math.max(1, Math.floor((entry.contentRect.width - 66) / 50) + 1));
+    });
+    observer.observe(form);
+    return () => observer.disconnect();
+  }, [open, triggerRef]);
 
   useEffect(() => {
     if (!open) return;
@@ -75,9 +91,9 @@ export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, o
           }}
         >
           {/* O leque abre para cima e para a direita para caber junto à lateral do chat. */}
-          {options.map((option, index) => (
+          {visibleOptions.map((option, index) => (
             <motion.button key={option.kind} type="button" role="menuitem" title={option.label} aria-label={option.label}
-              variants={{ closed: { opacity: 0, scale: 0.4, x: 0, y: 0 }, open: { opacity: 1, scale: 1, x: [22, 72, 122, 172][index], y: -60 } }}
+              variants={{ closed: { opacity: 0, scale: 0.4, x: 0, y: 0 }, open: { opacity: 1, scale: 1, ...position(index) } }}
               transition={{ duration: reduceMotion ? 0 : 0.45, delay: reduceMotion ? 0 : index * 0.035, ease: [0.22, 1, 0.36, 1] }}
               whileHover={reduceMotion ? undefined : { scale: 1.08 }}
               whileTap={reduceMotion ? undefined : { scale: 0.94 }}
@@ -98,7 +114,7 @@ export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, o
             aria-busy={closing}
             title={closing ? "Encerrando..." : "Encerrar chamado com Bot"}
             aria-label={closing ? "Encerrando..." : "Encerrar chamado com Bot"}
-            variants={{ closed: { opacity: 0, scale: 0.4, x: 0, y: 0 }, open: { opacity: 1, scale: 1, x: 222, y: -60 } }}
+            variants={{ closed: { opacity: 0, scale: 0.4, x: 0, y: 0 }, open: { opacity: 1, scale: 1, ...position(visibleOptions.length) } }}
             transition={{ duration: reduceMotion ? 0 : 0.45, delay: reduceMotion ? 0 : 0.14, ease: [0.22, 1, 0.36, 1] }}
             whileHover={reduceMotion || closing ? undefined : { scale: 1.08 }}
             whileTap={reduceMotion || closing ? undefined : { scale: 0.94 }}
@@ -117,7 +133,7 @@ export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, o
             aria-checked={signatureEnabled}
             aria-label="Assinar mensagens"
             title={signatureEnabled ? "Assinatura ativada · clique para desativar" : "Assinatura desativada · clique para ativar"}
-            variants={{ closed: { opacity: 0, scale: 0.4, x: 0, y: 0 }, open: { opacity: 1, scale: 1, x: allowCloseWithBot ? 272 : 222, y: -60 } }}
+            variants={{ closed: { opacity: 0, scale: 0.4, x: 0, y: 0 }, open: { opacity: 1, scale: 1, ...position(visibleOptions.length + Number(allowCloseWithBot)) } }}
             transition={{ duration: reduceMotion ? 0 : 0.45, delay: reduceMotion ? 0 : allowCloseWithBot ? 0.175 : 0.14, ease: [0.22, 1, 0.36, 1] }}
             whileHover={reduceMotion ? undefined : { scale: 1.08 }}
             whileTap={reduceMotion ? undefined : { scale: 0.94 }}

@@ -62,3 +62,34 @@ test("library paginates and emits a cursor for the last included message", async
 test("link extraction accepts only web URLs, removes punctuation and duplicates", () => {
   assert.deepEqual(extractMessageLinks("https://example.com, www.example.org. https://example.com javascript:alert(1) https://"), ["https://example.com/", "https://www.example.org/"]);
 });
+
+test("contact summaries count visible content and restrict thumbnails and all tabs to the selected contact", async () => {
+  const base = { content: "Arquivo", createdAt: new Date(), deletedAt: null, private: false, viewOnce: false, deletions: [], direction: "INCOMING", senderName: null, cachedMedia: null, sentByUser: null, contact: { id: 7, name: "Pessoa", phone: "5511000000000", isSaved: true, isGroup: false } };
+  const rows: Row[] = [
+    ...Array.from({ length: 6 }, (_, index) => ({ ...base, id: index + 1, contactId: 7, type: index === 0 ? "VIDEO" : "IMAGE" })),
+    { ...base, id: 10, contactId: 7, type: "DOCUMENT", content: "manual.pdf" },
+    { ...base, id: 11, contactId: 7, type: "TEXT", content: "https://example.com" },
+    { ...base, id: 12, contactId: 8, type: "IMAGE" },
+    { ...base, id: 13, contactId: 7, type: "IMAGE", viewOnce: true },
+    { ...base, id: 14, contactId: 7, type: "DOCUMENT", private: true },
+    { ...base, id: 15, contactId: 7, type: "TEXT", content: "https://private.example.com", deletions: [{ userId: "me" }] },
+  ];
+  const handler = createMediaLibraryHandler({ message: {
+    findMany: async (query: Row) => rows.filter((row) => matches(row, query.where)).slice(0, query.take),
+    count: async (query: Row) => rows.filter((row) => matches(row, query.where)).length,
+  } } as unknown as Pick<typeof prisma, "message">);
+  async function run(query: Row) {
+    const result = response();
+    await handler({ query, user: { id: "me" } } as unknown as Request, result as unknown as Response);
+    return result;
+  }
+  const summary = await run({ contactId: "7", summary: "1" });
+  assert.equal(summary.body.count, 8);
+  assert.deepEqual(summary.body.items.map((item: Row) => item.id), [1, 2, 3, 4]);
+  assert.deepEqual((await run({ contactId: "7" })).body.items.map((item: Row) => item.id), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual((await run({ contactId: "7", tab: "documents" })).body.items.map((item: Row) => item.id), [10]);
+  assert.deepEqual((await run({ contactId: "7", tab: "links" })).body.items.map((item: Row) => item.id), [11]);
+  for (const query of [{ summary: "1" }, { contactId: "0" }, { contactId: "invalid" }, { contactId: "7", summary: "invalid" }]) {
+    assert.equal((await run(query)).code, 400);
+  }
+});

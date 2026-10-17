@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ChatPanel } from "@/components/chat/chat-panel";
-import { ContactSidebar } from "@/components/chat/contact-sidebar";
+import { ContactSidebar, type ContactSidebarHandle } from "@/components/chat/contact-sidebar";
 import { NotificationsPopover } from "@/components/chat/notifications-popover";
 import { useChat } from "@/hooks/use-chat";
 import { useMobileSwipeBack } from "@/hooks/use-mobile-swipe-back";
@@ -22,6 +22,7 @@ export default function Home() {
   // No mobile/tablet a lista de conversas é a tela inicial; ao selecionar um
   // contato, o chat passa a ocupar a tela inteira.
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const newContactFormRef = useRef<ContactSidebarHandle>(null);
   // Impede que o mobile caia na tela vazia do chat: sem contato selecionado,
   // a lista permanece aberta mesmo durante hidratação ou restauração de estado.
   const mobileConversationListOpen = sidebarOpen || !chat.selectedContact;
@@ -39,6 +40,16 @@ export default function Home() {
   function openContactById(contactId: number) {
     const contact = chat.contacts.find((item) => item.id === contactId);
     if (contact) selectContact(contact);
+  }
+
+  async function openSharedContactForm(name: string, phone: string) {
+    resetSwipeBack();
+    newContactFormRef.current?.openNewContact({ name, phone });
+    setSidebarOpen(true);
+  }
+
+  async function messageSharedContact(_name: string, phone: string) {
+    selectContact(await chat.startContactConversation(phone));
   }
 
   function openNotification(notification: import("@/lib/notification-api").AppNotification) {
@@ -82,6 +93,7 @@ export default function Home() {
   return (
     <main ref={chatRootRef} data-chat-root className="flex h-dvh overflow-hidden bg-zinc-950 text-white">
       <ContactSidebar
+        newContactFormRef={newContactFormRef}
         userId={session.user.id}
         contacts={chat.contacts}
         loading={chat.loadingContacts}
@@ -146,10 +158,12 @@ export default function Home() {
           onDeleteMessage={chat.deleteMessage}
           onForwardMessage={chat.forwardMessage}
           onSendMedia={chat.sendMediaMessage}
+          onSendPoll={chat.sendPoll}
           onCloseWithBot={chat.closeWithBot}
           onSelectContact={selectContact}
           onSaveContact={chat.saveContact}
-          onSaveSharedContact={chat.saveSharedContact}
+          onSaveSharedContact={openSharedContactForm}
+          onMessageSharedContact={messageSharedContact}
           onRenameContact={chat.renameContact}
           onSetContactAssignment={chat.setContactAssignment}
           onSetContactPriority={chat.setContactPriority}

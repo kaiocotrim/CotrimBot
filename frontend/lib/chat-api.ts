@@ -1,4 +1,4 @@
-import type { Contact, ContactAvatar, Message, MessagesPage } from "@/types/chat";
+import type { Contact, ContactAvatar, Message, MessagesPage, Poll, PollResults } from "@/types/chat";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
@@ -31,6 +31,16 @@ export async function saveContact(name: string, phone: string, companyName?: str
     credentials: "include",
   });
   return parseResponse<Contact>(response, "Não foi possível salvar o contato");
+}
+
+export async function startContactConversation(phone: string): Promise<Contact> {
+  const response = await fetch(`${API_URL}/contacts/conversation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone }),
+    credentials: "include",
+  });
+  return parseResponse<Contact>(response, "Não foi possível abrir a conversa");
 }
 
 export type ContactAssignee = { id: string; name: string; image: string | null };
@@ -188,6 +198,28 @@ export async function postMessage(contactId: number, text: string, clientId?: st
   });
 
   return parseResponse<{ message: Message }>(response, "Erro ao enviar mensagem");
+}
+
+export async function postPoll(contactId: number, poll: Poll): Promise<{ message: Message }> {
+  const response = await fetch(`${API_URL}/contacts/${contactId}/send-poll`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(poll),
+  });
+  return parseResponse<{ message: Message }>(response, "Não foi possível enviar a enquete");
+}
+
+export async function getPollResults(messageId: number, signal?: AbortSignal): Promise<PollResults> {
+  const response = await fetch(`${API_URL}/messages/${messageId}/poll`, { credentials: "include", cache: "no-store", signal });
+  return parseResponse<PollResults>(response, "Não foi possível carregar os votos.");
+}
+
+export async function voteOnPoll(messageId: number, optionIndexes: number[]): Promise<PollResults> {
+  const response = await fetch(`${API_URL}/messages/${messageId}/poll/vote`, {
+    method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ optionIndexes }),
+  });
+  return parseResponse<PollResults>(response, "Não foi possível enviar seu voto.");
 }
 
 export async function rewriteMessage(text: string): Promise<string> {

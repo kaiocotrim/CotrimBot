@@ -91,6 +91,8 @@ export function getQuotedContent(message: unknown): string | null {
     ?? (quoted.documentMessage as { fileName?: unknown } | undefined)?.fileName;
 
   if (typeof text === "string" && text.trim()) return text.trim();
+  const poll = (quoted.pollCreationMessageV3 ?? quoted.pollCreationMessageV2 ?? quoted.pollCreationMessage) as { name?: unknown } | undefined;
+  if (poll && typeof poll.name === "string") return `📊 ${poll.name}`;
   if (quoted.audioMessage) return "[Áudio]";
   if (quoted.imageMessage) return "[Imagem]";
   if (quoted.videoMessage) return "[Vídeo]";

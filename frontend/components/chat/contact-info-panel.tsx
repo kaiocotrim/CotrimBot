@@ -5,6 +5,7 @@ import { Bot, Building2, Check, ChevronDown, ExternalLink, Link2, LoaderCircle, 
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ContactPhoto } from "@/components/chat/contact-photo";
+import { ContactMediaBrowser, ContactMediaSummary } from "@/components/chat/contact-media";
 import {
   getContactAssignees,
   getGroupParticipants,
@@ -71,6 +72,7 @@ export function ContactInfoPanel({
 }) {
   const reduceMotion = useReducedMotion();
   const [editing, setEditing] = useState(false);
+  const [mediaOpen, setMediaOpen] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -102,6 +104,7 @@ export function ContactInfoPanel({
   const assigneeMenuRef = useRef<HTMLDivElement>(null);
   const assigneeTriggerRef = useRef<HTMLButtonElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
+  const mediaTriggerRef = useRef<HTMLDivElement>(null);
   const assignedUserIds = contact.assignedUserIds ?? [];
   const selectedAssignees = assignees.filter((user) => assignedUserIds.includes(user.id));
   const assigneeSummary = selectedAssignees.length === 0
@@ -323,6 +326,10 @@ export function ContactInfoPanel({
       className="absolute inset-0 z-40 flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden bg-black
         @min-[1024px]:relative @min-[1024px]:inset-auto @min-[1024px]:z-auto @min-[1024px]:h-full @min-[1024px]:w-[min(24rem,40%)]"
     >
+      {mediaOpen ? <ContactMediaBrowser contactId={contact.id} contactName={contact.name} onBack={() => {
+        setMediaOpen(false);
+        requestAnimationFrame(() => mediaTriggerRef.current?.querySelector<HTMLButtonElement>("button")?.focus());
+      }} /> : <>
       <header className="flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center gap-3 px-4 pt-[env(safe-area-inset-top)] @min-[1024px]:h-16 @min-[1024px]:pt-0">
         <button
           type="button"
@@ -613,6 +620,10 @@ export function ContactInfoPanel({
         )}
         </AnimatePresence>
 
+        <div ref={mediaTriggerRef} className="mt-7 w-full shrink-0">
+          <ContactMediaSummary contactId={contact.id} onOpen={() => setMediaOpen(true)} />
+        </div>
+
         <motion.dl layout={reduceMotion ? false : "position"} transition={{ type: "spring", stiffness: 380, damping: 34 }} className="mt-8 w-full shrink-0 space-y-5 px-1">
           <div>
             <dt className="text-sm text-zinc-400 lg:text-xs">Tipo</dt>
@@ -846,6 +857,7 @@ export function ContactInfoPanel({
           Localizar mensagem nesta conversa
         </button>
       </div>
+      </>}
     </motion.aside>
   );
 }

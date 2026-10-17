@@ -6,6 +6,8 @@ import { notifyIncomingMessage, notifyReply } from "../services/notification.ser
 import { getGroupInfo, getMediaMessage } from "../services/evolution.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
 import { extractSharedContacts } from "../utils/shared-contact.js";
+import { extractPoll, pollSummary } from "../utils/poll.js";
+import { pollResults } from "../services/poll-results.service.js";
 import {
   findReplyContextInfo,
   getQuotedContent,
@@ -215,7 +217,8 @@ export async function whatsappWebhook(req: Request, res: Response) {
   if (body.event === "messages.update" || body.event === "send.message.update") {
     const updates = Array.isArray(body.data) ? body.data : [body.data];
     for (const update of updates) {
-      const externalId = update?.key?.id ?? update?.id;
+      if (update?.pollUpdates || update?.update?.pollUpdates) await pollResults.receive(update, body.sender);
+      const externalId = update?.key?.id ?? update?.keyId ?? update?.id;
       const status = String(update?.status ?? update?.update?.status ?? "").toUpperCase();
       if (externalId && status === "DELETED") {
         await markMessageAsDeleted(externalId);
@@ -239,7 +242,16 @@ export async function whatsappWebhook(req: Request, res: Response) {
     });
   }
 
-  const data = Array.isArray(body.data) ? body.data[0] : body.data;
+  const incoming = Array.isArray(body.data) ? body.data : [body.data];
+  const regularMessages = [];
+  for (const entry of incoming) {
+    if (!entry) continue;
+    const votePayload = unwrapWhatsAppMessage(entry.message);
+    if (votePayload.pollUpdateMessage) await pollResults.receive({ ...entry, message: votePayload }, body.sender);
+    else regularMessages.push(entry);
+  }
+  const data = regularMessages[0];
+  if (!data) return res.status(200).json({ received: true });
 
   const messageTimestamp = getMessageTimestamp(data?.messageTimestamp);
   if (
@@ -398,14 +410,19 @@ export async function whatsappWebhook(req: Request, res: Response) {
   const reportedMessageType = String(data.messageType ?? data.type ?? body.messageType ?? "").toLowerCase();
 
   // Tipo da mensagem que será salvo no banco.
-  let messageType: "TEXT" | "CONTACT" | "AUDIO" | "IMAGE" | "STICKER" | "VIDEO" | "DOCUMENT";
+  let messageType: "TEXT" | "CONTACT" | "POLL" | "AUDIO" | "IMAGE" | "STICKER" | "VIDEO" | "DOCUMENT";
   const sharedContacts = extractSharedContacts(data.message ?? {});
+  const poll = extractPoll(data.message ?? {});
 
   // Conteúdo exibido no CotrimBot.
   let content: string;
 
   // Mensagem de texto normal.
-  if (data.message?.contactMessage || data.message?.contactsArrayMessage) {
+  if (poll) {
+    messageType = "POLL";
+    content = pollSummary(poll);
+  }
+  else if (data.message?.contactMessage || data.message?.contactsArrayMessage) {
     messageType = "CONTACT";
     content = sharedContacts.length ? sharedContacts.map((card) => `${card.name}: +${card.phone}`).join("\n") : "[Contato compartilhado]";
   }
@@ -584,6 +601,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
       direction: fromMe ? "OUTGOING" : "INCOMING",
       type: messageType,
       ...(messageType === "CONTACT" ? { sharedContacts } : {}),
+      ...(poll ? { poll } : {}),
       contactId: contact.id,
       senderName,
       senderPhone,

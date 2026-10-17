@@ -58,6 +58,20 @@ export async function sendWhatsAppMessage(
   return response.json();
 }
 
+export async function sendWhatsAppPoll(number: string, poll: { question: string; options: string[]; selectableCount: number }) {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE;
+  if (!apiUrl || !apiKey || !instance) throw new Error("Configuração da Evolution API incompleta");
+  const response = await fetch(`${apiUrl}/message/sendPoll/${instance}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: apiKey },
+    body: JSON.stringify({ number, name: poll.question, values: poll.options, selectableCount: poll.selectableCount }),
+  });
+  if (!response.ok) throw new Error(`Erro ao enviar enquete pela Evolution: ${response.status}`);
+  return response.json();
+}
+
 export async function sendWhatsAppReaction(input: {
   remoteJid: string;
   fromMe: boolean;

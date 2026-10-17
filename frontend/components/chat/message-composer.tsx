@@ -5,12 +5,13 @@ import Image from "next/image";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AttachmentMenu, type AttachmentKind } from "@/components/chat/attachment-menu";
+import { PollComposer } from "@/components/chat/poll-composer";
 import { EmojiSelector } from "@/components/chat/emoji-selector";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { MessageText } from "@/components/chat/message-text";
 import { insertEmojiAtSelection } from "@/lib/emoji-text";
 import { getContactAssignees, rewriteMessage, type ContactAssignee } from "@/lib/chat-api";
-import type { Message } from "@/types/chat";
+import type { Message, Poll } from "@/types/chat";
 
 
 type MessageComposerProps = {
@@ -26,6 +27,7 @@ type MessageComposerProps = {
   onTextChange: (text: string) => void;
   onSend: (options: { private: boolean; includeSignature: boolean; mentionedUserIds?: string[] }) => void;
   onCloseWithBot: () => void;
+  onSendPoll?: (poll: Poll) => Promise<void>;
   allowCloseWithBot?: boolean;
   focusRequestKey: number;
   replyingTo: Pick<Message, "id" | "type" | "content" | "direction" | "senderName" | "private"> | null;
@@ -70,6 +72,7 @@ function replyPreview(message: Pick<Message, "type" | "content" | "direction" | 
     VIDEO: "Vídeo",
     DOCUMENT: "Documento",
     STICKER: "Figurinha",
+    POLL: "Enquete",
   };
   const label = labels[message.type];
   if (label && message.content.startsWith("[")) return label;
@@ -115,6 +118,7 @@ export function MessageComposer({
   onCloseWithBot,
   allowCloseWithBot = true,
   onSendMedia,
+  onSendPoll,
   focusRequestKey,
   replyingTo,
   onCancelReply,
@@ -122,6 +126,7 @@ export function MessageComposer({
   const [isFocused, setIsFocused] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
+  const [pollOpen, setPollOpen] = useState(false);
   const [emojisOpen, setEmojisOpen] = useState(false);
   const [rewriting, setRewriting] = useState(false);
   const [rewriteError, setRewriteError] = useState<string | null>(null);
@@ -637,9 +642,15 @@ export function MessageComposer({
   }, [text]);
 
   function selectAttachment(kind: AttachmentKind) {
+    if (sending) return;
+    if (kind === "poll") {
+      closeAttachments();
+      setPollOpen(true);
+      return;
+    }
     const input = fileInputRef.current;
     if (!input || sending) return;
-    const accept: Record<AttachmentKind, string> = {
+    const accept: Record<Exclude<AttachmentKind, "poll">, string> = {
       document: ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip",
       video: "video/*",
       image: "image/*",
@@ -1275,7 +1286,8 @@ export function MessageComposer({
               <svg className="size-5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" opacity=".25" /><path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
             ) : <ComposerIcon name="send" />}
           </motion.button>
-          <AttachmentMenu open={attachmentsOpen && !sending} triggerRef={attachmentTriggerRef} onClose={closeAttachments} onSelect={selectAttachment} closing={closing} onCloseWithBot={onCloseWithBot} allowCloseWithBot={allowCloseWithBot} signatureEnabled={includeSignature} onToggleSignature={toggleSignature} stacked={isStacked} />
+          <AttachmentMenu open={attachmentsOpen && !sending} triggerRef={attachmentTriggerRef} onClose={closeAttachments} onSelect={selectAttachment} closing={closing} onCloseWithBot={onCloseWithBot} allowCloseWithBot={allowCloseWithBot} allowPoll={Boolean(onSendPoll) && !isPrivateMode} signatureEnabled={includeSignature} onToggleSignature={toggleSignature} stacked={isStacked} />
+          {pollOpen && onSendPoll && <PollComposer onSend={onSendPoll} onClose={() => { setPollOpen(false); requestAnimationFrame(() => attachmentTriggerRef.current?.focus()); }} />}
           <EmojiSelector id={emojiSelectorId} open={emojisOpen && !sending} isPrivateMode={isPrivateMode} triggerRef={emojiTriggerRef} onClose={closeEmojis} onSelect={selectEmoji} fieldHeight={fieldHeight} rightInset={isStacked ? 0 : 56} />
           {/* Seleciona o arquivo localmente; a integração de envio de mídia é uma etapa separada. */}
           <input

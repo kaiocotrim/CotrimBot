@@ -11,7 +11,7 @@ import { ContactInfoPanel } from "@/components/chat/contact-info-panel";
 import { MessageComposer } from "@/components/chat/message-composer";
 import { MessageList } from "@/components/chat/message-list";
 import { getFavoriteMessages, type GroupParticipant } from "@/lib/chat-api";
-import type { Contact, Message } from "@/types/chat";
+import type { Contact, Message, Poll } from "@/types/chat";
 
 type ChatPanelProps = {
   userId: string;
@@ -45,9 +45,11 @@ type ChatPanelProps = {
   ) => Promise<void>;
 
   onCloseWithBot: () => void;
+  onSendPoll: (poll: Poll) => Promise<void>;
   onSelectContact: (contact: Contact) => void;
   onSaveContact: (name: string, phone: string, companyName: string, jobTitle?: string) => Promise<Contact[]>;
   onSaveSharedContact: (name: string, phone: string) => Promise<void>;
+  onMessageSharedContact: (name: string, phone: string) => Promise<void>;
   onRenameContact: (contactId: number, name: string, companyName?: string, jobTitle?: string, phone?: string) => Promise<void>;
   onSetContactAssignment: (contactId: number, assignedUserIds: string[]) => Promise<void>;
   onSetContactPriority: (contactId: number, priority: NonNullable<Contact["priority"]>) => Promise<void>;
@@ -78,10 +80,12 @@ export function ChatPanel({
   onDeleteMessage,
   onForwardMessage,
   onSendMedia,
+  onSendPoll,
   onCloseWithBot,
   onSelectContact,
   onSaveContact,
   onSaveSharedContact,
+  onMessageSharedContact,
   onRenameContact,
   onSetContactAssignment,
   onSetContactPriority,
@@ -402,6 +406,7 @@ export function ChatPanel({
             onEnsureMessageLoaded={onEnsureMessageLoaded}
             onToggleMessageSelection={toggleMessageSelection}
             onSaveSharedContact={onSaveSharedContact}
+            onMessageSharedContact={onMessageSharedContact}
           />
 
           <MessageComposer
@@ -411,6 +416,7 @@ export function ChatPanel({
             text={text}
             sending={sending}
             closing={closing}
+            onSendPoll={onSendPoll}
             onTextChange={onTextChange}
             onSend={(options) => {
               onSend({ ...options, replyToMessageId: activeReply?.id });

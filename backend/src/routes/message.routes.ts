@@ -4,6 +4,7 @@ import { Router } from "express";
 // Multer processa multipart/form-data e disponibiliza o arquivo em req.file.
 import { upload } from "../middlewares/upload.js";
 import { getMediaLibrary } from "../controllers/media-library.controller.js";
+import { getPollResults, sendPoll, voteOnPoll } from "../controllers/poll.controller.js";
 
 // Cada controller recebe req e res, executa a operação e responde ao frontend.
 // A extensão .js nos imports é necessária para os módulos ESM/NodeNext do projeto.
@@ -43,6 +44,9 @@ messageRouter.get("/contacts/:id/messages/favorites", getFavoriteMessages);
  * Envia o texto pela Evolution API, salva como OUTGOING e notifica o frontend.
  */
 messageRouter.post("/contacts/:id/send", sendMessageToContact);
+messageRouter.post("/contacts/:id/send-poll", sendPoll);
+messageRouter.get("/messages/:id/poll", getPollResults);
+messageRouter.put("/messages/:id/poll/vote", voteOnPoll);
 
 /**
  * POST /contacts/:id/close-with-bot

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { startContactConversation } from "../controllers/contact-conversation.controller.js";
 import {
   createContact,
   deleteContact,
@@ -36,6 +37,7 @@ contactRouter.get("/contacts/:id", getContactById);
 
 // POST /contacts - Cria um novo contato
 contactRouter.post("/contacts", createContact);
+contactRouter.post("/contacts/conversation", startContactConversation);
 
 // PATCH /contacts/:id - Atualiza um contato especifico pelo ID
 contactRouter.patch("/contacts/:id", updateContact);

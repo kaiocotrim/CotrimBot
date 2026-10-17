@@ -63,4 +63,44 @@
 .previous { left: 8px; } .next { right: 8px; }
 @media (max-width: 900px) { .header { grid-template-columns: 1fr auto; gap: 0 12px; padding-top: 10px; } .tabs { grid-column: 1 / -1; grid-row: 2; justify-content: center; height: 46px; } .tools { grid-column: 2; grid-row: 1; } .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .dialog { width: calc(100vw - 20px); height: calc(100dvh - 32px); border-radius: 16px; } .header { padding-right: 10px; padding-left: 14px; } .tab { min-width: 80px; padding: 0 10px; } .tools { gap: 0; } .iconButton { width: 32px; height: 32px; } .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .subtitle { font-size: 10px; } .tileInfo { padding-right: 6px; padding-left: 6px; } .tileInfo strong { font-size: 10px; } .viewer { inset: 8px; } .viewerImage { padding-right: 34px; padding-left: 34px; } }
+.contactSummary { width: 100%; border-top: 1px solid rgb(255 255 255 / 8%); border-bottom: 1px solid rgb(255 255 255 / 8%); }
+.summaryButton { display: block; width: 100%; padding: 16px 0; border-radius: 10px; text-align: left; }
+.summaryButton:hover .summaryHeading { color: #fff; }
+.summaryButton:focus-visible, .summaryError button:focus-visible { outline: 2px solid #aaa; outline-offset: 4px; }
+.summaryHeading { display: flex; align-items: center; gap: 10px; color: #d4d4d8; font-size: 13px; transition: color 150ms ease; }
+.summaryHeading > span:first-of-type { flex: 1; }
+.summaryHeading > svg { flex-shrink: 0; color: #71717a; }
+.summaryCount { color: #71717a; font-size: 12px; font-variant-numeric: tabular-nums; }
+.summaryGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 14px; }
+.summaryTile { position: relative; display: block; min-width: 0; aspect-ratio: 1; overflow: hidden; border-radius: 9px; background: #18181b; }
+.summaryTile img, .summaryTile video { width: 100%; height: 100%; object-fit: cover; }
+.summaryTile .tileInfo { padding: 20px 5px 5px; }
+.summaryTile .videoLabel { gap: 3px; font-size: 9px; }
+.summaryEmpty { display: block; margin-top: 12px; color: #71717a; font-size: 12px; line-height: 1.5; }
+.summaryError { padding-bottom: 14px; color: #a1a1aa; font-size: 12px; }
+.summaryError p { margin: 0 0 6px; }
+.summaryError button { border-radius: 6px; color: #e4e4e7; }
+.contactBrowser { display: flex; width: 100%; min-height: 0; flex: 1; flex-direction: column; overflow: hidden; background: #000; color: #eee; padding-top: env(safe-area-inset-top); }
+.contactBrowser .header { grid-template-columns: minmax(0, 1fr) auto; gap: 0 4px; padding: 12px 10px 0; background: #000; border-color: rgb(255 255 255 / 8%); }
+.panelHeading { display: flex; min-width: 0; align-items: center; gap: 6px; }
+.panelHeading .heading { overflow: hidden; }
+.panelHeading .title { font-size: 13px; }
+.panelHeading .subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.contactBrowser .tabs { grid-column: 1 / -1; grid-row: 2; justify-content: stretch; height: 50px; }
+.contactBrowser .tab { min-width: 0; flex: 1; padding: 0 8px; }
+.contactBrowser .tools { grid-column: 2; grid-row: 1; gap: 0; }
+.contactBrowser .iconButton { width: 30px; height: 34px; }
+.contactBrowser .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; padding: 0 12px; }
+.contactBrowser .tile, .contactBrowser .skeletonTile { border-radius: 8px; }
+.contactBrowser .groupTitle { padding: 20px 14px 10px; font-size: 11px; }
+.contactBrowser .row { gap: 8px; }
+.contactBrowser .fileIcon { width: 35px; height: 42px; }
+.contactBrowser .rowMain { gap: 9px; }
+.contactBrowser .rowText strong, .contactBrowser .rowText a { font-size: 12px; }
+.contactBrowser .selection { gap: 4px; padding: 0 12px; font-size: 11px; }
+.contactBrowser .selection button { padding: 6px; }
+.contactBrowser button:focus-visible, .contactBrowser a:focus-visible { outline: 2px solid #aaa; outline-offset: -3px; }
+.contactFooter { flex-shrink: 0; padding: 10px 12px max(10px, env(safe-area-inset-bottom)); border-top: 1px solid rgb(255 255 255 / 8%); }
+.contactFooter button { display: flex; width: 100%; min-height: 42px; align-items: center; justify-content: center; gap: 9px; border-radius: 10px; color: #d4d4d8; font-size: 11px; font-weight: 500; transition: background-color 150ms ease; }
+.contactFooter button:hover { background: rgb(255 255 255 / 6%); color: #fff; }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } .dialog, .backdrop, .tile img, .tile video { transition: none; } }
