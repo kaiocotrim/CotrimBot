@@ -22,7 +22,7 @@ import type { Contact, Message, SharedContact } from "@/types/chat";
 
 export type ContactSidebarHandle = { openNewContact: (contact: SharedContact) => void };
 
-type ContactSidebarProps = { newContactFormRef?: Ref<ContactSidebarHandle>; userId: string; contacts: Contact[]; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string, jobTitle?: string, openConversation?: boolean) => Promise<Contact[]>; onArchiveContact: (contact: Contact, archived: boolean) => Promise<void>; onPinContact: (contact: Contact, pinned: boolean) => Promise<void>; headerActions?: ReactNode; mobileOpen: boolean; revealForSwipe: boolean; onMobileOpenChange: (open: boolean) => void; notifications: AppNotification[]; notificationUnreadCount: number; notificationPermission: NotificationPermission | "unsupported"; onRequestNotificationPermission: () => void; onOpenNotification: (notification: AppNotification) => void; onMarkAllNotificationsRead: () => void; onClearNotifications: () => void };
+type ContactSidebarProps = { newContactFormRef?: Ref<ContactSidebarHandle>; userId: string; contacts: Contact[]; drafts?: Readonly<Record<number, string>>; loading: boolean; error: string | null; selectedContactId?: number; onSelectContact: (contact: Contact) => void; onLoadSavedContacts: () => Promise<Contact[]>; onSaveContact: (name: string, phone: string, companyName: string, jobTitle?: string, openConversation?: boolean) => Promise<Contact[]>; onArchiveContact: (contact: Contact, archived: boolean) => Promise<void>; onPinContact: (contact: Contact, pinned: boolean) => Promise<void>; headerActions?: ReactNode; mobileOpen: boolean; revealForSwipe: boolean; onMobileOpenChange: (open: boolean) => void; notifications: AppNotification[]; notificationUnreadCount: number; notificationPermission: NotificationPermission | "unsupported"; onRequestNotificationPermission: () => void; onOpenNotification: (notification: AppNotification) => void; onMarkAllNotificationsRead: () => void; onClearNotifications: () => void };
 type ConversationFilter = "conversations" | "groups" | "mine";
 type RegisteredCompany = { id: string; name: string; image: string | null };
 const PREVIEW_HOLD_DURATION = 1_000;
@@ -60,7 +60,7 @@ function formatSidebarDate(value: string) {
   return dateFormatter.format(date);
 }
 
-export function ContactSidebar({ newContactFormRef, userId, contacts, loading, error, selectedContactId, onSelectContact, onLoadSavedContacts, onSaveContact, onArchiveContact, onPinContact, headerActions, mobileOpen, revealForSwipe, onMobileOpenChange, notifications, notificationUnreadCount, notificationPermission, onRequestNotificationPermission, onOpenNotification, onMarkAllNotificationsRead, onClearNotifications }: ContactSidebarProps) {
+export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {}, loading, error, selectedContactId, onSelectContact, onLoadSavedContacts, onSaveContact, onArchiveContact, onPinContact, headerActions, mobileOpen, revealForSwipe, onMobileOpenChange, notifications, notificationUnreadCount, notificationPermission, onRequestNotificationPermission, onOpenNotification, onMarkAllNotificationsRead, onClearNotifications }: ContactSidebarProps) {
   const reduceMotion = useReducedMotion();
   const { data: session } = useSession();
   const activeOrganizationId = (session?.session as { activeOrganizationId?: string | null } | undefined)?.activeOrganizationId;
@@ -228,7 +228,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, loading, e
   const visibleContacts = useMemo(() => {
     const search = query.trim().toLocaleLowerCase("pt-BR");
     return contacts.filter((contact) => {
-      if (!contact.isGroup && !contact.messages?.length && contact.id !== selectedContactId) return false;
+      if (!contact.isGroup && !contact.messages?.length && !drafts[contact.id]?.trim() && contact.id !== selectedContactId) return false;
       if (contact.archived !== showArchived) return false;
       if (contact.isGroup !== (conversationFilter === "groups")) return false;
       if (conversationFilter === "mine" && !contact.assignedUserIds?.includes(userId)) return false;
@@ -237,7 +237,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, loading, e
         || contact.phone.includes(search)
         || Boolean(contact.messages?.[0]?.content.toLocaleLowerCase("pt-BR").includes(search));
     }).sort((first, second) => Number(Boolean(second.pinned)) - Number(Boolean(first.pinned)));
-  }, [contacts, conversationFilter, query, selectedContactId, showArchived, userId]);
+  }, [contacts, conversationFilter, drafts, query, selectedContactId, showArchived, userId]);
 
   const matchingCompanies = useMemo(() => {
     const search = newContactCompany.trim().toLocaleLowerCase("pt-BR");
@@ -1102,6 +1102,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, loading, e
             <AnimatePresence initial={false} mode="popLayout">
             {visibleContacts.map((contact, index) => {
               const lastMessage = contact.messages?.[0];
+              const draft = drafts[contact.id]?.trim();
               const selected = selectedContactId === contact.id;
               const unread = contact.unreadCount > 0;
               const priority = getContactPriorityDetails(contact.priority);
@@ -1197,8 +1198,8 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, loading, e
                       </div>
                       <div className="mt-0.5 flex items-center gap-2 pr-7">
                         <p className="min-w-0 flex-1 truncate text-sm leading-tight font-normal text-zinc-400 lg:text-[12px] lg:text-zinc-500">
-                          {lastMessage && !lastMessage.deletedAt && lastMessage.direction === "OUTGOING" && "✓✓ "}
-                          <MessageText content={lastMessage ? lastMessage.deletedAt ? "Mensagem apagada" : lastMessage.type === "SYSTEM" ? systemMessageLabel(lastMessage.content, userId) : lastMessage.content : "Nenhuma mensagem"} showSignature={Boolean(lastMessage && !lastMessage.deletedAt && !lastMessage.private && lastMessage.direction === "OUTGOING")} linkify={false} />
+                          {!draft && lastMessage && !lastMessage.deletedAt && lastMessage.direction === "OUTGOING" && "✓✓ "}
+                          {draft ? <><span className="font-medium text-emerald-400">Rascunho:</span> {draft.replace(/\s+/g, " ")}</> : <MessageText content={lastMessage ? lastMessage.deletedAt ? "Mensagem apagada" : lastMessage.type === "SYSTEM" ? systemMessageLabel(lastMessage.content, userId) : lastMessage.content : "Nenhuma mensagem"} showSignature={Boolean(lastMessage && !lastMessage.deletedAt && !lastMessage.private && lastMessage.direction === "OUTGOING")} linkify={false} />}
                         </p>
                         {unread && (
                           <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-zinc-300 px-1.5 text-[10px] font-semibold text-zinc-950">

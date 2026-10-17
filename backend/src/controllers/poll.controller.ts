@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
-import { sendWhatsAppPoll } from "../services/evolution.service.js";
+import { getProfilePicture, sendWhatsAppPoll } from "../services/evolution.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
 import { normalizePoll, pollSummary } from "../utils/poll.js";
 import { pollResults, storedPoll } from "../services/poll-results.service.js";
@@ -48,6 +48,7 @@ export function createPollInteractionHandlers(
   results = pollResults,
   getIdentity = getWhatsAppPollIdentity,
   getVotes = getWhatsAppPollVotes,
+  getPicture = getProfilePicture,
 ) {
   const synchronization = new Map<number, { at: number; promise: Promise<void> }>();
   async function synchronizePoll(message: { id: number; externalId: string; contact: { phone: string } }, ownJid?: string) {
@@ -83,12 +84,40 @@ export function createPollInteractionHandlers(
     const votes = poll.votes ?? [];
     const contacts = votes.length ? await database.contact.findMany({
       where: { OR: [{ phone: { in: votes.map((vote) => whatsAppJidIdentifier(vote.voterId)) } }, { whatsappLid: { in: votes.map((vote) => vote.voterId) } }] },
-      select: { phone: true, whatsappLid: true, name: true, isSaved: true, isGroup: true },
+      select: { phone: true, whatsappLid: true, name: true, isSaved: true, isGroup: true, profilePictureUrl: true },
     }) : [];
     return res.json({ poll: { ...poll, votes: votes.map((vote) => {
       const contact = contacts.find((item) => item.phone === whatsAppJidIdentifier(vote.voterId) || item.whatsappLid === vote.voterId);
-      return { ...vote, voterName: contact?.isSaved ? contact.name : vote.voterName ?? (contact ? contactDisplayName(contact) : null) };
+      return { ...vote, voterName: contact?.isSaved ? contact.name : vote.voterName ?? (contact ? contactDisplayName(contact) : null), voterProfilePictureUrl: contact?.profilePictureUrl ?? null };
     }) }, ownVoterIds, syncError });
+  }
+
+  async function getPollVoterAvatar(req: Request, res: Response) {
+    const id = Number(req.params.id);
+    const voterId = req.query.voterId;
+    if (!Number.isSafeInteger(id) || id <= 0 || typeof voterId !== "string") return res.status(400).json({ message: "Participante inválido" });
+    const message = await visiblePoll(id, req.user!.id);
+    const vote = storedPoll(message?.poll)?.votes?.find((item) => item.voterId === voterId && item.optionIndexes.length > 0);
+    if (!message || !vote) return res.status(404).json({ message: "Participante não encontrado" });
+    const jids = [vote.voterId, ...(vote.voterAliases ?? [])];
+    const identifiers = jids.map(whatsAppJidIdentifier);
+    const contact = await database.contact.findFirst({
+      where: { isGroup: false, OR: [{ phone: { in: identifiers } }, { whatsappLid: { in: jids } }] },
+      select: { id: true, phone: true, profilePictureUrl: true },
+    });
+    if (contact?.profilePictureUrl) return res.json({ profilePictureUrl: contact.profilePictureUrl });
+    const cached = await database.message.findFirst({
+      where: { senderPhone: { in: [...identifiers, ...jids] }, senderProfilePictureUrl: { not: null } },
+      select: { senderProfilePictureUrl: true },
+    });
+    if (cached?.senderProfilePictureUrl) return res.json({ profilePictureUrl: cached.senderProfilePictureUrl });
+    try {
+      const profile = await getPicture(contact?.phone ?? jids.find((jid) => jid.endsWith("@s.whatsapp.net")) ?? voterId);
+      if (contact && profile.profilePictureUrl) await database.contact.update({ where: { id: contact.id }, data: { profilePictureUrl: profile.profilePictureUrl } });
+      return res.json({ profilePictureUrl: profile.profilePictureUrl ?? null });
+    } catch {
+      return res.json({ profilePictureUrl: null });
+    }
   }
 
   async function voteOnPoll(req: Request, res: Response) {
@@ -115,7 +144,7 @@ export function createPollInteractionHandlers(
     }
   }
 
-  return { getPollResults, voteOnPoll };
+  return { getPollResults, getPollVoterAvatar, voteOnPoll };
 }
 
-export const { getPollResults, voteOnPoll } = createPollInteractionHandlers();
+export const { getPollResults, getPollVoterAvatar, voteOnPoll } = createPollInteractionHandlers();

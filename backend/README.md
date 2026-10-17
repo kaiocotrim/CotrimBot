@@ -1,5 +1,9 @@
 # Backend do CotrimBot
 
+Para investigar digitação e gravação de áudio no WhatsApp, consulte o
+[diagnóstico de presença da Evolution 2.3.7](../docs/whatsapp-presence.md),
+incluindo os logs temporários e a publicação no Dokploy.
+
 Edite os arquivos TypeScript em `src/`. A pasta `dist/` é gerada pelo compilador:
 alterações feitas nela podem ser sobrescritas na próxima compilação.
 

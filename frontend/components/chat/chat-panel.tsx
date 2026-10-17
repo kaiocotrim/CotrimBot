@@ -11,7 +11,7 @@ import { ContactInfoPanel } from "@/components/chat/contact-info-panel";
 import { MessageComposer } from "@/components/chat/message-composer";
 import { MessageList } from "@/components/chat/message-list";
 import { getFavoriteMessages, type GroupParticipant } from "@/lib/chat-api";
-import type { Contact, Message, Poll } from "@/types/chat";
+import type { Contact, ContactPresence, Message, Poll } from "@/types/chat";
 
 type ChatPanelProps = {
   userId: string;
@@ -26,6 +26,7 @@ type ChatPanelProps = {
   loadingOlderMessages: boolean;
   newMessageId: number | null;
   isTyping: boolean;
+  contactPresence?: ContactPresence | null;
 
   onTextChange: (text: string) => void;
   onSend: (options: { private: boolean; includeSignature: boolean; replyToMessageId?: number; mentionedUserIds?: string[] }) => void;
@@ -71,6 +72,7 @@ export function ChatPanel({
   loadingOlderMessages,
   newMessageId,
   isTyping,
+  contactPresence,
   onTextChange,
   onSend,
   onLoadOlderMessages,
@@ -327,6 +329,7 @@ export function ChatPanel({
               currentUserId={userId}
               onSetContactAssignment={onSetContactAssignment}
               isTyping={isTyping}
+              contactPresence={contactPresence}
               searchOpen={searchOpen}
               searchQuery={searchQuery}
               currentResult={normalizedSearchIndex}
@@ -428,7 +431,7 @@ export function ChatPanel({
             }}
             onCloseWithBot={onCloseWithBot}
             allowCloseWithBot={!contact.isGroup}
-            focusRequestKey={composerFocusKey}
+            focusRequestKey={`${contact.id}:${composerFocusKey}`}
             replyingTo={activeReply}
             onCancelReply={() => setReplyingTo(null)}
           />

@@ -45,6 +45,41 @@ function UserAvatar({ name, image }: { name: string; image?: string | null }) {
   );
 }
 
+function AssigneeOption({ name, image, avatarName = name, checked, onClick }: {
+  name: string;
+  image?: string | null;
+  avatarName?: string;
+  checked: boolean;
+  onClick: () => void;
+}) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <motion.button
+      type="button"
+      role="menuitemcheckbox"
+      aria-checked={checked}
+      onClick={onClick}
+      whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+      className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-zinc-200 transition-colors motion-reduce:transition-none hover:bg-white/[0.07] focus-visible:bg-white/[0.08] focus-visible:outline-none ${checked ? "bg-white/[0.06]" : ""}`}
+    >
+      <UserAvatar name={avatarName} image={image} />
+      <span className="min-w-0 flex-1 truncate">{name}</span>
+      <span aria-hidden="true" className="flex size-5 shrink-0 items-center justify-center">
+        <AnimatePresence initial={false}>
+          {checked && <motion.span
+            key="checked"
+            initial={{ opacity: 0, scale: reduceMotion ? 1 : 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: reduceMotion ? 1 : 0.5 }}
+            transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 450, damping: 25 }}
+            className="flex"
+          ><Check className="size-4 text-zinc-200" /></motion.span>}
+        </AnimatePresence>
+      </span>
+    </motion.button>
+  );
+}
+
 function formatParticipantPhone(phone: string) {
   return phone ? `+${phone}` : "Número indisponível";
 }
@@ -763,20 +798,33 @@ export function ContactInfoPanel({
                 aria-expanded={assigneeOpen}
                 disabled={assigneesLoading || assignmentSaving || Boolean(assignmentError && assignees.length === 0)}
                 onClick={() => setAssigneeOpen((open) => !open)}
-                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-left text-base text-zinc-100 transition-colors hover:bg-white/[0.075] focus-visible:outline-2 focus-visible:outline-white/40 disabled:opacity-60 lg:text-sm"
+                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl bg-white/[0.045] px-3 text-left text-base text-zinc-100 transition-colors hover:bg-white/[0.075] focus-visible:outline-2 focus-visible:outline-white/40 disabled:opacity-60 lg:text-sm"
               >
-                {selectedAssignees.length ? (
-                  <span aria-hidden="true" className="flex shrink-0 -space-x-2">
-                    {selectedAssignees.slice(0, 3).map((user) => <UserAvatar key={user.id} name={user.name} image={user.image} />)}
-                  </span>
-                ) : <UserAvatar name="" />}
+                <motion.span layout={reduceMotion ? false : true} aria-hidden="true" className="relative flex shrink-0 -space-x-2">
+                  <AnimatePresence initial={false} mode="popLayout">
+                    {(selectedAssignees.length ? selectedAssignees.slice(0, 3) : [{ id: "unassigned", name: "", image: null }]).map((user) => (
+                      <motion.span
+                        key={user.id}
+                        layout={reduceMotion ? false : "position"}
+                        initial={{ opacity: 0, scale: reduceMotion ? 1 : 0.7 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: reduceMotion ? 1 : 0.7 }}
+                        transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 30 }}
+                        className="relative flex shrink-0"
+                      ><UserAvatar name={user.name} image={user.image} /></motion.span>
+                    ))}
+                  </AnimatePresence>
+                </motion.span>
                 <span className="min-w-0 flex-1 truncate">{assigneesLoading ? "Carregando usuários..." : assigneeSummary}</span>
                 <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-zinc-500 transition-transform ${assigneeOpen ? "rotate-180" : ""}`} />
               </button>
-              {assigneeOpen && <div
+              {assigneeOpen && <motion.div
                 ref={assigneeMenuRef}
                 role="menu"
                 aria-label="Escolher responsáveis"
+                initial={reduceMotion ? false : { opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.16 }}
                 onKeyDown={(event) => {
                   if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
                   event.preventDefault();
@@ -787,17 +835,9 @@ export function ContactInfoPanel({
                 }}
                 className="mt-2 max-h-60 space-y-0.5 overflow-y-auto rounded-2xl border border-white/10 bg-zinc-900 p-1.5 shadow-[0_14px_36px_rgba(0,0,0,0.35)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
-                <button type="button" role="menuitemcheckbox" aria-checked={assignedUserIds.length === 0} onClick={() => void changeAssignees([])} className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.08] focus-visible:outline-none">
-                  <UserAvatar name="" />
-                  <span className="min-w-0 flex-1 truncate">Não atribuído</span>
-                  {assignedUserIds.length === 0 && <Check aria-hidden="true" className="size-4 text-zinc-200" />}
-                </button>
-                {assignees.map((user) => <button key={user.id} type="button" role="menuitemcheckbox" aria-checked={assignedUserIds.includes(user.id)} onClick={() => toggleAssignee(user.id)} className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.08] focus-visible:outline-none">
-                  <UserAvatar name={user.name} image={user.image} />
-                  <span className="min-w-0 flex-1 truncate">{user.name}</span>
-                  {assignedUserIds.includes(user.id) && <Check aria-hidden="true" className="size-4 text-zinc-200" />}
-                </button>)}
-              </div>}
+                <AssigneeOption name="Não atribuído" avatarName="" checked={assignedUserIds.length === 0} onClick={() => void changeAssignees([])} />
+                {assignees.map((user) => <AssigneeOption key={user.id} name={user.name} image={user.image} checked={assignedUserIds.includes(user.id)} onClick={() => toggleAssignee(user.id)} />)}
+              </motion.div>}
               {assignmentSaving && <p role="status" className="mt-1 text-xs text-zinc-400">Salvando responsáveis...</p>}
               {assignmentError && <p role="alert" className="mt-1 text-xs text-red-300">{assignmentError}</p>}
             </dd>

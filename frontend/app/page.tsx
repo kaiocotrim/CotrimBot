@@ -96,6 +96,7 @@ export default function Home() {
         newContactFormRef={newContactFormRef}
         userId={session.user.id}
         contacts={chat.contacts}
+        drafts={chat.drafts}
         loading={chat.loadingContacts}
         error={chat.contactsError}
         selectedContactId={chat.selectedContact?.id}
@@ -149,6 +150,7 @@ export default function Home() {
           loadingOlderMessages={chat.loadingOlderMessages}
           newMessageId={chat.newMessageId}
           isTyping={chat.isTyping}
+          contactPresence={chat.contactPresence}
           onTextChange={chat.setText}
           onSend={chat.sendMessage}
           onLoadOlderMessages={chat.loadOlderMessages}

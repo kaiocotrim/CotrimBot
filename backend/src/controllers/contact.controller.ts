@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { notifyAssignment } from "../services/notification.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
+import { presenceDebug, presenceIdentifiers } from "../utils/whatsapp-presence.js";
 import {
   archiveWhatsAppChat,
   getGroupInfo,
@@ -262,16 +263,19 @@ export async function subscribeContactPresence(req: Request, res: Response) {
 
     for (const identifier of identifiers) {
       try {
+        presenceDebug("subscription_attempt", { contactId: id, identifiers: presenceIdentifiers([identifier]) });
         await subscribeWhatsAppPresence(identifier);
+        presenceDebug("subscription_ok", { contactId: id });
         return res.status(204).send();
       } catch (error) {
+        presenceDebug("subscription_failed", { contactId: id });
         lastError = error;
       }
     }
 
     throw lastError;
-  } catch (error) {
-    console.error("Erro ao assinar presença do contato:", error);
+  } catch {
+    console.warn("Não foi possível assinar a presença do contato", { contactId: id });
     return res.status(502).json({ message: "Não foi possível acompanhar a digitação deste contato" });
   }
 }

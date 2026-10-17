@@ -27,6 +27,7 @@ import {
 
 import type {
   Contact,
+  ContactPresence,
   Message,
   Poll,
 } from "@/types/chat";
@@ -59,11 +60,22 @@ export function useChat() {
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
   const loadingOlderRef = useRef(false);
   const [newMessageId, setNewMessageId] = useState<number | null>(null);
-  const [typingContactIds, setTypingContactIds] = useState<Set<number>>(() => new Set());
+  const [contactPresences, setContactPresences] = useState<Map<number, ContactPresence>>(() => new Map());
   const typingTimeoutsRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
-  const [text, setText] =
-    useState("");
+  const [drafts, setDrafts] = useState<Record<number, string>>({});
+  const text = selectedContactId === undefined ? "" : drafts[selectedContactId] ?? "";
+
+  function setText(value: string) {
+    if (selectedContactId === undefined) return;
+    setDrafts((current) => {
+      if ((current[selectedContactId] ?? "") === value) return current;
+      const next = { ...current };
+      if (value) next[selectedContactId] = value;
+      else delete next[selectedContactId];
+      return next;
+    });
+  }
 
   const [sending, setSending] =
     useState(false);
@@ -77,24 +89,24 @@ export function useChat() {
   // =========================================================
 
   useEffect(() => {
-    function setContactTyping(contactId: number, isTyping: boolean) {
+    function setContactTyping(contactId: number, presence: ContactPresence | null) {
       const existingTimeout = typingTimeoutsRef.current.get(contactId);
       if (existingTimeout) clearTimeout(existingTimeout);
       typingTimeoutsRef.current.delete(contactId);
 
-      setTypingContactIds((current) => {
-        const next = new Set(current);
-        if (isTyping) next.add(contactId);
+      setContactPresences((current) => {
+        const next = new Map(current);
+        if (presence) next.set(contactId, presence);
         else next.delete(contactId);
         return next;
       });
 
-      if (isTyping) {
+      if (presence) {
         const timeout = setTimeout(() => {
           typingTimeoutsRef.current.delete(contactId);
-          setTypingContactIds((current) => {
+          setContactPresences((current) => {
             if (!current.has(contactId)) return current;
-            const next = new Set(current);
+            const next = new Map(current);
             next.delete(contactId);
             return next;
           });
@@ -127,7 +139,7 @@ export function useChat() {
         data.message.direction ===
         "INCOMING";
 
-      setContactTyping(data.contact.id, false);
+      setContactTyping(data.contact.id, null);
 
 
       // =====================================================
@@ -338,9 +350,12 @@ export function useChat() {
       setSelectedContact((current) => current?.id === data.id ? { ...current, ...data } : current);
     }
 
-    function handleContactPresence(data: { contactId: number; isTyping: boolean }) {
-      if (!Number.isInteger(data.contactId) || typeof data.isTyping !== "boolean") return;
-      setContactTyping(data.contactId, data.isTyping);
+    function handleContactPresence(data: { contactId: number; presence?: unknown; isTyping?: unknown }) {
+      if (!data || !Number.isSafeInteger(data.contactId) || data.contactId <= 0) return;
+      const presence = typeof data.presence === "string" ? data.presence.trim().toLowerCase() : data.presence;
+      if (presence === "composing" || presence === "recording") setContactTyping(data.contactId, presence);
+      else if (presence === "paused" || presence === "available" || presence === "unavailable") setContactTyping(data.contactId, null);
+      else if (presence === undefined && typeof data.isTyping === "boolean") setContactTyping(data.contactId, data.isTyping ? "composing" : null);
     }
 
     // Começa a ouvir o evento
@@ -398,6 +413,9 @@ export function useChat() {
     }
 
     function handleDisconnect() {
+      for (const timeout of typingTimeoutsRef.current.values()) clearTimeout(timeout);
+      typingTimeoutsRef.current.clear();
+      setContactPresences(new Map());
       console.log(
         "🔴 Desconectado do WebSocket"
       );
@@ -860,7 +878,6 @@ export function useChat() {
     setHasOlderMessages(false);
     setLoadingOlderMessages(false);
     setNewMessageId(optimisticId);
-    setText("");
     setContacts((current) => {
       const updatedTarget = { ...target, messages: [optimisticMessage] };
       return [updatedTarget, ...current.filter((contact) => contact.id !== target.id)];
@@ -1093,9 +1110,11 @@ export function useChat() {
     hasOlderMessages,
     loadingOlderMessages,
     newMessageId,
-    isTyping: selectedContactId !== undefined && typingContactIds.has(selectedContactId),
+    isTyping: selectedContactId !== undefined && contactPresences.get(selectedContactId) === "composing",
+    contactPresence: selectedContactId === undefined ? null : contactPresences.get(selectedContactId) ?? null,
 
     text,
+    drafts,
 
     sending,
     closing,

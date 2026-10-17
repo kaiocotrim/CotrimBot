@@ -29,7 +29,7 @@ type MessageComposerProps = {
   onCloseWithBot: () => void;
   onSendPoll?: (poll: Poll) => Promise<void>;
   allowCloseWithBot?: boolean;
-  focusRequestKey: number;
+  focusRequestKey: number | string;
   replyingTo: Pick<Message, "id" | "type" | "content" | "direction" | "senderName" | "private"> | null;
   onCancelReply: () => void;
 
@@ -280,8 +280,7 @@ export function MessageComposer({
   }, []);
 
   useEffect(() => {
-    if (focusRequestKey === 0) return;
-    const frame = requestAnimationFrame(() => textareaRef.current?.focus());
+    const frame = requestAnimationFrame(() => textareaRef.current?.focus({ preventScroll: true }));
     return () => cancelAnimationFrame(frame);
   }, [focusRequestKey]);
 

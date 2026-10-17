@@ -3,7 +3,7 @@
 import { ArrowLeft, CheckCheck, EllipsisVertical, Forward, Info, Search, Star, Trash2, UserRoundCheck, UserRoundPlus, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import type { Contact } from "@/types/chat";
+import type { Contact, ContactPresence } from "@/types/chat";
 import { Avatar } from "@/components/chat/avatar";
 import styles from "./chat-header.module.css";
 
@@ -12,6 +12,7 @@ type ChatHeaderProps = {
   currentUserId: string;
   onSetContactAssignment: (contactId: number, assignedUserIds: string[]) => Promise<void>;
   isTyping: boolean;
+  contactPresence?: ContactPresence | null;
   searchOpen: boolean;
   searchQuery: string;
   currentResult: number;
@@ -54,7 +55,7 @@ export function SidebarMenuButton({ onClick, expanded, className = "" }: { onCli
 
 const actionClass = "flex size-10 shrink-0 items-center sm:size-9 justify-center rounded-full transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-35";
 
-export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isTyping, searchOpen, searchQuery, currentResult, resultCount, selectionMode, selectedCount, selectionBusy, onOpenSearch, onOpenFavorites, onStartSelection, onCloseSelection, onFavoriteSelected, onDeleteSelected, onOpenForward, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch, onOpenSidebar, sidebarOpen }: ChatHeaderProps) {
+export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isTyping, contactPresence, searchOpen, searchQuery, currentResult, resultCount, selectionMode, selectedCount, selectionBusy, onOpenSearch, onOpenFavorites, onStartSelection, onCloseSelection, onFavoriteSelected, onDeleteSelected, onOpenForward, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch, onOpenSidebar, sidebarOpen }: ChatHeaderProps) {
   const reduceMotion = useReducedMotion();
   const searchRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -153,8 +154,8 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
                 {contact.name}
                 {contact.jobTitle && <span className="font-normal text-zinc-400"> - {contact.jobTitle}</span>}
               </span>
-              {isTyping
-                ? <span role="status" aria-label={`${contact.name} está digitando`} className="block h-4 truncate text-[13px] text-zinc-300 lg:text-xs">digitando…</span>
+              {(isTyping || contactPresence)
+                ? <span role="status" aria-label={`${contact.name} está ${contactPresence === "recording" ? "gravando áudio" : "digitando"}`} className="block h-4 truncate text-[13px] text-zinc-300 lg:text-xs">{contactPresence === "recording" ? "gravando áudio..." : "digitando..."}</span>
                 : <span className={`${styles.subtitle} block truncate text-[13px] text-zinc-400 lg:text-xs`}>{contact.isGroup ? "Grupo do WhatsApp" : contact.phone}</span>}
             </span>
           </button>

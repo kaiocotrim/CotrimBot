@@ -14,6 +14,7 @@ import {
   isViewOnceMessage,
   unwrapWhatsAppMessage,
 } from "../utils/whatsapp-message.js";
+import { isPresenceEvent, parsePresenceUpdate, presenceDebug, presenceIdentifiers } from "../utils/whatsapp-presence.js";
 import { normalizeWhatsAppJid, whatsAppJidIdentifier } from "../utils/whatsapp-jid.js";
 
 // Impede que sincronizações da Evolution repovoem o banco com o histórico antigo.
@@ -63,42 +64,35 @@ function getWhatsAppProfileName(value: unknown): string | null {
   return candidate ? candidate.trim().replace(/\s+/g, " ").slice(0, 191) : null;
 }
 
-type PresenceStatus = "unavailable" | "available" | "composing" | "recording" | "paused";
-const presenceStatuses = new Set<PresenceStatus>(["unavailable", "available", "composing", "recording", "paused"]);
-
-function asPresenceStatus(value: unknown): PresenceStatus | null {
-  if (typeof value !== "string") return null;
-  const normalized = value.toLowerCase() as PresenceStatus;
-  return presenceStatuses.has(normalized) ? normalized : null;
+export function createPresenceUpdateHandler(
+  database: Pick<typeof prisma, "contact"> = prisma,
+  emit: (payload: { contactId: number; presence: string; isTyping: boolean }) => void = (payload) => { getSocketServer().emit("contact_presence", payload); },
+) {
+  return async function handlePresenceUpdates(data: unknown) {
+    const updates = Array.isArray(data) ? data : [data];
+    presenceDebug("received", { count: updates.length });
+    for (const update of updates) {
+      const parsed = parsePresenceUpdate(update);
+      for (const reason of parsed.ignored) presenceDebug("ignored", { reason });
+      for (const { presence, jids } of parsed.updates) {
+        const identifiers = presenceIdentifiers(jids);
+        const phones = jids.filter((jid) => jid.endsWith("@s.whatsapp.net")).map(whatsAppJidIdentifier);
+        const lids = jids.filter((jid) => jid.endsWith("@lid"));
+        const contacts = await database.contact.findMany({
+          where: { isGroup: false, OR: [{ phone: { in: phones } }, { whatsappLid: { in: lids } }] },
+          select: { id: true }, take: 2,
+        });
+        if (!contacts.length) { presenceDebug("contact_not_found", { presence, identifiers }); continue; }
+        if (contacts.length > 1) { presenceDebug("ambiguous_contact", { presence, identifiers }); continue; }
+        const contactId = contacts[0]!.id;
+        emit({ contactId, presence, isTyping: presence === "composing" });
+        presenceDebug("emitted", { contactId, presence, identifiers });
+      }
+    }
+  };
 }
 
-function getPresenceStatus(value: unknown): PresenceStatus | null {
-  if (!isRecord(value)) return null;
-
-  const directStatus = asPresenceStatus(value.presence)
-    ?? asPresenceStatus(value.lastKnownPresence)
-    ?? asPresenceStatus(value.status);
-  if (directStatus) return directStatus;
-
-  if (!isRecord(value.presences)) return null;
-  const statuses = Object.values(value.presences)
-    .map((presence) => isRecord(presence)
-      ? asPresenceStatus(presence.lastKnownPresence) ?? asPresenceStatus(presence.presence) ?? asPresenceStatus(presence.status)
-      : null)
-    .filter((status): status is PresenceStatus => status !== null);
-
-  return statuses.includes("composing") ? "composing" : statuses[0] ?? null;
-}
-
-function getPresenceJids(value: unknown) {
-  if (!isRecord(value)) return [];
-  const key = isRecord(value.key) ? value.key : null;
-  const directCandidates = [value.id, value.remoteJid, value.remoteJidAlt, value.jid, key?.remoteJid, key?.remoteJidAlt]
-    .filter((candidate): candidate is string => typeof candidate === "string" && candidate.includes("@"));
-
-  if (directCandidates.length || !isRecord(value.presences)) return [...new Set(directCandidates)];
-  return [...new Set(Object.keys(value.presences).filter((candidate) => candidate.includes("@")))];
-}
+const handlePresenceUpdates = createPresenceUpdateHandler();
 
 function getDeletedMessageExternalId(value: unknown): string | null {
   if (!isRecord(value)) return null;
@@ -155,31 +149,9 @@ async function cacheMessageMedia(messageId: number, externalId: string) {
 export async function whatsappWebhook(req: Request, res: Response) {
   const body = req.body;
 
-  if (body.event === "presence.update") {
-    const updates = Array.isArray(body.data) ? body.data : [body.data];
-    for (const update of updates) {
-      const presence = getPresenceStatus(update);
-      const jids = getPresenceJids(update);
-      if (!presence || !jids.length) continue;
-
-      const normalizedJids = jids.map(normalizeWhatsAppJid);
-      const phones = normalizedJids.map(whatsAppJidIdentifier);
-      const contact = await prisma.contact.findFirst({
-        where: {
-          OR: [
-            { phone: { in: phones } },
-            { whatsappLid: { in: normalizedJids } },
-          ],
-        },
-      });
-      if (!contact) continue;
-
-      getSocketServer().emit("contact_presence", {
-        contactId: contact.id,
-        presence,
-        isTyping: presence === "composing",
-      });
-    }
+  presenceDebug("webhook_received", { event: isPresenceEvent(body?.event) ? "presence.update" : "other" });
+  if (isPresenceEvent(body?.event)) {
+    await handlePresenceUpdates(body.data);
     return res.status(200).json({ received: true });
   }
 

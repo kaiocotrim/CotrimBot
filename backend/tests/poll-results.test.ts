@@ -106,3 +106,48 @@ test("the Evolution extension validates chat ownership and relays real pollUpdat
   await assert.rejects(sendNativePollVote(channel, { number: "5511999999999", messageId: "poll-id", optionIndexes: [5] }, sdk));
   assert.equal(relayed.length, 1);
 });
+
+test("poll voter photos resolve saved contacts, WhatsApp aliases and unknown participants within visible polls", async () => {
+  let record: any = { id: 7, poll: { ...poll, votes: [{ ...vote("123@lid", [0]), voterAliases: ["5511999999999@s.whatsapp.net"] }] } };
+  let contact: any = { id: 4, phone: "5511999999999", profilePictureUrl: "https://photo.test/saved.jpg" };
+  let cached: any = null;
+  let unavailable = false;
+  const queries: any[] = [], pictures: string[] = [], saves: any[] = [];
+  const database = {
+    message: { findFirst: async (query: any) => { queries.push(query); return query.where.senderPhone ? cached : record; } },
+    contact: { findFirst: async (query: any) => { queries.push(query); return contact; }, update: async (query: any) => { saves.push(query); } },
+  } as unknown as Pick<typeof prisma, "message" | "contact">;
+  const handler = createPollInteractionHandlers(database, undefined, undefined, undefined, undefined, async (number) => {
+    pictures.push(number);
+    if (unavailable) throw new Error("Foto indisponível");
+    return { profilePictureUrl: "https://photo.test/whatsapp.jpg" };
+  });
+  async function run(voterId = "123@lid") {
+    const response = { code: 200, body: {} as any, status(code: number) { this.code = code; return this; }, json(body: unknown) { this.body = body; return this; } };
+    await handler.getPollVoterAvatar({ params: { id: "7" }, query: { voterId }, user: { id: "user" } } as unknown as Request, response as unknown as Response);
+    return response;
+  }
+  assert.equal((await run()).body.profilePictureUrl, "https://photo.test/saved.jpg");
+  assert.equal(pictures.length, 0);
+  assert.deepEqual(queries[0].where.deletions, { none: { userId: "user" } });
+  assert.equal(queries[0].where.private, false);
+  assert.ok(queries[1].where.OR[0].phone.in.includes("5511999999999"));
+  contact.profilePictureUrl = null;
+  cached = { senderProfilePictureUrl: "https://photo.test/group.jpg" };
+  assert.equal((await run()).body.profilePictureUrl, cached.senderProfilePictureUrl);
+  cached = null;
+  assert.equal((await run()).body.profilePictureUrl, "https://photo.test/whatsapp.jpg");
+  assert.equal(saves.length, 1);
+  contact = null;
+  await run();
+  assert.equal(pictures.at(-1), "5511999999999@s.whatsapp.net");
+  unavailable = true;
+  assert.equal((await run()).body.profilePictureUrl, null);
+  const before = pictures.length;
+  assert.equal((await run("stranger@s.whatsapp.net")).code, 404);
+  record.poll.votes[0].optionIndexes = [];
+  assert.equal((await run()).code, 404);
+  record = null;
+  assert.equal((await run()).code, 404);
+  assert.equal(pictures.length, before);
+});

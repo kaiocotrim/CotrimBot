@@ -1,6 +1,8 @@
 // Tipos compartilhados pelos componentes,
 // pelo hook useChat e pelo cliente HTTP.
 
+export type ContactPresence = "composing" | "recording";
+
 export type Contact = {
   id: number;
   name: string;
@@ -29,7 +31,7 @@ export type Contact = {
   unreadCount: number;
 };
 
-export type PollVote = { voterId: string; voterName: string | null; optionIndexes: number[]; updatedAt: string };
+export type PollVote = { voterId: string; voterName: string | null; voterProfilePictureUrl?: string | null; optionIndexes: number[]; updatedAt: string };
 export type Poll = { question: string; options: string[]; selectableCount: number; votes?: PollVote[] };
 export type PollResults = { poll: Poll; ownVoterIds: string[]; syncError?: string | null };
 

@@ -209,7 +209,7 @@ export async function subscribeWhatsAppPresence(number: string): Promise<void> {
   });
 
   if (!response.ok) {
-    throw new Error(`Erro ao assinar presença: ${response.status} - ${await response.text()}`);
+    throw new Error(`Erro ao assinar presença: HTTP ${response.status}`);
   }
 }
 
