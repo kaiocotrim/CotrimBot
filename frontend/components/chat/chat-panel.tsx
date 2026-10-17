@@ -311,16 +311,16 @@ export function ChatPanel({
   }
 
   return (
-    <section className="@container relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
+    <section className="@container relative flex min-h-0 min-w-0 flex-1 overflow-hidden max-lg:bg-[#050506] max-lg:[--chat-message-top-gap:12px]">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col @min-[640px]:flex-row">
         <div ref={setConversationPanel} className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {/* Papel de parede fornecido pelo usuário via Unsplash. */}
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+            className="pointer-events-none absolute inset-0 hidden bg-cover bg-center bg-no-repeat lg:block"
             style={{ backgroundImage: "url('/mesh-gradient2.png')" }}
           />
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-zinc-950/50" />
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 hidden bg-zinc-950/50 lg:block" />
 
           <div className="pointer-events-none absolute inset-x-0 top-0 z-20">
             <ChatHeader

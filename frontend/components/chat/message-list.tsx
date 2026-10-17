@@ -215,8 +215,11 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
       >
         <div
           ref={contentRef}
-          className={`flex min-h-full flex-col gap-2 px-2 sm:px-5 ${hasPinnedMessage ? "pt-[calc(7.5rem+env(safe-area-inset-top))]" : "pt-[calc(4rem+env(safe-area-inset-top))]"}`}
-          style={{ paddingBottom: "max(7rem, calc(var(--chat-composer-height, 0px) + 0.75rem))" }}
+          className="flex min-h-full flex-col gap-2 px-2 sm:px-5"
+          style={{
+            paddingTop: `calc(var(--chat-header-height, 64px) + env(safe-area-inset-top) + ${hasPinnedMessage ? "56px" : "var(--chat-message-top-gap, 0px)"})`,
+            paddingBottom: "max(7rem, calc(var(--chat-composer-height, 0px) + 0.75rem))",
+          }}
         >
         {loadingOlderMessages && (
           <div className="flex justify-center py-1" role="status" aria-label="Carregando mensagens anteriores">

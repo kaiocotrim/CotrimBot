@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from "framer-motion";
 import Image from "next/image";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { AttachmentMenu, type AttachmentKind } from "@/components/chat/attachment-menu";
 import { PollComposer } from "@/components/chat/poll-composer";
@@ -12,6 +12,7 @@ import { MessageText } from "@/components/chat/message-text";
 import { insertEmojiAtSelection } from "@/lib/emoji-text";
 import { getContactAssignees, rewriteMessage, type ContactAssignee } from "@/lib/chat-api";
 import type { Message, Poll } from "@/types/chat";
+import styles from "./message-composer.module.css";
 
 
 type MessageComposerProps = {
@@ -45,11 +46,20 @@ type PendingAttachment = {
   previewUrl: string | null;
 };
 type MentionMatch = { start: number; end: number; query: string };
-type ComposerIconName = "message" | "lock" | "plus" | "sticker" | "mic" | "send" | "expand" | "collapse" | "sparkles";
+type ComposerIconName = "message" | "lock" | "plus" | "sticker" | "smile" | "camera" | "mic" | "send" | "expand" | "collapse" | "sparkles";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 const LONG_PASTE_CHARACTER_LIMIT = 1200;
 const LONG_PASTE_LINE_LIMIT = 18;
+
+function subscribeToMobileLayout(onChange: () => void) {
+  const query = window.matchMedia("(max-width: 1023px)");
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+const getMobileLayout = () => window.matchMedia("(max-width: 1023px)").matches;
+const getServerMobileLayout = () => false;
 
 function shouldCollapsePastedText(value: string) {
   return value.length >= LONG_PASTE_CHARACTER_LIMIT || value.split(/\r?\n/).length >= LONG_PASTE_LINE_LIMIT;
@@ -90,6 +100,8 @@ function ComposerIcon({ name }: { name: ComposerIconName }) {
       {name === "lock" && <><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></>}
       {name === "plus" && <path d="M12 5v14M5 12h14" />}
       {name === "sticker" && <><path d="M9 3h6a6 6 0 0 1 6 6v5l-7 7H9a6 6 0 0 1-6-6V9a6 6 0 0 1 6-6ZM14 21v-4a3 3 0 0 1 3-3h4" /><path d="M8 9h.01M15 9h.01M8 13a4 4 0 0 0 5 2" /></>}
+      {name === "smile" && <><circle cx="12" cy="12" r="9" /><path d="M8 14a4.5 4.5 0 0 0 8 0M8.5 8.5h.01M15.5 8.5h.01" /></>}
+      {name === "camera" && <><path d="M14.5 4h-5L7.5 7H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2.5L14.5 4Z" /><circle cx="12" cy="13" r="4" /></>}
       {name === "mic" && <><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8" /></>}
       {name === "send" && <><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></>}
       {name === "expand" && <path d="M8 3H3v5m13 13h5v-5M3 3l6 6m12 12-6-6" />}
@@ -123,6 +135,8 @@ export function MessageComposer({
   replyingTo,
   onCancelReply,
 }: MessageComposerProps) {
+  const mobileLayout = useSyncExternalStore(subscribeToMobileLayout, getMobileLayout, getServerMobileLayout);
+  const isMobile = mode === "external" && mobileLayout;
   const [isFocused, setIsFocused] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
@@ -181,6 +195,7 @@ export function MessageComposer({
   const mentionListId = useId();
   const attachmentTriggerRef = useRef<HTMLButtonElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const attachmentKindRef = useRef<AttachmentKind>("document");
   const [measurements, setMeasurements] = useState({ compact: 24, stacked: 24 });
   const [availableHeight, setAvailableHeight] = useState(400);
@@ -195,7 +210,10 @@ export function MessageComposer({
   const textareaId = useId();
   const reduceMotion = useReducedMotion();
   const isLongTextCollapsed = longTextCollapsed && Boolean(text);
-  const showControls = isFocused || text.length > 0 || isFullscreen;
+  const hasPayload = Boolean(text.trim() || pendingAttachments.length);
+  const showControls = isMobile || isFocused || text.length > 0 || isFullscreen;
+  const showEmojis = isMobile || isFocused;
+  const showMicrophone = showControls && (!isMobile || !hasPayload || isRecording);
   const isStacked = measurements.compact > 24 || isFullscreen || isLongTextCollapsed;
   const transition = { duration: reduceMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
   const filteredMentionUsers = useMemo(() => {
@@ -687,7 +705,7 @@ export function MessageComposer({
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [text, showControls, isFocused]);
+  }, [text, showControls, isFocused, isMobile, hasPayload]);
 
   // Atualiza o espaço reservado no histórico durante todos os quadros da animação.
   // A expansão respeita a altura real do painel, inclusive após redimensionamento.
@@ -713,8 +731,15 @@ export function MessageComposer({
   const fieldHeight = isFullscreen ? availableHeight : isStacked ? Math.min(naturalHeight, availableHeight) : 44;
   const textHeight = isStacked ? Math.max(24, fieldHeight - 72) : 24;
   const controlBottom = isStacked ? 8 : 6;
+  const mobileRightInset = hasPayload && !isRecording ? 52 : 96;
+  const mobileTextInset = (text.trim() ? 88 : 54) + (isPrivateMode ? 24 : 0);
   const compactTextInset = (isRecording ? (isFocused ? 216 : 180) : isFocused ? 178 : showControls ? 144 : 68) + (isPrivateMode && showControls ? 24 : 0);
-  const textLayout = {
+  const textLayout = isMobile ? {
+    height: textHeight,
+    top: isStacked ? 16 : 10,
+    left: isStacked ? 16 : isPrivateMode ? 38 : 14,
+    width: isStacked ? "calc(100% - 64px)" : `calc(100% - ${mobileTextInset}px)`,
+  } : {
     height: textHeight,
     top: isStacked ? 16 : 10,
     left: isStacked ? 16 : isFocused ? isPrivateMode ? 112 : 88 : showControls && isPrivateMode ? 76 : 52,
@@ -722,7 +747,7 @@ export function MessageComposer({
   };
 
   return (
-    <div ref={composerRef} data-audio-recording={isRecording} className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent px-2 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5 sm:pb-[max(2.125rem,env(safe-area-inset-bottom))]">
+    <div ref={composerRef} data-message-composer data-mobile={isMobile} data-private={isPrivateMode} data-audio-recording={isRecording} className={`${styles.root} pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent px-2 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5 sm:pb-[max(2.125rem,env(safe-area-inset-bottom))]`}>
       <div className="pointer-events-auto mx-auto max-w-2xl">
         <form
           ref={formRef}
@@ -877,8 +902,8 @@ export function MessageComposer({
           {attachmentError && <span role="alert" className="sr-only">{attachmentError}</span>}
           {/* Mesmo texto e fonte do campo, sem interferir na altura que está sendo animada. */}
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-0 overflow-hidden opacity-0">
-            <textarea ref={compactMirrorRef} value={text} readOnly tabIndex={-1} rows={1} className={textClassName} style={{ height: 0, width: `calc(100% - ${compactTextInset + 58}px)` }} />
-            <textarea ref={stackedMirrorRef} value={text} readOnly tabIndex={-1} rows={1} className={textClassName} style={{ height: 0, width: "calc(100% - 66px)" }} />
+            <textarea ref={compactMirrorRef} value={text} readOnly tabIndex={-1} rows={1} className={textClassName} style={{ height: 0, width: `calc(100% - ${isMobile ? 52 + mobileRightInset + mobileTextInset + 2 : compactTextInset + 58}px)` }} />
+            <textarea ref={stackedMirrorRef} value={text} readOnly tabIndex={-1} rows={1} className={textClassName} style={{ height: 0, width: `calc(100% - ${isMobile ? 52 + mobileRightInset + 66 : 66}px)` }} />
           </div>
 
           <AnimatePresence>
@@ -921,11 +946,12 @@ export function MessageComposer({
           </AnimatePresence>
 
           <motion.div
+            data-composer-field
             initial={false}
-            animate={{ height: fieldHeight, marginRight: isStacked ? 0 : 56, borderTopLeftRadius: emojisOpen && !sending ? 0 : 24, borderTopRightRadius: emojisOpen && !sending ? 0 : 24 }}
+            animate={{ height: fieldHeight, marginLeft: isMobile ? 52 : 0, marginRight: isMobile ? mobileRightInset : isStacked ? 0 : 56, borderTopLeftRadius: emojisOpen && !sending ? 0 : 24, borderTopRightRadius: emojisOpen && !sending ? 0 : 24 }}
             style={emojisOpen && !sending ? { borderTopWidth: 0, boxShadow: "inset 0 -1px 1px rgba(0,0,0,0.12), 0 4px 20px rgba(0,0,0,0.16)" } : undefined}
             transition={transition}
-            className={`relative overflow-hidden rounded-[24px] border bg-gradient-to-b from-white/[0.075] via-white/[0.03] to-white/[0.015] shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.22),0_6px_22px_rgba(0,0,0,0.2)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow] duration-250 motion-reduce:transition-none ${isPrivateMode ? "border-zinc-200 bg-white ring-2 ring-white/15" : emojisOpen && !sending ? "border-white/15 bg-zinc-900/90" : isFocused ? "border-white/25 bg-zinc-900/65 ring-2 ring-white/[0.06]" : "border-white/12 bg-zinc-950/35"}`}
+            className={`${isMobile ? styles.mobileField : ""} relative overflow-hidden rounded-[24px] border bg-gradient-to-b from-white/[0.075] via-white/[0.03] to-white/[0.015] shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.22),0_6px_22px_rgba(0,0,0,0.2)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow] duration-250 motion-reduce:transition-none ${isPrivateMode ? "border-zinc-200 bg-white ring-2 ring-white/15" : emojisOpen && !sending ? "border-white/15 bg-zinc-900/90" : isFocused ? "border-white/25 bg-zinc-900/65 ring-2 ring-white/[0.06]" : "border-white/12 bg-zinc-950/35"}`}
           >
             <AnimatePresence initial={false}>
               {isLongTextCollapsed && (
@@ -1077,7 +1103,7 @@ export function MessageComposer({
               animate={{
                 opacity: isPrivateMode || !showControls ? 1 : 0,
                 scale: isPrivateMode || !showControls ? 1 : 0.9,
-                left: isPrivateMode && showControls ? isFocused ? 84 : 46 : 13,
+                left: isMobile ? 12 : isPrivateMode && showControls ? isFocused ? 84 : 46 : 13,
               }}
               transition={transition}
               className={`pointer-events-none absolute bottom-3 ${isPrivateMode ? "text-zinc-700" : "text-zinc-300"}`}
@@ -1088,7 +1114,7 @@ export function MessageComposer({
               ref={attachmentTriggerRef}
               type="button"
               initial={false}
-              animate={{ opacity: showControls ? 1 : 0, scale: showControls ? attachmentsOpen ? 0.96 : 1 : 0.9, rotate: reduceMotion ? 0 : attachmentsOpen ? 45 : 0, y: 0, bottom: controlBottom, left: 8 }}
+              animate={{ opacity: showControls ? 1 : 0, scale: showControls ? attachmentsOpen ? 0.96 : 1 : 0.9, rotate: reduceMotion ? 0 : attachmentsOpen ? 45 : 0, y: 0, bottom: isMobile ? 0 : controlBottom, left: isMobile ? -52 : 8 }}
               whileTap={reduceMotion || sending ? undefined : { scale: 0.86, backgroundColor: isPrivateMode ? "rgb(228,228,231)" : "rgba(63,63,70,0.8)", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.3)" }}
               transition={{ ...transition, scale: reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 22 } }}
               aria-label="Abrir anexos"
@@ -1102,7 +1128,7 @@ export function MessageComposer({
                 closeEmojis();
                 setAttachmentsOpen((current) => !current);
               }}
-              className={`absolute size-8 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isPrivateMode ? privateButtonClassName : "border-white/10 bg-white/[0.035]"}`}
+              className={`${isMobile ? styles.mobileCircle : "size-8"} absolute border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isPrivateMode ? privateButtonClassName : "border-white/10 bg-white/[0.035]"}`}
               style={{ pointerEvents: showControls ? "auto" : "none", transformOrigin: "center" }}
             >
               <ComposerIcon name="plus" />
@@ -1112,24 +1138,24 @@ export function MessageComposer({
               ref={emojiTriggerRef}
               type="button"
               initial={false}
-              animate={{ opacity: isFocused ? 1 : 0, scale: isFocused ? 1 : 0.85, x: isFocused ? 0 : -8, bottom: controlBottom, left: 46 }}
+              animate={{ opacity: showEmojis ? 1 : 0, scale: showEmojis ? 1 : 0.85, x: showEmojis ? 0 : -8, bottom: controlBottom, left: isMobile ? "calc(100% - 38px)" : 46 }}
               transition={transition}
               aria-label="Abrir emojis"
               title="Abrir emojis"
               aria-haspopup="dialog"
               aria-expanded={emojisOpen}
               aria-controls={emojiSelectorId}
-              aria-hidden={!isFocused}
-              tabIndex={isFocused ? 0 : -1}
-              disabled={!isFocused || sending}
+              aria-hidden={!showEmojis}
+              tabIndex={showEmojis ? 0 : -1}
+              disabled={!showEmojis || sending}
               onClick={() => {
                 closeAttachments();
                 setEmojisOpen((current) => !current);
               }}
-              className={`absolute size-8 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isPrivateMode ? privateButtonClassName : "border-white/10 bg-white/[0.035]"}`}
-              style={{ pointerEvents: isFocused ? "auto" : "none" }}
+              className={`${isMobile ? styles.mobileEmoji : "border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)]"} absolute size-8 ${buttonClassName} ${isPrivateMode ? privateButtonClassName : isMobile ? "" : "border-white/10 bg-white/[0.035]"}`}
+              style={{ pointerEvents: showEmojis ? "auto" : "none" }}
             >
-              <ComposerIcon name="sticker" />
+              <ComposerIcon name={isMobile ? "smile" : "sticker"} />
             </motion.button>
             <motion.button
               type="button"
@@ -1138,7 +1164,7 @@ export function MessageComposer({
                 opacity: text.trim() ? 1 : 0,
                 scale: text.trim() ? 1 : 0.75,
                 bottom: controlBottom,
-                right: isStacked ? isRecording ? 128 : 90 : isRecording ? 84 : 46,
+                right: isMobile ? 44 : isStacked ? isRecording ? 128 : 90 : isRecording ? 84 : 46,
               }}
               transition={transition}
               whileHover={reduceMotion || rewriting ? undefined : { scale: 1.06 }}
@@ -1175,19 +1201,19 @@ export function MessageComposer({
               type="button"
               initial={false}
               animate={{
-                opacity: showControls ? 1 : 0,
-                width: 32,
-                height: 32,
+                opacity: showMicrophone ? 1 : 0,
+                width: isMobile ? 44 : 32,
+                height: isMobile ? 44 : 32,
                 borderRadius: 999,
 
                 scale: isRecording
                   ? [1, 1.08, 1]
-                  : showControls
+                  : showMicrophone
                     ? 1
                     : 0.9,
 
-                bottom: controlBottom,
-                right: isStacked ? 52 : 8,
+                bottom: isMobile ? 0 : controlBottom,
+                right: isMobile ? -mobileRightInset : isStacked ? 52 : 8,
               }}
               transition={
                 isRecording
@@ -1208,9 +1234,9 @@ export function MessageComposer({
                   ? "Parar gravação"
                   : "Gravar áudio"
               }
-              aria-hidden={!showControls}
-              tabIndex={showControls ? 0 : -1}
-              disabled={!showControls || sending}
+              aria-hidden={!showMicrophone}
+              tabIndex={showMicrophone ? 0 : -1}
+              disabled={!showMicrophone || sending}
               onClick={() => {
                 if (isRecording) {
                   stopRecording();
@@ -1218,16 +1244,17 @@ export function MessageComposer({
                   void startRecording();
                 }
               }}
-              className={`absolute border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isRecording
+              className={`${isMobile ? styles.mobileCircle : ""} absolute border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isRecording
                   ? isPrivateMode ? "border-red-600/30 bg-red-500/10 !text-red-700 hover:bg-red-500/15 hover:!text-red-800 focus-visible:!outline-red-600/60" : "border-red-400/40 bg-red-500/20 text-red-300"
                   : isPrivateMode
                     ? privateButtonClassName
                     : "border-white/10 bg-white/[0.035]"
                 }`}
               style={{
-                pointerEvents: showControls
+                pointerEvents: showMicrophone
                   ? "auto"
                   : "none",
+                display: isMobile && !showMicrophone ? "none" : undefined,
               }}
             >
               {isRecording ? (
@@ -1245,6 +1272,22 @@ export function MessageComposer({
                 <ComposerIcon name="mic" />
               )}
             </motion.button>
+            {isMobile && !hasPayload && !isRecording && (
+              <button
+                type="button"
+                aria-label="Abrir câmera"
+                title="Abrir câmera"
+                disabled={sending}
+                onClick={() => {
+                  closeAttachments();
+                  closeEmojis();
+                  cameraInputRef.current?.click();
+                }}
+                className={`${styles.mobileCamera} absolute -right-[48px] bottom-0 size-11 ${buttonClassName}`}
+              >
+                <ComposerIcon name="camera" />
+              </button>
+            )}
             <motion.button
               type="button"
               initial={false}
@@ -1273,12 +1316,15 @@ export function MessageComposer({
             ref={sendButtonRef}
             type="submit"
             initial={false}
-            animate={{ width: isStacked ? 36 : 44, height: isStacked ? 36 : 44, right: isStacked ? 8 : 0, bottom: isStacked ? 8 : 0 }}
+            animate={{ width: isMobile ? 44 : isStacked ? 36 : 44, height: isMobile ? 44 : isStacked ? 36 : 44, right: isMobile ? 0 : isStacked ? 8 : 0, bottom: isMobile ? 0 : isStacked ? 8 : 0 }}
             transition={transition}
             disabled={sending || (!text.trim() && !pendingAttachments.length)}
             aria-busy={sending}
             aria-label={sending ? "Enviando mensagem" : "Enviar mensagem"}
+            aria-hidden={isMobile && (!hasPayload || isRecording)}
+            tabIndex={isMobile && (!hasPayload || isRecording) ? -1 : 0}
             title="Enviar mensagem"
+            style={{ display: isMobile && (!hasPayload || isRecording) ? "none" : undefined }}
             className={`absolute flex items-center justify-center overflow-hidden rounded-full border bg-gradient-to-br from-white/[0.12] via-white/[0.03] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.16),0_4px_16px_rgba(0,0,0,0.18)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,color,box-shadow] duration-250 focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none ${isPrivateMode ? `focus-visible:outline-zinc-500/60 ${text.trim() || pendingAttachments.length ? "border-zinc-500 bg-zinc-500 text-white enabled:hover:border-zinc-600 enabled:hover:bg-zinc-600" : "border-zinc-300 bg-zinc-100 text-zinc-400"}` : `focus-visible:outline-emerald-400/50 ${text.trim() || pendingAttachments.length ? "border-emerald-200/20 bg-emerald-600/60 text-white enabled:hover:bg-emerald-500/70 enabled:hover:border-emerald-100/30" : "border-white/10 bg-emerald-950/25 text-white/45"}`}`}
           >
             {sending ? (
@@ -1287,7 +1333,19 @@ export function MessageComposer({
           </motion.button>
           <AttachmentMenu open={attachmentsOpen && !sending} triggerRef={attachmentTriggerRef} onClose={closeAttachments} onSelect={selectAttachment} closing={closing} onCloseWithBot={onCloseWithBot} allowCloseWithBot={allowCloseWithBot} allowPoll={Boolean(onSendPoll) && !isPrivateMode} signatureEnabled={includeSignature} onToggleSignature={toggleSignature} stacked={isStacked} />
           {pollOpen && onSendPoll && <PollComposer onSend={onSendPoll} onClose={() => { setPollOpen(false); requestAnimationFrame(() => attachmentTriggerRef.current?.focus()); }} />}
-          <EmojiSelector id={emojiSelectorId} open={emojisOpen && !sending} isPrivateMode={isPrivateMode} triggerRef={emojiTriggerRef} onClose={closeEmojis} onSelect={selectEmoji} fieldHeight={fieldHeight} rightInset={isStacked ? 0 : 56} />
+          <EmojiSelector id={emojiSelectorId} open={emojisOpen && !sending} isPrivateMode={isPrivateMode} triggerRef={emojiTriggerRef} onClose={closeEmojis} onSelect={selectEmoji} fieldHeight={fieldHeight} rightInset={isMobile ? 0 : isStacked ? 0 : 56} />
+          {isMobile && <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(event) => {
+              const files = Array.from(event.target.files ?? []);
+              if (files.length) stagePendingFiles(files);
+              event.target.value = "";
+            }}
+          />}
           {/* Seleciona o arquivo localmente; a integração de envio de mídia é uma etapa separada. */}
           <input
             ref={fileInputRef}

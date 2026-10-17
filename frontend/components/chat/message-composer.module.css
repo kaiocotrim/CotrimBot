@@ -1,0 +1,49 @@
+@media (max-width: 1023px) {
+  .root[data-mobile="true"] {
+    padding: 10px max(12px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    border-top: 1px solid rgb(255 255 255 / 9%);
+    border-radius: 30px 30px 0 0;
+    background: linear-gradient(to bottom, rgb(5 5 6 / 90%), #050506 80%);
+  }
+
+  /* Os controles externos pertencem ao mesmo formulário e campo de texto. */
+  .mobileField {
+    overflow: visible;
+  }
+
+  .mobileCircle {
+    width: 44px;
+    height: 44px;
+    background-color: #242426;
+    background-image: linear-gradient(135deg, rgb(255 255 255 / 4%), transparent);
+    color: #f4f4f5;
+  }
+
+  .mobileCircle svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .root[data-private="true"] .mobileCircle {
+    background-color: #f4f4f5;
+  }
+
+  .root[data-audio-recording="true"] .mobileCircle[aria-label="Parar gravação"] {
+    background-color: rgb(239 68 68 / 20%);
+  }
+
+  .mobileEmoji,
+  .mobileCamera {
+    color: #ededf0;
+  }
+
+  .mobileEmoji svg {
+    width: 23px;
+    height: 23px;
+  }
+
+  .mobileCamera svg {
+    width: 25px;
+    height: 25px;
+  }
+}

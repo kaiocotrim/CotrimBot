@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowLeft, CheckCheck, EllipsisVertical, Forward, Info, Search, Star, Trash2, UserRoundCheck, UserRoundPlus, X } from "lucide-react";
+import { ArrowLeft, CheckCheck, EllipsisVertical, Forward, Info, Phone, Search, Star, Trash2, UserRoundCheck, UserRoundPlus, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { parsePhoneNumberFromString } from "libphonenumber-js/min";
 import { useEffect, useRef, useState } from "react";
 import type { Contact, ContactPresence } from "@/types/chat";
 import { Avatar } from "@/components/chat/avatar";
@@ -64,6 +65,8 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
   const [menuOpen, setMenuOpen] = useState(false);
   const assignedUserIds = contact.assignedUserIds ?? [];
   const assignedToMe = assignedUserIds.includes(currentUserId);
+  const phoneNumber = contact.isGroup ? undefined : parsePhoneNumberFromString(`+${contact.phone.replace(/\D/g, "")}`);
+  const callHref = phoneNumber?.isValid() ? `tel:${phoneNumber.number}` : undefined;
 
   async function toggleAssignment() {
     if (assigning) return;
@@ -102,13 +105,10 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
   }, [menuOpen]);
 
   return (
-    <header className="pointer-events-auto relative isolate flex h-[calc(64px+env(safe-area-inset-top))] w-full min-w-0 items-center gap-1.5 px-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-2 sm:gap-3 sm:px-4">
+    <header className={`${styles.header} pointer-events-auto relative isolate flex h-[calc(64px+env(safe-area-inset-top))] w-full min-w-0 items-center gap-1.5 px-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-2 sm:gap-3 sm:px-4`}>
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[200px] backdrop-blur-3xl backdrop-saturate-150 [mask-image:linear-gradient(to_bottom,black_0%,black_35%,rgba(0,0,0,0.75)_55%,rgba(0,0,0,0.3)_78%,transparent_100%)]"
-        style={{
-          backgroundImage: "radial-gradient(ellipse at 25% 0%, rgba(0,0,0,0.08), transparent 70%), linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.42) 35%, rgba(0,0,0,0.22) 60%, rgba(0,0,0,0.06) 82%, transparent 100%)",
-        }}
+        className={`${styles.backdrop} pointer-events-none absolute inset-x-0 top-0 -z-10 h-[200px] backdrop-blur-3xl backdrop-saturate-150 [mask-image:linear-gradient(to_bottom,black_0%,black_35%,rgba(0,0,0,0.75)_55%,rgba(0,0,0,0.3)_78%,transparent_100%)]`}
       />
       {selectionMode ? (
         <>
@@ -146,11 +146,11 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
         </>
       ) : (
         <>
-          <SidebarMenuButton onClick={onOpenSidebar} expanded={sidebarOpen} />
-          <button type="button" onClick={onOpenContactInfo} aria-label={`Abrir informações de ${contact.name}`} className="flex min-w-0 flex-1 items-center gap-2 rounded-xl sm:gap-3 text-left focus-visible:outline-2 focus-visible:outline-white/50">
-            <Avatar contact={contact} className="size-10" />
+          <SidebarMenuButton onClick={onOpenSidebar} expanded={sidebarOpen} className={styles.backButton} />
+          <button type="button" onClick={onOpenContactInfo} aria-label={`Abrir informações de ${contact.name}`} className={`${styles.contact} flex min-w-0 flex-1 items-center gap-2 rounded-xl sm:gap-3 text-left focus-visible:outline-2 focus-visible:outline-white/50`}>
+            <Avatar contact={contact} className={`${styles.avatar} size-10`} />
             <span key={contact.id} className="min-w-0 flex-1">
-              <span className="block truncate text-base font-medium lg:text-[15px]">
+              <span className={`${styles.contactName} block truncate text-base font-medium lg:text-[15px]`}>
                 {contact.name}
                 {contact.jobTitle && <span className="font-normal text-zinc-400"> - {contact.jobTitle}</span>}
               </span>
@@ -159,14 +159,22 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
                 : <span className={`${styles.subtitle} block truncate text-[13px] text-zinc-400 lg:text-xs`}>{contact.isGroup ? "Grupo do WhatsApp" : contact.phone}</span>}
             </span>
           </button>
-          <div className="ml-auto flex h-11 shrink-0 items-center rounded-full border border-white/10 bg-white/[0.035] px-1">
+          <div className={`${styles.actions} ml-auto flex h-11 shrink-0 items-center rounded-full border border-white/10 bg-white/[0.035] px-1`}>
+            {callHref && <a
+              href={callHref}
+              aria-label={`Ligar para ${contact.name}`}
+              title={`Ligar para ${contact.name}`}
+              className={`${styles.callButton} ${styles.mobileAction} ${actionClass}`}
+            >
+              <Phone className="size-5" fill="currentColor" strokeWidth={1.6} aria-hidden="true" />
+            </a>}
             {!contact.isGroup && <button
               type="button"
               onClick={() => void toggleAssignment()}
               disabled={assigning}
               aria-label={assignedToMe ? "Deixar de acompanhar conversa" : "Acompanhar conversa"}
               title={assignedToMe ? "Você acompanha esta conversa · clique para sair" : assignedUserIds.length ? "Acompanhar junto com os outros responsáveis" : "Assumir conversa para aparecer em Minhas"}
-              className={`${actionClass} ${assignedToMe ? "text-white" : "text-zinc-300"}`}
+              className={`${styles.assignmentButton} ${actionClass} ${assignedToMe ? "text-white" : "text-zinc-300"}`}
             >
               {assignedToMe ? <UserRoundCheck className="size-5" aria-hidden="true" /> : <UserRoundPlus className="size-5" aria-hidden="true" />}
             </button>}
@@ -178,7 +186,7 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
                 title="Mais opções"
-                className={actionClass}
+                className={`${styles.mobileAction} ${actionClass}`}
               >
                 <EllipsisVertical className="size-5" strokeWidth={2} aria-hidden="true" />
               </button>
@@ -193,6 +201,16 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
                   style={{ transformOrigin: "top right" }}
                   className="absolute top-[calc(100%+0.55rem)] right-0 z-50 w-56 overflow-hidden rounded-xl border border-white/10 bg-zinc-950/95 p-1.5 text-sm shadow-[0_18px_50px_rgba(0,0,0,0.55)] backdrop-blur-xl"
                 >
+                  {!contact.isGroup && <button
+                    type="button"
+                    role="menuitem"
+                    disabled={assigning}
+                    onClick={() => { setMenuOpen(false); void toggleAssignment(); }}
+                    className={`${styles.assignmentMenuItem} w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-35`}
+                  >
+                    {assignedToMe ? <UserRoundCheck className="size-4 text-zinc-400" aria-hidden="true" /> : <UserRoundPlus className="size-4 text-zinc-400" aria-hidden="true" />}
+                    {assignedToMe ? "Deixar de acompanhar" : "Acompanhar conversa"}
+                  </button>}
                   <button
                     type="button"
                     role="menuitem"
@@ -229,7 +247,7 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
               onClick={onOpenContactInfo}
               aria-label="Informações do contato"
               title="Informações do contato"
-              className={actionClass}
+              className={`${styles.mobileAction} ${actionClass}`}
             >
               <Info className="size-5" strokeWidth={2} aria-hidden="true" />
             </button>

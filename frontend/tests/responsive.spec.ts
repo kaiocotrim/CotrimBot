@@ -7,7 +7,7 @@ async function mockApi(page: Page, messageCount = 1) {
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   const message = { id: 1, externalId: "test-1", content: `Mensagem longa ${longWord}`, private: false, contactId: 1, direction: "INCOMING", type: "TEXT", createdAt: new Date().toISOString(), readAt: null, reaction: null, senderName: null, senderPhone: null, senderProfilePictureUrl: null };
   const messages = Array.from({ length: messageCount }, (_, index) => ({ ...message, id: index + 1, externalId: `test-${index + 1}`, content: `Mensagem ${index + 1}: ${message.content}` }));
-  const contact = { id: 1, name: "Contato de teste", phone: "5500000000000", isGroup: false, archived: false, unreadCount: 0, profilePictureUrl: null, messages: [message] };
+  const contact = { id: 1, name: "Contato de teste", phone: "5511999999999", isGroup: false, archived: false, unreadCount: 0, profilePictureUrl: null, messages: [message] };
 
   // Toda API é simulada no navegador, como no teste de digitação.
   await page.route("**/socket.io/**", (route) => route.abort());
@@ -66,6 +66,40 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 414, height: 800 }
     await expect(backButton).toBeVisible();
     await expect(backButton).toHaveAttribute("aria-expanded", "false");
 
+    // As ações do cabeçalho ficam separadas; o emoji pertence ao campo,
+    // enquanto anexos, câmera e microfone ficam fora da cápsula de texto.
+    const call = page.getByRole("link", { name: "Ligar para Contato de teste" });
+    const menu = page.getByRole("button", { name: "Mais opções", exact: true });
+    const info = page.getByRole("button", { name: "Informações do contato", exact: true });
+    await expect(call).toBeVisible();
+    await expect(call).toHaveAttribute("href", "tel:+5511999999999");
+    await expect(menu).toBeVisible();
+    await expect(info).toBeVisible();
+    const [callBox, menuBox, infoBox] = await Promise.all([call.boundingBox(), menu.boundingBox(), info.boundingBox()]);
+    expect(callBox!.x + callBox!.width).toBeLessThanOrEqual(menuBox!.x + 1);
+    expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(infoBox!.x + 1);
+
+    const composer = page.locator("[data-message-composer]");
+    await expect(composer).toHaveAttribute("data-mobile", "true");
+    const input = composer.getByRole("textbox", { name: "Mensagem", exact: true });
+    const field = composer.locator("[data-composer-field]");
+    const attachments = composer.getByRole("button", { name: "Abrir anexos", exact: true });
+    const emojis = composer.getByRole("button", { name: "Abrir emojis", exact: true });
+    const camera = composer.getByRole("button", { name: "Abrir câmera", exact: true });
+    const microphone = composer.getByRole("button", { name: "Gravar áudio", exact: true });
+    await expect(input).toHaveCount(1);
+    for (const control of [field, attachments, emojis, camera, microphone]) await expect(control).toBeVisible();
+    await expect(composer.getByRole("button", { name: "Enviar mensagem", exact: true })).toBeHidden();
+    const [fieldBox, inputBox, attachmentsBox, emojiBox, cameraBox, microphoneBox] = await Promise.all(
+      [field, input, attachments, emojis, camera, microphone].map((control) => control.boundingBox()),
+    );
+    expect(attachmentsBox!.x + attachmentsBox!.width).toBeLessThanOrEqual(fieldBox!.x + 1);
+    expect(fieldBox!.x + fieldBox!.width).toBeLessThanOrEqual(cameraBox!.x + 1);
+    expect(cameraBox!.x + cameraBox!.width).toBeLessThanOrEqual(microphoneBox!.x + 1);
+    expect(inputBox!.x).toBeGreaterThanOrEqual(fieldBox!.x);
+    expect(inputBox!.x + inputBox!.width).toBeLessThanOrEqual(emojiBox!.x + 1);
+    expect(emojiBox!.x + emojiBox!.width).toBeLessThanOrEqual(fieldBox!.x + fieldBox!.width);
+
     // Mensagens com textos longos quebram sem gerar rolagem horizontal.
     const bubble = page.locator('[data-message-id="1"]').getByText(longWord, { exact: false });
     await expect(bubble).toBeVisible();
@@ -79,11 +113,11 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 414, height: 800 }
     const contactInfo = page.getByRole("complementary", { name: "Informações do contato" });
     await expect(contactInfo).toBeVisible();
     await expect.poll(async () => (await contactInfo.boundingBox())!.x).toBe(0);
-    const infoBox = await contactInfo.boundingBox();
-    expect(infoBox!.x).toBe(0);
-    expect(infoBox!.y).toBe(0);
-    expect(infoBox!.width).toBe(viewport.width);
-    expect(infoBox!.height).toBe(viewport.height);
+    const contactInfoBox = await contactInfo.boundingBox();
+    expect(contactInfoBox!.x).toBe(0);
+    expect(contactInfoBox!.y).toBe(0);
+    expect(contactInfoBox!.width).toBe(viewport.width);
+    expect(contactInfoBox!.height).toBe(viewport.height);
     await expectNoHorizontalOverflow(page);
     await page.getByRole("button", { name: "Fechar informações" }).click();
     await expect(contactInfo).toBeHidden();
@@ -98,6 +132,61 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 414, height: 800 }
     expect(runtimeErrors).toEqual([]);
   });
 }
+
+test("composer mobile abre câmera e emojis e troca microfone por envio", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { runtimeErrors } = await mockApi(page);
+  const sentTexts: string[] = [];
+  await page.route("**/contacts/1/send", async (route) => {
+    const payload = route.request().postDataJSON() as { text: string; clientId: string; private: boolean };
+    sentTexts.push(payload.text);
+    await route.fulfill({ json: { message: {
+      id: 2, externalId: "sent-2", contactId: 1, content: payload.text,
+      clientId: payload.clientId, private: payload.private, direction: "OUTGOING", type: "TEXT",
+      createdAt: new Date().toISOString(), readAt: null, reaction: null,
+      senderName: null, senderPhone: null, senderProfilePictureUrl: null,
+    } } });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+
+  const composer = page.locator("[data-message-composer]");
+  const input = composer.getByRole("textbox", { name: "Mensagem", exact: true });
+  const microphone = composer.getByRole("button", { name: "Gravar áudio", exact: true });
+  const send = composer.getByRole("button", { name: "Enviar mensagem", exact: true });
+  await expect(microphone).toBeVisible();
+  const chooserPromise = page.waitForEvent("filechooser");
+  await composer.getByRole("button", { name: "Abrir câmera", exact: true }).click();
+  const chooser = await chooserPromise;
+  await expect(chooser.element()).toHaveAttribute("accept", "image/*");
+  await expect(chooser.element()).toHaveAttribute("capture", "environment");
+  await chooser.setFiles({
+    name: "camera.png", mimeType: "image/png",
+    buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a6XcAAAAASUVORK5CYII=", "base64"),
+  });
+  await expect(composer.getByRole("img", { name: "Prévia de camera.png", exact: true })).toBeVisible();
+  await expect(send).toBeVisible();
+  await expect(microphone).toBeHidden();
+  await composer.getByRole("button", { name: "Remover camera.png", exact: true }).click();
+  await expect(microphone).toBeVisible();
+  await expect(send).toBeHidden();
+
+  await input.fill("Olá 😊");
+  await composer.getByRole("button", { name: "Abrir emojis", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Selecionar emoji", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(input).toHaveValue("Olá 😊");
+  await expect(send).toBeVisible();
+  await expect(microphone).toBeHidden();
+  await send.click();
+  await expect.poll(() => sentTexts).toEqual(["Olá 😊"]);
+  await expect(input).toHaveValue("");
+  await expect(page.locator('[data-message-id="2"]')).toContainText("Olá");
+  await expect(microphone).toBeVisible();
+  await expect(send).toBeHidden();
+  await expectNoHorizontalOverflow(page);
+  expect(runtimeErrors).toEqual([]);
+});
 
 test("teclado reduz só a conversa e mantém a posição de leitura", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
