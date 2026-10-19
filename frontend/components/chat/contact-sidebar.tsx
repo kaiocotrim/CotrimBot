@@ -641,8 +641,9 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
         id="chat-sidebar"
         tabIndex={-1}
         data-sidebar-open={mobileOpen || showNotifications ? "true" : "false"}
+        aria-hidden={!mobileOpen && !showNotifications && !isDesktop}
         inert={!mobileOpen && !showNotifications && !isDesktop}
-        className={`fixed inset-0 z-40 flex h-dvh w-screen bg-zinc-950 outline-none transition-opacity duration-200 motion-reduce:transition-none lg:visible lg:static lg:z-auto lg:h-full lg:w-auto lg:shrink-0 lg:bg-transparent lg:opacity-100 lg:pointer-events-auto lg:transition-none ${mobileOpen || showNotifications ? "visible opacity-100" : revealForSwipe ? "visible pointer-events-none opacity-100" : "invisible pointer-events-none opacity-0"}`}
+        className={`absolute inset-0 z-40 flex h-full w-full bg-zinc-950 outline-none lg:visible lg:static lg:z-auto lg:h-full lg:w-auto lg:shrink-0 lg:bg-transparent lg:opacity-100 lg:pointer-events-auto ${mobileOpen || showNotifications ? "visible opacity-100" : revealForSwipe ? "visible pointer-events-none opacity-100" : "invisible pointer-events-none opacity-0"}`}
       >
         {navigationRail}
         {content}

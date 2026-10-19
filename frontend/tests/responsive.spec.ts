@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const longWord = "a".repeat(160);
 
-async function mockApi(page: Page, messageCount = 1, compactExamples = false) {
+async function mockApi(page: Page, messageCount = 1, compactExamples = false, contactCount = 1) {
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   const message = { id: 1, externalId: "test-1", content: `Mensagem longa ${longWord}`, private: false, contactId: 1, direction: "INCOMING", type: "TEXT", createdAt: new Date().toISOString(), readAt: null, reaction: null, senderName: null, senderPhone: null, senderProfilePictureUrl: null };
@@ -22,7 +22,7 @@ async function mockApi(page: Page, messageCount = 1, compactExamples = false) {
     } else if (pathname.endsWith("/contacts/assignees")) {
       body = [];
     } else if (pathname.endsWith("/contacts")) {
-      body = [contact];
+      body = Array.from({ length: contactCount }, (_, index) => ({ ...contact, id: index + 1, name: index ? `Contato ${index + 1}` : contact.name }));
     } else if (pathname.endsWith("/avatar")) {
       body = { profilePictureUrl: null };
     } else if (pathname.endsWith("/messages")) {
@@ -62,7 +62,8 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 414, height: 800 }
 
     // Escolher uma conversa troca a lista pelo chat em tela cheia.
     await contactButton.click();
-    await expect(sidebar).toBeHidden();
+    await expect(sidebar).toHaveAttribute("inert", "");
+    await expect(sidebar).toHaveAttribute("aria-hidden", "true");
     await expect(page.getByRole("textbox", { name: "Mensagem", exact: true })).toBeVisible();
     const backButton = page.getByRole("button", { name: "Voltar para conversas" });
     await expect(backButton).toBeVisible();
@@ -258,7 +259,12 @@ test("teclado reduz só a conversa e mantém a posição de leitura", async ({ p
   await resizeVisualViewport(500);
   await expect.poll(async () => (await root.boundingBox())!.height).toBe(500);
   await expect(root).toHaveAttribute("data-keyboard-open", "true");
-  await expect.poll(fieldBottomGap).toBe(6);
+  await expect.poll(fieldBottomGap).toBe(0);
+  expect((await lastBubble.boundingBox())!.y + (await lastBubble.boundingBox())!.height).toBeLessThanOrEqual((await composer.boundingBox())!.y);
+  await input.blur();
+  // Perder o foco não fecha imediatamente o teclado no iPhone.
+  await expect(root).toHaveAttribute("data-keyboard-open", "true");
+  await expect.poll(fieldBottomGap).toBe(0);
   const inputBox = (await input.boundingBox())!;
   const rootBox = (await root.boundingBox())!;
   expect(inputBox.y + inputBox.height).toBeLessThanOrEqual(rootBox.y + rootBox.height);
@@ -268,12 +274,18 @@ test("teclado reduz só a conversa e mantém a posição de leitura", async ({ p
   expect((await scrollMetrics()).height).toBeLessThan(844);
   await expect.poll(async () => (await scrollMetrics()).bottom).toBeLessThan(2);
 
+  // A animação de fechamento ainda ocupa parte da tela após o blur.
+  await resizeVisualViewport(760);
+  await expect.poll(async () => (await root.boundingBox())!.height).toBe(760);
+  await expect(root).toHaveAttribute("data-keyboard-open", "true");
+  await expect.poll(fieldBottomGap).toBe(0);
   await resizeVisualViewport(844);
   await expect.poll(async () => (await root.boundingBox())!.height).toBe(844);
   await expect(root).toHaveAttribute("data-keyboard-open", "false");
   await expect.poll(fieldBottomGap).toBe(34);
   await expect.poll(async () => (await scrollMetrics()).bottom).toBeLessThan(2);
 
+  await input.focus();
   await list.evaluate((element) => { element.scrollTop = 250; });
   await expect.poll(async () => (await scrollMetrics()).top).toBe(250);
   await resizeVisualViewport(500);
@@ -292,6 +304,45 @@ test("teclado reduz só a conversa e mantém a posição de leitura", async ({ p
   await expect.poll(async () => (await root.boundingBox())!.height).toBe(844);
   expect((await scrollMetrics()).top).toBe(250);
   expect(runtimeErrors).toEqual([]);
+});
+
+test("rodapé usa dvh em repouso e acompanha deslocamento e retomada do teclado iOS", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockApi(page, 40);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+  const root = page.locator("[data-chat-root]");
+  const composer = page.locator("[data-message-composer]");
+  const input = composer.getByRole("textbox", { name: "Mensagem", exact: true });
+  await expect(composer).toHaveCount(1);
+  await expect(composer.locator("textarea:enabled")).toHaveCount(1);
+  await expect(input).toHaveAttribute("enterkeyhint", "send");
+  for (const mirror of await composer.locator("[data-composer-measurement] textarea").all()) {
+    await expect(mirror).toBeDisabled();
+  }
+  const viewport = (height: number, top: number, event: string) => page.evaluate(({ height, top, event }) => {
+    Object.defineProperty(window.visualViewport!, "height", { configurable: true, value: height });
+    Object.defineProperty(window.visualViewport!, "offsetTop", { configurable: true, value: top });
+    if (event === "pageshow") window.dispatchEvent(new Event(event));
+    else window.visualViewport!.dispatchEvent(new Event(event));
+  }, { height, top, event });
+  // UI do navegador em repouso não pode reduzir outra vez o layout de 100dvh.
+  await viewport(810, 5, "resize");
+  await expect.poll(async () => Math.round((await root.boundingBox())!.height)).toBe(844);
+  await expect.poll(async () => Math.round((await root.boundingBox())!.y)).toBe(0);
+  await expect.poll(async () => composer.evaluate((element) => getComputedStyle(element).paddingBottom)).toBe("0px");
+  await input.focus();
+  // Retomar o PWA pode restaurar o teclado sem emitir resize.
+  await viewport(500, 22, "pageshow");
+  await expect(root).toHaveAttribute("data-keyboard-open", "true");
+  await expect.poll(async () => Math.round((await root.boundingBox())!.y)).toBe(22);
+  await expect.poll(async () => Math.round((await composer.boundingBox())!.y + (await composer.boundingBox())!.height)).toBe(522);
+  await viewport(480, 30, "scroll");
+  await expect.poll(async () => Math.round((await composer.boundingBox())!.y + (await composer.boundingBox())!.height)).toBe(510);
+  await input.blur();
+  await viewport(844, 0, "resize");
+  await expect(root).toHaveAttribute("data-keyboard-open", "false");
+  await expect.poll(async () => Math.round((await composer.boundingBox())!.y + (await composer.boundingBox())!.height)).toBe(844);
 });
 
 test("menu de conversas pode ser recolhido no desktop (1280px)", async ({ page }) => {
@@ -324,7 +375,67 @@ test("menu de conversas pode ser recolhido no desktop (1280px)", async ({ page }
   expect(runtimeErrors).toEqual([]);
 });
 
-test("deslizar para a direita retorna à lista e preserva o rascunho", async ({ page }) => {
+test("navegação mobile anima a tela inteira e preserva scroll, dados e histórico", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { runtimeErrors } = await mockApi(page, 40, false, 30);
+  let messageRequests = 0;
+  page.on("request", (request) => { if (/\/contacts\/\d+\/messages\?/.test(request.url())) messageRequests++; });
+  await page.goto("/");
+  const panel = page.locator("[data-swipe-back-panel]");
+  const sidebar = page.locator("#chat-sidebar");
+  const contact = page.getByRole("button", { name: "Contato 20", exact: true });
+  await contact.scrollIntoViewIfNeeded();
+  const list = sidebar.locator(".compact-scroll-viewport");
+  let listTop = await list.evaluate((element) => element.scrollTop);
+  expect(listTop).toBeGreaterThan(0);
+  await contact.click();
+  // Amostra quadros reais: header, mensagens e input viajam no mesmo painel.
+  await expect(panel).toHaveAttribute("data-navigation-state", "opening");
+  const openingX = (await panel.boundingBox())!.x;
+  expect(openingX).toBeGreaterThan(0);
+  expect(openingX).toBeLessThanOrEqual(390);
+  await expect(sidebar).toHaveAttribute("inert", "");
+  await expect(panel).toHaveAttribute("data-navigation-state", "open");
+  listTop = await list.evaluate((element) => element.scrollTop);
+  await panel.evaluate((element) => { element.dataset.sameInstance = "preserved"; });
+  const input = page.getByRole("textbox", { name: "Mensagem", exact: true });
+  await input.fill("Rascunho de navegação");
+  const historyLength = await page.evaluate(() => window.history.length);
+  const messages = page.locator("[data-swipe-back-area]");
+  await messages.evaluate((element) => { element.scrollTop = 250; });
+  const requestsBeforeBack = messageRequests;
+
+  await page.getByRole("button", { name: "Voltar para conversas" }).click();
+  await expect(panel).toHaveAttribute("data-navigation-state", "closing");
+  await expect(panel).toHaveAttribute("data-navigation-state", "closed");
+  expect(await list.evaluate((element) => element.scrollTop)).toBe(listTop);
+  await page.goForward();
+  await expect(panel).toHaveAttribute("data-navigation-state", "open");
+  await expect(panel).toHaveAttribute("data-same-instance", "preserved");
+  await expect(input).toHaveValue("Rascunho de navegação");
+  expect(await messages.evaluate((element) => element.scrollTop)).toBe(250);
+  expect(messageRequests).toBe(requestsBeforeBack);
+  expect(await page.evaluate(() => window.history.length)).toBe(historyLength);
+  await page.goBack();
+  await expect(panel).toHaveAttribute("data-navigation-state", "closed");
+  expect(await list.evaluate((element) => element.scrollTop)).toBe(listTop);
+  expect(runtimeErrors).toEqual([]);
+});
+
+test("redução de movimento elimina o deslocamento animado da navegação", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockApi(page);
+  await page.goto("/");
+  const panel = page.locator("[data-swipe-back-panel]");
+  await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+  await expect(panel).toHaveAttribute("data-navigation-state", "open");
+  expect((await panel.boundingBox())!.x).toBe(0);
+  await page.getByRole("button", { name: "Voltar para conversas" }).click();
+  await expect(panel).toHaveAttribute("data-navigation-state", "closed");
+});
+
+test("deslizar para a direita retorna à lista e preserva o rascunho", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const { runtimeErrors } = await mockApi(page);
   await page.goto("/");
@@ -339,25 +450,31 @@ test("deslizar para a direita retorna à lista e preserva o rascunho", async ({ 
     cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
   const panel = page.locator("[data-swipe-back-panel]");
   const sidebar = page.locator("#chat-sidebar");
+  await expect(panel).toHaveAttribute("data-navigation-state", "open");
   expect(await page.evaluate(() => Boolean(document.elementFromPoint(220, 180)?.closest("[data-swipe-back-area]")))).toBe(true);
 
   // Um movimento vertical e um horizontal curto não fecham a conversa.
-  await touch("touchStart", 220, 180);
-  await touch("touchMove", 215, 255);
-  await touch("touchEnd", 215, 255);
+  await touch("touchStart", 24, 180);
+  await touch("touchMove", 19, 255);
+  await touch("touchEnd", 19, 255);
   await expect(sidebar).toHaveAttribute("data-sidebar-open", "false");
+  // O gesto iniciado no meio da tela pertence às mensagens, não à navegação.
   await touch("touchStart", 175, 180);
-  await touch("touchMove", 220, 180);
+  await touch("touchMove", 300, 180);
+  await touch("touchEnd", 300, 180);
+  expect((await panel.boundingBox())!.x).toBe(0);
+  await touch("touchStart", 24, 180);
+  await touch("touchMove", 69, 180);
   await expect.poll(async () => (await panel.boundingBox())!.x).toBeGreaterThan(20);
-  await touch("touchEnd", 220, 180);
+  await touch("touchEnd", 69, 180);
   await expect.poll(async () => (await panel.boundingBox())!.x).toBeLessThan(1);
   await expect(sidebar).toHaveAttribute("data-sidebar-open", "false");
 
   // Deslizar da direita para a esquerda não fecha a conversa.
-  await touch("touchStart", 280, 180);
-  await touch("touchMove", 130, 180);
+  await touch("touchStart", 24, 180);
+  await touch("touchMove", 5, 180);
   await expect.poll(async () => (await panel.boundingBox())!.x).toBe(0);
-  await touch("touchEnd", 130, 180);
+  await touch("touchEnd", 5, 180);
   await expect(sidebar).toHaveAttribute("data-sidebar-open", "false");
 
   // Deslizar da esquerda para a direita retorna à lista.
@@ -365,6 +482,7 @@ test("deslizar para a direita retorna à lista e preserva o rascunho", async ({ 
   await page.waitForTimeout(600);
   await touch("touchMove", 204, 180);
   await expect.poll(async () => (await panel.boundingBox())!.x).toBeGreaterThan(100);
+  await page.screenshot({ path: testInfo.outputPath("swipe-back.png") });
   await touch("touchEnd", 204, 180);
   await expect(sidebar).toHaveAttribute("data-sidebar-open", "true");
   await expect(contactButton).toHaveAttribute("aria-current", "true");

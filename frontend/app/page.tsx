@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ContactSidebar, type ContactSidebarHandle } from "@/components/chat/contact-sidebar";
@@ -26,16 +26,56 @@ export default function Home() {
   // Impede que o mobile caia na tela vazia do chat: sem contato selecionado,
   // a lista permanece aberta mesmo durante hidratação ou restauração de estado.
   const mobileConversationListOpen = sidebarOpen || !chat.selectedContact;
-  const swipeBack = useMobileSwipeBack(!mobileConversationListOpen, () => setSidebarOpen(true));
+  const backPendingRef = useRef(false);
+  const backToList = useCallback(() => {
+    if (backPendingRef.current) return;
+    if (window.matchMedia("(max-width: 1023px)").matches && window.history.state?.cotrimbotContactId) {
+      backPendingRef.current = true;
+      window.history.back();
+    }
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    setSidebarOpen(true);
+  }, []);
+  const { setPanel, x, onPointerDown, onPointerMove, onPointerUp, onPointerCancel } = useMobileSwipeBack(!mobileConversationListOpen, backToList);
   const selectedContactId = chat.selectedContact?.id;
   const selectChatContact = chat.selectContact;
-  const resetSwipeBack = swipeBack.reset;
 
   const selectContact = useCallback((contact: Contact) => {
-    resetSwipeBack();
+    if (backPendingRef.current) return;
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      const state = { ...window.history.state, cotrimbotContactId: contact.id };
+      if (window.history.state?.cotrimbotContactId) window.history.replaceState(state, "");
+      else window.history.pushState(state, "");
+    }
     if (selectedContactId !== contact.id) selectChatContact(contact);
     setSidebarOpen(false);
-  }, [selectedContactId, selectChatContact, resetSwipeBack]);
+  }, [selectedContactId, selectChatContact]);
+
+  const historyRestoredRef = useRef(false);
+  const restoreConversation = useEffectEvent((state: { cotrimbotContactId?: number } | null) => {
+    backPendingRef.current = false;
+    if (window.location.pathname !== "/" || !window.matchMedia("(max-width: 1023px)").matches) return;
+    const contact = chat.contacts.find((item) => item.id === state?.cotrimbotContactId);
+    if (contact) {
+      if (selectedContactId !== contact.id) selectChatContact(contact);
+      setSidebarOpen(false);
+    } else {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      setSidebarOpen(true);
+    }
+  });
+  useEffect(() => {
+    const onPopState = (event: PopStateEvent) => restoreConversation(event.state);
+    // Restaura o estado local antes de o App Router processar a mesma travessia.
+    window.addEventListener("popstate", onPopState, true);
+    return () => window.removeEventListener("popstate", onPopState, true);
+  }, []);
+  useEffect(() => {
+    if (!historyRestoredRef.current && chat.contacts.length) {
+      historyRestoredRef.current = true;
+      if (window.history.state?.cotrimbotContactId) queueMicrotask(() => restoreConversation(window.history.state));
+    }
+  }, [chat.contacts]);
 
   function openContactById(contactId: number) {
     const contact = chat.contacts.find((item) => item.id === contactId);
@@ -43,9 +83,8 @@ export default function Home() {
   }
 
   async function openSharedContactForm(name: string, phone: string) {
-    resetSwipeBack();
     newContactFormRef.current?.openNewContact({ name, phone });
-    setSidebarOpen(true);
+    backToList();
   }
 
   async function messageSharedContact(_name: string, phone: string) {
@@ -74,7 +113,7 @@ export default function Home() {
     if (!params.has("contactId") && !params.has("notificationId")) return;
     const contact = chat.contacts.find((item) => item.id === Number(params.get("contactId")));
     if (contact) queueMicrotask(() => selectContact(contact));
-    window.history.replaceState(null, "", window.location.pathname);
+    window.history.replaceState(window.history.state, "", window.location.pathname);
   }, [chat, selectContact]);
   useEffect(() => {
     if (!isPending && !session) {
@@ -102,8 +141,8 @@ export default function Home() {
         selectedContactId={chat.selectedContact?.id}
         onSelectContact={selectContact}
         mobileOpen={mobileConversationListOpen}
-        revealForSwipe={swipeBack.revealing}
-        onMobileOpenChange={setSidebarOpen}
+        revealForSwipe
+        onMobileOpenChange={(open) => open ? backToList() : chat.selectedContact && selectContact(chat.selectedContact)}
         onLoadSavedContacts={chat.loadSavedContacts}
         onSaveContact={chat.saveContact}
         onArchiveContact={chat.archiveContact}
@@ -129,13 +168,14 @@ export default function Home() {
       />
 
       <motion.div
+        ref={setPanel}
         data-swipe-back-panel
-        className={`flex min-h-0 min-w-0 flex-1 bg-zinc-950 max-lg:relative max-lg:z-50 ${mobileConversationListOpen ? "max-lg:invisible" : ""}`}
-        style={{ x: swipeBack.x }}
-        onPointerDown={swipeBack.onPointerDown}
-        onPointerMove={swipeBack.onPointerMove}
-        onPointerUp={swipeBack.onPointerUp}
-        onPointerCancel={swipeBack.onPointerCancel}
+        className="flex min-h-0 min-w-0 flex-1 bg-zinc-950 max-lg:absolute max-lg:inset-0 max-lg:z-50 max-lg:backface-hidden"
+        style={{ x }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
       >
         <ChatPanel
           userId={session.user.id}
@@ -169,7 +209,7 @@ export default function Home() {
           onRenameContact={chat.renameContact}
           onSetContactAssignment={chat.setContactAssignment}
           onSetContactPriority={chat.setContactPriority}
-          onOpenSidebar={() => setSidebarOpen(true)}
+          onOpenSidebar={backToList}
           sidebarOpen={mobileConversationListOpen}
         />
       </motion.div>

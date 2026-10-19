@@ -5,7 +5,7 @@
   }
 
   .root[data-mobile="true"] {
-    padding: 6px max(8px, env(safe-area-inset-right)) max(6px, var(--chat-bottom-safe-area, env(safe-area-inset-bottom))) max(8px, env(safe-area-inset-left));
+    padding: 6px max(8px, env(safe-area-inset-right)) var(--chat-bottom-safe-area, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left));
     border-top: 1px solid rgb(255 255 255 / 9%);
     border-radius: 0;
     background: linear-gradient(to bottom, rgb(5 5 6 / 90%), #050506 80%);

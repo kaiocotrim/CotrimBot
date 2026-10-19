@@ -904,9 +904,9 @@ export function MessageComposer({
           </AnimatePresence>
           {attachmentError && <span role="alert" className="sr-only">{attachmentError}</span>}
           {/* Mesmo texto e fonte do campo, sem interferir na altura que está sendo animada. */}
-          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-0 overflow-hidden opacity-0">
-            <textarea ref={compactMirrorRef} value={text} readOnly tabIndex={-1} rows={1} className={textClassName} style={{ height: 0, width: `calc(100% - ${isMobile ? 52 + mobileRightInset + mobileTextInset + 2 : compactTextInset + 58}px)` }} />
-            <textarea ref={stackedMirrorRef} value={text} readOnly tabIndex={-1} rows={1} className={textClassName} style={{ height: 0, width: `calc(100% - ${isMobile ? 52 + mobileRightInset + 66 : 66}px)` }} />
+          <div aria-hidden="true" inert data-composer-measurement className="pointer-events-none absolute inset-x-0 top-0 h-0 overflow-hidden opacity-0">
+            <textarea ref={compactMirrorRef} value={text} disabled readOnly tabIndex={-1} rows={1} className={textClassName} style={{ height: 0, width: `calc(100% - ${isMobile ? 52 + mobileRightInset + mobileTextInset + 2 : compactTextInset + 58}px)` }} />
+            <textarea ref={stackedMirrorRef} value={text} disabled readOnly tabIndex={-1} rows={1} className={textClassName} style={{ height: 0, width: `calc(100% - ${isMobile ? 52 + mobileRightInset + 66 : 66}px)` }} />
           </div>
 
           <AnimatePresence>
@@ -1006,6 +1006,7 @@ export function MessageComposer({
               transition={transition}
               onAnimationComplete={syncTextScroll}
               rows={1}
+              enterKeyHint="send"
               aria-label="Mensagem"
               aria-autocomplete="list"
               aria-controls={mentionMatch ? mentionListId : undefined}
