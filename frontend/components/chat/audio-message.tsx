@@ -3,6 +3,7 @@
 import { useRef, useState, type ChangeEvent } from "react";
 
 import { transcribeMessage } from "@/lib/chat-api";
+import { isLocalTranscriptionEnabled, transcribeLocalAudio } from "@/lib/local-transcription";
 import { TranscriptionSettings } from "@/components/chat/transcription-settings";
 
 type AudioMessageProps = {
@@ -86,13 +87,15 @@ export function AudioMessage({ mediaUrl, messageId, onTranscribe }: AudioMessage
       setTranscribing(true);
       setError(null);
 
-      const transcription = onTranscribe ? await onTranscribe(messageId) : (await transcribeMessage(messageId)).transcription;
+      const transcription = isLocalTranscriptionEnabled()
+        ? await transcribeLocalAudio(mediaUrl)
+        : onTranscribe ? await onTranscribe(messageId) : (await transcribeMessage(messageId)).transcription;
 
       setTranscription(transcription);
       setShowTranscription(true);
     } catch (err) {
       console.error("Erro ao transcrever:", err);
-      setError("Não foi possível transcrever. Tente novamente.");
+      setError(err instanceof Error ? err.message : "Não foi possível transcrever. Tente novamente.");
     } finally {
       setTranscribing(false);
     }

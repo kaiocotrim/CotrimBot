@@ -5,6 +5,11 @@ node_modules/
 .venv/
 __pycache__/
 *.py[cod]
+.tools/
+.build-venv/
+transcription-service/build/
+transcription-service/dist/
+transcription-service/log-build.txt
 
 # Environment variables
 .env

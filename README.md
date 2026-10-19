@@ -52,7 +52,7 @@ Dockerfile                 # Build da imagem única do frontend + backend
 | --- | --- |
 | Frontend | Next.js 16, React 19, Tailwind CSS 4, Socket.IO Client |
 | Backend | Express 5, Socket.IO, Prisma 7, MySQL |
-| Transcrição | Python 3.11, FastAPI, faster-whisper, ffmpeg |
+| Transcrição | Python 3.11 (Docker) / Python 3.12 (Windows), FastAPI, faster-whisper, ffmpeg |
 | Infraestrutura | Docker Compose, Evolution API, Postgres, Redis |
 | IA | Gemini API (reformulação de texto) |
 
@@ -71,7 +71,7 @@ Dockerfile                 # Build da imagem única do frontend + backend
 
 - Node.js >= 22 e npm
 - Docker e Docker Compose (para rodar o ambiente completo)
-- Python 3.11 (apenas se for rodar o `transcription-service` fora do Docker)
+- Python 3.11 (apenas para rodar o `transcription-service` diretamente em desenvolvimento)
 
 ## Variáveis de ambiente
 
@@ -153,6 +153,40 @@ cd transcription-service
 pip install -r requirements.txt
 uvicorn main:app --reload --port 5000
 ```
+
+Para gerar o executável Windows (requer Python 3.12 de 64 bits instalado
+somente na máquina de build), execute `build-windows.bat` dentro de
+`transcription-service`. O script cria um ambiente virtual exclusivo, registra
+toda a saída em `log-build.txt` e gera:
+
+```text
+transcription-service/dist/CotrimBotTranscritor/
+  CotrimBotTranscritor.exe
+  _internal/
+```
+
+Na máquina do usuário final, execute `CotrimBotTranscritor.exe`. O serviço
+escuta apenas em `http://127.0.0.1:8765`. Na primeira execução, o modelo
+configurado (`base`) pode ser baixado; ele fica persistido em
+`%LOCALAPPDATA%\CotrimBot\Transcritor\models` e os logs ficam em
+`%LOCALAPPDATA%\CotrimBot\Transcritor\logs`.
+
+Em **Configurações → Transcrição local**, marque **Usar transcrição local
+neste navegador** e clique em **Verificar conexão**. A preferência é salva
+neste navegador e direciona os áudios (incluindo os do chat interno) e as
+configurações do modelo para o serviço do computador. Permita o acesso à
+rede local quando o navegador solicitar. O link **Abrir status do serviço**
+consulta o serviço; para iniciá-lo, abra o executável no Windows.
+
+O status retorna `loading` durante o carregamento do modelo, `ok` quando
+está pronto e `error` se o carregamento falhar. Para acessar a partir de
+outro endereço do frontend, defina `TRANSCRIPTION_ALLOWED_ORIGINS` no
+ambiente do executável com as origens permitidas separadas por vírgula.
+Por padrão, são aceitos `http://localhost:3000`, `http://127.0.0.1:3000`
+e `http://127.0.0.1:3100`.
+
+Teste do fluxo no navegador: `cd frontend` e
+`node --test tests/local-transcription.test.mjs`.
 
 ## Rodando com Docker Compose (ambiente completo)
 

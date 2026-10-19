@@ -4,7 +4,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Select } from "@base-ui/react/select";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
-import { BadgeCheck, Bell, Building2, Camera, Check, ChevronDown, ContactRound, Link2, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "lucide-react";
+import { BadgeCheck, Bell, Building2, Camera, Check, ChevronDown, ContactRound, Laptop, Link2, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "lucide-react";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ import { SuccessConfetti } from "@/components/chat/success-confetti";
 import { EvolutionConnectionSettings } from "@/components/chat/evolution-connection-settings";
 import { EvolutionCallSettings } from "@/components/chat/evolution-call-settings";
 import { authClient } from "@/lib/auth-client";
+import { checkLocalTranscription, isLocalTranscriptionEnabled, setLocalTranscriptionEnabled } from "@/lib/local-transcription";
 import { readNotificationPermission } from "@/hooks/use-notifications";
 import { usePushSubscription } from "@/hooks/use-push-subscription";
 import {
@@ -87,6 +88,7 @@ const sections = [
   { value: "whatsapp", label: "WhatsApp", icon: QrCode },
   { value: "calls", label: "Chamadas", icon: PhoneOff },
   { value: "business", label: "Empresa", icon: Building2 },
+  { value: "local", label: "Transcrição local", icon: Laptop },
 ] as const;
 
 const MotionPanel = motion.create(Tabs.Panel);
@@ -357,9 +359,74 @@ function SettingsContent({ user }: { user: SettingsUser }) {
             <EvolutionCallSettings />
           </MotionPanel>
 
+          <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="local" className={styles.panel}>
+            <LocalServiceSettings />
+          </MotionPanel>
+
         </div>
       </div>
     </Tabs.Root>
+  );
+}
+
+function LocalServiceSettings() {
+  const [status, setStatus] = useState<"idle" | "checking" | "online" | "offline">("idle");
+  const [enabled, setEnabled] = useState(isLocalTranscriptionEnabled);
+
+  async function checkLocalService() {
+    setStatus("checking");
+    try {
+      await checkLocalTranscription();
+      setStatus("online");
+    } catch {
+      setStatus("offline");
+    }
+  }
+
+  return (
+    <>
+      <section className={styles.card}>
+        <h3>Transcrição local</h3>
+        <p>
+          Execute o <strong>CotrimBotTranscritor.exe</strong> no seu computador para transcrever
+          os áudios usando CPU, sem depender de um serviço externo.
+        </p>
+        <ol>
+          <li>Abra o executável na pasta <code>dist\CotrimBotTranscritor</code>.</li>
+          <li>Aguarde o primeiro download do modelo de transcrição.</li>
+          <li>Mantenha a janela do serviço aberta enquanto usar a transcrição.</li>
+        </ol>
+        <a
+          href="http://127.0.0.1:8765/"
+          target="_blank"
+          rel="noreferrer"
+          className={styles.primaryButton}
+        >
+          Abrir status do serviço
+        </a>
+      </section>
+
+      <section className={styles.card}>
+        <h3>Status do serviço</h3>
+        <label>
+          <input type="checkbox" checked={enabled} onChange={(event) => {
+            const next = event.target.checked;
+            setLocalTranscriptionEnabled(next);
+            setEnabled(next);
+            if (next) void checkLocalService();
+          }} />{" "}
+          Usar transcrição local neste navegador
+        </label>
+        <p>
+          O serviço local deve responder em <code>http://127.0.0.1:8765</code>.
+        </p>
+        <button type="button" className={styles.secondaryButton} onClick={() => void checkLocalService()} disabled={status === "checking"}>
+          {status === "checking" ? "Verificando…" : "Verificar conexão"}
+        </button>
+        {status === "online" && <p role="status" className={styles.feedback}>Serviço local conectado.</p>}
+        {status === "offline" && <p role="alert" className={styles.error}>Serviço local indisponível. Abra o CotrimBotTranscritor.exe, aguarde o modelo carregar e permita o acesso à rede local no navegador.</p>}
+      </section>
+    </>
   );
 }
 

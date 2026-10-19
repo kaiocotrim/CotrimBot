@@ -543,6 +543,33 @@
   color: #222;
 }
 
+.secondaryButton {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  margin-top: 16px;
+  padding: 10px 24px;
+  border: 1px solid #3b3b3b;
+  border-radius: 999px;
+  background: transparent;
+  color: #f4f4f5;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.secondaryButton:hover:not(:disabled) {
+  border-color: #696969;
+  background: #1c1c1c;
+}
+
+.secondaryButton:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .accountForm {
   display: flex;
   flex-direction: column;
