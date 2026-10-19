@@ -322,7 +322,7 @@ export function ChatPanel({
           />
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 hidden bg-zinc-950/50 lg:block" />
 
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-20">
+          <div data-chat-header className="pointer-events-none absolute inset-x-0 top-0 z-20 max-lg:relative max-lg:shrink-0">
             <ChatHeader
               key={contact.id}
               contact={contact}

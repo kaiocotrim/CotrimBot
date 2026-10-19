@@ -2,11 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 
 const longWord = "a".repeat(160);
 
-async function mockApi(page: Page, messageCount = 1) {
+async function mockApi(page: Page, messageCount = 1, compactExamples = false) {
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   const message = { id: 1, externalId: "test-1", content: `Mensagem longa ${longWord}`, private: false, contactId: 1, direction: "INCOMING", type: "TEXT", createdAt: new Date().toISOString(), readAt: null, reaction: null, senderName: null, senderPhone: null, senderProfilePictureUrl: null };
-  const messages = Array.from({ length: messageCount }, (_, index) => ({ ...message, id: index + 1, externalId: `test-${index + 1}`, content: `Mensagem ${index + 1}: ${message.content}` }));
+  const messages = Array.from({ length: messageCount }, (_, index) => ({ ...message, id: index + 1, externalId: `test-${index + 1}`, private: compactExamples && index === 1, content: compactExamples && index < 2 ? index === 0 ? "OSS" : "Nota privada" : `Mensagem ${index + 1}: ${message.content}` }));
   const contact = { id: 1, name: "Contato de teste", phone: "5511999999999", isGroup: false, archived: false, unreadCount: 0, profilePictureUrl: null, messages: [message] };
 
   // Toda API é simulada no navegador, como no teste de digitação.
@@ -29,6 +29,8 @@ async function mockApi(page: Page, messageCount = 1) {
       body = { messages, hasMore: false, nextCursor: null };
     } else if (pathname.endsWith("/notifications")) {
       body = { notifications: [], unreadCount: 0 };
+    } else if (pathname.endsWith("/media-library")) {
+      body = { count: 0, items: [] };
     }
     await route.fulfill({ json: body });
   });
@@ -188,6 +190,36 @@ test("composer mobile abre câmera e emojis e troca microfone por envio", async 
   expect(runtimeErrors).toEqual([]);
 });
 
+test("bolhas mobile compactas preservam texto longo e mensagem privada", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { runtimeErrors } = await mockApi(page, 3, true);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+  const short = page.locator('[data-message-id="1"] [data-message-bubble]');
+  const privateBubble = page.locator('[data-message-id="2"] [data-message-bubble]');
+  const long = page.locator('[data-message-id="3"] [data-message-bubble]');
+  await expect(short).toContainText("OSS");
+  await expect(privateBubble).toContainText("Privado");
+  await expect(privateBubble).toHaveAttribute("data-private", "true");
+  expect((await short.boundingBox())!.width).toBeLessThan(140);
+  expect((await short.boundingBox())!.height).toBeLessThan(40);
+  expect((await privateBubble.boundingBox())!.height).toBeLessThan(60);
+  expect((await long.boundingBox())!.width).toBeLessThanOrEqual(390 * 0.85);
+  expect(await short.evaluate((element) => getComputedStyle(element).fontSize)).toBe("15px");
+  await page.screenshot({ path: testInfo.outputPath("mobile-compact.png") });
+
+  const field = page.locator("[data-composer-field]");
+  const input = page.getByRole("textbox", { name: "Mensagem", exact: true });
+  await expect.poll(async () => (await field.boundingBox())!.height).toBe(44);
+  await input.fill("Primeira linha\nSegunda linha");
+  await expect.poll(async () => (await field.boundingBox())!.height).toBeGreaterThan(44);
+  await expect.poll(async () => (await field.boundingBox())!.height).toBeLessThan(90);
+  await input.fill("");
+  await expect.poll(async () => (await field.boundingBox())!.height).toBe(44);
+  await expectNoHorizontalOverflow(page);
+  expect(runtimeErrors).toEqual([]);
+});
+
 test("teclado reduz só a conversa e mantém a posição de leitura", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const { runtimeErrors } = await mockApi(page, 40);
@@ -197,6 +229,15 @@ test("teclado reduz só a conversa e mantém a posição de leitura", async ({ p
   const root = page.locator("[data-chat-root]");
   const list = page.locator("[data-swipe-back-area]");
   const input = page.getByRole("textbox", { name: "Mensagem", exact: true });
+  const composer = page.locator("[data-message-composer]");
+  const field = composer.locator("[data-composer-field]");
+  // Simula a safe area do PWA sem depender de um modelo específico de celular.
+  await page.addStyleTag({ content: '[data-chat-root]:not([data-keyboard-open="true"]) { --chat-bottom-safe-area: 34px; }' });
+  const fieldBottomGap = async () => {
+    const rootBox = (await root.boundingBox())!;
+    const fieldBox = (await field.boundingBox())!;
+    return Math.round(rootBox.y + rootBox.height - fieldBox.y - fieldBox.height);
+  };
   const scrollMetrics = () => list.evaluate((element) => ({
     top: element.scrollTop,
     bottom: element.scrollHeight - element.clientHeight - element.scrollTop,
@@ -210,9 +251,14 @@ test("teclado reduz só a conversa e mantém a posição de leitura", async ({ p
   }, height);
 
   await expect.poll(async () => (await scrollMetrics()).bottom).toBeLessThan(2);
+  await expect.poll(fieldBottomGap).toBe(34);
+  const lastBubble = list.locator('[data-message-id="40"] [data-message-bubble]');
+  expect((await lastBubble.boundingBox())!.y + (await lastBubble.boundingBox())!.height).toBeLessThanOrEqual((await composer.boundingBox())!.y);
   await input.focus();
   await resizeVisualViewport(500);
   await expect.poll(async () => (await root.boundingBox())!.height).toBe(500);
+  await expect(root).toHaveAttribute("data-keyboard-open", "true");
+  await expect.poll(fieldBottomGap).toBe(6);
   const inputBox = (await input.boundingBox())!;
   const rootBox = (await root.boundingBox())!;
   expect(inputBox.y + inputBox.height).toBeLessThanOrEqual(rootBox.y + rootBox.height);
@@ -224,6 +270,8 @@ test("teclado reduz só a conversa e mantém a posição de leitura", async ({ p
 
   await resizeVisualViewport(844);
   await expect.poll(async () => (await root.boundingBox())!.height).toBe(844);
+  await expect(root).toHaveAttribute("data-keyboard-open", "false");
+  await expect.poll(fieldBottomGap).toBe(34);
   await expect.poll(async () => (await scrollMetrics()).bottom).toBeLessThan(2);
 
   await list.evaluate((element) => { element.scrollTop = 250; });

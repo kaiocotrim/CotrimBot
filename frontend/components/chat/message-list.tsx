@@ -215,10 +215,11 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
       >
         <div
           ref={contentRef}
-          className="flex min-h-full flex-col gap-2 px-2 sm:px-5"
+          data-message-list-content
+          className="flex min-h-full flex-col gap-1 px-2 sm:px-5 lg:gap-2"
           style={{
-            paddingTop: `calc(var(--chat-header-height, 64px) + env(safe-area-inset-top) + ${hasPinnedMessage ? "56px" : "var(--chat-message-top-gap, 0px)"})`,
-            paddingBottom: "max(7rem, calc(var(--chat-composer-height, 0px) + 0.75rem))",
+            paddingTop: `var(--chat-message-top-space, calc(var(--chat-header-height, 64px) + env(safe-area-inset-top) + ${hasPinnedMessage ? "56px" : "var(--chat-message-top-gap, 0px)"}))`,
+            paddingBottom: "var(--chat-message-bottom-space, max(7rem, calc(var(--chat-composer-height, 0px) + 0.75rem)))",
           }}
         >
         {loadingOlderMessages && (
@@ -365,7 +366,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
         aria-label="Ir para a mensagem mais recente"
         aria-hidden={!showScrollButton}
         tabIndex={showScrollButton ? 0 : -1}
-        className={`absolute right-1/2 bottom-[calc(var(--chat-composer-height,0px)+12px)] z-20 flex size-9 translate-x-1/2 items-center justify-center rounded-full border border-white/15 bg-zinc-900/90 text-zinc-200 shadow-[0_6px_20px_rgba(0,0,0,0.35)] backdrop-blur-xl transition-[opacity,transform,background-color] duration-200 hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-white/60 motion-reduce:transition-none ${showScrollButton ? "scale-100 opacity-100" : "pointer-events-none scale-90 opacity-0"}`}
+        className={`absolute right-1/2 bottom-[calc(var(--chat-composer-height,0px)+12px)] max-lg:bottom-3 z-20 flex size-9 translate-x-1/2 items-center justify-center rounded-full border border-white/15 bg-zinc-900/90 text-zinc-200 shadow-[0_6px_20px_rgba(0,0,0,0.35)] backdrop-blur-xl transition-[opacity,transform,background-color] duration-200 hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-white/60 motion-reduce:transition-none ${showScrollButton ? "scale-100 opacity-100" : "pointer-events-none scale-90 opacity-0"}`}
       >
         <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M12 4v15M6.5 13.5 12 19l5.5-5.5" />

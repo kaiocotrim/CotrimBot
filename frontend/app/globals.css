@@ -15,10 +15,17 @@ html:has([data-chat-root]) body {
 /* Mantém cabeçalho e composer dentro da área realmente visível no mobile. */
 @media (max-width: 1023px) {
   [data-chat-root] {
+    --chat-message-top-space: 8px;
+    --chat-message-bottom-space: 8px;
+    --chat-bottom-safe-area: env(safe-area-inset-bottom, 0px);
     position: fixed;
     inset-inline: 0;
     top: var(--chat-viewport-top, 0px);
     height: var(--chat-viewport-height, 100dvh);
+  }
+
+  [data-chat-root][data-keyboard-open="true"] {
+    --chat-bottom-safe-area: 0px;
   }
 
   /* Apenas o conteúdo não editável dos balões dispensa a seleção nativa. */

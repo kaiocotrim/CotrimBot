@@ -365,6 +365,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
   return (
     <div
       data-message-bubble
+      data-private={isPrivate}
       onContextMenu={(event) => {
         if (!isMessageGestureTarget(event.target)) return;
         event.preventDefault();
@@ -387,9 +388,9 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
         event.preventDefault();
         event.stopPropagation();
       }}
-      className={`group/message relative min-w-0 max-w-[86%] text-base leading-[1.45] transition-[background-color,box-shadow] duration-300 lg:max-w-[min(62%,620px)] lg:text-[13.5px] lg:leading-[1.4] font-normal [overflow-wrap:anywhere] ${isPrivate ? "text-zinc-900" : "text-white"} ${message.reaction ? "mb-3" : ""} ${
+      className={`group/message relative min-w-0 max-w-[85%] text-[15px] leading-[1.35] transition-[background-color,box-shadow] duration-300 lg:max-w-[min(62%,620px)] lg:text-[13.5px] lg:leading-[1.4] font-normal [overflow-wrap:anywhere] ${isPrivate ? "text-zinc-900" : "text-white"} ${message.reaction ? "mb-3" : ""} ${
         isPrivate
-          ? "rounded-[24px] bg-zinc-100 px-3.5 py-2.5 shadow-[0_4px_16px_rgba(24,24,27,0.12)]"
+          ? "rounded-2xl bg-zinc-100 px-2.5 py-1.5 lg:rounded-[24px] lg:px-3.5 lg:py-2.5 shadow-[0_4px_16px_rgba(24,24,27,0.12)]"
           : isSticker
           ? "overflow-visible bg-transparent p-0"
           : message.type === "CONTACT"
@@ -400,7 +401,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
             ? `rounded-[20px] p-[3px] shadow-[0_3px_12px_rgba(0,0,0,0.16)] bg-zinc-800`
           : isImage
             ? `rounded-[18px] p-[3px] shadow-[0_3px_12px_rgba(0,0,0,0.16)] bg-zinc-800`
-            : `rounded-[24px] px-3.5 py-2.5 bg-zinc-800`
+            : `rounded-2xl px-2.5 py-1.5 lg:rounded-[24px] lg:px-3.5 lg:py-2.5 bg-zinc-800`
       } ${message.favorited ? "!bg-amber-300/[0.10] shadow-[0_8px_24px_rgba(245,158,11,0.08)]" : ""}`}
     >
       <AnimatePresence>
@@ -417,7 +418,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
         )}
       </AnimatePresence>
       {isPrivate && (
-        <div className="mb-1 flex items-center gap-1 text-xs font-semibold tracking-wide text-zinc-600 lg:text-[10px]">
+        <div className="mb-0.5 flex items-center gap-1 text-[11px] leading-[14px] font-semibold text-zinc-600 lg:mb-1 lg:text-[10px] lg:leading-normal lg:tracking-wide">
           <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
           <span>Privado</span>
         </div>

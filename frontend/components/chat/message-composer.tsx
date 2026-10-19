@@ -714,31 +714,34 @@ export function MessageComposer({
     const form = formRef.current;
     const panel = composer?.parentElement;
     if (!composer || !form || !panel) return;
+    const header = panel.querySelector<HTMLElement>("[data-chat-header]");
     const observer = new ResizeObserver(() => {
       panel.style.setProperty("--chat-composer-height", `${composer.offsetHeight}px`);
       const chromeHeight = composer.offsetHeight - form.offsetHeight;
-      setAvailableHeight(Math.max(48, panel.clientHeight - chromeHeight - 16));
+      const headerHeight = window.matchMedia("(max-width: 1023px)").matches ? header?.offsetHeight ?? 0 : 0;
+      setAvailableHeight(Math.max(44, panel.clientHeight - headerHeight - chromeHeight - 16));
     });
     observer.observe(composer);
     observer.observe(panel);
+    if (header) observer.observe(header);
     return () => {
       observer.disconnect();
       panel.style.removeProperty("--chat-composer-height");
     };
   }, []);
 
-  const naturalHeight = isLongTextCollapsed ? 136 : Math.max(112, Math.min(measurements.stacked, 144) + 72);
+  const naturalHeight = isLongTextCollapsed ? 136 : isMobile ? Math.max(44, Math.min(measurements.compact, 144) + 20) : Math.max(112, Math.min(measurements.stacked, 144) + 72);
   const fieldHeight = isFullscreen ? availableHeight : isStacked ? Math.min(naturalHeight, availableHeight) : 44;
-  const textHeight = isStacked ? Math.max(24, fieldHeight - 72) : 24;
-  const controlBottom = isStacked ? 8 : 6;
+  const textHeight = isStacked ? Math.max(24, fieldHeight - (isMobile ? 20 : 72)) : 24;
+  const controlBottom = isMobile ? 6 : isStacked ? 8 : 6;
   const mobileRightInset = hasPayload && !isRecording ? 52 : 96;
   const mobileTextInset = (text.trim() ? 88 : 54) + (isPrivateMode ? 24 : 0);
   const compactTextInset = (isRecording ? (isFocused ? 216 : 180) : isFocused ? 178 : showControls ? 144 : 68) + (isPrivateMode && showControls ? 24 : 0);
   const textLayout = isMobile ? {
     height: textHeight,
-    top: isStacked ? 16 : 10,
-    left: isStacked ? 16 : isPrivateMode ? 38 : 14,
-    width: isStacked ? "calc(100% - 64px)" : `calc(100% - ${mobileTextInset}px)`,
+    top: 10,
+    left: isPrivateMode ? 38 : 14,
+    width: `calc(100% - ${mobileTextInset}px)`,
   } : {
     height: textHeight,
     top: isStacked ? 16 : 10,
