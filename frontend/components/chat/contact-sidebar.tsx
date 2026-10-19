@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Archive, ArchiveRestore, ArrowLeft, Building2, ChevronDown, Copy, MessageCircle, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Phone, Search, UserRound, UserRoundPlus, X } from "lucide-react";
 import { getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/min";
@@ -68,6 +68,13 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
   const [isCollapsed, setIsCollapsed] = useState(false);
   // O modo recolhido só existe no desktop; no mobile o painel abre sempre completo.
   const collapsed = isCollapsed && isDesktop;
+  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [resizing, setResizing] = useState(false);
+  const resizeRef = useRef<{ pointerId: number; startX: number; width: number } | null>(null);
+
+  function resizeSidebar(width: number) {
+    setSidebarWidth(Math.round(Math.max(280, Math.min(window.innerWidth * 0.42, width))));
+  }
   const [query, setQuery] = useState("");
   const [conversationFilter, setConversationFilter] = useState<ConversationFilter>("conversations");
   const [showArchived, setShowArchived] = useState(false);
@@ -643,14 +650,49 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
         data-sidebar-open={mobileOpen || showNotifications ? "true" : "false"}
         aria-hidden={!mobileOpen && !showNotifications && !isDesktop}
         inert={!mobileOpen && !showNotifications && !isDesktop}
-        className={`absolute inset-0 z-40 flex h-full w-full bg-zinc-950 outline-none lg:visible lg:static lg:z-auto lg:h-full lg:w-auto lg:shrink-0 lg:bg-transparent lg:opacity-100 lg:pointer-events-auto ${mobileOpen || showNotifications ? "visible opacity-100" : revealForSwipe ? "visible pointer-events-none opacity-100" : "invisible pointer-events-none opacity-0"}`}
+        style={{ "--contact-sidebar-width": `${sidebarWidth}px` } as CSSProperties}
+        className={`absolute inset-0 z-40 flex h-full w-full bg-zinc-950 outline-none lg:visible lg:relative lg:inset-auto lg:z-auto lg:h-full lg:w-auto lg:shrink-0 lg:bg-transparent lg:opacity-100 lg:pointer-events-auto ${mobileOpen || showNotifications ? "visible opacity-100" : revealForSwipe ? "visible pointer-events-none opacity-100" : "invisible pointer-events-none opacity-0"}`}
       >
         {navigationRail}
         {content}
+        {!collapsed && (
+          <div
+            role="separator"
+            aria-label="Ajustar largura da lista de conversas"
+            aria-orientation="vertical"
+            aria-valuetext={`${sidebarWidth} pixels`}
+            tabIndex={0}
+            title="Arraste para ajustar a largura. Clique duas vezes para restaurar."
+            className="absolute inset-y-0 -right-1 z-60 hidden w-2 cursor-col-resize touch-none select-none outline-none before:absolute before:inset-y-0 before:left-1/2 before:w-px before:transition-colors hover:before:bg-white/35 focus-visible:before:bg-white/60 lg:block"
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              const panel = event.currentTarget.previousElementSibling;
+              resizeRef.current = { pointerId: event.pointerId, startX: event.clientX, width: panel?.getBoundingClientRect().width ?? sidebarWidth };
+              setResizing(true);
+              event.currentTarget.setPointerCapture(event.pointerId);
+              event.preventDefault();
+            }}
+            onPointerMove={(event) => {
+              const drag = resizeRef.current;
+              if (drag?.pointerId === event.pointerId) resizeSidebar(drag.width + event.clientX - drag.startX);
+            }}
+            onPointerUp={(event) => {
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+            }}
+            onLostPointerCapture={() => { resizeRef.current = null; setResizing(false); }}
+            onPointerCancel={() => { resizeRef.current = null; setResizing(false); }}
+            onDoubleClick={() => setSidebarWidth(320)}
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home") return;
+              event.preventDefault();
+              resizeSidebar(event.key === "Home" ? 320 : sidebarWidth + (event.key === "ArrowRight" ? 16 : -16));
+            }}
+          />
+        )}
       </div>
     </>
   );
-  const panelWidthClass = "w-full min-w-0 max-w-none lg:w-[320px] lg:min-w-[280px] lg:max-w-[42vw]";
+  const panelWidthClass = "w-full min-w-0 max-w-none lg:w-[var(--contact-sidebar-width,320px)] lg:min-w-[280px] lg:max-w-[42vw]";
   const closeDrawerButton = (
     <button
       type="button"
@@ -940,7 +982,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
             </motion.button>
             {savedActionError && <p role="alert" className="px-3 pt-3 text-sm text-red-300">{savedActionError}</p>}
           </div>
-          {savedLoading && <p role="status" className="px-5 py-8 text-sm text-zinc-400">Carregando contatos salvos...</p>}
+          {savedLoading && <p role="status" className="px-5 py-8 text-center text-sm text-zinc-400">Carregando contatos salvos...</p>}
           {!savedLoading && savedError && (
             <div className="px-5 py-8 text-sm text-red-300" role="alert">
               <p>{savedError}</p>
@@ -951,13 +993,18 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
             <div className="px-5 pt-7 pb-2 text-[11px] font-semibold tracking-[0.12em] text-zinc-500 uppercase">Contatos salvos</div>
           )}
           {!savedLoading && !savedError && visibleSavedContacts.length === 0 && <p className="px-5 py-6 text-sm leading-5 text-zinc-500">{savedQuery ? "Nenhum contato encontrado" : "Sua lista está vazia. Salve um contato para iniciar uma conversa."}</p>}
-          {!savedLoading && !savedError && visibleSavedContacts.map((contact) => {
+          {!savedLoading && !savedError && visibleSavedContacts.map((contact, index) => {
             const first = contact.name.trim().charAt(0).toLocaleUpperCase("pt-BR");
             const letter = /^[A-ZÀ-ÖØ-Ý]$/u.test(first) ? first : "#";
             const showLetter = letter !== previousLetter;
             previousLetter = letter;
             return (
-              <div key={contact.id}>
+              <motion.div
+                key={contact.id}
+                initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.3, delay: Math.min(index, 7) * 0.035, ease: [0.22, 1, 0.36, 1] }}
+              >
                 {showLetter && <div className="px-5 pt-5 pb-1.5 text-xs font-medium text-zinc-500">{letter}</div>}
                 <div className="mx-2 flex items-center rounded-xl transition-colors hover:bg-white/[0.05]">
                   <button type="button" onClick={() => { onSelectContact(contact); setShowSavedContacts(false); }} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left focus-visible:bg-white/[0.07] focus-visible:outline-none">
@@ -971,7 +1018,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
                     </span>
                   </button>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </CompactScrollArea>
@@ -984,8 +1031,9 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
         ref={sidebarRef}
         tabIndex={-1}
         aria-label="Barra lateral de conversas"
+        data-resizing={resizing}
         aria-keyshortcuts="Control+b"
-        className={`relative flex h-full min-h-0 shrink-0 flex-col bg-[#09090b] outline-none transition-[width,min-width,max-width] duration-200 motion-reduce:transition-none lg:border-r lg:border-white/[0.08] lg:bg-transparent ${collapsed ? "w-20 min-w-20 max-w-20" : panelWidthClass}`}
+        className={`relative flex h-full min-h-0 shrink-0 flex-col bg-[#09090b] outline-none transition-[width,min-width,max-width] duration-200 data-[resizing=true]:transition-none motion-reduce:transition-none lg:border-r lg:border-white/[0.08] lg:bg-transparent ${collapsed ? "w-20 min-w-20 max-w-20" : panelWidthClass}`}
       >
         {collapsed && (
           <div className="flex justify-center pt-4">
