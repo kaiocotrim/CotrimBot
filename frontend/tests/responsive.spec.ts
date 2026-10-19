@@ -158,8 +158,8 @@ test("composer mobile abre câmera e emojis e troca microfone por envio", async 
   const chooserPromise = page.waitForEvent("filechooser");
   await composer.getByRole("button", { name: "Abrir câmera", exact: true }).click();
   const chooser = await chooserPromise;
-  await expect(chooser.element()).toHaveAttribute("accept", "image/*");
-  await expect(chooser.element()).toHaveAttribute("capture", "environment");
+  expect(await chooser.element().getAttribute("accept")).toBe("image/*");
+  expect(await chooser.element().getAttribute("capture")).toBe("environment");
   await chooser.setFiles({
     name: "camera.png", mimeType: "image/png",
     buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a6XcAAAAASUVORK5CYII=", "base64"),
