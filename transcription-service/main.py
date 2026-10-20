@@ -218,3 +218,5 @@ async def transcribe(file: UploadFile = File(...)):
             os.remove(temp_path)
         except OSError:
             logger.warning("Não foi possível remover o arquivo temporário %s.", temp_path)
+
+

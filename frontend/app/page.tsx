@@ -102,6 +102,9 @@ export default function Home() {
     onOpenContact: openContactById,
     onOpenInternalConversation: (conversationId) => router.push(`/chat-interno/?conversationId=${encodeURIComponent(conversationId)}`),
   });
+  useEffect(() => {
+    if (selectedContactId !== undefined) notifications.markContactRead(selectedContactId);
+  }, [selectedContactId, notifications.markContactRead]);
 
   // O app aberto por um clique em notificação push chega com ?contactId=; abre a conversa
   // assim que os contatos carregarem e limpa a URL.

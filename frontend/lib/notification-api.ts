@@ -26,6 +26,10 @@ export async function markNotificationRead(id: number) {
   await request(`/notifications/${id}/read`, { method: "PATCH" });
 }
 
+export async function markContactNotificationsRead(contactId: number) {
+  await request(`/notifications/contact/${contactId}/read`, { method: "PATCH" });
+}
+
 export async function markAllNotificationsRead() {
   await request("/notifications/read-all", { method: "PATCH" });
 }
