@@ -167,14 +167,14 @@ export async function getContactGroupParticipants(req: Request, res: Response) {
     const participants = [...new Map((group.participants ?? []).flatMap((participant) => {
       const identifier = participant.phoneNumber ?? participant.id ?? "";
       const phone = identifier.replace(/@.*$/, "").replace(/\D/g, "");
-      const lid = participant.id?.endsWith("@lid") ? participant.id : null;
+      const lid = participant.lid ?? (participant.id?.endsWith("@lid") ? participant.id : null);
       return phone ? [[phone, { phone, lid, isAdmin: Boolean(participant.admin) }] as const] : [];
     })).values()];
     const phones = participants.map((participant) => participant.phone);
     const lids = participants.flatMap((participant) => participant.lid ? [participant.lid] : []);
     const participantIdentifiers = [...phones, ...lids.map((lid) => lid.replace(/\D/g, ""))];
 
-    const [savedContacts, cachedAvatars] = phones.length ? await Promise.all([
+    const [savedContacts, cachedSenders] = phones.length ? await Promise.all([
       prisma.contact.findMany({
         where: {
           isSaved: true,
@@ -189,10 +189,10 @@ export async function getContactGroupParticipants(req: Request, res: Response) {
         where: {
           contactId: id,
           senderPhone: { in: participantIdentifiers },
-          senderProfilePictureUrl: { not: null },
+          OR: [{ senderName: { not: null } }, { senderProfilePictureUrl: { not: null } }],
         },
         orderBy: { createdAt: "desc" },
-        select: { senderPhone: true, senderProfilePictureUrl: true },
+        select: { senderPhone: true, senderName: true, senderProfilePictureUrl: true },
       }),
     ]) : [[], []];
 
@@ -201,8 +201,13 @@ export async function getContactGroupParticipants(req: Request, res: Response) {
       ? [[item.whatsappLid.replace(/\D/g, ""), item] as const]
       : []));
     const avatarsByPhone = new Map<string, string>();
-    for (const item of cachedAvatars) {
+    const namesByIdentifier = new Map<string, string>();
+    for (const item of cachedSenders) {
       const phone = item.senderPhone?.replace(/\D/g, "");
+      const name = item.senderName?.trim();
+      if (phone && name && name !== "Participante" && !/^\+?[\d\s().:-]+(?:@(?:lid|s\.whatsapp\.net))?$/.test(name) && !namesByIdentifier.has(phone)) {
+        namesByIdentifier.set(phone, name);
+      }
       if (phone && item.senderProfilePictureUrl && !avatarsByPhone.has(phone)) {
         avatarsByPhone.set(phone, item.senderProfilePictureUrl);
       }
@@ -215,7 +220,9 @@ export async function getContactGroupParticipants(req: Request, res: Response) {
         return {
           phone: participant.phone,
           lid: participant.lid?.replace(/\D/g, "") ?? null,
-          name: savedContact?.name ?? null,
+          name: savedContact?.name ?? namesByIdentifier.get(participant.phone)
+            ?? (participant.lid ? namesByIdentifier.get(participant.lid.replace(/\D/g, "")) : null)
+            ?? null,
           profilePictureUrl: savedContact?.profilePictureUrl
             ?? avatarsByPhone.get(participant.phone)
             ?? (participant.lid ? avatarsByPhone.get(participant.lid.replace(/\D/g, "")) : undefined)

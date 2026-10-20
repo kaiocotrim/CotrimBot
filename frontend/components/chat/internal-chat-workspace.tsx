@@ -18,6 +18,10 @@ import { useInternalChat } from "@/hooks/use-internal-chat";
 import { internalChatApi, internalMediaUrl, type InternalConversation, type InternalMember, type InternalMessage } from "@/lib/internal-chat-api";
 import { prepareAvatarImage } from "@/lib/prepare-avatar-image";
 import { participantColor } from "@/lib/participant-color";
+import { Languages } from "lucide-react";
+import { MessageTranslation } from "@/components/chat/message-translation";
+import { useMessageTranslations } from "@/hooks/use-message-translations";
+import { splitMessageSignatures } from "@/lib/message-signature";
 import type { Message } from "@/types/chat";
 
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
@@ -154,6 +158,7 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [rowMenuId, setRowMenuId] = useState<string | null>(null);
   const [messageMenuId, setMessageMenuId] = useState<number | null>(null);
+  const { getTranslation, toggleTranslation, hideTranslation } = useMessageTranslations();
   const [reactionMenuId, setReactionMenuId] = useState<number | null>(null);
   const [reactionPosition, setReactionPosition] = useState({ top: 0, left: 0 });
   const [reactingMessageId, setReactingMessageId] = useState<number | null>(null);
@@ -865,6 +870,9 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
               {chat.loadingMessages && <p className="py-2 text-center text-xs text-zinc-400">Carregando histórico...</p>}
               {chat.messages.map((message, index) => {
                 const own = message.senderId === userId;
+                const translationSource = own && !message.private ? splitMessageSignatures(message.content).body : message.content;
+                const canTranslate = message.type === "TEXT" && !message.deletedAt && Boolean(translationSource.trim());
+                const translation = getTranslation(message.id, translationSource);
                 const previous = chat.messages[index - 1];
                 const separator = !previous || dayFormatter.format(new Date(previous.createdAt)) !== dayFormatter.format(new Date(message.createdAt));
                 const cascadeStart = Math.max(0, chat.messages.length - 12);
@@ -895,6 +903,7 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
                         {message.type === "FILE" && message.media && !message.deletedAt && chat.organizationId && chat.selectedId
                           ? <InternalMediaContent message={message} messages={chat.messages} organizationId={chat.organizationId} conversationId={chat.selectedId} currentUserId={userId} />
                           : <div className="whitespace-pre-wrap break-words"><MessageText content={message.deletedAt ? "Mensagem apagada" : message.content} showSignature={own && !message.private} /></div>}
+                        {canTranslate && <MessageTranslation translation={translation} lightBackground={Boolean(message.private)} onHide={() => hideTranslation(message.id, translationSource)} onRetry={() => void toggleTranslation(message.id, translationSource)} />}
                         <div className={mediaTime ? "absolute right-2 bottom-2 flex items-center justify-end gap-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[9px] text-white/85" : message.private ? "mt-1 flex items-center justify-end gap-1.5 text-[9px] text-zinc-500" : "mt-1 flex items-center justify-end gap-1.5 text-[9px] text-white/55"}>
                           {messagePinned && <Pin className="size-3" fill="currentColor" aria-label="Mensagem fixada" />}
                           {message.favorited && <Star className="size-3" fill="currentColor" aria-label="Mensagem favorita" />}
@@ -916,6 +925,7 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
                             >
                               <button type="button" role="menuitem" onClick={() => { setReplyTo(message); setMessageMenuId(null); }} className={menuItemClass}><Reply className="size-4" /> Responder</button>
                               <button type="button" role="menuitem" disabled={!message.content || Boolean(message.deletedAt)} onClick={() => { void navigator.clipboard.writeText(message.content); setMessageMenuId(null); }} className={`${menuItemClass} disabled:opacity-40`}><Copy className="size-4" /> Copiar</button>
+                              {canTranslate && <button type="button" role="menuitem" disabled={translation?.status === "loading"} onClick={() => { setMessageMenuId(null); void toggleTranslation(message.id, translationSource); }} className={`${menuItemClass} disabled:opacity-40`}><Languages className="size-4" /> {translation?.status === "loading" ? "Traduzindo…" : translation?.visible ? "Ocultar tradução" : "Traduzir para português"}</button>}
                               <button type="button" role="menuitem" disabled={Boolean(message.deletedAt)} onClick={(event) => openReactionPicker(message, event.currentTarget)} className={`${menuItemClass} disabled:opacity-40`}><Smile className="size-4" /> Reagir</button>
                               <button type="button" role="menuitem" disabled={Boolean(message.deletedAt)} onClick={() => openForward(message)} className={`${menuItemClass} disabled:opacity-40`}><Forward className="size-4" /> Encaminhar</button>
                               <button type="button" role="menuitem" disabled={messageActionBusy === message.id || Boolean(message.deletedAt)} onClick={() => messagePinned ? void updateMessageFlags(message, { pinned: false }) : openPinDialog(message)} className={`${menuItemClass} disabled:opacity-40`}><Pin className="size-4" fill={messagePinned ? "currentColor" : "none"} /> {messagePinned ? "Desafixar" : "Fixar"}</button>

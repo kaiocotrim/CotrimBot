@@ -1,8 +1,27 @@
-import { Fragment } from "react";
+"use client";
+
+import { Fragment, useContext } from "react";
 import { EmojiText } from "@/components/chat/emoji-text";
+import { GroupMentionContext } from "@/components/chat/group-mention-context";
 import { splitMessageSignatures } from "@/lib/message-signature";
 
 const URL_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"'`“”‘’]+/gi;
+
+const MENTION_PATTERN = /(?<![\p{L}\p{N}_@])@(\d{5,20})(?:@(?:s\.whatsapp\.net|lid))?(?![\p{L}\p{N}_@])/gu;
+
+function MentionText({ content }: { content: string }) {
+  const mentions = useContext(GroupMentionContext);
+  if (!mentions?.size) return <EmojiText content={content} />;
+  const parts = [];
+  let offset = 0;
+  for (const match of content.matchAll(MENTION_PATTERN)) {
+    const target = mentions.get(match[1]);
+    if (!target) continue;
+    parts.push(<Fragment key={match.index}><EmojiText content={content.slice(offset, match.index)} /><span data-whatsapp-mention={match[1]} title={`@${target.name}`} className="rounded bg-sky-400/10 px-0.5 font-semibold text-sky-400 [[data-private-message=true]_&]:text-sky-700">@{target.name}</span></Fragment>);
+    offset = match.index + match[0].length;
+  }
+  return <>{parts}<EmojiText content={content.slice(offset)} /></>;
+}
 
 function trimUrlPunctuation(value: string) {
   let url = value;
@@ -32,7 +51,7 @@ export function MessageText({ content, showSignature = false, linkify = true }: 
   const parts = [];
   let offset = 0;
 
-  for (const match of linkify ? body.matchAll(URL_PATTERN) : []) {
+  for (const match of body.matchAll(URL_PATTERN)) {
     const value = trimUrlPunctuation(match[0]);
     const href = /^https?:\/\//i.test(value) ? value : `https://${value}`;
     try {
@@ -44,19 +63,19 @@ export function MessageText({ content, showSignature = false, linkify = true }: 
 
     parts.push(
       <Fragment key={match.index}>
-        <EmojiText content={body.slice(offset, match.index)} />
-        <a
+        <MentionText content={body.slice(offset, match.index)} />
+        {linkify ? <a
           href={href}
           target="_blank"
           rel="noopener noreferrer"
           className="cursor-pointer break-words underline underline-offset-2 [overflow-wrap:anywhere] hover:opacity-80 focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
         >
           {value}
-        </a>
+        </a> : <EmojiText content={value} />}
       </Fragment>,
     );
     offset = match.index + value.length;
   }
 
-  return <>{parts}<EmojiText content={body.slice(offset)} /></>;
+  return <>{parts}<MentionText content={body.slice(offset)} /></>;
 }

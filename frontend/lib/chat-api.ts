@@ -234,6 +234,18 @@ export async function rewriteMessage(text: string): Promise<string> {
   return result.text;
 }
 
+export async function translateMessage(text: string): Promise<string> {
+  const response = await fetch(`${API_URL}/ai/translate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+    credentials: "include",
+  });
+  const result = await parseResponse<{ text: string }>(response, "Não foi possível traduzir a mensagem.");
+  if (typeof result.text !== "string" || !result.text.trim()) throw new Error("O serviço não retornou uma tradução válida.");
+  return result.text;
+}
+
 // Solicita ao backend o encerramento com a pesquisa de satisfação do bot.
 export async function closeConversationWithBot(contactId: number): Promise<{ message: Message; contact: Contact }> {
   const response = await fetch(

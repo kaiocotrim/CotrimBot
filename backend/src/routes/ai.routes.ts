@@ -1,6 +1,8 @@
 import { Router } from "express";
+import { translateMessage } from "../controllers/translation.controller.js";
 
 export const aiRouter = Router();
+aiRouter.post("/ai/translate", translateMessage);
 
 type GeminiResponse = {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;

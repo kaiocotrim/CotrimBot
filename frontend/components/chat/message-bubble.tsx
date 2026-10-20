@@ -26,6 +26,10 @@ import { SharedContactMessage } from "@/components/chat/shared-contact-message";
 import { PollMessage } from "@/components/chat/poll-message";
 import { TextMessage } from "@/components/chat/text-message";
 import { VideoMessage } from "@/components/chat/video-message";
+import { Languages } from "lucide-react";
+import { MessageTranslation } from "@/components/chat/message-translation";
+import { useMessageTranslations } from "@/hooks/use-message-translations";
+import { splitMessageSignatures } from "@/lib/message-signature";
 import { participantColor } from "@/lib/participant-color";
 import type { Contact, Message } from "@/types/chat";
 
@@ -97,6 +101,10 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
   const outgoing = message.direction === "OUTGOING";
   const isPrivate = Boolean(message.private);
   const showSignature = outgoing && !isPrivate;
+  const { getTranslation, toggleTranslation, hideTranslation } = useMessageTranslations();
+  const translationSource = showSignature ? splitMessageSignatures(message.content).body : message.content;
+  const canTranslate = message.type === "TEXT" && !message.deletedAt && Boolean(translationSource.trim());
+  const translation = getTranslation(message.id, translationSource);
   const isAudio = message.type === "AUDIO";
   const isImage = message.type === "IMAGE";
   const isVideo = message.type === "VIDEO";
@@ -378,6 +386,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           showActions();
         }
       }}
+      data-private-message={isPrivate ? "true" : undefined}
       onPointerDown={onMessagePointerDown}
       onPointerMove={onMessagePointerMove}
       onPointerUp={(event) => { if (longPressRef.current?.pointerId === event.pointerId) cancelLongPress(); }}
@@ -497,6 +506,10 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
                     <Copy size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Copiar</span>
                   </button>
+                  {canTranslate && <button type="button" role="menuitem" disabled={translation?.status === "loading"} onClick={() => { setActionsOpen(false); void toggleTranslation(message.id, translationSource); }} className={`${menuButtonClass} disabled:opacity-40`}>
+                    <Languages size={15} className="shrink-0 text-zinc-200" />
+                    <span>{translation?.status === "loading" ? "Traduzindo…" : translation?.visible ? "Ocultar tradução" : "Traduzir para português"}</span>
+                  </button>}
                   <button type="button" role="menuitem" onClick={(event) => openReactionPicker(event.currentTarget)} className={menuButtonClass}>
                     <Smiley size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Reagir</span>
@@ -664,6 +677,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
       ) : (
         content
       )}
+      {canTranslate && <MessageTranslation translation={translation} lightBackground={isPrivate} onHide={() => hideTranslation(message.id, translationSource)} onRetry={() => void toggleTranslation(message.id, translationSource)} />}
       {message.deletedAt && (
         <motion.p
           role="note"

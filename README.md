@@ -165,15 +165,14 @@ transcription-service/dist/CotrimBotTranscritor/
   _internal/
 ```
 
-O build também gera `frontend/public/downloads/CotrimBotTranscritor.zip`,
-disponível pelo botão **Baixar para Windows (.zip)** em **Configurações →
-Transcrição local**. O ZIP inclui o executável e toda a pasta `_internal`.
+O build também gera `frontend/public/downloads/CotrimBotTranscritor.zip`.
+O botão **Baixar para Windows (.zip)** em **Configurações → Transcrição local**
+abre o [download no MediaFire](https://www.mediafire.com/file/qq78n7yjcbg3tl8/CotrimBotTranscritor.zip/file)
+em uma nova aba. O ZIP inclui o executável e toda a pasta `_internal`.
 Para empacotar um executável já gerado, execute
 `py -3.12 transcription-service/package-windows.py` na raiz do projeto.
-O ZIP é um artefato gerado e não é versionado: copie-o para
-`frontend/public/downloads/` antes do build do frontend ou do Docker no
-ambiente de publicação. No export estático, ele será incluído em
-`frontend/out/downloads/`.
+O ZIP é um artefato gerado e não é versionado. Para publicar uma nova versão,
+envie o ZIP atualizado ao MediaFire e atualize o link do botão se necessário.
 
 Na máquina do usuário final, baixe e extraia o ZIP inteiro e execute
 `CotrimBotTranscritor.exe` uma vez dentro da pasta extraída. Ele copia o

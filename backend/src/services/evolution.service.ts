@@ -221,6 +221,7 @@ type GroupInfoResponse = {
   pictureUrl?: string | null;
   participants?: Array<{
     id?: string;
+    lid?: string;
     phoneNumber?: string;
     admin?: string | null;
   }>;

@@ -399,8 +399,9 @@ function LocalServiceSettings() {
         </ol>
         <div className={styles.localServiceActions}>
           <a
-            href="/downloads/CotrimBotTranscritor.zip"
-            download="CotrimBotTranscritor.zip"
+            href="https://www.mediafire.com/file/qq78n7yjcbg3tl8/CotrimBotTranscritor.zip/file"
+            target="_blank"
+            rel="noopener noreferrer"
             className={styles.primaryButton}
           >
             Baixar para Windows (.zip)

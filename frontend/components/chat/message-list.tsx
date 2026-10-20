@@ -4,6 +4,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Avatar } from "@/components/chat/avatar";
 import { MessageBubble } from "@/components/chat/message-bubble";
+import { GroupMentionContext } from "@/components/chat/group-mention-context";
+import { buildGroupMentions } from "@/lib/group-mentions";
 import { MessageSenderAvatar } from "@/components/chat/message-sender-avatar";
 import { OutgoingMessageAvatar } from "@/components/chat/outgoing-message-avatar";
 import { getGroupParticipants, type GroupParticipant } from "@/lib/chat-api";
@@ -90,6 +92,11 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
     [messages],
   );
   const messagesById = useMemo(() => new Map(messages.map((message) => [message.id, message])), [messages]);
+  const mentionTargets = useMemo(() => contact.isGroup ? buildGroupMentions(
+    contacts,
+    groupParticipantState?.contactId === contact.id ? groupParticipantState.participants : [],
+    messages,
+  ) : null, [contact.id, contact.isGroup, contacts, groupParticipantState, messages]);
   const groupParticipantsByIdentifier = useMemo(() => {
     const result = new Map<string, GroupParticipant>();
     if (groupParticipantState?.contactId !== contact.id) return result;
@@ -206,6 +213,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
   }
 
   return (
+    <GroupMentionContext.Provider value={mentionTargets}>
     <div className="relative flex min-h-0 flex-1">
       <div
         ref={scrollRef}
@@ -374,5 +382,6 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
         </svg>
       </button>
     </div>
+    </GroupMentionContext.Provider>
   );
 }
