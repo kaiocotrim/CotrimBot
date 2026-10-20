@@ -747,7 +747,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
         initial={reduceMotion ? false : { opacity: 0, x: 24 }}
         animate={{ opacity: 1, x: 0 }}
         transition={reduceMotion ? { duration: 0 } : { duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-        className={`flex h-full min-h-0 ${panelWidthClass} shrink-0 flex-col border-r border-white/[0.08] bg-[#111111] text-white`}
+        className={`flex h-full min-h-0 ${panelWidthClass} shrink-0 flex-col border-r border-white/[0.08] bg-[#09090b] text-white`}
       >
         <header className="flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center gap-3 px-4 pt-[env(safe-area-inset-top)] lg:h-16 lg:pt-0">
           <button type="button" aria-label={sharedContactDraft ? "Voltar à conversa" : "Voltar aos contatos"} onClick={() => { setSavedActionError(null); setShowNewContact(false); if (sharedContactDraft) { setShowSavedContacts(false); onMobileOpenChange(false); } }} className="flex size-10 items-center justify-center rounded-full text-zinc-300 transition-colors lg:size-8 hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-white">
@@ -962,13 +962,13 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
         initial={reduceMotion ? false : { opacity: 0, x: 24 }}
         animate={{ opacity: 1, x: 0 }}
         transition={reduceMotion ? { duration: 0 } : { duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-        className={`flex h-full min-h-0 ${panelWidthClass} shrink-0 flex-col border-r border-white/[0.08] bg-[#111111] text-zinc-100`}
+        className={`flex h-full min-h-0 ${panelWidthClass} shrink-0 flex-col border-r border-white/[0.08] bg-[#09090b] text-zinc-100`}
       >
         <header className="flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center gap-3 px-4 pt-[env(safe-area-inset-top)] lg:h-16 lg:pt-0">
           <button type="button" aria-label="Voltar às conversas" onClick={() => setShowSavedContacts(false)} className="flex size-10 items-center justify-center rounded-full text-zinc-400 transition-colors lg:size-8 hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-white">
             <ArrowLeft aria-hidden="true" className="size-5" strokeWidth={1.8} />
           </button>
-          <h2 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-tight">Nova conversa</h2>
+          <h2 className="min-w-0 flex-1 truncate text-[16px] font-normal tracking-tight">Nova conversa</h2>
           {closeDrawerButton}
         </header>
         <label className="mx-4 mb-3 flex h-10 shrink-0 items-center gap-2.5 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 text-zinc-500 transition-colors focus-within:border-white/40 focus-within:text-zinc-300">
@@ -1057,7 +1057,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
           <div className="flex items-center justify-between gap-2">
             <h1 className="min-w-0 truncate text-[28px] font-semibold tracking-[-0.03em] text-zinc-100 lg:text-lg lg:tracking-tight">
               <span className="lg:hidden">Conversas</span>
-              <span className="hidden font-normal lg:inline">CotrimBot</span>
+              <span className="hidden font-normal lg:inline">Conversas</span>
             </h1>
             <div className="flex shrink-0 items-center gap-1.5">
               <span className="hidden lg:contents">{headerActions}</span>
@@ -1066,7 +1066,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
                 aria-label="Nova conversa"
                 onClick={openSavedContacts}
                 whileTap={reduceMotion ? undefined : { scale: 0.9 }}
-                className="flex size-11 items-center justify-center rounded-full bg-zinc-200 text-zinc-950 transition-colors hover:bg-white lg:size-8 lg:bg-zinc-950 lg:text-zinc-400 lg:hover:bg-zinc-800 lg:hover:text-zinc-200"
+                className="flex size-11 items-center justify-center rounded-full bg-zinc-200 text-zinc-950 transition-colors hover:text-white lg:size-8 lg:bg-zinc-950 lg:text-zinc-400 lg:hover:text-white"
               >
                 <svg className="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
                   <path d="M12 5v14M5 12h14" />
@@ -1079,7 +1079,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
                 aria-label="Recolher menu de conversas"
                 aria-expanded={true}
                 title="Recolher menu (Ctrl+B)"
-                className="hidden size-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 focus-visible:outline-2 focus-visible:outline-white/50 lg:flex"
+                className="hidden size-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 lg:flex"
               >
                 <PanelLeftClose aria-hidden="true" className="size-[18px]" strokeWidth={1.8} />
               </button>

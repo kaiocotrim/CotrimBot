@@ -423,7 +423,7 @@ export function CalendarModal({ onClose, variant = "modal" }: { onClose: () => v
               <button type="button" aria-label={monthPickerOpen ? "Ano anterior" : "Mês anterior"} onClick={() => changeMonth(-1)} className="flex size-10 shrink-0 items-center justify-center rounded-xl text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 lg:size-11">
                 <ChevronLeft aria-hidden="true" className="size-5" />
               </button>
-              <h3 className="text-center text-base font-semibold text-zinc-100 lg:text-lg">
+              <h3 className="text-center text-base font-normal text-zinc-100 lg:text-lg">
                 <button ref={monthHeadingRef} type="button" aria-expanded={monthPickerOpen} aria-label={monthPickerOpen ? "Voltar aos dias do mês" : "Escolher mês"} onClick={() => { setPickerYear(year); setMonthPickerOpen((current) => !current); }} className="inline-flex items-center gap-1.5 bg-transparent px-1 py-1 transition-opacity hover:opacity-70 focus-visible:outline-2 focus-visible:outline-white/50">
                   <AnimatePresence mode="popLayout" initial={false}>
                     <motion.span key={monthPickerOpen ? `year-${pickerYear}` : monthKey} className="block" aria-live="polite" initial={reduceMotion ? false : { opacity: 0, y: 4, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -3, filter: "blur(3px)" }} transition={{ duration: reduceMotion ? 0 : 0.26, ease: appleEase }}>
@@ -516,7 +516,7 @@ export function CalendarModal({ onClose, variant = "modal" }: { onClose: () => v
             ) : <>
             <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h3 className="text-base font-semibold sm:text-lg">{sentenceCase(new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(selectedDate))}</h3>
+                <h3 className="text-base font-normal sm:text-lg">{sentenceCase(new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(selectedDate))}</h3>
                 <p className="mt-0.5 text-sm text-zinc-400">{dayEvents.length} {dayEvents.length === 1 ? "compromisso" : "compromissos"}{dayMessages.length > 0 && ` · ${dayMessages.length} ${dayMessages.length === 1 ? "mensagem" : "mensagens"}`}</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
@@ -618,7 +618,7 @@ export function CalendarModal({ onClose, variant = "modal" }: { onClose: () => v
               </div>
             ) : (
               <div className={isPage ? "flex min-h-64 flex-1 flex-col items-center justify-center px-5 text-center" : "flex min-h-64 flex-col items-center justify-center px-5 text-center"}>
-                <p className="font-medium text-zinc-200">Nada programado para este dia</p>
+                <p className="font-normal text-zinc-200">Nada programado para este dia</p>
                 <p className="mt-1 text-sm text-zinc-500">Clique em + para criar um compromisso ou programar uma mensagem.</p>
               </div>
             )}

@@ -56,9 +56,9 @@ export function NotificationCenter({
 
   return (
     <section aria-label="Central de notificações" className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#09090b] text-white">
-      <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-white/[0.07] px-5">
+      <header className="flex h-16 shrink-0 items-center justify-between gap-4 px-5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <h1 className="truncate text-base font-semibold tracking-tight text-zinc-100">Notificações</h1>
+          <h1 className="truncate text-base font-normal tracking-tight text-zinc-100">Notificações</h1>
           {unreadCount > 0 && (
             <span className="flex min-w-5 items-center justify-center rounded-full bg-white/[0.09] px-1.5 text-[10px] font-medium leading-5 text-zinc-300">
               {unreadCount > 99 ? "99+" : unreadCount}
@@ -75,7 +75,7 @@ export function NotificationCenter({
         </div>
       </header>
 
-      <div className="flex shrink-0 flex-col gap-3 border-b border-white/[0.05] px-4 py-3.5">
+      <div className="flex shrink-0 flex-col gap-3 px-4 py-3.5">
         <div className="flex gap-1 rounded-xl border border-white/[0.045] bg-white/[0.035] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.035),0_8px_24px_rgba(0,0,0,0.12)] backdrop-blur-xl" role="tablist" aria-label="Filtros de notificações">
           {([["all", "Geral"], ["unread", "Não lidas"], ["mentions", "@Menções"]] as const).map(([value, label]) => (
             <button key={value} type="button" role="tab" aria-selected={filter === value} onClick={() => setFilter(value)} className={`min-w-0 flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium transition ${filter === value ? "bg-gradient-to-b from-white/[0.14] to-white/[0.075] text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_3px_10px_rgba(0,0,0,0.18)]" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"}`}>

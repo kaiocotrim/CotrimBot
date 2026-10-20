@@ -50,8 +50,11 @@ export function ChatNavigationRail({
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
 
   return (
-    <nav aria-label="Navegação principal" className="flex h-full w-[60px] shrink-0 flex-col items-center border-r border-white/[0.08] bg-[#1a1a1a] px-2 py-3 text-zinc-400">
-      <div className="flex w-full flex-col items-center gap-1">
+    <nav aria-label="Navegação principal" className="flex h-full w-[60px] shrink-0 flex-col items-center border-r border-white/[0.08] bg-[#09090b] px-2 py-3 text-zinc-500">
+      <div className="flex size-9 shrink-0 items-center justify-center">
+        <Image src="/icons/icon-96x96.png" alt="CotrimBot" width={28} height={28} unoptimized className="size-7 object-contain" />
+      </div>
+      <div className="flex min-h-0 flex-1 w-full -translate-y-[74px] flex-col items-center justify-center gap-1">
         {sections.filter(({ id }) => !unifiedConversations || (id !== "contacts" && id !== "groups" && id !== "mine")).map(({ id, label, icon: Icon }) => (
           <motion.button
             key={id}
@@ -65,24 +68,24 @@ export function ChatNavigationRail({
             title={label}
             onClick={() => onNavigate(id)}
             whileTap={reduceMotion ? undefined : { scale: 0.9 }}
-            className={`relative flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70 ${activeSection === id ? "text-zinc-50" : "hover:bg-white/[0.07] hover:text-zinc-100"}`}
+            className={`relative flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70 ${activeSection === id ? "text-zinc-50" : "text-zinc-600 hover:text-zinc-100"}`}
           >
             {activeSection === id && (
               <motion.span
                 layoutId="chat-rail-active"
                 aria-hidden="true"
-                className="absolute inset-0 rounded-xl bg-white/[0.12]"
+                className="absolute inset-0 rounded-xl bg-transparent"
                 transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 460, damping: 38 }}
               />
             )}
             <Icon aria-hidden="true" className="relative size-5" strokeWidth={1.8} />
             {id === "conversations" && unreadCount > 0 && (
-              <span aria-hidden="true" className="absolute -top-0.5 -right-1 flex size-5 min-w-5 items-center justify-center rounded-full border border-[#1a1a1a] bg-zinc-300 px-1 text-[10px] font-semibold leading-none text-zinc-950">
+              <span aria-hidden="true" className="absolute -top-0.5 -right-1 flex size-5 min-w-5 items-center justify-center rounded-full border border-[#09090b] bg-zinc-300 px-1 text-[10px] font-semibold leading-none text-zinc-950">
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
             {id === "notifications" && notificationUnreadCount > 0 && (
-              <span aria-hidden="true" className="absolute -top-0.5 -right-1 flex size-5 min-w-5 items-center justify-center rounded-full border border-[#1a1a1a] bg-zinc-300 px-1 text-[10px] font-semibold leading-none text-zinc-950">
+              <span aria-hidden="true" className="absolute -top-0.5 -right-1 flex size-5 min-w-5 items-center justify-center rounded-full border border-[#09090b] bg-zinc-300 px-1 text-[10px] font-semibold leading-none text-zinc-950">
                 {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
               </span>
             )}
@@ -92,7 +95,7 @@ export function ChatNavigationRail({
           href="/calendario"
           aria-label="Calendário"
           title="Calendário"
-          className="flex size-11 items-center justify-center rounded-xl text-zinc-400 transition-[background-color,color,transform] hover:bg-white/[0.07] hover:text-zinc-100 active:scale-90 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70"
+          className="flex size-11 items-center justify-center rounded-xl text-zinc-600 transition-[background-color,color,transform] hover:text-zinc-100 active:scale-90 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70"
         >
           <CalendarDays aria-hidden="true" className="size-5" strokeWidth={1.8} />
         </Link>
@@ -103,7 +106,7 @@ export function ChatNavigationRail({
               href="/chat-interno"
               aria-label={`Abrir empresa ${company.name}`}
               title={company.name}
-              className="flex size-11 shrink-0 items-center justify-center rounded-xl text-zinc-400 transition-colors hover:bg-white/[0.07] hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70"
+              className="flex size-11 shrink-0 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70"
             >
               <span className="flex size-8 items-center justify-center overflow-hidden rounded-lg bg-white/[0.035]">
                 {company.logo

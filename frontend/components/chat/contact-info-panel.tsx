@@ -358,7 +358,7 @@ export function ContactInfoPanel({
       exit={{ opacity: 0, x: 20 }}
       transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       aria-label="Informações do contato"
-      className="absolute inset-0 z-40 flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden bg-black
+      className="absolute inset-0 z-40 flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden bg-[#09090b]
         @min-[1024px]:relative @min-[1024px]:inset-auto @min-[1024px]:z-auto @min-[1024px]:h-full @min-[1024px]:w-[min(24rem,40%)]"
     >
       {mediaOpen ? <ContactMediaBrowser contactId={contact.id} contactName={contact.name} onBack={() => {
@@ -370,7 +370,7 @@ export function ContactInfoPanel({
           type="button"
           onClick={onClose}
           aria-label="Fechar informações"
-          className="flex size-11 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 active:scale-95 lg:size-9"
+          className="flex size-11 items-center justify-center rounded-full text-zinc-500 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 active:scale-95 lg:size-9"
         >
           <X className="size-4" aria-hidden="true" />
         </button>
@@ -647,7 +647,7 @@ export function ContactInfoPanel({
             transition={{ duration: reduceMotion ? 0 : 0.15 }}
             type="button"
             onClick={() => startEditing()}
-            className="mt-3 flex min-h-11 items-center gap-2 rounded-full px-3 py-1.5 text-sm text-zinc-300/80 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 lg:min-h-0 lg:text-xs"
+            className="mt-3 flex min-h-11 items-center gap-2 rounded-full px-3 py-1.5 text-sm text-zinc-300/80 transition hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 lg:min-h-0 lg:text-xs"
           >
             <Pencil className="size-3.5" aria-hidden="true" />
             Editar contato
@@ -845,7 +845,7 @@ export function ContactInfoPanel({
           <div>
             <dt className="text-sm text-zinc-400 lg:text-xs">Prioridade</dt>
             <LayoutGroup>
-            <dd className="mt-2 grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-white/[0.025] p-1">
+            <dd className="mt-2 grid grid-cols-3 gap-1 rounded-xl bg-white/[0.025] p-1">
               {contactPriorities.map((option) => <motion.button
                 key={option.value}
                 whileTap={reduceMotion ? undefined : { scale: 0.96 }}
@@ -854,7 +854,7 @@ export function ContactInfoPanel({
                 aria-pressed={selectedPriority === option.value}
                 disabled={prioritySaving}
                 onClick={() => void changePriority(selectedPriority === option.value ? "NONE" : option.value)}
-                className={`relative isolate flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-white/40 disabled:opacity-60 lg:h-9 lg:text-xs ${selectedPriority === option.value ? "text-zinc-100" : "text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200"}`}
+                className={`relative isolate flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-white/40 disabled:opacity-60 lg:h-9 lg:text-xs ${selectedPriority === option.value ? option.value === "LOW" ? "text-green-400" : option.value === "MEDIUM" ? "text-yellow-300" : "text-red-400" : option.value === "LOW" ? "text-zinc-400 opacity-45 hover:text-green-400 hover:opacity-100" : option.value === "MEDIUM" ? "text-zinc-400 opacity-45 hover:text-yellow-300 hover:opacity-100" : "text-zinc-400 opacity-45 hover:text-red-400 hover:opacity-100"}`}
               >
                 {selectedPriority === option.value && <motion.span aria-hidden="true" layoutId="contact-priority" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 32 }} className="pointer-events-none absolute inset-0 -z-10 rounded-lg bg-white/[0.1] shadow-sm" />}
                 <span aria-hidden="true" className={`size-1.5 rounded-full ${option.dot}`} />
@@ -878,7 +878,7 @@ export function ContactInfoPanel({
             onClick={onCloseWithBot}
             disabled={closing}
             aria-busy={closing}
-            className="mt-7 flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-red-400/[0.08] px-4 py-3 text-sm font-medium text-red-200 transition hover:bg-red-400/[0.13] focus-visible:outline-2 focus-visible:outline-red-300/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-7 flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-white/[0.06] px-4 py-3 text-sm font-medium text-zinc-300 transition hover:bg-white/[0.1] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {closing ? (
               <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />

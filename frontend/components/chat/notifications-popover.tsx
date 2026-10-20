@@ -41,7 +41,7 @@ export function NotificationsPopover({
     <Popover.Root>
       <Popover.Trigger
         aria-label={unreadCount ? `Notificações, ${unreadCount} não lidas` : "Notificações"}
-        className="group relative flex size-10 items-center justify-center rounded-full bg-zinc-950 lg:size-8 text-zinc-500 transition-[background-color,color,transform] hover:bg-zinc-800 hover:text-zinc-100 focus-visible:text-zinc-100 active:scale-95"
+        className="group relative flex size-10 items-center justify-center rounded-full bg-zinc-950 lg:size-8 text-zinc-500 transition-[background-color,color,transform] hover:text-white focus-visible:text-white active:scale-95"
       >
         <Bell aria-hidden="true" className="size-[18px] opacity-30 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100" />
         {unreadCount > 0 && (
@@ -62,7 +62,7 @@ export function NotificationsPopover({
             >
             <header className="flex items-center justify-between gap-2 px-3 py-2.5">
               <div>
-                <Popover.Title className="text-[15px] font-semibold tracking-[-0.01em]">Notificações</Popover.Title>
+                <Popover.Title className="text-[15px] font-normal tracking-[-0.01em]">Notificações</Popover.Title>
                 {unreadCount > 0 && <p className="mt-0.5 text-[10px] text-zinc-500">{unreadCount} {unreadCount === 1 ? "nova" : "novas"}</p>}
               </div>
               <div className="flex items-center gap-1">

@@ -54,7 +54,7 @@ export function SidebarMenuButton({ onClick, expanded, className = "" }: { onCli
   );
 }
 
-const actionClass = "flex size-10 shrink-0 items-center sm:size-9 justify-center rounded-full transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-35";
+const actionClass = "flex size-10 shrink-0 items-center sm:size-9 justify-center rounded-full text-zinc-600 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-35";
 
 export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isTyping, contactPresence, searchOpen, searchQuery, currentResult, resultCount, selectionMode, selectedCount, selectionBusy, onOpenSearch, onOpenFavorites, onStartSelection, onCloseSelection, onFavoriteSelected, onDeleteSelected, onOpenForward, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch, onOpenSidebar, sidebarOpen }: ChatHeaderProps) {
   const reduceMotion = useReducedMotion();
@@ -174,7 +174,7 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
               disabled={assigning}
               aria-label={assignedToMe ? "Deixar de acompanhar conversa" : "Acompanhar conversa"}
               title={assignedToMe ? "Você acompanha esta conversa · clique para sair" : assignedUserIds.length ? "Acompanhar junto com os outros responsáveis" : "Assumir conversa para aparecer em Minhas"}
-              className={`${styles.assignmentButton} ${actionClass} ${assignedToMe ? "text-white" : "text-zinc-300"}`}
+              className={`${styles.assignmentButton} ${actionClass} ${assignedToMe ? "text-white" : ""}`}
             >
               {assignedToMe ? <UserRoundCheck className="size-5" aria-hidden="true" /> : <UserRoundPlus className="size-5" aria-hidden="true" />}
             </button>}
@@ -186,7 +186,7 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
                 title="Mais opções"
-                className={`${styles.mobileAction} ${actionClass}`}
+                className={`${styles.mobileAction} ${actionClass} ${menuOpen ? "text-white" : ""}`}
               >
                 <EllipsisVertical className="size-5" strokeWidth={2} aria-hidden="true" />
               </button>

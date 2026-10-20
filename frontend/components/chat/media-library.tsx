@@ -65,7 +65,7 @@ function LibrarySkeleton({ tab }: { tab: MediaLibraryTab }) {
 export function MediaLibrary() {
   const [open, setOpen] = useState(false);
   return <Dialog.Root open={open} onOpenChange={setOpen}>
-    <Dialog.Trigger aria-label="Mídias de todas as conversas" title="Mídias" className="flex size-11 items-center justify-center rounded-xl text-zinc-400 transition-colors hover:bg-white/[0.07] hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-white/70"><Images className="size-5" strokeWidth={1.8} aria-hidden="true" /></Dialog.Trigger>
+    <Dialog.Trigger aria-label="Mídias de todas as conversas" title="Mídias" className="flex size-11 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-white/70"><Images className="size-5" strokeWidth={1.8} aria-hidden="true" /></Dialog.Trigger>
     <Dialog.Portal>
       <Dialog.Backdrop className={styles.backdrop} />
       <Dialog.Popup className={styles.dialog}>
