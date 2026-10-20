@@ -7,6 +7,7 @@ type TypingIndicatorProps = {
   label: string;
   className?: string;
   showLabel?: boolean;
+  decorative?: boolean;
 };
 
 // Compartilha os pontos do cabeçalho e do composer sem estado por quadro.
@@ -14,16 +15,18 @@ export const TypingIndicator = memo(function TypingIndicator({
   label,
   className = "text-emerald-400",
   showLabel = false,
+  decorative = false,
 }: TypingIndicatorProps) {
   const reduceMotion = useReducedMotion();
 
   return (
-    <span role="status" aria-label={label} className={`flex h-4 min-w-0 items-center gap-1 ${className}`}>
-      <span className={showLabel ? "mr-2 min-w-0 truncate" : "sr-only"}>{label}</span>
+    <span role={decorative ? undefined : "status"} aria-label={decorative ? undefined : label} aria-hidden={decorative || undefined} className={`flex h-4 min-w-0 items-center gap-1 ${className}`}>
+      {!decorative && <span className={showLabel ? "mr-2 min-w-0 truncate" : "sr-only"}>{label}</span>}
       {[0, 1, 2].map((dot) => (
         <motion.span
           key={dot}
           aria-hidden="true"
+          data-typing-dot
           className="size-1 shrink-0 rounded-full bg-current"
           animate={reduceMotion ? undefined : { y: [0, -3, 0], opacity: [0.45, 1, 0.45] }}
           transition={{ duration: 0.72, repeat: Infinity, ease: "easeInOut", delay: dot * 0.12 }}

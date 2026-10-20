@@ -9,6 +9,8 @@ import { PollComposer } from "@/components/chat/poll-composer";
 import { EmojiSelector } from "@/components/chat/emoji-selector";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { MessageText } from "@/components/chat/message-text";
+import { TeamTypingBadge } from "@/components/chat/team-typing-badge";
+import type { TeamTypingMember } from "@/hooks/use-contact-team-typing";
 import { insertEmojiAtSelection } from "@/lib/emoji-text";
 import { getContactAssignees, rewriteMessage, type ContactAssignee } from "@/lib/chat-api";
 import type { Message, Poll } from "@/types/chat";
@@ -24,6 +26,9 @@ type MessageComposerProps = {
   text: string;
   sending: boolean;
   closing: boolean;
+  typingLabel?: string;
+  typingMembers?: TeamTypingMember[];
+  onStopTyping?: () => void;
 
   onTextChange: (text: string) => void;
   onSend: (options: { private: boolean; includeSignature: boolean; mentionedUserIds?: string[] }) => void;
@@ -125,6 +130,9 @@ export function MessageComposer({
   text,
   sending,
   closing,
+  typingLabel,
+  typingMembers = [],
+  onStopTyping,
   onTextChange,
   onSend,
   onCloseWithBot,
@@ -752,12 +760,18 @@ export function MessageComposer({
   return (
     <div ref={composerRef} data-message-composer data-mobile={isMobile} data-private={isPrivateMode} data-audio-recording={isRecording} className={`${styles.root} pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent px-2 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5 sm:pb-[max(2.125rem,env(safe-area-inset-bottom))]`}>
       <div className="pointer-events-auto mx-auto max-w-2xl">
+        <AnimatePresence>
+          {typingLabel && <motion.div key="team-typing" initial={reduceMotion ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? 0 : 0.15 }} className="pointer-events-none mb-2 flex justify-center">
+            <TeamTypingBadge members={typingMembers} label={typingLabel} />
+          </motion.div>}
+        </AnimatePresence>
         <form
           ref={formRef}
           className="relative rounded-[26px]"
           onFocus={() => setIsFocused(true)}
           onBlur={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget)) {
+              onStopTyping?.();
               setIsFocused(false);
               closeAttachments();
               // O seletor controla o fechamento por clique externo; perder foco

@@ -29,6 +29,7 @@ import { calendarEventRouter } from "./routes/calendar-event.routes.js";
 import { scheduledMessageRouter } from "./routes/scheduled-message.routes.js";
 import { clientRouter } from "./routes/client-profile.routes.js";
 import { startScheduledMessageWorker } from "./services/scheduled-message.service.js";
+import { createContactTypingPresence } from "./services/contact-typing.service.js";
 
 // Cria a aplicação Express.
 export const app = express();
@@ -85,7 +86,11 @@ io.use(async (socket, next) => {
     const session = await auth.api.getSession({
       headers: fromNodeHeaders(socket.handshake.headers),
     });
-    if (session) socket.data.userId = session.user.id;
+    if (session) {
+      socket.data.userId = session.user.id;
+      socket.data.userName = session.user.name;
+      socket.data.userImage = session.user.image ?? null;
+    }
   } catch (error) {
     console.error("Erro ao autenticar o WebSocket:", error);
   }
@@ -95,9 +100,13 @@ io.use(async (socket, next) => {
 // Disponibiliza essa instância do Socket.IO
 // para controllers e services da aplicação.
 setSocketServer(io);
+const registerContactTyping = createContactTypingPresence(io, async (id) => Boolean(
+  await prisma.contact.findUnique({ where: { id }, select: { id: true } }),
+));
 
 // Detecta quando um frontend se conecta.
 io.on("connection", (socket) => {
+  registerContactTyping(socket);
   if (socket.data.userId) void socket.join(userRoom(socket.data.userId));
 
   console.log(

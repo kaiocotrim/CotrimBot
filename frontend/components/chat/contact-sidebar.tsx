@@ -9,6 +9,8 @@ import { Avatar } from "@/components/chat/avatar";
 import { ChatNavigationRail, type ChatRailSection } from "@/components/chat/chat-navigation-rail";
 import { CountryCodePicker } from "@/components/chat/country-code-picker";
 import { MessageText } from "@/components/chat/message-text";
+import { TypingIndicator } from "@/components/chat/typing-indicator";
+import { useContactTypingPreviews } from "@/hooks/use-contact-typing-previews";
 import { NotificationCenter } from "@/components/chat/notification-center";
 import { QuickConversationPreview } from "@/components/chat/quick-conversation-preview";
 import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
@@ -76,6 +78,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
     setSidebarWidth(Math.round(Math.max(280, Math.min(window.innerWidth * 0.42, width))));
   }
   const [query, setQuery] = useState("");
+  const typingPreviews = useContactTypingPreviews(userId);
   const [conversationFilter, setConversationFilter] = useState<ConversationFilter>("conversations");
   const [showArchived, setShowArchived] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -1054,7 +1057,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
           <div className="flex items-center justify-between gap-2">
             <h1 className="min-w-0 truncate text-[28px] font-semibold tracking-[-0.03em] text-zinc-100 lg:text-lg lg:tracking-tight">
               <span className="lg:hidden">Conversas</span>
-              <span className="hidden lg:inline">CotrimBot</span>
+              <span className="hidden font-normal lg:inline">CotrimBot</span>
             </h1>
             <div className="flex shrink-0 items-center gap-1.5">
               <span className="hidden lg:contents">{headerActions}</span>
@@ -1152,6 +1155,8 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
             {visibleContacts.map((contact, index) => {
               const lastMessage = contact.messages?.[0];
               const draft = drafts[contact.id]?.trim();
+              const typingNames = typingPreviews.get(contact.id)?.map(member => member.name) ?? [];
+              const typingPreview = typingNames.length ? `${typingNames.slice(0, 2).join(" e ")}${typingNames.length > 2 ? ` e mais ${typingNames.length - 2}` : ""} digitando…` : null;
               const selected = selectedContactId === contact.id;
               const unread = contact.unreadCount > 0;
               const priority = getContactPriorityDetails(contact.priority);
@@ -1247,8 +1252,10 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
                       </div>
                       <div className="mt-0.5 flex items-center gap-2 pr-7">
                         <p className="min-w-0 flex-1 truncate text-sm leading-tight font-normal text-zinc-400 lg:text-[12px] lg:text-zinc-500">
-                          {!draft && lastMessage && !lastMessage.deletedAt && lastMessage.direction === "OUTGOING" && "✓✓ "}
-                          {draft ? <><span className="font-medium text-emerald-400">Rascunho:</span> {draft.replace(/\s+/g, " ")}</> : <MessageText content={lastMessage ? lastMessage.deletedAt ? "Mensagem apagada" : lastMessage.type === "SYSTEM" ? systemMessageLabel(lastMessage.content, userId) : lastMessage.content : "Nenhuma mensagem"} showSignature={Boolean(lastMessage && !lastMessage.deletedAt && !lastMessage.private && lastMessage.direction === "OUTGOING")} linkify={false} />}
+                          {typingPreview ? <TypingIndicator label={typingPreview} showLabel className="text-zinc-400" /> : <>
+                            {!draft && lastMessage && !lastMessage.deletedAt && lastMessage.direction === "OUTGOING" && "✓✓ "}
+                            {draft ? <><span className="font-medium text-zinc-400">Rascunho:</span> {draft.replace(/\s+/g, " ")}</> : <MessageText content={lastMessage ? lastMessage.deletedAt ? "Mensagem apagada" : lastMessage.type === "SYSTEM" ? systemMessageLabel(lastMessage.content, userId) : lastMessage.content : "Nenhuma mensagem"} showSignature={Boolean(lastMessage && !lastMessage.deletedAt && !lastMessage.private && lastMessage.direction === "OUTGOING")} linkify={false} />}
+                          </>}
                         </p>
                         {unread && (
                           <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-zinc-300 px-1.5 text-[10px] font-semibold text-zinc-950">

@@ -10,6 +10,7 @@ import { EmptyChatAnimation } from "@/components/chat/empty-chat-animation";
 import { ContactInfoPanel } from "@/components/chat/contact-info-panel";
 import { MessageComposer } from "@/components/chat/message-composer";
 import { MessageList } from "@/components/chat/message-list";
+import { useContactTeamTyping } from "@/hooks/use-contact-team-typing";
 import { getFavoriteMessages, type GroupParticipant } from "@/lib/chat-api";
 import type { Contact, ContactPresence, Message, Poll } from "@/types/chat";
 
@@ -94,6 +95,7 @@ export function ChatPanel({
   onOpenSidebar,
   sidebarOpen,
 }: ChatPanelProps) {
+  const { typingLabel, typingMembers, sendTyping } = useContactTeamTyping(contact?.id, userId);
   const [conversationPanel, setConversationPanel] = useState<HTMLElement | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [composerFocusKey, setComposerFocusKey] = useState(0);
@@ -420,16 +422,21 @@ export function ChatPanel({
             sending={sending}
             closing={closing}
             onSendPoll={onSendPoll}
-            onTextChange={onTextChange}
+            typingLabel={typingLabel}
+            typingMembers={typingMembers}
+            onStopTyping={() => sendTyping(false)}
+            onTextChange={(value) => { onTextChange(value); sendTyping(Boolean(value.trim())); }}
             onSend={(options) => {
+              sendTyping(false);
               onSend({ ...options, replyToMessageId: activeReply?.id });
               setReplyingTo(null);
             }}
             onSendMedia={async (files, caption, includeSignature) => {
+              sendTyping(false);
               await onSendMedia(files, caption, activeReply?.id, includeSignature);
               setReplyingTo(null);
             }}
-            onCloseWithBot={onCloseWithBot}
+            onCloseWithBot={() => { sendTyping(false); onCloseWithBot(); }}
             allowCloseWithBot={!contact.isGroup}
             focusRequestKey={`${contact.id}:${composerFocusKey}`}
             replyingTo={activeReply}
