@@ -157,6 +157,19 @@ export function useInternalChat({ activeOrganizationId, currentUserId }: Interna
         ? { ...message, pinned: payload.pinned, pinnedUntil: payload.pinnedUntil, favorited: payload.favorited }
         : message));
     };
+    const handleConversationRead = (payload: { organizationId: string; conversationId: string; userId: string; lastReadAt: string }) => {
+      if (payload.organizationId !== organizationId || !Number.isFinite(Date.parse(payload.lastReadAt))) return;
+      setConversations((current) => current.map((conversation) => {
+        if (conversation.id !== payload.conversationId) return conversation;
+        return {
+          ...conversation,
+          unreadCount: payload.userId === currentUserIdRef.current ? 0 : conversation.unreadCount,
+          participants: conversation.participants.map((participant) => participant.user.id === payload.userId
+            && (!participant.lastReadAt || Date.parse(payload.lastReadAt) > Date.parse(participant.lastReadAt))
+            ? { ...participant, lastReadAt: payload.lastReadAt } : participant),
+        };
+      }));
+    };
     socket.on("internal:message:new", addMessage);
     socket.on("internal:message:deleted", handleDeleted);
     socket.on("internal:typing:start", handleTyping);
@@ -164,6 +177,7 @@ export function useInternalChat({ activeOrganizationId, currentUserId }: Interna
     socket.on("disconnect", clearTyping);
     socket.on("internal:reaction:updated", handleReaction);
     socket.on("internal:message:flags", handleMessageFlags);
+    socket.on("internal:conversation:read", handleConversationRead);
     const handleConversationUpdated = (payload: { organizationId: string }) => {
       if (payload.organizationId === organizationId) void reload();
     };
@@ -179,6 +193,7 @@ export function useInternalChat({ activeOrganizationId, currentUserId }: Interna
       queueMicrotask(() => setTypingUsers(null));
       socket.off("internal:reaction:updated", handleReaction);
       socket.off("internal:message:flags", handleMessageFlags);
+      socket.off("internal:conversation:read", handleConversationRead);
       socket.off("internal:conversation:updated", handleConversationUpdated);
     };
   }, [organizationId, selectedId, reload]);

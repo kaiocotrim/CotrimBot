@@ -153,7 +153,7 @@ export function ImageMessage({ messageId, mediaUrl, content, showSignature, view
   );
 
   return (
-    <div>
+    <div className="w-min max-w-full">
       <button type="button" data-message-media-preview onClick={(event) => { event.stopPropagation(); openViewer(); }} aria-label={viewOnce ? "Abrir imagem de visualização única" : "Abrir imagem"} className="relative block overflow-hidden rounded-[15px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60">
         <motion.img
           src={mediaUrl}
@@ -168,7 +168,7 @@ export function ImageMessage({ messageId, mediaUrl, content, showSignature, view
           </span>
         )}
       </button>
-      {hasCaption && <p className="px-2 pt-2 pb-0.5 whitespace-pre-wrap"><MessageText content={content} showSignature={showSignature} /></p>}
+      {hasCaption && <p className="w-0 min-w-full px-2 pt-2 pb-0.5 whitespace-pre-wrap [overflow-wrap:anywhere]"><MessageText content={content} showSignature={showSignature} /></p>}
       {typeof document !== "undefined" && createPortal(viewer, document.body)}
     </div>
   );

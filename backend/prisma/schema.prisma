@@ -177,11 +177,23 @@ model Message {
   quotedByMessages        Message[]        @relation("MessageToMessage")
   cachedMedia             MessageMedia?
   deletions               MessageDeletion[]
+  receipts                MessageReceipt[]
 
   @@index([contactId], map: "Message_contactId_fkey")
   @@index([sentByUserId])
   @@index([quotedExternalId])
   @@index([quotedMessageId])
+}
+
+model MessageReceipt {
+  messageId   Int
+  recipientId String   @db.VarChar(100)
+  deliveredAt DateTime?
+  readAt      DateTime?
+  playedAt    DateTime?
+  message     Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, recipientId])
 }
 
 model MessageMedia {

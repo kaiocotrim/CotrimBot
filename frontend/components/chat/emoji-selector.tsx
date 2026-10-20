@@ -1,12 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, type CSSProperties, type RefObject } from "react";
 import styles from "./emoji-selector.module.css";
 
-// Carrega a grade e os nomes em português somente ao abrir o seletor.
-const Picker = dynamic(async () => {
+async function loadPicker() {
   const [{ default: EmojiPicker }, { default: data }] = await Promise.all([
     import("emoji-picker-react"),
     import("emoji-picker-react/dist/data/emojis-pt.js"),
@@ -14,7 +13,21 @@ const Picker = dynamic(async () => {
   return function PortuguesePicker(props: import("emoji-picker-react").PickerProps) {
     return <EmojiPicker {...props} emojiData={data} />;
   };
-}, { ssr: false, loading: () => <p role="status" className="p-5 text-xs">Carregando emojis...</p> });
+}
+
+let pickerPromise: ReturnType<typeof loadPicker> | undefined;
+function preparePicker() {
+  return pickerPromise ??= loadPicker().catch((error) => {
+    pickerPromise = undefined;
+    throw error;
+  });
+}
+
+export function preloadEmojiPicker() {
+  void preparePicker().catch(() => {});
+}
+
+const Picker = dynamic(preparePicker, { ssr: false, loading: () => <p role="status" className="p-5 text-xs">Carregando emojis...</p> });
 
 const pickerStyle = {
   "--epr-bg-color": "transparent",
@@ -83,6 +96,9 @@ export function EmojiSelector({ id, open, isPrivateMode, triggerRef, onClose, on
 
   useEffect(() => {
     if (!open) return;
+    const focusFrame = requestAnimationFrame(() => {
+      selectorRef.current?.querySelector<HTMLInputElement>("input.epr-search")?.focus({ preventScroll: true });
+    });
     const handleOutsideClick = (event: PointerEvent) => {
       if (!(event.target instanceof Node)) return;
       if (!selectorRef.current?.contains(event.target) && !triggerRef.current?.contains(event.target)) onClose();
@@ -96,18 +112,19 @@ export function EmojiSelector({ id, open, isPrivateMode, triggerRef, onClose, on
     document.addEventListener("pointerdown", handleOutsideClick);
     document.addEventListener("keydown", handleEscape, true);
     return () => {
+      cancelAnimationFrame(focusFrame);
       document.removeEventListener("pointerdown", handleOutsideClick);
       document.removeEventListener("keydown", handleEscape, true);
     };
   }, [open, onClose, triggerRef]);
 
   return (
-    <AnimatePresence>
-      {open && (
         <motion.div
           ref={selectorRef}
           id={id}
           role="dialog"
+          aria-hidden={!open}
+          inert={!open}
           aria-label="Selecionar emoji"
           // Anima a rolagem vertical e preserva o observer da categoria ativa.
           onClickCapture={(event) => {
@@ -139,14 +156,14 @@ export function EmojiSelector({ id, open, isPrivateMode, triggerRef, onClose, on
               event.preventDefault();
             }
           }}
-          // Expande a partir da borda do input, sem deformar os emojis.
-          initial={{ opacity: 0, height: reduceMotion ? "auto" : 0 }}
-          animate={{ opacity: 1, height: "auto", bottom: fieldHeight - 1, right: rightInset }}
-          exit={{ opacity: 0, height: reduceMotion ? "auto" : 0 }}
+          // Preserva a grade e anima só composição, sem recalcular sua altura.
+          initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
+          animate={open
+            ? { opacity: 1, y: 0, display: "block" }
+            : { opacity: 0, y: reduceMotion ? 0 : 8, transitionEnd: { display: "none" } }}
           transition={{
-            duration: reduceMotion ? 0 : 0.55,
+            duration: reduceMotion ? 0 : 0.18,
             ease: [0.4, 0, 0.2, 1],
-            opacity: { duration: reduceMotion ? 0 : 0.35 },
           }}
           style={{ transformOrigin: "bottom left", bottom: fieldHeight - 1, right: rightInset, borderBottomWidth: 0 }}
           className={`${styles.selector} absolute left-0 z-40 overflow-hidden rounded-t-[24px] border bg-gradient-to-br from-white/[0.04] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_-12px_36px_rgba(0,0,0,0.25)] backdrop-blur-2xl backdrop-saturate-150 ${isPrivateMode ? `${styles.privateSelector} border-zinc-200 bg-white text-zinc-600` : "border-[#2f2f33] bg-zinc-900/95 text-zinc-400"}`}
@@ -155,12 +172,7 @@ export function EmojiSelector({ id, open, isPrivateMode, triggerRef, onClose, on
             if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault();
           }}
         >
-          <motion.div
-            initial={{ opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
-            transition={{ duration: reduceMotion ? 0 : 0.4, delay: reduceMotion ? 0 : 0.08, ease: [0.4, 0, 0.2, 1] }}
-          >
+          <div>
           <Picker
             theme={(isPrivateMode ? "light" : "dark") as import("emoji-picker-react").Theme}
             emojiStyle={"apple" as import("emoji-picker-react").EmojiStyle}
@@ -182,8 +194,8 @@ export function EmojiSelector({ id, open, isPrivateMode, triggerRef, onClose, on
             ]}
             searchClearButtonLabel="Limpar busca"
             previewConfig={{ showPreview: false }}
-            lazyLoadEmojis={false}
-            autoFocusSearch
+            lazyLoadEmojis
+            autoFocusSearch={open}
             onEmojiClick={(data) => onSelect(data.emoji)}
           />
           <div className="flex items-center justify-center px-4 pb-3 pt-2">
@@ -197,9 +209,7 @@ export function EmojiSelector({ id, open, isPrivateMode, triggerRef, onClose, on
               </button>
             </div>
           </div>
-          </motion.div>
+          </div>
         </motion.div>
-      )}
-    </AnimatePresence>
   );
 }

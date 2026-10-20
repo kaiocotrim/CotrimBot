@@ -6,7 +6,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from "react-dom";
 import { AttachmentMenu, type AttachmentKind } from "@/components/chat/attachment-menu";
 import { PollComposer } from "@/components/chat/poll-composer";
-import { EmojiSelector } from "@/components/chat/emoji-selector";
+import { EmojiSelector, preloadEmojiPicker } from "@/components/chat/emoji-selector";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { MessageText } from "@/components/chat/message-text";
 import { TeamTypingBadge } from "@/components/chat/team-typing-badge";
@@ -150,6 +150,7 @@ export function MessageComposer({
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [pollOpen, setPollOpen] = useState(false);
   const [emojisOpen, setEmojisOpen] = useState(false);
+  const [emojiPickerMounted, setEmojiPickerMounted] = useState(false);
   const [rewriting, setRewriting] = useState(false);
   const [rewriteError, setRewriteError] = useState<string | null>(null);
   const [longTextCollapsed, setLongTextCollapsed] = useState(false);
@@ -1166,8 +1167,12 @@ export function MessageComposer({
               aria-hidden={!showEmojis}
               tabIndex={showEmojis ? 0 : -1}
               disabled={!showEmojis || sending}
+              onPointerEnter={preloadEmojiPicker}
+              onFocus={preloadEmojiPicker}
+              onPointerDown={preloadEmojiPicker}
               onClick={() => {
                 closeAttachments();
+                setEmojiPickerMounted(true);
                 setEmojisOpen((current) => !current);
               }}
               className={`${isMobile ? styles.mobileEmoji : "border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)]"} absolute size-8 ${buttonClassName} ${isPrivateMode ? privateButtonClassName : isMobile ? "" : "border-white/10 bg-white/[0.035]"}`}
@@ -1351,7 +1356,7 @@ export function MessageComposer({
           </motion.button>
           <AttachmentMenu open={attachmentsOpen && !sending} triggerRef={attachmentTriggerRef} onClose={closeAttachments} onSelect={selectAttachment} closing={closing} onCloseWithBot={onCloseWithBot} allowCloseWithBot={allowCloseWithBot} allowPoll={Boolean(onSendPoll) && !isPrivateMode} signatureEnabled={includeSignature} onToggleSignature={toggleSignature} stacked={isStacked} />
           {pollOpen && onSendPoll && <PollComposer onSend={onSendPoll} onClose={() => { setPollOpen(false); requestAnimationFrame(() => attachmentTriggerRef.current?.focus()); }} />}
-          <EmojiSelector id={emojiSelectorId} open={emojisOpen && !sending} isPrivateMode={isPrivateMode} triggerRef={emojiTriggerRef} onClose={closeEmojis} onSelect={selectEmoji} fieldHeight={fieldHeight} rightInset={isMobile ? 0 : isStacked ? 0 : 56} />
+          {emojiPickerMounted && <EmojiSelector id={emojiSelectorId} open={emojisOpen && !sending} isPrivateMode={isPrivateMode} triggerRef={emojiTriggerRef} onClose={closeEmojis} onSelect={selectEmoji} fieldHeight={fieldHeight} rightInset={isMobile ? 0 : isStacked ? 0 : 56} />}
           {isMobile && <input
             ref={cameraInputRef}
             type="file"

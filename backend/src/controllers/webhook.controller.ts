@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { recordMessageReceipt } from "../services/message-receipts.service.js";
 
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
@@ -189,6 +190,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
   if (body.event === "messages.update" || body.event === "send.message.update") {
     const updates = Array.isArray(body.data) ? body.data : [body.data];
     for (const update of updates) {
+      if (update?.receipt) { await recordMessageReceipt(update); continue; }
       if (update?.pollUpdates || update?.update?.pollUpdates) await pollResults.receive(update, body.sender);
       const externalId = update?.key?.id ?? update?.keyId ?? update?.id;
       const status = String(update?.status ?? update?.update?.status ?? "").toUpperCase();

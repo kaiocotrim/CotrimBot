@@ -8,6 +8,7 @@ import { GroupMentionContext } from "@/components/chat/group-mention-context";
 import { buildGroupMentions } from "@/lib/group-mentions";
 import { MessageSenderAvatar } from "@/components/chat/message-sender-avatar";
 import { OutgoingMessageAvatar } from "@/components/chat/outgoing-message-avatar";
+import type { ParticipantProfile } from "@/components/chat/participant-info-panel";
 import { getGroupParticipants, type GroupParticipant } from "@/lib/chat-api";
 import { systemMessageLabel } from "@/lib/system-message";
 import type { Contact, Message } from "@/types/chat";
@@ -34,6 +35,7 @@ type MessageListProps = {
   onToggleMessageSelection: (messageId: number) => void;
   onSaveSharedContact: (name: string, phone: string) => Promise<void>;
   onMessageSharedContact: (name: string, phone: string) => Promise<void>;
+  onOpenParticipantInfo?: (profile: ParticipantProfile) => void;
 };
 
 const CHAT_TIME_ZONE = "America/Sao_Paulo";
@@ -75,7 +77,7 @@ function identifierDigits(value?: string | null) {
 }
 
 // Posiciona mensagens recebidas à esquerda e enviadas à direita.
-export function MessageList({ currentUser, contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, hasPinnedMessage, selectionMode, selectedMessageIds, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onDeleteMessage, onRequestForward, onReplyToMessage, onEnsureMessageLoaded, onToggleMessageSelection, onSaveSharedContact, onMessageSharedContact }: MessageListProps) {
+export function MessageList({ currentUser, contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, hasPinnedMessage, selectionMode, selectedMessageIds, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onDeleteMessage, onRequestForward, onReplyToMessage, onEnsureMessageLoaded, onToggleMessageSelection, onSaveSharedContact, onMessageSharedContact, onOpenParticipantInfo }: MessageListProps) {
   const reduceMotion = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -321,7 +323,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
                   }
             }
             style={{ transformOrigin: outgoing ? "bottom right" : "bottom left" }}
-            className={`relative z-0 flex w-full flex-col gap-2 rounded-2xl transition-[background-color,box-shadow] duration-200 has-[[aria-expanded=true]]:z-30 ${highlightedMessageId === message.id ? "bg-amber-300/10 shadow-[0_0_0_2px_rgba(252,211,77,0.28)]" : navigatedMessageId === message.id ? "bg-emerald-300/10 shadow-[0_0_0_2px_rgba(110,231,183,0.28)]" : ""}`}
+            className={`relative z-0 flex w-full flex-col gap-2 rounded-2xl transition-[background-color,box-shadow] duration-200 has-[[aria-expanded=true]]:z-30 ${highlightedMessageId === message.id ? "bg-amber-300/10 shadow-[0_0_0_2px_rgba(252,211,77,0.28)]" : navigatedMessageId === message.id ? "bg-zinc-400/10 shadow-[0_0_0_2px_rgba(161,161,170,0.22)]" : ""}`}
           >
             {label && (
               <div className="flex w-full items-center justify-center py-1" role="separator" aria-label={label}>
@@ -349,9 +351,25 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
                 </button>
               )}
               {!outgoing && (contact.isGroup
-                ? savedSender
+                ? <motion.button
+                    type="button"
+                    disabled={selectionMode || !onOpenParticipantInfo}
+                    aria-label={`Ver informações de ${displayMessage.senderName || "participante"}`}
+                    onClick={(event) => onOpenParticipantInfo?.({
+                      savedContact: savedSender,
+                      participant: {
+                        phone: groupParticipant?.phone || savedSender?.phone || (message.senderPhone?.includes("@lid") ? "" : identifierDigits(message.senderPhone)),
+                        lid: groupParticipant?.lid,
+                        name: displayMessage.senderName,
+                        profilePictureUrl: displayMessage.senderProfilePictureUrl ?? event.currentTarget.querySelector("img")?.src ?? null,
+                        isAdmin: groupParticipant?.isAdmin ?? false,
+                      },
+                    })}
+                    whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+                    className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
+                  >{savedSender
                   ? <Avatar contact={savedSender} />
-                  : <MessageSenderAvatar message={displayMessage} />
+                  : <MessageSenderAvatar message={displayMessage} />}</motion.button>
                 : <Avatar contact={contact} />)}
 
               {/* O balão escolhe entre player de áudio e conteúdo textual. */}

@@ -4,6 +4,7 @@ import { Router } from "express";
 // Multer processa multipart/form-data e disponibiliza o arquivo em req.file.
 import { upload } from "../middlewares/upload.js";
 import { getMediaLibrary } from "../controllers/media-library.controller.js";
+import { getMessageInfo } from "../controllers/message-info.controller.js";
 import { getPollResults, getPollVoterAvatar, sendPoll, voteOnPoll } from "../controllers/poll.controller.js";
 
 // Cada controller recebe req e res, executa a operação e responde ao frontend.
@@ -69,6 +70,7 @@ messageRouter.patch("/contacts/:id/messages/read", markMessagesAsRead);
  */
 messageRouter.get("/messages/:id/media", getMessageMedia);
 messageRouter.get("/messages/:id/sender-avatar", getGroupSenderAvatar);
+messageRouter.get("/messages/:id/info", getMessageInfo);
 messageRouter.put("/messages/:id/reaction", reactToMessage);
 messageRouter.patch("/messages/:id/flags", updateMessageFlags);
 messageRouter.delete("/messages/:id", deleteMessage);

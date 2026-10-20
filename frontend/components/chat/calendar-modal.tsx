@@ -1,11 +1,13 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { CalendarPlus2, Check, ChevronLeft, ChevronRight, MessageSquareText, Plus, Trash2 } from "lucide-react";
+import { CalendarPlus2, Check, ChevronLeft, ChevronRight, MessageSquareText, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CalendarEventForm, type CalendarEvent, type CalendarEventCategory } from "@/components/chat/calendar-event-form";
 import { ScheduledMessageWizard, type ScheduledMessage } from "@/components/chat/scheduled-message-wizard";
+
+import styles from "./calendar-modal.module.css";
 
 const weekdays = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const shortWeekdays = ["S", "T", "Q", "Q", "S", "S", "D"];
@@ -93,8 +95,13 @@ export function CalendarModal({ onClose, variant = "modal" }: { onClose: () => v
   useEffect(() => {
     if (isPage) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     dialogRef.current?.focus();
-    return () => previousFocus?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
   }, [isPage]);
 
   useEffect(() => {
@@ -383,19 +390,26 @@ export function CalendarModal({ onClose, variant = "modal" }: { onClose: () => v
         transition={{ duration: reduceMotion ? 0 : 0.34, ease: appleEase, layout: layoutTransition }}
         className={isPage
           ? "relative flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-zinc-950 text-zinc-100"
-          : ["relative flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 text-zinc-100 shadow-[0_24px_70px_rgba(0,0,0,0.45)] sm:max-h-[calc(100dvh-2.5rem)]", choosingAction ? "max-w-[540px]" : schedulingMessage ? "max-w-[620px]" : creatingEvent ? "max-w-[1080px]" : "max-w-[1180px]"].join(" ")}
+          : ["relative flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-zinc-950 text-zinc-100 shadow-[0_32px_120px_rgba(0,0,0,0.55)] sm:max-h-[calc(100dvh-3rem)]", choosingAction ? "max-w-[540px]" : schedulingMessage ? "max-w-[620px]" : "h-[calc(100dvh-1.5rem)] max-w-[1480px] sm:h-[calc(100dvh-3rem)]"].join(" ")}
       >
+        {!isPage && !choosingAction && !schedulingMessage && (
+          <header className="flex shrink-0 items-center justify-end px-5 py-4 sm:px-8 sm:py-5">
+            <button type="button" onClick={onClose} aria-label="Fechar calendário" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70">
+              <X aria-hidden="true" className="size-5" />
+            </button>
+          </header>
+        )}
         <AnimatePresence mode="popLayout" initial={false}>
           {choosingAction ? (
             <motion.div layout={!reduceMotion} key="event-actions" initial={reduceMotion ? false : { opacity: 0, y: 8, scale: 0.99, filter: "blur(6px)" }} animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -5, scale: 0.995, filter: "blur(4px)" }} transition={{ duration: reduceMotion ? 0 : 0.34, ease: appleEase, layout: layoutTransition }} className="flex min-h-0 flex-1 items-center justify-center px-5 py-8 sm:px-8">
               <div role="group" aria-label="Opções para novo evento" className="flex w-full max-w-md flex-col gap-3">
-                <button autoFocus type="button" onClick={() => { setSchedulingStep(0); setChoosingAction(false); setSchedulingMessage(true); }} className="flex min-h-28 items-center gap-4 rounded-2xl bg-white/[0.045] p-5 text-left transition-colors hover:bg-white/[0.09] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50">
-                  <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.07] text-zinc-300"><MessageSquareText className="size-5" strokeWidth={1.8} /></span>
-                  <span className="min-w-0"><strong className="block text-base font-semibold text-zinc-100">Programar mensagem</strong><span className="mt-1 block text-sm text-zinc-500">Escolha o número, o texto e o horário</span></span>
+                <button autoFocus type="button" onClick={() => { setSchedulingStep(0); setChoosingAction(false); setSchedulingMessage(true); }} className="flex min-h-28 items-center gap-4 rounded-2xl p-5 text-left text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50">
+                  <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.07]"><MessageSquareText className="size-5" strokeWidth={1.8} /></span>
+                  <span className="min-w-0"><strong className="block text-base font-normal">Programar mensagem</strong><span className="mt-1 block text-sm">Escolha o número, o texto e o horário</span></span>
                 </button>
-                <button type="button" onClick={() => { setChoosingAction(false); setCreatingEvent(true); }} className="flex min-h-28 items-center gap-4 rounded-2xl bg-white/[0.045] p-5 text-left transition-colors hover:bg-white/[0.09] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50">
-                  <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.07] text-zinc-300"><CalendarPlus2 className="size-5" strokeWidth={1.8} /></span>
-                  <span className="min-w-0"><strong className="block text-base font-semibold text-zinc-100">Criar evento</strong><span className="mt-1 block text-sm text-zinc-500">Adicionar compromisso ao calendário</span></span>
+                <button type="button" onClick={() => { setChoosingAction(false); setCreatingEvent(true); }} className="flex min-h-28 items-center gap-4 rounded-2xl p-5 text-left text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50">
+                  <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.07]"><CalendarPlus2 className="size-5" strokeWidth={1.8} /></span>
+                  <span className="min-w-0"><strong className="block text-base font-normal">Criar evento</strong><span className="mt-1 block text-sm">Adicionar compromisso ao calendário</span></span>
                 </button>
               </div>
             </motion.div>
@@ -417,8 +431,8 @@ export function CalendarModal({ onClose, variant = "modal" }: { onClose: () => v
               />
             </motion.div>
           ) : (
-        <motion.div layout={!reduceMotion} key="calendar-content" initial={reduceMotion ? false : { opacity: 0, y: 6, scale: 0.995, filter: "blur(5px)" }} animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.997, filter: "blur(4px)" }} transition={{ duration: reduceMotion ? 0 : 0.32, ease: appleEase, layout: layoutTransition }} onAnimationComplete={() => { if (returnFocusToNewEventRef.current) { newEventButtonRef.current?.focus(); returnFocusToNewEventRef.current = false; } }} className={["min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:overflow-hidden", isPage ? "gap-3 p-4 sm:p-5 lg:grid-cols-[minmax(380px,0.94fr)_minmax(0,1.06fr)] lg:p-4" : "lg:grid-cols-[0.96fr_1.04fr]", creatingEvent ? "lg:items-center" : ""].join(" ")}>
-          <section aria-label="Calendário mensal" className={isPage ? "flex min-w-0 flex-col p-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:p-5 lg:min-h-0 lg:justify-center lg:overflow-y-auto" : "min-w-0 px-4 pb-6 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-7 lg:max-h-full lg:overflow-y-auto lg:px-8 lg:pb-5 lg:pt-3"}>
+        <motion.div layout={!reduceMotion} key="calendar-content" initial={reduceMotion ? false : { opacity: 0, y: 6, scale: 0.995, filter: "blur(5px)" }} animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.997, filter: "blur(4px)" }} transition={{ duration: reduceMotion ? 0 : 0.32, ease: appleEase, layout: layoutTransition }} onAnimationComplete={() => { if (returnFocusToNewEventRef.current) { newEventButtonRef.current?.focus(); returnFocusToNewEventRef.current = false; } }} className={["min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:overflow-hidden", isPage ? "gap-3 p-4 sm:p-5 lg:grid-cols-[minmax(380px,0.94fr)_minmax(0,1.06fr)] lg:p-4" : styles.workspace, isPage ? "lg:items-center" : ""].join(" ")}>
+          <section aria-label="Calendário mensal" className={isPage ? "flex min-w-0 flex-col p-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:p-5 lg:min-h-0 lg:justify-center lg:overflow-y-auto" : styles.month}>
             <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
               <button type="button" aria-label={monthPickerOpen ? "Ano anterior" : "Mês anterior"} onClick={() => changeMonth(-1)} className="flex size-10 shrink-0 items-center justify-center rounded-xl text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 lg:size-11">
                 <ChevronLeft aria-hidden="true" className="size-5" />
@@ -484,7 +498,7 @@ export function CalendarModal({ onClose, variant = "modal" }: { onClose: () => v
                     aria-pressed={isSelected}
                     aria-current={isToday ? "date" : undefined}
                     onClick={() => { setSelectedDate(date); if (!isCurrentMonth) setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1)); }}
-                    className={["flex aspect-square min-h-0 flex-col items-center justify-center gap-1 rounded-xl bg-transparent text-sm transition-[background-color,color,transform] duration-200 ease-out hover:scale-[1.025] active:scale-[0.975] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70 sm:text-base lg:aspect-auto", isPage ? "lg:h-[clamp(40px,6dvh,56px)]" : "lg:h-[clamp(44px,calc(16.667dvh_-_57.333px),76px)]", isSelected ? "font-semibold text-white" : isCurrentMonth ? "text-zinc-300 hover:text-white" : "text-zinc-600 hover:text-zinc-400", isToday ? "hover:bg-white/[0.16]" : "hover:bg-white/[0.055]", isToday && !isSelected ? "font-semibold text-zinc-100" : ""].join(" ")}
+                    className={["flex aspect-square min-h-0 flex-col items-center justify-center gap-1 rounded-xl bg-transparent text-sm transition-[background-color,color,transform] duration-200 ease-out hover:scale-[1.025] active:scale-[0.975] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70 sm:text-base lg:aspect-auto", isPage ? "lg:h-[clamp(40px,6dvh,56px)]" : "lg:h-[clamp(40px,6.5dvh,60px)]", isSelected ? "font-semibold text-white" : isCurrentMonth ? "text-zinc-300 hover:text-white" : "text-zinc-600 hover:text-zinc-400", isToday ? "hover:bg-white/[0.16]" : "hover:bg-white/[0.055]", isToday && !isSelected ? "font-semibold text-zinc-100" : ""].join(" ")}
                   >
                     <span className={isSelected ? "underline decoration-white/60 decoration-2 underline-offset-[7px]" : ""}>{date.getDate()}</span>
                     {(eventColors.length > 0 || hasScheduledMessage) && <span aria-hidden="true" className="flex gap-[3px]">{eventColors.map((color) => <span key={color} className={["size-[7px] rounded-full sm:size-[9px]", colors[color].dot].join(" ")} />)}{hasScheduledMessage && <span className="size-[7px] rounded-full bg-zinc-300 sm:size-[9px]" />}</span>}
@@ -496,9 +510,9 @@ export function CalendarModal({ onClose, variant = "modal" }: { onClose: () => v
             </AnimatePresence>
           </section>
 
-          <section aria-label="Compromissos do dia" className={isPage ? "flex min-w-0 flex-col p-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:p-5 lg:min-h-0 lg:overflow-y-auto" : "min-w-0 px-4 pb-6 pt-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-7 lg:max-h-full lg:overflow-y-auto lg:px-8 lg:pb-7"}>
+          <section aria-label="Compromissos do dia" className={isPage ? "flex min-w-0 flex-col p-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:p-5 lg:min-h-0 lg:overflow-y-auto" : styles.agenda}>
             <AnimatePresence mode="popLayout" initial={false}>
-              <motion.div key={creatingEvent ? "new-event" : dateKey(selectedDate)} initial={reduceMotion ? false : { opacity: 0, y: 7, filter: "blur(5px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -5, filter: "blur(4px)" }} transition={{ duration: reduceMotion ? 0 : 0.3, ease: appleEase }} className={isPage ? "flex min-h-0 flex-1 flex-col" : undefined}>
+              <motion.div key={creatingEvent ? "new-event" : dateKey(selectedDate)} initial={reduceMotion ? false : { opacity: 0, y: 7, filter: "blur(5px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -5, filter: "blur(4px)" }} transition={{ duration: reduceMotion ? 0 : 0.3, ease: appleEase }} className="flex min-h-0 flex-1 flex-col">
             {creatingEvent ? (
               <CalendarEventForm
                 date={dateKey(selectedDate)}
@@ -617,7 +631,7 @@ export function CalendarModal({ onClose, variant = "modal" }: { onClose: () => v
                 })}
               </div>
             ) : (
-              <div className={isPage ? "flex min-h-64 flex-1 flex-col items-center justify-center px-5 text-center" : "flex min-h-64 flex-col items-center justify-center px-5 text-center"}>
+              <div className={isPage ? "flex min-h-64 flex-1 flex-col items-center justify-center px-5 text-center" : "flex min-h-64 flex-1 flex-col items-center justify-center px-5 py-8 text-center"}>
                 <p className="font-normal text-zinc-200">Nada programado para este dia</p>
                 <p className="mt-1 text-sm text-zinc-500">Clique em + para criar um compromisso ou programar uma mensagem.</p>
               </div>
@@ -750,8 +764,8 @@ export function CalendarModal({ onClose, variant = "modal" }: { onClose: () => v
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5" role="presentation">
-      <motion.button type="button" aria-label="Fechar calendário" className="absolute inset-0 cursor-default bg-black/65 backdrop-blur-[2px]" onClick={onClose} initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? 0 : 0.28, ease: appleEase }} />
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6" role="presentation">
+      <motion.button type="button" tabIndex={-1} aria-label="Fechar calendário" className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-md" onClick={onClose} initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? 0 : 0.28, ease: appleEase }} />
       {calendarPanel}
     </div>,
     document.body,

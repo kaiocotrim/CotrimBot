@@ -21,12 +21,13 @@ import { DocumentMessage } from "@/components/chat/document-message";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { ImageMessage } from "@/components/chat/image-message";
 import { MessageText } from "@/components/chat/message-text";
+import { MessageInfoPanel } from "@/components/chat/message-info-panel";
 import { StickerMessage } from "@/components/chat/sticker-message";
 import { SharedContactMessage } from "@/components/chat/shared-contact-message";
 import { PollMessage } from "@/components/chat/poll-message";
 import { TextMessage } from "@/components/chat/text-message";
 import { VideoMessage } from "@/components/chat/video-message";
-import { Languages } from "lucide-react";
+import { Info, Languages } from "lucide-react";
 import { MessageTranslation } from "@/components/chat/message-translation";
 import { useMessageTranslations } from "@/hooks/use-message-translations";
 import { splitMessageSignatures } from "@/lib/message-signature";
@@ -82,6 +83,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
   const [reacting, setReacting] = useState(false);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [messageInfoOpen, setMessageInfoOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
   const [pinDurationHours, setPinDurationHours] = useState<24 | 168 | 720>(168);
@@ -196,7 +198,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
         <WarningCircle size={12} weight="fill" aria-hidden="true" />
       </span>
     ) : (
-      <span className={message.readAt ? isPrivate ? "text-sky-600" : "text-sky-300" : isPrivate ? "text-zinc-500" : "text-white/50"} title={message.readAt ? "Visualizada" : "Enviada"} aria-label={message.readAt ? "Mensagem visualizada" : "Mensagem enviada"}>
+      <span className={`transition-colors duration-200 ${message.readAt ? isPrivate ? "text-zinc-800" : "text-white" : isPrivate ? "text-zinc-500" : "text-white/50"}`} title={message.readAt ? "Visualizada" : "Enviada"} aria-label={message.readAt ? "Mensagem visualizada" : "Mensagem enviada"}>
         <svg className="h-2.5 w-[15px]" viewBox="0 0 18 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="m1 6 3 3 6-7" />
           <path d="m7 8 2 2 8-8" />
@@ -433,9 +435,12 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           <span>Privado</span>
         </div>
       )}
+      <AnimatePresence>
+        {messageInfoOpen && <MessageInfoPanel message={message} groupName={contact.name} onClose={() => setMessageInfoOpen(false)} />}
+      </AnimatePresence>
       {contact.isGroup && !outgoing && message.senderName && (
         <p
-          className={`${isImage || isVideo ? "px-3 pt-2 pb-2" : "mb-1"} pr-5 text-[13px] font-semibold leading-tight lg:text-[11px]`}
+          className={`${isImage || isVideo ? "px-3 pt-2 pb-2" : "mb-1"} pr-5 text-[13px] font-medium leading-tight lg:text-[11px]`}
           style={{ color: participantColor(message.senderPhone || message.senderName, isPrivate) }}
         >
           {message.senderName}
@@ -498,6 +503,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           >
             <div role="menu" aria-label="Ações da mensagem" className="w-[210px] overflow-hidden rounded-xl border border-white/10 bg-zinc-900/95 p-1 text-sm font-medium leading-tight text-zinc-100 shadow-xl backdrop-blur-xl lg:w-[178px] lg:text-[12px]">
               <>
+                  {contact.isGroup && outgoing && !isPrivate && message.id > 0 && !message.deletedAt && <button type="button" role="menuitem" onClick={() => { setActionsOpen(false); setMessageInfoOpen(true); }} className={menuButtonClass}><Info size={15} className="shrink-0 text-zinc-200" /><span>Dados da mensagem</span></button>}
                   <button type="button" role="menuitem" onClick={() => { onReply(message); setActionsOpen(false); }} className={menuButtonClass}>
                     <ArrowBendUpLeft size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Responder</span>
@@ -640,14 +646,14 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           type="button"
           disabled={!message.quotedMessageId}
           onClick={() => message.quotedMessageId && void onNavigateToMessage(message.quotedMessageId)}
-          className={`mb-2 block w-full border-l-4 px-2.5 py-2 text-left ${isPrivate ? "border-zinc-400 bg-zinc-200/70" : "border-emerald-300 bg-black/15"} ${isImage || isVideo ? "rounded-xl" : "rounded-lg"} disabled:cursor-default`}
+          className={`mb-2 block w-full border-l-4 px-2.5 py-2 text-left ${isPrivate ? "border-zinc-400 bg-zinc-200/70" : "border-white bg-black/15"} ${isImage || isVideo ? "rounded-xl" : "rounded-lg"} disabled:cursor-default`}
         >
           <span className="flex min-w-0 items-center gap-2">
             {quotedMediaMessage?.type === "IMAGE" && message.quotedMessageId && (
               <Image unoptimized src={`${API_URL}/messages/${message.quotedMessageId}/media`} alt="" width={36} height={36} className="size-9 shrink-0 rounded-md object-cover" />
             )}
             <span className="min-w-0">
-              <span className={`block truncate text-[11px] font-semibold ${isPrivate ? "text-zinc-700" : "text-emerald-200"}`}>
+              <span className={`block truncate text-[11px] font-semibold ${isPrivate ? "text-zinc-700" : "text-white"}`}>
                 {message.quotedSenderName || "Mensagem"}
               </span>
               <span className={`block truncate text-xs ${isPrivate ? "text-zinc-600" : "text-white/75"}`}><MessageText content={message.quotedContent} showSignature={showQuotedSignature} linkify={false} /></span>

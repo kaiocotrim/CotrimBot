@@ -3,6 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, ChevronLeft, ChevronRight, Search, Send, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 import { CalendarDatePicker } from "@/components/chat/calendar-date-picker";
 import { CalendarTimePicker } from "@/components/chat/calendar-time-picker";
 import { Avatar } from "@/components/chat/avatar";
@@ -43,6 +44,8 @@ export function ScheduledMessageWizard({ step, onStepChange, onBack, onScheduled
 }) {
   const reduceMotion = useReducedMotion();
   const recipientRef = useRef<HTMLInputElement>(null);
+  const contactListRef = useRef<HTMLDivElement>(null);
+  const [contactListPosition, setContactListPosition] = useState<{ left: number; top: number; width: number; maxHeight: number } | null>(null);
   const [phone, setPhone] = useState("");
   const [selectedContact, setSelectedContact] = useState<SavedContact | null>(null);
   const [contacts, setContacts] = useState<SavedContact[]>([]);
@@ -55,6 +58,43 @@ export function ScheduledMessageWizard({ step, onStepChange, onBack, onScheduled
   const [time, setTime] = useState(() => timeKey(initialDate));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<{ step: number; message: string } | null>(null);
+  const showContacts = step === 0 && contacts.length > 0 && !selectedContact;
+
+  useEffect(() => {
+    if (!showContacts) return;
+    let frame: number;
+    const updatePosition = () => {
+      const anchor = recipientRef.current?.parentElement;
+      if (anchor) {
+        const rect = anchor.getBoundingClientRect();
+        const below = window.innerHeight - rect.bottom - 20;
+        const above = rect.top - 20;
+        const openAbove = below < 180 && above > below;
+        const maxHeight = Math.max(0, Math.min(256, openAbove ? above : below));
+        const next = {
+          left: rect.left,
+          top: openAbove ? rect.top - maxHeight - 8 : rect.bottom + 8,
+          width: rect.width,
+          maxHeight,
+        };
+        setContactListPosition((current) => current && Object.keys(next).every((key) => current[key as keyof typeof next] === next[key as keyof typeof next]) ? current : next);
+      }
+      frame = requestAnimationFrame(updatePosition);
+    };
+    frame = requestAnimationFrame(updatePosition);
+    const dismissOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !recipientRef.current?.parentElement?.contains(event.target) && !contactListRef.current?.contains(event.target)) setContacts([]);
+    };
+    document.addEventListener("pointerdown", dismissOutside);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("pointerdown", dismissOutside);
+    };
+  }, [showContacts]);
+
+  useEffect(() => {
+    if (showContacts) contactListRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+  }, [activeContactIndex, showContacts]);
 
   useEffect(() => {
     const query = phone.trim();
@@ -176,15 +216,16 @@ export function ScheduledMessageWizard({ step, onStepChange, onBack, onScheduled
                   <input ref={recipientRef} id="scheduled-message-recipient" autoFocus required readOnly={Boolean(selectedContact)} type="text" autoComplete="off" maxLength={100} value={selectedContact ? selectedContact.name : phone} onChange={(event) => { setSelectedContact(null); setPhone(event.target.value); setContacts([]); setSearchingContacts(false); setSearchedContacts(false); setActiveContactIndex(0); setError(null); }} onKeyDown={handleRecipientKeyDown} role="combobox" aria-autocomplete="list" aria-expanded={contacts.length > 0 && !selectedContact} aria-controls="scheduled-message-contacts" aria-activedescendant={contacts.length && !selectedContact ? `scheduled-message-contact-${contacts[activeContactIndex]?.id}` : undefined} placeholder="Nome ou +55 11 99999-9999" className="min-w-0 flex-1 bg-transparent text-base text-zinc-100 outline-none placeholder:text-zinc-600" />
                   {selectedContact && <button type="button" aria-label="Remover contato selecionado" onClick={() => { setSelectedContact(null); setPhone(""); setContacts([]); recipientRef.current?.focus(); }} className="rounded-full p-1 text-zinc-500 hover:bg-white/[0.08] hover:text-white"><X aria-hidden="true" className="size-4" /></button>}
                 </div>
-                {contacts.length > 0 && !selectedContact && (
-                  <div id="scheduled-message-contacts" role="listbox" aria-label="Contatos encontrados" className="absolute inset-x-0 top-full z-20 mt-2 max-h-64 overflow-y-auto rounded-xl border border-white/[0.09] bg-zinc-900 p-1.5 shadow-2xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {showContacts && contactListPosition && createPortal(
+                  <div ref={contactListRef} id="scheduled-message-contacts" role="listbox" aria-label="Contatos encontrados" style={contactListPosition} className="fixed z-[130] overflow-y-auto rounded-xl border border-white/[0.09] bg-zinc-900 p-1.5 shadow-2xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {contacts.map((contact, index) => (
-                      <button id={`scheduled-message-contact-${contact.id}`} key={contact.id} type="button" role="option" aria-selected={index === activeContactIndex} onMouseEnter={() => setActiveContactIndex(index)} onClick={() => selectContact(contact)} className={["flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors", index === activeContactIndex ? "bg-white/[0.09]" : "hover:bg-white/[0.06]"].join(" ")}>
+                      <button id={`scheduled-message-contact-${contact.id}`} key={contact.id} type="button" role="option" tabIndex={-1} aria-selected={index === activeContactIndex} onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setActiveContactIndex(index)} onClick={() => selectContact(contact)} className={["flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors", index === activeContactIndex ? "bg-white/[0.09]" : "hover:bg-white/[0.06]"].join(" ")}>
                         <Avatar contact={contact} className="size-9 text-xs" />
                         <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-zinc-100">{contact.name}</span><span className="block truncate text-xs text-zinc-500">{contact.phone}{contact.companyName ? ` · ${contact.companyName}` : ""}</span></span>
                       </button>
                     ))}
-                  </div>
+                  </div>,
+                  document.body,
                 )}
               </div>
               {selectedContact ? <p className="mt-3 flex items-center gap-1.5 text-xs text-zinc-400"><Check aria-hidden="true" className="size-3.5 text-emerald-400" /> Enviar para {selectedContact.phone}</p> : <p className="mt-3 text-xs text-zinc-600">{searchingContacts ? "Buscando contatos…" : searchedContacts && !contacts.length && /[a-zÀ-ÿ]/i.test(phone) ? "Nenhum contato encontrado com esse nome." : "Sem contato salvo? Digite o número e continue."}</p>}

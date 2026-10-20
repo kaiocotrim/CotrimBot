@@ -17,7 +17,7 @@ function MentionText({ content }: { content: string }) {
   for (const match of content.matchAll(MENTION_PATTERN)) {
     const target = mentions.get(match[1]);
     if (!target) continue;
-    parts.push(<Fragment key={match.index}><EmojiText content={content.slice(offset, match.index)} /><span data-whatsapp-mention={match[1]} title={`@${target.name}`} className="rounded bg-sky-400/10 px-0.5 font-semibold text-sky-400 [[data-private-message=true]_&]:text-sky-700">@{target.name}</span></Fragment>);
+    parts.push(<Fragment key={match.index}><EmojiText content={content.slice(offset, match.index)} /><span data-whatsapp-mention={match[1]} title={`@${target.name}`} className="px-0.5 font-normal text-zinc-400 [[data-private-message=true]_&]:text-zinc-600">@{target.name}</span></Fragment>);
     offset = match.index + match[0].length;
   }
   return <>{parts}<EmojiText content={content.slice(offset)} /></>;

@@ -8,6 +8,7 @@ import { Avatar } from "@/components/chat/avatar";
 import { ChatHeader, SidebarMenuButton } from "@/components/chat/chat-header";
 import { EmptyChatAnimation } from "@/components/chat/empty-chat-animation";
 import { ContactInfoPanel } from "@/components/chat/contact-info-panel";
+import { ParticipantInfoPanel, type ParticipantProfile } from "@/components/chat/participant-info-panel";
 import { MessageComposer } from "@/components/chat/message-composer";
 import { MessageList } from "@/components/chat/message-list";
 import { useContactTeamTyping } from "@/hooks/use-contact-team-typing";
@@ -103,6 +104,12 @@ export function ChatPanel({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchIndex, setSearchIndex] = useState(0);
   const [contactInfoOpen, setContactInfoOpen] = useState(false);
+  const [participantProfile, setParticipantProfile] = useState<ParticipantProfile | null>(null);
+  const [participantGroupId, setParticipantGroupId] = useState(contact?.id);
+  if (participantGroupId !== contact?.id) {
+    setParticipantGroupId(contact?.id);
+    setParticipantProfile(null);
+  }
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<number>>(() => new Set());
   const [selectionBusy, setSelectionBusy] = useState(false);
@@ -142,6 +149,7 @@ export function ChatPanel({
   }
 
   function startSelection() {
+    setParticipantProfile(null);
     setContactInfoOpen(false);
     setSearchOpen(false);
     setSearchQuery("");
@@ -246,12 +254,14 @@ export function ChatPanel({
   async function startParticipantConversation(participant: GroupParticipant) {
     const target = contacts.find((item) => !item.isGroup && item.phone.replace(/\D/g, "") === participant.phone);
     if (target) {
+      setParticipantProfile(null);
       setContactInfoOpen(false);
       onSelectContact(target);
       return;
     }
 
     await onSaveContact(participant.name ?? `+${participant.phone}`, participant.phone, "");
+    setParticipantProfile(null);
     setContactInfoOpen(false);
   }
 
@@ -339,14 +349,14 @@ export function ChatPanel({
               selectionMode={selectionMode}
               selectedCount={selectedMessageIds.size}
               selectionBusy={selectionBusy}
-              onOpenSearch={() => { setContactInfoOpen(false); setSearchOpen(true); }}
-              onOpenFavorites={() => { setContactInfoOpen(false); void openFavoriteMessages(); }}
+              onOpenSearch={() => { setParticipantProfile(null); setContactInfoOpen(false); setSearchOpen(true); }}
+              onOpenFavorites={() => { setParticipantProfile(null); setContactInfoOpen(false); void openFavoriteMessages(); }}
               onStartSelection={startSelection}
               onCloseSelection={closeSelection}
               onFavoriteSelected={() => void favoriteSelectedMessages()}
               onDeleteSelected={() => { setDeleteSelectionError(null); setDeleteSelectionOpen(true); }}
               onOpenForward={() => openForwardPanel(messages.filter((message) => selectedMessageIds.has(message.id)))}
-              onOpenContactInfo={() => setContactInfoOpen(true)}
+              onOpenContactInfo={() => { setParticipantProfile(null); setContactInfoOpen(true); }}
               onSearchQueryChange={(value) => { setSearchQuery(value); setSearchIndex(0); }}
               onPreviousResult={() => setSearchIndex((current) => searchResults.length ? (current - 1 + searchResults.length) % searchResults.length : 0)}
               onNextResult={() => setSearchIndex((current) => searchResults.length ? (current + 1) % searchResults.length : 0)}
@@ -412,6 +422,12 @@ export function ChatPanel({
             onToggleMessageSelection={toggleMessageSelection}
             onSaveSharedContact={onSaveSharedContact}
             onMessageSharedContact={onMessageSharedContact}
+            onOpenParticipantInfo={(profile) => {
+              setContactInfoOpen(false);
+              setSearchOpen(false);
+              setFavoritesOpen(false);
+              setParticipantProfile(profile);
+            }}
           />
 
           <MessageComposer
@@ -616,7 +632,15 @@ export function ChatPanel({
         </div>
 
         <AnimatePresence mode="wait">
-          {contactInfoOpen && (
+          {participantProfile ? (
+            <ParticipantInfoPanel
+              key={`participant-${participantProfile.participant.phone || participantProfile.participant.lid || participantProfile.participant.name}`}
+              profile={participantProfile}
+              groupName={contact.name}
+              onClose={() => setParticipantProfile(null)}
+              onStartConversation={startParticipantConversation}
+            />
+          ) : contactInfoOpen && (
             <ContactInfoPanel
               key={contact.id}
               contact={contact}

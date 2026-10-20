@@ -13,6 +13,8 @@ import { MessageText } from "@/components/chat/message-text";
 import { MessageComposer } from "@/components/chat/message-composer";
 import { InternalMediaContent } from "@/components/chat/internal-media-content";
 import { InternalConversationPreview } from "@/components/chat/internal-conversation-preview";
+import { InternalConversationListSkeleton } from "@/components/chat/internal-chat-skeleton";
+import { InternalReadReceipt } from "@/components/chat/internal-read-receipt";
 import { TypingIndicator } from "@/components/chat/typing-indicator";
 import { useInternalChat } from "@/hooks/use-internal-chat";
 import { internalChatApi, internalMediaUrl, type InternalConversation, type InternalMember, type InternalMessage } from "@/lib/internal-chat-api";
@@ -105,27 +107,6 @@ function AnimatedMemberContactRow({ member, collapsed, index, onOpen }: { member
   >
     <MemberContactRow member={member} collapsed={collapsed} onOpen={onOpen} />
   </motion.div>;
-}
-
-function InternalConversationListSkeleton({ collapsed }: { collapsed: boolean }) {
-  const reduceMotion = useReducedMotion();
-
-  return <div role="status" aria-label="Carregando contatos e conversas" className={collapsed ? "space-y-2 py-1" : "space-y-1 py-1"}>
-    <span className="sr-only">Carregando contatos e conversas...</span>
-    {[0, 1, 2, 3, 4, 5].map((item) => <motion.div
-      key={item}
-      aria-hidden="true"
-      animate={reduceMotion ? undefined : { opacity: [0.38, 0.82, 0.38] }}
-      transition={reduceMotion ? undefined : { duration: 1.35, delay: item * 0.08, repeat: Infinity, ease: "easeInOut" }}
-      className={`flex items-center rounded-xl ${collapsed ? "justify-center py-2" : "gap-2.5 px-2 py-2"}`}
-    >
-      <span className="size-12 shrink-0 rounded-full bg-white/[0.1] lg:size-10" />
-      {!collapsed && <span className="min-w-0 flex-1 space-y-2">
-        <span className={`block h-3.5 rounded bg-white/[0.1] ${item % 3 === 0 ? "w-2/5" : item % 2 === 0 ? "w-3/5" : "w-1/2"}`} />
-        <span className={`block h-2.5 rounded bg-white/[0.065] ${item % 2 === 0 ? "w-3/4" : "w-2/3"}`} />
-      </span>}
-    </motion.div>)}
-  </div>;
 }
 
 type InternalChatWorkspaceProps = {
@@ -908,7 +889,7 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
                           {messagePinned && <Pin className="size-3" fill="currentColor" aria-label="Mensagem fixada" />}
                           {message.favorited && <Star className="size-3" fill="currentColor" aria-label="Mensagem favorita" />}
                           <time dateTime={message.createdAt}>{timeFormatter.format(new Date(message.createdAt))}</time>
-                          {own && <CheckCheck className="size-3" />}
+                          {own && <InternalReadReceipt message={message} participants={chat.selected?.participants ?? []} />}
                         </div>
                         {message.reactions.length > 0 && <div className="absolute -bottom-3 right-2 flex gap-0.5 rounded-full border border-white/10 bg-zinc-900 px-1.5 py-0.5 text-xs">{message.reactions.map((reaction) => <button key={reaction.userId} type="button" onClick={() => void chat.react(message.id, reaction.emoji)} aria-label={`Reagir com ${reaction.emoji}`}>{reaction.emoji}</button>)}</div>}
                         <AnimatePresence>

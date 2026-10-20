@@ -66,24 +66,24 @@ export function NotificationCenter({
           )}
         </div>
         <div className="flex items-center gap-1">
-          <button type="button" onClick={onMarkAllRead} disabled={!unreadCount} title="Marcar todas como lidas" aria-label="Marcar todas como lidas" className="flex size-8 items-center justify-center rounded-lg text-zinc-600 transition hover:bg-white/[0.05] hover:text-zinc-300 disabled:cursor-default disabled:opacity-25">
+          <button type="button" onClick={onMarkAllRead} disabled={!unreadCount} title="Marcar todas como lidas" aria-label="Marcar todas como lidas" className="flex size-8 items-center justify-center rounded-lg text-zinc-600 transition-colors hover:text-white disabled:cursor-default disabled:opacity-25">
             <CheckCheck aria-hidden="true" className="size-4" />
           </button>
-          <button type="button" onClick={onClear} disabled={!notifications.length} title="Limpar notificações" aria-label="Limpar notificações" className="flex size-8 items-center justify-center rounded-lg text-zinc-600 transition hover:bg-white/[0.05] hover:text-zinc-300 disabled:cursor-default disabled:opacity-25">
+          <button type="button" onClick={onClear} disabled={!notifications.length} title="Limpar notificações" aria-label="Limpar notificações" className="flex size-8 items-center justify-center rounded-lg text-zinc-600 transition-colors hover:text-white disabled:cursor-default disabled:opacity-25">
             <Trash2 aria-hidden="true" className="size-4" />
           </button>
         </div>
       </header>
 
       <div className="flex shrink-0 flex-col gap-3 px-4 py-3.5">
-        <div className="flex gap-1 rounded-xl border border-white/[0.045] bg-white/[0.035] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.035),0_8px_24px_rgba(0,0,0,0.12)] backdrop-blur-xl" role="tablist" aria-label="Filtros de notificações">
+        <div className="flex gap-1" role="tablist" aria-label="Filtros de notificações">
           {([["all", "Geral"], ["unread", "Não lidas"], ["mentions", "@Menções"]] as const).map(([value, label]) => (
-            <button key={value} type="button" role="tab" aria-selected={filter === value} onClick={() => setFilter(value)} className={`min-w-0 flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium transition ${filter === value ? "bg-gradient-to-b from-white/[0.14] to-white/[0.075] text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_3px_10px_rgba(0,0,0,0.18)]" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"}`}>
+            <button key={value} type="button" role="tab" aria-selected={filter === value} onClick={() => setFilter(value)} className={`min-w-0 flex-1 border-b px-2 py-2 text-[13px] font-normal transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 ${filter === value ? "border-zinc-300 text-zinc-100" : "border-transparent text-zinc-500"}`}>
               {label}
             </button>
           ))}
         </div>
-        <label className="flex h-9 items-center gap-2 rounded-lg border border-white/[0.035] bg-white/[0.03] px-3 text-zinc-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)] backdrop-blur-lg transition focus-within:border-white/[0.09] focus-within:bg-white/[0.055] focus-within:text-zinc-400">
+        <label className="flex h-9 items-center gap-2 rounded-full border border-white/10 bg-transparent px-3 text-zinc-500 transition-colors focus-within:border-white/20 focus-within:text-zinc-300">
           <Search aria-hidden="true" className="size-3.5" />
           <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar" className="min-w-0 flex-1 bg-transparent text-xs text-zinc-200 outline-none placeholder:text-zinc-600" />
         </label>
@@ -95,25 +95,25 @@ export function NotificationCenter({
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-5">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-1">
         {visibleNotifications.length ? (
-          <ul className="mx-auto w-full max-w-3xl space-y-1">
+          <ul className="mx-auto w-full max-w-3xl divide-y divide-white/[0.05]">
             {visibleNotifications.map((notification) => {
               const Icon = notification.type === "CONVERSATION_ASSIGNED" ? UserRoundPlus : isMention(notification) ? AtSign : MessageSquare;
               return (
                 <li key={notification.id}>
-                  <button type="button" onClick={() => onOpenNotification(notification)} className="group flex w-full items-start gap-3 rounded-2xl border border-white/[0.045] bg-gradient-to-br from-white/[0.055] to-white/[0.022] px-3 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.035),0_8px_24px_rgba(0,0,0,0.14)] backdrop-blur-xl transition hover:border-white/[0.08] hover:from-white/[0.075] hover:to-white/[0.035] focus-visible:border-white/[0.12] focus-visible:outline-none">
-                    <span className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl ${notification.readAt ? "bg-white/[0.035] text-zinc-600" : "bg-white/[0.08] text-zinc-200"}`}>
-                      <Icon aria-hidden="true" className="size-4" />
+                  <button type="button" onClick={() => onOpenNotification(notification)} className="group flex w-full items-start gap-3 py-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50">
+                    <span className={`mt-0.5 flex size-6 shrink-0 items-center justify-center transition-colors group-hover:text-white ${notification.readAt ? "text-zinc-600" : "text-zinc-400"}`}>
+                      <Icon aria-hidden="true" className="size-[18px]" strokeWidth={1.8} />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-3">
-                        <span className={`truncate text-sm ${notification.readAt ? "text-zinc-400" : "font-medium text-zinc-100"}`}>{notification.title}</span>
+                        <span className={`line-clamp-2 text-[13px] font-normal leading-5 transition-colors group-hover:text-white ${notification.readAt ? "text-zinc-400" : "text-zinc-200"}`}>{notification.title}</span>
                         <span className="shrink-0 text-[10px] text-zinc-600">{formatRelativeTime(notification.createdAt, now)}</span>
                       </span>
-                      <span className="mt-1 line-clamp-2 block text-xs leading-5 text-zinc-500">{notification.body}</span>
+                      <span className="mt-1 line-clamp-2 block text-xs leading-5 text-zinc-500 transition-colors group-hover:text-zinc-300">{notification.body}</span>
                     </span>
-                    {!notification.readAt && <span aria-label="Não lida" className="mt-3 size-2 shrink-0 rounded-full bg-zinc-400" />}
+                    {!notification.readAt && <span aria-label="Não lida" className="mt-2 size-1.5 shrink-0 rounded-full bg-zinc-400" />}
                   </button>
                 </li>
               );

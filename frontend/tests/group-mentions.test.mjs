@@ -18,7 +18,7 @@ test("group mentions resolve LIDs and phone numbers in text, captions, replies a
     alias: { react: path.dirname(require.resolve("react/package.json")) },
     stdin: { resolveDir: frontend, loader: "jsx", contents: `
       import React,{useState}from"react";import{createRoot}from"react-dom/client";
-      import{MessageList}from"@/components/chat/message-list";
+      import{MessageList}from"@/components/chat/message-list";import{ParticipantInfoPanel}from"@/components/chat/participant-info-panel";
       const noop=async()=>{};const source=${JSON.stringify(source)};
       const base={externalId:"x",contactId:1,type:"TEXT",direction:"INCOMING",createdAt:"2026-10-20T15:00:00Z",readAt:null,reaction:null,senderPhone:null,senderName:null};
       const messages=[{...base,id:1,content:source,senderPhone:"5511000000000",senderName:"Kaio Cotrim"},
@@ -28,7 +28,7 @@ test("group mentions resolve LIDs and phone numbers in text, captions, replies a
         {...base,id:5,direction:"OUTGOING",private:true,content:"Nota: @83318892712062"},
         {...base,id:6,content:"https://example.com/@277815698174176 mail@277815698174176.com @999999999999",quotedContent:"https://example.com/@277815698174176",quotedMessageId:1}];
       window.rawMessages=messages;const saved={id:9,name:"Felype",phone:"5511888888888",isSaved:true,isGroup:false};
-      function App(){const[group,setGroup]=useState(true);window.openDirect=()=>setGroup(false);return <main style={{height:"100dvh",display:"flex"}}><MessageList currentUser={{id:"me",name:"Teste"}} contact={{id:group?1:2,name:group?"Grupo":"Direto",phone:"group@g.us",isGroup:group}} contacts={[saved]} messages={messages} hasOlderMessages={false} loadingOlderMessages={false} newMessageId={null} hasPinnedMessage={false} selectionMode={false} selectedMessageIds={new Set()} onLoadOlderMessages={noop} onReactToMessage={noop} onUpdateMessageFlags={noop} onDeleteMessage={noop} onRequestForward={noop} onReplyToMessage={noop} onEnsureMessageLoaded={noop} onToggleMessageSelection={noop} onSaveSharedContact={noop} onMessageSharedContact={noop}/></main>};createRoot(document.getElementById("root")).render(<App/>);` },
+      function App(){const[group,setGroup]=useState(true);const[profile,setProfile]=useState(null);window.openDirect=()=>setGroup(false);return <main style={{height:"100dvh",display:"flex"}}><MessageList currentUser={{id:"me",name:"Teste"}} contact={{id:group?1:2,name:group?"Grupo":"Direto",phone:"group@g.us",isGroup:group}} contacts={[saved]} messages={messages} hasOlderMessages={false} loadingOlderMessages={false} newMessageId={null} hasPinnedMessage={false} selectionMode={false} selectedMessageIds={new Set()} onLoadOlderMessages={noop} onReactToMessage={noop} onUpdateMessageFlags={noop} onDeleteMessage={noop} onRequestForward={noop} onReplyToMessage={noop} onEnsureMessageLoaded={noop} onToggleMessageSelection={noop} onSaveSharedContact={noop} onMessageSharedContact={noop} onOpenParticipantInfo={setProfile}/>{profile&&<ParticipantInfoPanel profile={profile} groupName="Grupo" onClose={()=>setProfile(null)} onStartConversation={noop}/>}</main>};createRoot(document.getElementById("root")).render(<App/>);` },
     bundle: true, write: false, jsx: "automatic",
     define: { "process.env": "{}", "process.env.NODE_ENV": '"test"' },
   });
@@ -53,6 +53,14 @@ test("group mentions resolve LIDs and phone numbers in text, captions, replies a
     await page.addStyleTag({ content: "body{background:#09090b;color:white;font-family:Arial}img{min-width:36px;min-height:36px}" });
     await page.addScriptTag({ content: bundle.outputFiles[0].text });
     const row = id => page.locator(`[data-message-id="${id}"]`);
+    await row(2).getByRole("button", { name: "Ver informações de Thiago", exact: true }).click();
+    const participantPanel = page.getByRole("complementary", { name: "Informações de Thiago" });
+    await expect(participantPanel).toBeVisible();
+    await expect(participantPanel).toContainText("+5511999999999");
+    await expect(participantPanel).toContainText("Participante de Grupo");
+    await page.keyboard.press("Escape");
+    await expect(participantPanel).toHaveCount(0);
+    await expect(row(2).getByRole("button", { name: "Ver informações de Thiago", exact: true })).toBeFocused();
     for (const id of [1, 3, 4]) {
       await expect(row(id).locator('[data-whatsapp-mention="277815698174176"]')).toHaveText("@Felype");
       await expect(row(id).locator('[data-whatsapp-mention="83318892712062"]')).toHaveText("@Thiago");

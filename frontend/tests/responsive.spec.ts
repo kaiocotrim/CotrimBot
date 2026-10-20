@@ -177,6 +177,15 @@ test("composer mobile abre câmera e emojis e troca microfone por envio", async 
   await input.fill("Olá 😊");
   await composer.getByRole("button", { name: "Abrir emojis", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Selecionar emoji", exact: true })).toBeVisible();
+  const picker = page.locator(".EmojiPickerReact");
+  await expect(picker).toBeVisible();
+  const pickerElement = await picker.elementHandle();
+  await page.keyboard.press("Escape");
+  await expect(picker).toBeHidden();
+  await expect(picker).toHaveCount(1);
+  await composer.getByRole("button", { name: "Abrir emojis", exact: true }).click();
+  await expect(picker).toBeVisible();
+  expect(await pickerElement!.evaluate((element) => element === document.querySelector(".EmojiPickerReact"))).toBe(true);
   await page.keyboard.press("Escape");
   await expect(input).toHaveValue("Olá 😊");
   await expect(send).toBeVisible();
