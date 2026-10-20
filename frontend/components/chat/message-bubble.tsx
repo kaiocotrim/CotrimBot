@@ -26,6 +26,7 @@ import { SharedContactMessage } from "@/components/chat/shared-contact-message";
 import { PollMessage } from "@/components/chat/poll-message";
 import { TextMessage } from "@/components/chat/text-message";
 import { VideoMessage } from "@/components/chat/video-message";
+import { participantColor } from "@/lib/participant-color";
 import type { Contact, Message } from "@/types/chat";
 
 type MessageBubbleProps = {
@@ -424,7 +425,10 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
         </div>
       )}
       {contact.isGroup && !outgoing && message.senderName && (
-        <p className={`${isImage || isVideo ? "px-3 pt-2 pb-2" : "mb-1"} pr-5 text-[13px] font-semibold leading-tight text-emerald-300 lg:text-[11px]`}>
+        <p
+          className={`${isImage || isVideo ? "px-3 pt-2 pb-2" : "mb-1"} pr-5 text-[13px] font-semibold leading-tight lg:text-[11px]`}
+          style={{ color: participantColor(message.senderPhone || message.senderName, isPrivate) }}
+        >
           {message.senderName}
         </p>
       )}

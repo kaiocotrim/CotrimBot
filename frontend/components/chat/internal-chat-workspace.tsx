@@ -17,6 +17,7 @@ import { TypingIndicator } from "@/components/chat/typing-indicator";
 import { useInternalChat } from "@/hooks/use-internal-chat";
 import { internalChatApi, internalMediaUrl, type InternalConversation, type InternalMember, type InternalMessage } from "@/lib/internal-chat-api";
 import { prepareAvatarImage } from "@/lib/prepare-avatar-image";
+import { participantColor } from "@/lib/participant-color";
 import type { Message } from "@/types/chat";
 
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
@@ -889,7 +890,7 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
                         onContextMenu={(event) => { event.preventDefault(); setMessageMenuId(message.id); setReactionMenuId(null); }}
                       >
                         {message.private && <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-zinc-600"><LockKeyhole className="size-3" /> Privado</p>}
-                        {chat.selected?.type === "GROUP" && !own && <p className="mb-1 text-[11px] font-semibold text-zinc-300">{message.sender.name}</p>}
+                        {chat.selected?.type === "GROUP" && !own && <p className="mb-1 text-[11px] font-semibold" style={{ color: participantColor(message.senderId, Boolean(message.private)) }}>{message.sender.name}</p>}
                         {message.replyTo && <button type="button" onClick={() => document.getElementById(`internal-message-${message.replyTo?.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })} className="mb-2 block w-full rounded border-l-2 border-zinc-400 bg-black/15 px-2 py-1 text-left text-xs"><span className="block font-medium text-zinc-300">{message.replyTo.sender.name}</span><span className="block truncate text-zinc-400">{message.replyTo.content}</span></button>}
                         {message.type === "FILE" && message.media && !message.deletedAt && chat.organizationId && chat.selectedId
                           ? <InternalMediaContent message={message} messages={chat.messages} organizationId={chat.organizationId} conversationId={chat.selectedId} currentUserId={userId} />

@@ -74,4 +74,7 @@ if not exist "%DIST_DIR%\CotrimBotTranscritor.exe" (
     exit /b 1
 )
 echo Executavel validado: "%DIST_DIR%\CotrimBotTranscritor.exe"
+echo Gerando ZIP para download no site
+"%VENV_PYTHON%" package-windows.py
+if errorlevel 1 exit /b 1
 exit /b 0

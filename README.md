@@ -165,7 +165,31 @@ transcription-service/dist/CotrimBotTranscritor/
   _internal/
 ```
 
-Na máquina do usuário final, execute `CotrimBotTranscritor.exe`. O serviço
+O build também gera `frontend/public/downloads/CotrimBotTranscritor.zip`,
+disponível pelo botão **Baixar para Windows (.zip)** em **Configurações →
+Transcrição local**. O ZIP inclui o executável e toda a pasta `_internal`.
+Para empacotar um executável já gerado, execute
+`py -3.12 transcription-service/package-windows.py` na raiz do projeto.
+O ZIP é um artefato gerado e não é versionado: copie-o para
+`frontend/public/downloads/` antes do build do frontend ou do Docker no
+ambiente de publicação. No export estático, ele será incluído em
+`frontend/out/downloads/`.
+
+Na máquina do usuário final, baixe e extraia o ZIP inteiro e execute
+`CotrimBotTranscritor.exe` uma vez dentro da pasta extraída. Ele copia o
+pacote para `%LOCALAPPDATA%\Programs\CotrimBotTranscritor`, registra a
+inicialização automática apenas para o usuário atual e inicia em segundo
+plano, sem console e sem exigir administrador. A pasta extraída pode ser
+removida depois da configuração. O Windows inicia o transcritor ao entrar
+na conta; não é necessário deixar uma janela aberta.
+
+Para desativar, use **Configurações do Windows → Aplicativos → Inicialização
+→ CotrimBotTranscritor** ou execute o programa com `--disable-startup`.
+Para encerrá-lo imediatamente, finalize **CotrimBotTranscritor** no
+Gerenciador de Tarefas. Para atualizar o pacote, encerre a versão atual e
+abra o executável do novo ZIP. O argumento interno `--background` executa
+somente o serviço, sem instalar nem modificar a inicialização automática.
+O serviço
 escuta apenas em `http://127.0.0.1:8765`. Na primeira execução, o modelo
 configurado (`base`) pode ser baixado; ele fica persistido em
 `%LOCALAPPDATA%\CotrimBot\Transcritor\models` e os logs ficam em

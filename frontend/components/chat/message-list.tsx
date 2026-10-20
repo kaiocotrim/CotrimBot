@@ -284,6 +284,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
           ? {
               ...message,
               senderName: savedSender?.name ?? whatsappSenderName ?? groupParticipant?.name ?? message.senderName,
+              senderPhone: groupParticipant?.phone || savedSender?.phone || message.senderPhone,
               senderProfilePictureUrl: savedSender?.profilePictureUrl ?? groupParticipant?.profilePictureUrl ?? message.senderProfilePictureUrl,
             }
           : message;

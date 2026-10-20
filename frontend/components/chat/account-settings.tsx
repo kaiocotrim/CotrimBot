@@ -388,22 +388,33 @@ function LocalServiceSettings() {
       <section className={styles.card}>
         <h3>Transcrição local</h3>
         <p>
-          Execute o <strong>CotrimBotTranscritor.exe</strong> no seu computador para transcrever
-          os áudios usando CPU, sem depender de um serviço externo.
+          Configure o <strong>CotrimBotTranscritor.exe</strong> uma vez para transcrever
+          os áudios no seu computador. Ele inicia com o Windows e funciona em segundo plano, sem janela aberta.
         </p>
         <ol>
-          <li>Abra o executável na pasta <code>dist\CotrimBotTranscritor</code>.</li>
+          <li>Baixe o ZIP para Windows e extraia todos os arquivos.</li>
+          <li>Abra <code>CotrimBotTranscritor.exe</code> uma vez na pasta extraída para instalar e ativar a inicialização automática.</li>
           <li>Aguarde o primeiro download do modelo de transcrição.</li>
-          <li>Mantenha a janela do serviço aberta enquanto usar a transcrição.</li>
+          <li>Ative a opção abaixo e clique em Verificar conexão. Nas próximas entradas no Windows, o transcritor inicia sozinho.</li>
         </ol>
-        <a
-          href="http://127.0.0.1:8765/"
-          target="_blank"
-          rel="noreferrer"
-          className={styles.primaryButton}
-        >
-          Abrir status do serviço
-        </a>
+        <div className={styles.localServiceActions}>
+          <a
+            href="/downloads/CotrimBotTranscritor.zip"
+            download="CotrimBotTranscritor.zip"
+            className={styles.primaryButton}
+          >
+            Baixar para Windows (.zip)
+          </a>
+          <a
+            href="http://127.0.0.1:8765/"
+            target="_blank"
+            rel="noreferrer"
+            className={styles.secondaryButton}
+          >
+            Abrir status do serviço
+          </a>
+        </div>
+        <p>Para desativar a inicialização automática, acesse Configurações do Windows → Aplicativos → Inicialização → CotrimBotTranscritor.</p>
       </section>
 
       <section className={styles.card}>

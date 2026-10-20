@@ -533,6 +533,16 @@
   text-decoration: none;
 }
 
+.localServiceActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.localServiceActions a {
+  text-decoration: none;
+}
+
 .primaryButton:hover:not(:disabled),
 .providerButton:hover:not(:disabled) {
   background: #dedede;
