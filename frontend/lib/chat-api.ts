@@ -292,9 +292,11 @@ export async function sendMedia(
   );
 
   if (!response.ok) {
-    throw new Error(
-      "Erro ao enviar mídia"
-    );
+    const result = await response.json().catch(() => null) as { message?: unknown } | null;
+    const detail = typeof result?.message === "string" && result.message.trim()
+      ? result.message
+      : "Erro ao enviar mídia";
+    throw new Error(detail);
   }
 
   return response.json();

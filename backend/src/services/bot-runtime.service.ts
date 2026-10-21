@@ -57,15 +57,35 @@ return async function processBotMessage(messageId: number, instance: unknown) {
       // Commit the unique claim independently BEFORE contacting Evolution. It survives
       // an ambiguous timeout/transaction rollback and prevents a later duplicate send.
       await database.botExecutionLog.create({ data: { messageId, botId: bot.id, outcome: "PROCESSING" } });
-      const response = image
-        ? await sendMedia({ number: contact.phone, mediatype: "image", mimetype: image.mimetype, media: Buffer.from(image.data).toString("base64"), fileName: image.fileName, caption: result.text })
-        : await send(contact.phone, result.text);
-      const externalId = response?.key?.id;
-      if (typeof externalId !== "string" || !externalId) throw new Error("Missing Evolution message ID");
-      const message = await tx.message.upsert({ where: { externalId }, create: { externalId, contactId: contact.id, direction: "OUTGOING", content: result.text, type: image ? "IMAGE" : "TEXT" }, update: {} });
+      const messages = [];
+      if (!image || result.text.trim()) {
+        const response = await send(contact.phone, result.text);
+        const externalId = response?.key?.id;
+        if (typeof externalId !== "string" || !externalId) throw new Error("Missing Evolution message ID");
+        messages.push(await tx.message.upsert({
+          where: { externalId },
+          create: { externalId, contactId: contact.id, direction: "OUTGOING", content: result.text, type: "TEXT" },
+          update: {},
+        }));
+      }
       if (image) {
+        const response = await sendMedia({
+          number: contact.phone,
+          mediatype: "image",
+          mimetype: image.mimetype,
+          media: Buffer.from(image.data).toString("base64"),
+          fileName: image.fileName,
+        });
+        const externalId = response?.key?.id;
+        if (typeof externalId !== "string" || !externalId) throw new Error("Missing Evolution media message ID");
+        const message = await tx.message.upsert({
+          where: { externalId },
+          create: { externalId, contactId: contact.id, direction: "OUTGOING", content: "[Imagem]", type: "IMAGE" },
+          update: {},
+        });
         const media = { data: image.data, mimetype: image.mimetype, fileName: image.fileName };
         await tx.messageMedia.upsert({ where: { messageId: message.id }, create: { messageId: message.id, ...media }, update: media });
+        messages.push(message);
       }
       await tx.botSession.upsert({ where: { instance_contactId: { instance: runtimeInstance, contactId: contact.id } },
         create: { instance: runtimeInstance, contactId: contact.id, botId: bot.id, revision: bot.publishedRevision, state: result.state as unknown as PrismaTypes.InputJsonValue, status: result.state.status },
@@ -75,9 +95,11 @@ return async function processBotMessage(messageId: number, instance: unknown) {
       // updateMany writes directly, so saving the reply/session can commit.
       const completed = await tx.botExecutionLog.updateMany({ where: { messageId }, data: { outcome: "SENT" } });
       if (completed.count !== 1) throw new Error("Missing bot execution claim");
-      return { message, contact: { ...contact, name: contactDisplayName(contact), assignedUserIds: contact.assignments.map(assignment => assignment.userId) } };
+      return { messages, contact: { ...contact, name: contactDisplayName(contact), assignedUserIds: contact.assignments.map(assignment => assignment.userId) } };
     }, { timeout: 30000, maxWait: 10000 });
-    if (emitted) emit(emitted);
+    if (emitted) {
+      for (const message of emitted.messages) emit({ message, contact: emitted.contact });
+    }
   } catch {
     // Do not retry ambiguous network sends automatically: WhatsApp has no exactly-once send primitive.
     if (activeBotId) await database.botExecutionLog.upsert({ where: { messageId }, create: { messageId, botId: activeBotId, outcome: "FAILED_OR_UNCERTAIN" }, update: { outcome: "FAILED_OR_UNCERTAIN" } });

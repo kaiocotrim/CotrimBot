@@ -177,18 +177,20 @@ test("image greetings and option photos use media, persist image bytes and keep 
   await process(1, "test-instance");
   assert.equal(state.mediaSent.length, 1);
   assert.equal(state.mediaSent[0].media, "AQID");
-  assert.match(state.mediaSent[0].caption, /Assistente Infordoc/);
-  assert.equal(state.outgoing[0].type, "IMAGE");
+  assert.equal(state.mediaSent[0].caption, undefined);
+  assert.match(state.sent[0]!, /Assistente Infordoc/);
+  assert.equal(state.outgoing[0].type, "TEXT");
+  assert.equal(state.outgoing[1].type, "IMAGE");
   assert.equal(state.cachedMedia[0].mimetype, "image/png");
   assert.equal(state.logs.get(1)?.outcome, "SENT");
   state.message = { ...state.message, id: 2, content: "1" };
   await process(2, "test-instance");
-  assert.match(state.mediaSent[1].caption, /Legenda da foto/);
+  assert.match(state.sent[1]!, /Legenda da foto/);
   state.message = { ...state.message, id: 3, content: "0" };
   await process(3, "test-instance");
-  assert.match(state.mediaSent[2].caption, /Assistente Infordoc/);
-  assert.equal(state.sent.length, 0);
-  assert.equal(state.emitted.length, 3);
+  assert.equal(state.mediaSent.length, 3);
+  assert.match(state.sent[2]!, /Assistente Infordoc/);
+  assert.equal(state.emitted.length, 6);
 });
 
 test("missing/foreign images and ambiguous media failures do not send or retry photos", async () => {
@@ -197,7 +199,7 @@ test("missing/foreign images and ambiguous media failures do not send or retry p
     flow.menus[0]!.imageId = "image-a";
     state.imageAvailable = !missing; state.failSend = !missing;
     await process(1, "test-instance"); await process(1, "test-instance");
-    assert.equal(state.mediaSent.length, missing ? 0 : 1);
+    assert.equal(state.mediaSent.length, 0);
     assert.equal(state.logs.get(1)?.outcome, "FAILED_OR_UNCERTAIN");
     assert.equal(state.emitted.length, 0);
   }

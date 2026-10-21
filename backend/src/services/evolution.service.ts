@@ -400,43 +400,51 @@ export async function sendWhatsAppMedia({
     );
   }
 
-  const response = await fetch(
-    `${apiUrl}/message/sendMedia/${instance}`,
-    {
-      method: "POST",
-      signal: AbortSignal.timeout(15000),
+  const mediaPayloads = media.startsWith("data:") || /^https?:\/\//i.test(media)
+    ? [media]
+    : [`data:${mimetype};base64,${media}`, media];
 
-      headers: {
-        "Content-Type": "application/json",
-        apikey: apiKey,
-      },
+  for (const [index, mediaPayload] of mediaPayloads.entries()) {
+    const response = await fetch(
+      `${apiUrl}/message/sendMedia/${instance}`,
+      {
+        method: "POST",
+        signal: AbortSignal.timeout(15000),
 
-      body: JSON.stringify({
-        number,
-        mediatype,
-        mimetype,
-        media: media.startsWith("data:") || /^https?:\/\//i.test(media) ? media : `data:${mimetype};base64,${media}`,
-        fileName,
-        caption,
-        ...(quoted ? {
-          quoted: {
-            key: { id: quoted.externalId, fromMe: quoted.fromMe },
-            message: { conversation: quoted.content },
-          },
-        } : {}),
-      }),
-    }
-  );
+        headers: {
+          "Content-Type": "application/json",
+          apikey: apiKey,
+        },
 
-  if (!response.ok) {
-    const error = await response.text();
-
-    throw new Error(
-      `Erro ao enviar mídia pela Evolution: ${response.status} - ${error}`
+        body: JSON.stringify({
+          number,
+          mediatype,
+          mimetype,
+          media: mediaPayload,
+          fileName,
+          caption,
+          ...(quoted ? {
+            quoted: {
+              key: { id: quoted.externalId, fromMe: quoted.fromMe },
+              message: { conversation: quoted.content },
+            },
+          } : {}),
+        }),
+      }
     );
+
+    if (response.ok) return response.json();
+
+    const error = await response.text();
+    const canRetryWithAlternativeFormat = index === 0 && response.status >= 400 && response.status < 500 && mediaPayloads.length > 1;
+    if (!canRetryWithAlternativeFormat) {
+      throw new Error(
+        `Erro ao enviar mídia pela Evolution: ${response.status} - ${error}`
+      );
+    }
   }
 
-  return response.json();
+  throw new Error("Erro ao enviar mídia pela Evolution: formato de mídia não aceito");
 }
 
 const EVOLUTION_SETTINGS_TIMEOUT_MS = 10_000;
