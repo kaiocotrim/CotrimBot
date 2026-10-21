@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { notifyAssignment } from "../services/notification.service.js";
+import { isInforbotName } from "../services/bot.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
 import { presenceDebug, presenceIdentifiers } from "../utils/whatsapp-presence.js";
 import { normalizeWhatsAppJid, whatsAppJidIdentifier } from "../utils/whatsapp-jid.js";
@@ -502,6 +503,7 @@ export async function setContactAssignment(req: Request, res: Response) {
     select: { id: true, name: true },
   });
   const userNames = new Map(users.map((user) => [user.id, user.name]));
+  const inforbotUserIds = new Set(users.filter(user => isInforbotName(user.name)).map(user => user.id));
   if (assigneeIds.some((assigneeId) => !userNames.has(assigneeId))) {
     return res.status(400).json({ message: "Um ou mais usuários não foram encontrados" });
   }
@@ -516,6 +518,7 @@ export async function setContactAssignment(req: Request, res: Response) {
       return res.status(400).json({ message: "Um ou mais usuários não pertencem à empresa" });
     }
     for (const member of members) {
+      if (isInforbotName(member.displayName)) inforbotUserIds.add(member.userId);
       if (member.displayName?.trim()) userNames.set(member.userId, member.displayName.trim());
     }
   }
@@ -528,13 +531,15 @@ export async function setContactAssignment(req: Request, res: Response) {
   if (contact.isGroup) return res.status(400).json({ message: "Grupos não podem ser atribuídos" });
   const currentIds = contact.assignments.map((assignment) => assignment.userId).sort();
   const nextIds = [...assigneeIds].sort();
-  const assignedToInforbot = assigneeIds.some((assigneeId) => userNames.get(assigneeId)?.trim().toLocaleLowerCase("pt-BR") === "inforbot");
+  const assignedToInforbot = assigneeIds.some((assigneeId) => inforbotUserIds.has(assigneeId));
   if (currentIds.length === nextIds.length && currentIds.every((value, index) => value === nextIds[index])) {
     const { assignments, ...unchanged } = contact;
     return res.json({ ...unchanged, name: contactDisplayName(unchanged), assignedUserIds: assignments.map((assignment) => assignment.userId) });
   }
 
   const { updated, systemMessage } = await prisma.$transaction(async (transaction) => {
+    // Serialize assignment changes with incoming bot messages.
+    await transaction.$queryRaw`SELECT id FROM Contact WHERE id = ${id} FOR UPDATE`;
     if (assignedToInforbot) {
       await transaction.botSession.deleteMany({ where: { contactId: id } });
     }

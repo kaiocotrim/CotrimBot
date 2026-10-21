@@ -1,3 +1,7 @@
+export function isInforbotName(name: string | null | undefined): boolean {
+  return name?.trim().toLocaleLowerCase("pt-BR") === "inforbot";
+}
+
 const SATISFACTION_SURVEY = `Olá! 😊
 
 Queremos saber como foi sua experiência com o nosso atendimento.

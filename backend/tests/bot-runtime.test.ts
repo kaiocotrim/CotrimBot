@@ -8,7 +8,7 @@ function harness() {
   const flow = fixture();
   const state = { sent: [] as string[], emitted: [] as unknown[], logs: new Map<number, Record<string, unknown>>(), session: null as any,
     contact: { id: 1, phone: "5511999999999", name: "Cliente", isGroup: false, blocked: false, assignments: [{ userId: "inforbot-id" }] as unknown[] },
-    members: [{ organizationId: "company-a", displayName: "Inforbot", user: { name: "Bot de atendimento" } }] as { organizationId: string; displayName: string | null; user: { name: string } }[],
+    members: [{ userId: "inforbot-id", organizationId: "company-a", displayName: "Inforbot", user: { name: "Bot de atendimento" } }] as { userId: string; organizationId: string; displayName: string | null; user: { name: string } }[],
     message: { id: 1, contactId: 1, direction: "INCOMING", type: "TEXT", content: "Oi" }, failSend: false };
   const db: any = {
     $queryRaw: async () => [],
@@ -46,7 +46,7 @@ test("inactive bot, other instance/organization, groups, outgoing messages and a
   for (const variant of ["inactive", "instance", "organization", "group", "outgoing", "assigned", "blocked"] as const) {
     const { state, process } = harness();
     if (variant === "inactive") state.members = [];
-    if (variant === "organization") state.members = [{ organizationId: "company-b", displayName: "Inforbot", user: { name: "Inforbot" } }];
+    if (variant === "organization") state.members = [{ userId: "inforbot-id", organizationId: "company-b", displayName: "Inforbot", user: { name: "Inforbot" } }];
     if (variant === "group") state.contact.isGroup = true;
     if (variant === "outgoing") state.message.direction = "OUTGOING";
     if (variant === "assigned") { state.contact.assignments = [{ userId: "tech" }]; state.members = []; }
@@ -62,6 +62,69 @@ test("assignment to Inforbot enables the published flow", async () => {
   await process(1, "test-instance");
   assert.equal(state.sent.length, 1);
   assert.match(state.sent[0]!, /Assistente Infordoc/);
+  assert.deepEqual((state.emitted[0] as any).contact.assignedUserIds, ["inforbot-id"]);
+});
+
+test("a new Inforbot assignment restarts an old paused session and continues the menu", async () => {
+  for (const status of ["WAITING_HUMAN", "HUMAN_ACTIVE", "CLOSED"]) {
+    const { state, process } = harness();
+    state.session = { status, updatedAt: new Date("2026-10-21T10:00:00Z") };
+    state.contact.assignments = [{ userId: "inforbot-id", assignedAt: new Date("2026-10-21T11:00:00Z") }];
+    await process(1, "test-instance");
+    assert.match(state.sent[0]!, /Assistente Infordoc/, status);
+    state.session.updatedAt = new Date("2026-10-21T11:01:00Z");
+    state.message = { ...state.message, id: 2, content: "1" };
+    await process(2, "test-instance");
+    assert.match(state.sent[1]!, /sac.infordoc.com.br/, status);
+  }
+});
+
+test("media starts service once, but does not select menu options", async () => {
+  const { state, process } = harness();
+  state.message.type = "IMAGE";
+  await process(1, "test-instance");
+  await process(1, "test-instance");
+  assert.equal(state.sent.length, 1);
+  assert.match(state.sent[0]!, /Assistente Infordoc/);
+  state.message.id = 2;
+  await process(2, "test-instance");
+  assert.equal(state.sent.length, 1);
+  state.message = { ...state.message, id: 3, type: "TEXT", content: "1" };
+  await process(3, "test-instance");
+  assert.match(state.sent[1]!, /sac.infordoc.com.br/);
+});
+
+test("human transfer stays paused until a new assignment and unassigned chats stay silent", async () => {
+  const { state, process } = harness();
+  state.session = { status: "WAITING_HUMAN", updatedAt: new Date("2026-10-21T11:00:00Z") };
+  state.contact.assignments = [{ userId: "inforbot-id", assignedAt: new Date("2026-10-21T10:00:00Z") }];
+  await process(1, "test-instance");
+  assert.equal(state.sent.length, 0);
+  state.contact.assignments = [];
+  state.members = [];
+  state.session = null;
+  await process(1, "test-instance");
+  assert.equal(state.sent.length, 0);
+});
+
+test("Inforbot is also recognized by the account name when display name is empty", async () => {
+  const { state, process } = harness();
+  state.members[0]!.displayName = " ";
+  state.members[0]!.user.name = " InforBot ";
+  await process(1, "test-instance");
+  assert.match(state.sent[0]!, /Assistente Infordoc/);
+});
+
+test("Inforbot account with an Administrator display name starts and continues the published flow", async () => {
+  const { state, process } = harness();
+  state.members[0]!.displayName = "Administrador";
+  state.members[0]!.user.name = "Inforbot";
+  await process(1, "test-instance");
+  assert.match(state.sent[0]!, /Assistente Infordoc/);
+  state.message = { ...state.message, id: 2, content: "1" };
+  await process(2, "test-instance");
+  assert.match(state.sent[1]!, /sac.infordoc.com.br/);
+  assert.deepEqual((state.emitted[1] as any).contact.assignedUserIds, ["inforbot-id"]);
 });
 
 test("human transfer pauses new messages and close-with-bot session reset restarts once", async () => {

@@ -68,6 +68,12 @@ Limites: 50 menus, 50 opções por menu, números únicos de 1 a 999, mensagens 
 
 ## Arquitetura e integração
 
+### Atendimento atribuído ao Inforbot
+
+Uma conversa atribuída ao membro Inforbot inicia o fluxo publicado na próxima mensagem recebida do cliente, inclusive quando a primeira mensagem é uma mídia. Depois do início, as escolhas do menu são processadas em mensagens de texto. Respostas automáticas preservam os responsáveis exibidos no chat.
+
+Uma nova atribuição ao Inforbot limpa a sessão anterior sob o mesmo lock usado pelo runtime. Sessões antigas cuja atualização precede essa atribuição também são reiniciadas. Uma transferência para atendimento humano permanece pausada até a conversa ser devolvida ao bot; mensagens duplicadas não geram novos envios.
+
 - `Bot.draft` e `Bot.published` guardam documentos JSON de menus/opções. A opção por snapshots substitui tabelas separadas para cada menu: publicação atômica, referências validadas no servidor e edição sem alterar produção. `revision` impede sobrescrita concorrente; `publishedRevision` muda apenas ao publicar.
 - `BotInstance` vincula a instância Evolution global a uma organização e a um único bot ativo. As consultas administrativas sempre filtram pela empresa ativa e conferem a associação do usuário.
 - `BotSession` identifica a conversa por instância e `Contact.id`, guardando menu, pilha de retorno, versão e estado. `BOT_ACTIVE`, `WAITING_HUMAN`, `HUMAN_ACTIVE` e `CLOSED` são suportados. `CLOSED` fica reservado a futuros encerramentos; o encerramento atual devolve a conversa ao bot.

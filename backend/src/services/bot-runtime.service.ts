@@ -4,6 +4,7 @@ import { sendWhatsAppMessage } from "./evolution.service.js";
 import { advanceBot, type BotFlow, type BotState } from "./bot-flow.js";
 import { Prisma, type Prisma as PrismaTypes } from "../../generated/prisma/client.js";
 import { contactDisplayName } from "../utils/contact-name.js";
+import { isInforbotName } from "./bot.service.js";
 
 export async function lockBotContact(tx: Prisma.TransactionClient, contactId: number) {
   await tx.$queryRaw`SELECT id FROM Contact WHERE id = ${contactId} FOR UPDATE`;
@@ -15,7 +16,7 @@ return async function processBotMessage(messageId: number, instance: unknown) {
   const runtimeInstance = process.env.EVOLUTION_INSTANCE;
   if (!runtimeInstance || typeof instance !== "string" || instance.trim() !== runtimeInstance.trim()) return;
   const input = await database.message.findUnique({ where: { id: messageId } });
-  if (!input || input.direction !== "INCOMING" || input.type !== "TEXT") return;
+  if (!input || input.direction !== "INCOMING" || input.type === "SYSTEM") return;
   let activeBotId: string | undefined;
   try {
     const emitted = await database.$transaction(async tx => {
@@ -25,22 +26,28 @@ return async function processBotMessage(messageId: number, instance: unknown) {
       const assignedMembers = contact.assignments.length
         ? await tx.member.findMany({
             where: { userId: { in: contact.assignments.map(assignment => assignment.userId) } },
-            select: { organizationId: true, displayName: true, user: { select: { name: true } } },
+            select: { userId: true, organizationId: true, displayName: true, user: { select: { name: true } } },
           })
         : [];
       const inforbotMember = assignedMembers.find(member =>
-        (member.displayName?.trim() || member.user.name).toLocaleLowerCase("pt-BR") === "inforbot"
+        isInforbotName(member.user.name) || isInforbotName(member.displayName)
       );
       if (!inforbotMember) return;
       const bot = await tx.bot.findFirst({
         where: { organizationId: inforbotMember.organizationId, published: { not: Prisma.JsonNull } },
-        orderBy: { publishedRevision: "desc" },
+        orderBy: [{ publishedRevision: "desc" }, { id: "asc" }],
       });
       if (!bot?.published) return;
       activeBotId = bot.id;
       if (await tx.botExecutionLog.findUnique({ where: { messageId } })) return;
-      const previous = await tx.botSession.findUnique({ where: { instance_contactId: { instance: runtimeInstance, contactId: contact.id } } });
+      const savedSession = await tx.botSession.findUnique({ where: { instance_contactId: { instance: runtimeInstance, contactId: contact.id } } });
+      const assignment = contact.assignments.find(item => item.userId === inforbotMember.userId);
+      // A return to Inforbot starts a new service, including sessions left paused
+      // by an older worker before assignment changes cleared the session.
+      const previous = savedSession && assignment && assignment.assignedAt > savedSession.updatedAt ? null : savedSession;
       if (previous && ["WAITING_HUMAN", "HUMAN_ACTIVE", "CLOSED"].includes(previous.status)) return;
+      // Any incoming message can start service; menu choices require text.
+      if (previous && input.type !== "TEXT") return;
       const state = previous?.botId === bot.id && previous.revision === bot.publishedRevision
         ? previous.state as unknown as BotState
         : null;
@@ -56,7 +63,7 @@ return async function processBotMessage(messageId: number, instance: unknown) {
         create: { instance: runtimeInstance, contactId: contact.id, botId: bot.id, revision: bot.publishedRevision, state: result.state as unknown as PrismaTypes.InputJsonValue, status: result.state.status },
         update: { botId: bot.id, revision: bot.publishedRevision, state: result.state as unknown as PrismaTypes.InputJsonValue, status: result.state.status } });
       await tx.botExecutionLog.update({ where: { messageId }, data: { outcome: "SENT" } });
-      return { message, contact: { ...contact, name: contactDisplayName(contact), assignedUserIds: [] } };
+      return { message, contact: { ...contact, name: contactDisplayName(contact), assignedUserIds: contact.assignments.map(assignment => assignment.userId) } };
     }, { timeout: 30000, maxWait: 10000 });
     if (emitted) emit(emitted);
   } catch {
