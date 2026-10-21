@@ -20,7 +20,14 @@ function harness() {
     botExecutionLog: {
       findUnique: async ({ where }: any) => state.logs.get(where.messageId) ?? null,
       create: async ({ data }: any) => { if (state.logs.has(data.messageId)) throw new Error("duplicate"); state.logs.set(data.messageId, data); },
-      update: async ({ where, data }: any) => state.logs.set(where.messageId, { ...state.logs.get(where.messageId), ...data }),
+      // Model the MySQL snapshot: Prisma update cannot read the independently
+      // inserted claim, while a direct UPDATE can write the committed row.
+      update: async () => { throw new Error("P2025: claim not visible in transaction snapshot"); },
+      updateMany: async ({ where, data }: any) => {
+        if (!state.logs.has(where.messageId)) return { count: 0 };
+        state.logs.set(where.messageId, { ...state.logs.get(where.messageId), ...data });
+        return { count: 1 };
+      },
       upsert: async ({ where, create, update }: any) => state.logs.set(where.messageId, state.logs.has(where.messageId) ? { ...state.logs.get(where.messageId), ...update } : create),
     },
   };
@@ -40,6 +47,20 @@ test("runtime persists and emits replies, handles simultaneous duplicates and se
   await process(2, "test-instance"); assert.match(state.sent[1]!, /sac.infordoc.com.br/);
   state.message = { ...state.message, id: 3, content: "0" };
   await process(3, "test-instance"); assert.match(state.sent[2]!, /Assistente Infordoc/);
+});
+
+test("independently committed claims complete and option 2 continues the saved menu", async () => {
+  const { state, process, flow } = harness();
+  flow.menus[0]!.options.find(option => option.number === "2")!.active = true;
+  flow.menus[0]!.options.find(option => option.number === "2")!.response = "Resposta da opção 2";
+  await process(1, "test-instance");
+  assert.equal(state.logs.get(1)?.outcome, "SENT");
+  assert.equal(state.session.status, "BOT_ACTIVE");
+  state.message = { ...state.message, id: 2, content: "2" };
+  await process(2, "test-instance");
+  assert.equal(state.logs.get(2)?.outcome, "SENT");
+  assert.equal(state.sent[1], "Resposta da opção 2\n\n0 — Voltar");
+  assert.equal(state.emitted.length, 2);
 });
 
 test("inactive bot, other instance/organization, groups, outgoing messages and assignments suppress automation", async () => {

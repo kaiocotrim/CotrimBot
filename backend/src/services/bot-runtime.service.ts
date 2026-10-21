@@ -62,7 +62,11 @@ return async function processBotMessage(messageId: number, instance: unknown) {
       await tx.botSession.upsert({ where: { instance_contactId: { instance: runtimeInstance, contactId: contact.id } },
         create: { instance: runtimeInstance, contactId: contact.id, botId: bot.id, revision: bot.publishedRevision, state: result.state as unknown as PrismaTypes.InputJsonValue, status: result.state.status },
         update: { botId: bot.id, revision: bot.publishedRevision, state: result.state as unknown as PrismaTypes.InputJsonValue, status: result.state.status } });
-      await tx.botExecutionLog.update({ where: { messageId }, data: { outcome: "SENT" } });
+      // The claim was inserted on a separate connection after this transaction's
+      // first read. MySQL REPEATABLE READ hides it from Prisma update's lookup;
+      // updateMany writes directly, so saving the reply/session can commit.
+      const completed = await tx.botExecutionLog.updateMany({ where: { messageId }, data: { outcome: "SENT" } });
+      if (completed.count !== 1) throw new Error("Missing bot execution claim");
       return { message, contact: { ...contact, name: contactDisplayName(contact), assignedUserIds: contact.assignments.map(assignment => assignment.userId) } };
     }, { timeout: 30000, maxWait: 10000 });
     if (emitted) emit(emitted);
