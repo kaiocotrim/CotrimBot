@@ -60,6 +60,8 @@ type ChatPanelProps = {
   sidebarOpen: boolean;
 };
 
+
+
 // Agrupa todas as partes visuais da conversa selecionada.
 export function ChatPanel({
   userId,
