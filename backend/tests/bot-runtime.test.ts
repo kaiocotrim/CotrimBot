@@ -6,16 +6,18 @@ import type { prisma } from "../src/lib/prisma.js";
 
 function harness() {
   const flow = fixture();
-  const state = { sent: [] as string[], emitted: [] as unknown[], logs: new Map<number, Record<string, unknown>>(), session: null as any,
+  const state = { sent: [] as string[], mediaSent: [] as any[], cachedMedia: [] as any[], outgoing: [] as any[], emitted: [] as unknown[], logs: new Map<number, Record<string, unknown>>(), session: null as any,
     contact: { id: 1, phone: "5511999999999", name: "Cliente", isGroup: false, blocked: false, assignments: [{ userId: "inforbot-id" }] as unknown[] },
     members: [{ userId: "inforbot-id", organizationId: "company-a", displayName: "Inforbot", user: { name: "Bot de atendimento" } }] as { userId: string; organizationId: string; displayName: string | null; user: { name: string } }[],
-    message: { id: 1, contactId: 1, direction: "INCOMING", type: "TEXT", content: "Oi" }, failSend: false };
+    message: { id: 1, contactId: 1, direction: "INCOMING", type: "TEXT", content: "Oi" }, failSend: false, imageAvailable: true };
   const db: any = {
     $queryRaw: async () => [],
     contact: { findUniqueOrThrow: async () => state.contact },
-    message: { findUnique: async () => state.message, upsert: async ({ create }: any) => ({ id: 100, ...create }) },
+    message: { findUnique: async () => state.message, upsert: async ({ create }: any) => { state.outgoing.push(create); return { id: 100, ...create }; } },
+    messageMedia: { upsert: async ({ create }: any) => { state.cachedMedia.push(create); } },
     member: { findMany: async () => state.members },
-    bot: { findFirst: async ({ where }: any) => where.organizationId === "company-a" ? { id: "bot-a", published: flow, publishedRevision: 1 } : null },
+    bot: { findFirst: async ({ where }: any) => where.organizationId === "company-a" ? { id: "bot-a", organizationId: "company-a", published: flow, publishedRevision: 1 } : null },
+    botImage: { findFirst: async ({ where }: any) => state.imageAvailable && where.organizationId === "company-a" && where.id === "image-a" ? { data: new Uint8Array([1, 2, 3]), mimetype: "image/png", fileName: "foto.png" } : null },
     botSession: { findUnique: async () => state.session, upsert: async ({ create, update }: any) => { state.session = state.session ? { ...state.session, ...update } : create; } },
     botExecutionLog: {
       findUnique: async ({ where }: any) => state.logs.get(where.messageId) ?? null,
@@ -33,7 +35,7 @@ function harness() {
   };
   let queue = Promise.resolve();
   db.$transaction = (fn: any) => { const next = queue.then(() => fn(db)); queue = next.catch(() => {}); return next; };
-  const process = createBotProcessor(db as typeof prisma, async (_phone, text) => { state.sent.push(text); if (state.failSend) throw new Error("timeout"); return { key: { id: `sent-${state.sent.length}` } }; }, event => { state.emitted.push(event); });
+  const process = createBotProcessor(db as typeof prisma, async (_phone, text) => { state.sent.push(text); if (state.failSend) throw new Error("timeout"); return { key: { id: `sent-${state.sent.length}` } }; }, event => { state.emitted.push(event); }, async input => { state.mediaSent.push(input); if (state.failSend) throw new Error("timeout"); return { key: { id: `image-${state.mediaSent.length}` } }; });
   return { state, process, flow };
 }
 
@@ -164,4 +166,39 @@ test("ambiguous Evolution failures are recorded and never retried on duplicate d
   await process(1, "test-instance"); await process(1, "test-instance");
   assert.equal(state.sent.length, 1); assert.equal(state.logs.get(1)?.outcome, "FAILED_OR_UNCERTAIN");
   assert.equal(state.emitted.length, 0);
+});
+
+test("image greetings and option photos use media, persist image bytes and keep menu navigation", async () => {
+  const { state, process, flow } = harness();
+  flow.menus[0]!.imageId = "image-a";
+  const option = flow.menus[0]!.options[0]!;
+  option.action = "IMAGE"; option.imageId = "image-a"; option.response = "Legenda da foto";
+  await process(1, "test-instance");
+  await process(1, "test-instance");
+  assert.equal(state.mediaSent.length, 1);
+  assert.equal(state.mediaSent[0].media, "AQID");
+  assert.match(state.mediaSent[0].caption, /Assistente Infordoc/);
+  assert.equal(state.outgoing[0].type, "IMAGE");
+  assert.equal(state.cachedMedia[0].mimetype, "image/png");
+  assert.equal(state.logs.get(1)?.outcome, "SENT");
+  state.message = { ...state.message, id: 2, content: "1" };
+  await process(2, "test-instance");
+  assert.match(state.mediaSent[1].caption, /Legenda da foto/);
+  state.message = { ...state.message, id: 3, content: "0" };
+  await process(3, "test-instance");
+  assert.match(state.mediaSent[2].caption, /Assistente Infordoc/);
+  assert.equal(state.sent.length, 0);
+  assert.equal(state.emitted.length, 3);
+});
+
+test("missing/foreign images and ambiguous media failures do not send or retry photos", async () => {
+  for (const missing of [true, false]) {
+    const { state, process, flow } = harness();
+    flow.menus[0]!.imageId = "image-a";
+    state.imageAvailable = !missing; state.failSend = !missing;
+    await process(1, "test-instance"); await process(1, "test-instance");
+    assert.equal(state.mediaSent.length, missing ? 0 : 1);
+    assert.equal(state.logs.get(1)?.outcome, "FAILED_OR_UNCERTAIN");
+    assert.equal(state.emitted.length, 0);
+  }
 });

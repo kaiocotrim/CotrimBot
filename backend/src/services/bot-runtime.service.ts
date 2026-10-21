@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
-import { sendWhatsAppMessage } from "./evolution.service.js";
+import { sendWhatsAppMessage, sendWhatsAppMedia } from "./evolution.service.js";
 import { advanceBot, type BotFlow, type BotState } from "./bot-flow.js";
 import { Prisma, type Prisma as PrismaTypes } from "../../generated/prisma/client.js";
 import { contactDisplayName } from "../utils/contact-name.js";
@@ -11,7 +11,7 @@ export async function lockBotContact(tx: Prisma.TransactionClient, contactId: nu
 }
 
 // Contact row locks serialize bot replies and assignment changes across workers.
-export function createBotProcessor(database = prisma, send = sendWhatsAppMessage, emit: (payload: unknown) => void = payload => { getSocketServer().emit("new_message", payload); }) {
+export function createBotProcessor(database = prisma, send = sendWhatsAppMessage, emit: (payload: unknown) => void = payload => { getSocketServer().emit("new_message", payload); }, sendMedia = sendWhatsAppMedia) {
 return async function processBotMessage(messageId: number, instance: unknown) {
   const runtimeInstance = process.env.EVOLUTION_INSTANCE;
   if (!runtimeInstance || typeof instance !== "string" || instance.trim() !== runtimeInstance.trim()) return;
@@ -52,13 +52,21 @@ return async function processBotMessage(messageId: number, instance: unknown) {
         ? previous.state as unknown as BotState
         : null;
       const result = advanceBot(bot.published as unknown as BotFlow, state, input.content);
+      const image = result.imageId ? await tx.botImage.findFirst({ where: { id: result.imageId, organizationId: bot.organizationId } }) : null;
+      if (result.imageId && !image) throw new Error("Bot image not found");
       // Commit the unique claim independently BEFORE contacting Evolution. It survives
       // an ambiguous timeout/transaction rollback and prevents a later duplicate send.
       await database.botExecutionLog.create({ data: { messageId, botId: bot.id, outcome: "PROCESSING" } });
-      const response = await send(contact.phone, result.text);
+      const response = image
+        ? await sendMedia({ number: contact.phone, mediatype: "image", mimetype: image.mimetype, media: Buffer.from(image.data).toString("base64"), fileName: image.fileName, caption: result.text })
+        : await send(contact.phone, result.text);
       const externalId = response?.key?.id;
       if (typeof externalId !== "string" || !externalId) throw new Error("Missing Evolution message ID");
-      const message = await tx.message.upsert({ where: { externalId }, create: { externalId, contactId: contact.id, direction: "OUTGOING", content: result.text }, update: {} });
+      const message = await tx.message.upsert({ where: { externalId }, create: { externalId, contactId: contact.id, direction: "OUTGOING", content: result.text, type: image ? "IMAGE" : "TEXT" }, update: {} });
+      if (image) {
+        const media = { data: image.data, mimetype: image.mimetype, fileName: image.fileName };
+        await tx.messageMedia.upsert({ where: { messageId: message.id }, create: { messageId: message.id, ...media }, update: media });
+      }
       await tx.botSession.upsert({ where: { instance_contactId: { instance: runtimeInstance, contactId: contact.id } },
         create: { instance: runtimeInstance, contactId: contact.id, botId: bot.id, revision: bot.publishedRevision, state: result.state as unknown as PrismaTypes.InputJsonValue, status: result.state.status },
         update: { botId: bot.id, revision: bot.publishedRevision, state: result.state as unknown as PrismaTypes.InputJsonValue, status: result.state.status } });

@@ -55,6 +55,48 @@ test("bot webhook requires a configured secret with an exact match", () => {
   assert.equal(authenticateBotWebhook("", ""), false);
 });
 
+test("images support menu greetings, submenus, optional captions and returning to text menus", () => {
+  const flow = fixture();
+  flow.menus[0]!.imageId = "greeting-image";
+  flow.menus[0]!.text = "";
+  const option = flow.menus[0]!.options[0]!;
+  option.action = "IMAGE"; option.imageId = "option-image"; option.response = "";
+  flow.menus[1]!.imageId = "submenu-image";
+  validateFlow(flow, true);
+  const greeting = advanceBot(flow, null, "Oi");
+  assert.equal(greeting.imageId, "greeting-image");
+  assert.match(greeting.text, /1 — Ajuda/);
+  const picture = advanceBot(flow, greeting.state, "1");
+  assert.equal(picture.imageId, "option-image");
+  assert.equal(picture.text, "0 — Voltar");
+  option.response = "Veja como fazer.";
+  assert.match(advanceBot(flow, greeting.state, "1").text, /Veja como fazer/);
+  assert.equal(advanceBot(flow, greeting.state, "3").imageId, "submenu-image");
+  assert.equal(advanceBot(flow, picture.state, "0").imageId, "greeting-image");
+  delete option.imageId;
+  assert.throws(() => validateFlow(flow, true), /Envie uma imagem/);
+  assert.throws(() => advanceBot(flow, greeting.state, "1"), /envie uma imagem/);
+  option.imageId = "https://unsafe.example/image.png";
+  assert.throws(() => validateFlow(flow), /Opção inválida/);
+});
+
+test("message options can include an optional image", () => {
+  const flow = fixture();
+  const option = flow.menus[0]!.options[0]!;
+  option.imageId = "message-image";
+  validateFlow(flow, true);
+  const reply = advanceBot(flow, advanceBot(flow, null, "Oi").state, option.number);
+  assert.equal(reply.imageId, "message-image");
+  assert.match(reply.text, /sac\.infordoc\.com\.br/);
+});
+
+test("publication identifies an empty disconnected menu by name while drafts remain editable", () => {
+  const flow = fixture();
+  flow.menus.push({ id: "unused", name: "Menu sem uso", text: "  ", options: [] });
+  validateFlow(flow);
+  assert.throws(() => validateFlow(flow, true), /Preencha a mensagem do menu "Menu sem uso"/);
+});
+
 test("designer positions survive validation without changing navigation and invalid coordinates are rejected", () => {
   const flow = fixture();
   flow.layout = { "main:message": { x: 150, y: 220 } };

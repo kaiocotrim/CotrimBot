@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import type { BotFlow } from "../lib/bot-api";
+import { advanceBot, validateFlow } from "../../backend/src/services/bot-flow";
 
 for (const width of [1440, 390]) {
   test(`Central de Bots: editar, salvar e testar (${width}px)`, async ({ page }, testInfo) => {
@@ -16,6 +17,10 @@ for (const width of [1440, 390]) {
         const body = route.request().postDataJSON(); saved.push(body);
         await route.fulfill({ json: { ...body, id: "bot", revision: 0, published: null } }); return;
       }
+      if (path.endsWith("/bots/bot") && route.request().method() === "PUT") {
+        const body = route.request().postDataJSON(); saved.push(body);
+        await route.fulfill({ json: { ...body, id: "bot", revision: body.revision + 1, published: null } }); return;
+      }
       if (path.endsWith("/bots")) { await route.fulfill({ json: { bots: [], activeBotId: null, instanceAvailable: true } }); return; }
       await route.fulfill({ json: {} });
     });
@@ -31,11 +36,69 @@ for (const width of [1440, 390]) {
     await expect(page.getByRole("status")).toContainText("Rascunho salvo");
     expect(saved).toHaveLength(1);
     expect((saved[0].draft as { menus: { options: { response: string }[] }[] }).menus[0].options[0].response).toContain("sac.infordoc.com.br");
+    await page.getByRole("button", { name: "Ajustar", exact: true }).click();
+    const expandedFlow = page.getByRole("dialog", { name: "Visualização ampliada do fluxo" });
+    await expect(expandedFlow).toBeVisible();
+    await expect(expandedFlow.getByRole("region", { name: "Designer de fluxo" })).toBeVisible();
+    const closeBounds = await expandedFlow.getByRole("button", { name: "Fechar visualização do fluxo" }).boundingBox();
+    expect(closeBounds!.x).toBeGreaterThanOrEqual(0);
+    expect(closeBounds!.x + closeBounds!.width).toBeLessThanOrEqual(width);
+    await expect(expandedFlow.getByRole("button", { name: "Adicionar opção", exact: true })).toBeVisible();
+    const expandedBounds = await expandedFlow.boundingBox();
+    expect(expandedBounds!.width).toBe(width);
+    expect(expandedBounds!.height).toBe(1000);
+    await page.screenshot({ path: testInfo.outputPath("bot-flow-expanded.png") });
+    await expandedFlow.getByRole("button", { name: "Editar opção 1: Ajuda para abrir chamado", exact: true }).click();
+    const expandedEditor = expandedFlow.getByRole("region", { name: "Editar nó", exact: true });
+    await expect(expandedEditor).toBeVisible();
+    await expandedEditor.getByRole("textbox", { name: "Conteúdo da resposta" }).fill("Resposta editada na tela ampliada.");
+    await expandedEditor.getByRole("button", { name: /^Salvar rascunho/ }).click();
+    await expect(expandedEditor.getByRole("status")).toContainText("Rascunho salvo");
+    expect(saved).toHaveLength(2);
+    expect((saved[1].draft as BotFlow).menus[0].options[0].response).toBe("Resposta editada na tela ampliada.");
+    const editorCloseBounds = await expandedFlow.getByRole("button", { name: "Fechar visualização do fluxo" }).boundingBox();
+    expect(editorCloseBounds!.x + editorCloseBounds!.width).toBeLessThanOrEqual(width);
+    await page.screenshot({ path: testInfo.outputPath("bot-flow-expanded-editor.png") });
+    await expandedEditor.getByRole("button", { name: "Criar menu de opções", exact: true }).click();
+    await expect(expandedEditor.getByRole("textbox", { name: "Nome do menu", exact: true })).toHaveValue("Menu da opção 1");
+    await expect(expandedEditor.getByRole("textbox", { name: "Mensagem do submenu" })).toHaveValue("Resposta editada na tela ampliada.");
+    await expandedEditor.getByRole("textbox", { name: "Mensagem do submenu" }).fill("Escolha o assunto do atendimento:");
+    await expandedEditor.getByRole("button", { name: "Editar opções", exact: true }).click();
+    await expandedEditor.getByRole("button", { name: "Adicionar opção", exact: true }).click();
+    await expandedEditor.getByRole("textbox", { name: "Nome da opção", exact: true }).fill("Suporte");
+    await expandedEditor.getByRole("textbox", { name: "Conteúdo da resposta" }).fill("Resposta do submenu.");
+    await expandedEditor.getByRole("button", { name: /^Salvar rascunho/ }).click();
+    await expect(expandedEditor.getByRole("status")).toContainText("Rascunho salvo");
+    const connectedFlow = saved[2].draft as BotFlow;
+    validateFlow(connectedFlow, true);
+    const parentOption = connectedFlow.menus[0].options[0];
+    expect(parentOption.action).toBe("SUBMENU");
+    expect(parentOption.number).toBe("1");
+    const greeting = advanceBot(connectedFlow, null, "Oi");
+    const submenu = advanceBot(connectedFlow, greeting.state, "1");
+    expect(submenu.state.menuId).toBe(parentOption.targetMenuId);
+    expect(submenu.text).toContain("1 — Suporte");
+    expect(advanceBot(connectedFlow, submenu.state, "1").text).toContain("Resposta do submenu.");
+    expect(advanceBot(connectedFlow, submenu.state, "0").state.menuId).toBe("root");
+    await page.screenshot({ path: testInfo.outputPath("bot-option-submenu.png") });
+    await page.keyboard.press("Escape");
+    await expect(expandedFlow).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Ajustar", exact: true })).toBeFocused();
+    await expect(page.getByRole("textbox", { name: "Conteúdo da resposta" })).toHaveValue("Resposta do submenu.");
     await page.screenshot({ path: testInfo.outputPath("bot-editor.png"), fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.getByRole("button", { name: "Testar bot", exact: true }).click();
     await expect(page.getByText(/nenhuma mensagem será enviada/)).toBeVisible();
     await expect(page.getByRole("region", { name: "Simulador do bot" })).toContainText("1 — Ajuda para abrir chamado");
+    await page.getByRole("button", { name: "Editar Mensagem", exact: true }).click();
+    await page.getByRole("button", { name: "Menu de opções Cria um novo submenu", exact: true }).click();
+    await page.getByRole("textbox", { name: "Nome do menu", exact: true }).fill("Menu sem uso");
+    await page.getByRole("button", { name: "Menu principal", exact: true }).click();
+    await page.getByRole("button", { name: "Publicar", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText('Sem conexão › Menu sem uso');
+    await expect(page.getByRole("textbox", { name: "Nome do menu", exact: true })).toHaveValue("Menu sem uso");
+    await expect(page.getByRole("textbox", { name: "Mensagem do submenu" })).toBeFocused();
+    expect(saved).toHaveLength(3);
     expect(errors).toEqual([]);
   });
 }
@@ -65,6 +128,22 @@ test("designer visual: selecionar nós, arrastar, salvar posições e abrir subm
   await page.goto("/dashboard/bots/");
   await expect(page.getByRole("textbox", { name: "Mensagem inicial", exact: true })).toHaveValue(draft.menus[0].text);
   await page.getByRole("button", { name: "Ajustar", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Visualização ampliada do fluxo" })).toBeVisible();
+  const expandedMessage = page.locator('[data-flow-node="root:message"]');
+  const expandedPosition = await expandedMessage.boundingBox();
+  expect(expandedPosition).not.toBeNull();
+  await page.mouse.move(expandedPosition!.x + 80, expandedPosition!.y + 15);
+  await page.mouse.down();
+  await page.mouse.move(expandedPosition!.x + 145, expandedPosition!.y + 55, { steps: 8 });
+  await page.mouse.up();
+  const movedPosition = await expandedMessage.boundingBox();
+  expect(movedPosition!.x).toBeGreaterThan(expandedPosition!.x + 30);
+  expect(movedPosition!.y).toBeGreaterThan(expandedPosition!.y + 20);
+  await expect(page.getByRole("dialog").getByRole("textbox", { name: "Mensagem inicial", exact: true })).toBeVisible();
+  await page.getByRole("dialog").getByRole("combobox", { name: "Menu do fluxo" }).selectOption("scanner-menu");
+  await expect(page.getByRole("dialog").getByRole("textbox", { name: "Mensagem do submenu" })).toHaveValue("Qual problema você está enfrentando?");
+  await page.getByRole("dialog").getByRole("combobox", { name: "Menu do fluxo" }).selectOption("root");
+  await page.getByRole("button", { name: "Fechar visualização do fluxo" }).click();
   const messageNode = page.locator('[data-flow-node="root:message"]');
   const bounds = await messageNode.boundingBox(); expect(bounds).not.toBeNull();
   await page.mouse.move(bounds!.x + 80, bounds!.y + 15);

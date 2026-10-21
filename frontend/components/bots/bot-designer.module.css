@@ -1,4 +1,19 @@
 .root { --line: #ffffff14; --muted: #71717a; --flow-line: #a1a1aa; --flow-label: #18181b; --flow-label-border: #52525b; --flow-label-text: #e4e4e7; --flow-map: #71717a; min-height: 100dvh; background: #000; color: #e4e4e7; font-family: var(--font-cal-ui), var(--font-apple); font-size: 13px; color-scheme: dark; }
+.flowDialog { position: fixed; inset: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 12px; border: 0; background: #000; color: inherit; overflow: hidden; }
+.flowDialog::backdrop { background: #000; }
+.flowDialog .canvasPanel { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; }
+.flowDialog .canvasToolbar { position: relative; flex-shrink: 0; min-width: 0; flex-wrap: wrap; }
+.flowDialog .canvasTools { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+.flowDialog .canvasViewport { position: relative; inset: auto; flex: 1; min-height: 0; }
+.flowDialog .canvasTools select { min-width: 110px; max-width: 130px; flex-shrink: 0; }
+.expandedEditor { position: absolute; top: 76px; right: 24px; bottom: 64px; width: min(340px, calc(100% - 48px)); min-inline-size: 0; padding: 0; margin: 0; border: 0; z-index: 2; box-shadow: -12px 12px 60px #000b; border-radius: 18px; }
+.expandedEditorContent { height: 100%; }
+.expandedEditor .inspector { height: 100%; min-height: 0; max-height: 100%; background: #090909; }
+@media (max-width: 699px) { .expandedEditor { top: 140px; right: 24px; } .flowDialog .canvasTools { width: 100%; } }
+.imageUpload { display: flex; flex-direction: column; gap: 10px; }
+.imageUpload .helper { display: flex; align-items: center; gap: 6px; }
+.imageUpload input { font-size: 11px; padding: 9px; }
+.imagePreview { display: block; width: 100%; height: auto; max-height: 220px; object-fit: contain; border-radius: 12px; background: #111; margin-bottom: 8px; }
 .root h1, .root h2 { font-family: inherit; }
 .root :is(button, a, [role="button"]):focus-visible { outline: 2px solid #a1a1a1; }
 .root button, .root a, .root input, .root select, .root textarea { outline-offset: 3px; }

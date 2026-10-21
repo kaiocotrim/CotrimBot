@@ -1,9 +1,21 @@
-export type BotOption = { id: string; number: string; label: string; active: boolean; action: "MESSAGE" | "SUBMENU" | "HUMAN"; response: string; targetMenuId: string };
-export type BotMenu = { id: string; name: string; text: string; options: BotOption[] };
+export type BotOption = { id: string; number: string; label: string; active: boolean; action: "MESSAGE" | "SUBMENU" | "HUMAN" | "IMAGE"; response: string; targetMenuId: string; imageId?: string };
+export type BotMenu = { id: string; name: string; text: string; options: BotOption[]; imageId?: string };
 export type BotFlow = { rootMenuId: string; invalidMessage: string; backLabel: string; menus: BotMenu[]; layout?: Record<string, { x: number; y: number }> };
 export type Bot = { id: string; name: string; revision: number; published: BotFlow | null; draft: BotFlow };
 export type BotList = { bots: Bot[]; activeBotId: string | null; instanceAvailable: boolean };
-export type Simulation = { state: { status: string; menuId: string }; messages: { role: string; text: string }[] };
+export type Simulation = { state: { status: string; menuId: string }; messages: { role: string; text: string; imageId?: string }[] };
+
+export function botImageUrl(id: string): string {
+  return `${process.env.NEXT_PUBLIC_API_URL ?? "/api"}/bots/images/${encodeURIComponent(id)}`;
+}
+
+export async function uploadBotImage(file: File): Promise<{ id: string }> {
+  const body = new FormData(); body.append("file", file);
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "/api"}/bots/images`, { method: "POST", credentials: "include", body });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message ?? "Não foi possível enviar a imagem.");
+  return data;
+}
 
 export async function botRequest<T>(path = "", body?: unknown, method = "POST"): Promise<T> {
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "/api"}/bots${path}`, {

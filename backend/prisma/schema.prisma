@@ -337,6 +337,7 @@ model Organization {
   clients     Client[]
   bots        Bot[]
   botInstances BotInstance[]
+    botImages    BotImage[]
 }
 
 model OrganizationMessage {
@@ -558,6 +559,17 @@ enum GroupPermissionKey {
 }
 
 // Immutable published snapshots keep drafts out of live conversations.
+model BotImage {
+  id             String @id @default(cuid())
+  organizationId String
+  data           Bytes @db.LongBlob
+  mimetype       String @db.VarChar(100)
+  fileName       String @db.VarChar(255)
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  @@index([organizationId])
+}
+
 model Bot {
   id             String @id @default(cuid())
   organizationId String

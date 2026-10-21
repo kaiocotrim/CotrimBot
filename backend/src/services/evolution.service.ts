@@ -404,6 +404,7 @@ export async function sendWhatsAppMedia({
     `${apiUrl}/message/sendMedia/${instance}`,
     {
       method: "POST",
+      signal: AbortSignal.timeout(15000),
 
       headers: {
         "Content-Type": "application/json",
