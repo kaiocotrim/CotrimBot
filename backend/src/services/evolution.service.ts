@@ -415,7 +415,7 @@ export async function sendWhatsAppMedia({
         number,
         mediatype,
         mimetype,
-        media,
+        media: media.startsWith("data:") || /^https?:\/\//i.test(media) ? media : `data:${mimetype};base64,${media}`,
         fileName,
         caption,
         ...(quoted ? {
