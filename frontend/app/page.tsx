@@ -19,6 +19,16 @@ export default function Home() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const chat = useChat();
+  const assignedUnreadCount = session?.user.id
+    ? chat.contacts.reduce((total, contact) => contact.assignedUserIds?.includes(session.user.id)
+      ? total + contact.unreadCount
+      : total, 0)
+    : 0;
+  useEffect(() => {
+    const originalTitle = document.title;
+    document.title = assignedUnreadCount > 0 ? `(${assignedUnreadCount}) ${originalTitle}` : originalTitle;
+    return () => { document.title = originalTitle; };
+  }, [assignedUnreadCount]);
   // No mobile/tablet a lista de conversas é a tela inicial; ao selecionar um
   // contato, o chat passa a ocupar a tela inteira.
   const [sidebarOpen, setSidebarOpen] = useState(true);

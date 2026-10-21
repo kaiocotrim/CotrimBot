@@ -1,5 +1,7 @@
 import type { Request, Response } from "express";
+import { processBotMessage } from "../services/bot-runtime.service.js";
 import { recordMessageReceipt } from "../services/message-receipts.service.js";
+import { recordOutgoingMessageRead } from "../services/outgoing-message-read.service.js";
 
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
@@ -190,7 +192,11 @@ export async function whatsappWebhook(req: Request, res: Response) {
   if (body.event === "messages.update" || body.event === "send.message.update") {
     const updates = Array.isArray(body.data) ? body.data : [body.data];
     for (const update of updates) {
-      if (update?.receipt) { await recordMessageReceipt(update); continue; }
+      if (update?.receipt) {
+        await recordMessageReceipt(update);
+        await recordOutgoingMessageRead(update);
+        continue;
+      }
       if (update?.pollUpdates || update?.update?.pollUpdates) await pollResults.receive(update, body.sender);
       const externalId = update?.key?.id ?? update?.keyId ?? update?.id;
       const status = String(update?.status ?? update?.update?.status ?? "").toUpperCase();
@@ -198,13 +204,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
         await markMessageAsDeleted(externalId);
         continue;
       }
-      if (!externalId || !["READ", "PLAYED", "4"].includes(status)) continue;
-
-      const message = await prisma.message.findUnique({ where: { externalId } });
-      if (!message || message.direction !== "OUTGOING" || message.readAt) continue;
-
-      const updated = await prisma.message.update({ where: { id: message.id }, data: { readAt: new Date() } });
-      getSocketServer().emit("message_read", { messageId: updated.id, readAt: updated.readAt });
+      await recordOutgoingMessageRead(update);
     }
     return res.status(200).json({ received: true });
   }
@@ -585,7 +585,11 @@ export async function whatsappWebhook(req: Request, res: Response) {
       quotedContent: replyContextInfo ? quotedMessage?.content ?? quotedContent : null,
       quotedSenderName,
     },
+  }).catch((error: unknown) => {
+    if (error && typeof error === "object" && "code" in error && error.code === "P2002") return null;
+    throw error;
   });
+  if (!incomingMessage) return res.status(200).json({ received: true, duplicate: true });
 
   if (messageType === "IMAGE" || messageType === "VIDEO") {
     try {
@@ -633,6 +637,11 @@ export async function whatsappWebhook(req: Request, res: Response) {
     mensagem: incomingMessage.content,
     externalId: incomingMessage.externalId,
   });
+
+  // O runtime só processa conversas atribuídas ao membro Inforbot.
+  if (!fromMe && !contact.isGroup) {
+    await processBotMessage(incomingMessage.id, req.body?.instance);
+  }
 
   // Respondemos 200 para informar à Evolution
   // que o webhook foi recebido corretamente.

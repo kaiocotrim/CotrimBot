@@ -1,0 +1,83 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createBotProcessor } from "../src/services/bot-runtime.service.js";
+import { fixture } from "./bot-fixture.js";
+import type { prisma } from "../src/lib/prisma.js";
+
+function harness() {
+  const flow = fixture();
+  const state = { sent: [] as string[], emitted: [] as unknown[], logs: new Map<number, Record<string, unknown>>(), session: null as any,
+    contact: { id: 1, phone: "5511999999999", name: "Cliente", isGroup: false, blocked: false, assignments: [{ userId: "inforbot-id" }] as unknown[] },
+    members: [{ organizationId: "company-a", displayName: "Inforbot", user: { name: "Bot de atendimento" } }] as { organizationId: string; displayName: string | null; user: { name: string } }[],
+    message: { id: 1, contactId: 1, direction: "INCOMING", type: "TEXT", content: "Oi" }, failSend: false };
+  const db: any = {
+    $queryRaw: async () => [],
+    contact: { findUniqueOrThrow: async () => state.contact },
+    message: { findUnique: async () => state.message, upsert: async ({ create }: any) => ({ id: 100, ...create }) },
+    member: { findMany: async () => state.members },
+    bot: { findFirst: async ({ where }: any) => where.organizationId === "company-a" ? { id: "bot-a", published: flow, publishedRevision: 1 } : null },
+    botSession: { findUnique: async () => state.session, upsert: async ({ create, update }: any) => { state.session = state.session ? { ...state.session, ...update } : create; } },
+    botExecutionLog: {
+      findUnique: async ({ where }: any) => state.logs.get(where.messageId) ?? null,
+      create: async ({ data }: any) => { if (state.logs.has(data.messageId)) throw new Error("duplicate"); state.logs.set(data.messageId, data); },
+      update: async ({ where, data }: any) => state.logs.set(where.messageId, { ...state.logs.get(where.messageId), ...data }),
+      upsert: async ({ where, create, update }: any) => state.logs.set(where.messageId, state.logs.has(where.messageId) ? { ...state.logs.get(where.messageId), ...update } : create),
+    },
+  };
+  let queue = Promise.resolve();
+  db.$transaction = (fn: any) => { const next = queue.then(() => fn(db)); queue = next.catch(() => {}); return next; };
+  const process = createBotProcessor(db as typeof prisma, async (_phone, text) => { state.sent.push(text); if (state.failSend) throw new Error("timeout"); return { key: { id: `sent-${state.sent.length}` } }; }, event => { state.emitted.push(event); });
+  return { state, process, flow };
+}
+
+process.env.EVOLUTION_INSTANCE = "test-instance";
+
+test("runtime persists and emits replies, handles simultaneous duplicates and sends the configured option", async () => {
+  const { state, process } = harness();
+  await Promise.all([process(1, "test-instance"), process(1, "test-instance")]);
+  assert.equal(state.sent.length, 1); assert.equal(state.emitted.length, 1);
+  state.message = { ...state.message, id: 2, content: "1" };
+  await process(2, "test-instance"); assert.match(state.sent[1]!, /sac.infordoc.com.br/);
+  state.message = { ...state.message, id: 3, content: "0" };
+  await process(3, "test-instance"); assert.match(state.sent[2]!, /Assistente Infordoc/);
+});
+
+test("inactive bot, other instance/organization, groups, outgoing messages and assignments suppress automation", async () => {
+  for (const variant of ["inactive", "instance", "organization", "group", "outgoing", "assigned", "blocked"] as const) {
+    const { state, process } = harness();
+    if (variant === "inactive") state.members = [];
+    if (variant === "organization") state.members = [{ organizationId: "company-b", displayName: "Inforbot", user: { name: "Inforbot" } }];
+    if (variant === "group") state.contact.isGroup = true;
+    if (variant === "outgoing") state.message.direction = "OUTGOING";
+    if (variant === "assigned") { state.contact.assignments = [{ userId: "tech" }]; state.members = []; }
+    if (variant === "blocked") state.contact.blocked = true;
+    await process(1, variant === "instance" ? "different" : "test-instance");
+    assert.equal(state.sent.length, 0, variant);
+  }
+});
+
+test("assignment to Inforbot enables the published flow", async () => {
+  const { state, process } = harness();
+  state.contact.assignments = [{ userId: "inforbot-id" }];
+  await process(1, "test-instance");
+  assert.equal(state.sent.length, 1);
+  assert.match(state.sent[0]!, /Assistente Infordoc/);
+});
+
+test("human transfer pauses new messages and close-with-bot session reset restarts once", async () => {
+  const { state, process } = harness();
+  for (const [i, content] of ["Oi", "3", "4", "1"].entries()) { state.message = { ...state.message, id: i + 1, content }; await process(i + 1, "test-instance"); }
+  assert.equal(state.session.status, "WAITING_HUMAN"); assert.equal(state.sent.length, 3);
+  state.session.status = "HUMAN_ACTIVE";
+  state.message.id = 5; await process(5, "test-instance"); assert.equal(state.sent.length, 3);
+  state.session = null;
+  state.message.id = 6; await process(6, "test-instance"); await process(6, "test-instance");
+  assert.equal(state.sent.length, 4); assert.match(state.sent[3]!, /Assistente Infordoc/);
+});
+
+test("ambiguous Evolution failures are recorded and never retried on duplicate delivery", async () => {
+  const { state, process } = harness(); state.failSend = true;
+  await process(1, "test-instance"); await process(1, "test-instance");
+  assert.equal(state.sent.length, 1); assert.equal(state.logs.get(1)?.outcome, "FAILED_OR_UNCERTAIN");
+  assert.equal(state.emitted.length, 0);
+});

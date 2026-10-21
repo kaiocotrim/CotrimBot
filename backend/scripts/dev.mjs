@@ -8,6 +8,15 @@ const require = createRequire(import.meta.url);
 const prismaCli = require.resolve("prisma/build/index.js");
 const typescriptCli = path.join(backendDirectory, "node_modules", "typescript", "bin", "tsc");
 
+const migrations = spawnSync(process.execPath, [prismaCli, "migrate", "deploy", "--config", "prisma.config.ts"], {
+  cwd: backendDirectory,
+  stdio: "inherit",
+});
+
+if (migrations.status !== 0) {
+  process.exit(migrations.status ?? 1);
+}
+
 const clientGeneration = spawnSync(process.execPath, [prismaCli, "generate", "--config", "prisma.config.ts"], {
   cwd: backendDirectory,
   stdio: "inherit",

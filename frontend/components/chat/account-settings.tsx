@@ -4,7 +4,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Select } from "@base-ui/react/select";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
-import { BadgeCheck, Bell, Building2, Camera, Check, ChevronDown, ContactRound, Laptop, Link2, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "lucide-react";
+import { BadgeCheck, Bell, Bot, Building2, Camera, Check, ChevronDown, ContactRound, Laptop, Link2, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "lucide-react";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -88,6 +88,7 @@ const sections = [
   { value: "whatsapp", label: "WhatsApp", icon: QrCode },
   { value: "calls", label: "Chamadas", icon: PhoneOff },
   { value: "business", label: "Empresa", icon: Building2 },
+  { value: "bots", label: "Central de Bots", icon: Bot },
   { value: "local", label: "Transcrição local", icon: Laptop },
 ] as const;
 
@@ -149,6 +150,10 @@ function SettingsContent({ user }: { user: SettingsUser }) {
     : sections.filter((item) => item.value !== "whatsapp");
 
   function changeSection(value: Section) {
+    if (value === "bots") {
+      router.push("/dashboard/bots");
+      return;
+    }
     if (value === "business") {
       router.push("/empresa");
       return;

@@ -91,6 +91,7 @@ reais — senhas, chaves de API — não devem ser commitados nem compartilhados
 | `EVOLUTION_API_URL` | URL base da Evolution API. |
 | `EVOLUTION_API_KEY` | Chave de autenticação da Evolution API. |
 | `EVOLUTION_INSTANCE` | Nome da instância do WhatsApp na Evolution API. |
+| `BOT_WEBHOOK_SECRET` | Segredo compartilhado entre servidor e webhook Evolution para acionar a Central de Bots. |
 | `GEMINI_API_KEY` | Chave da API do Gemini usada para reformular texto. |
 | `TRANSCRIPTION_SERVICE_URL` | URL do microserviço de transcrição. |
 | `VAPID_PUBLIC_KEY` | Chave pública VAPID das notificações push (ver abaixo). |
@@ -268,3 +269,7 @@ O Socket.IO roda na mesma porta do backend, com CORS liberado para o frontend.
 
 - [backend/README.md](backend/README.md) — estrutura e comandos do backend.
 - [frontend/AGENTS.md](frontend/AGENTS.md) e [frontend/CLAUDE.md](frontend/CLAUDE.md) — convenções do frontend.
+
+## Central de Bots
+
+Consulte [configuração, arquitetura e testes do Bot Builder](docs/bot-builder.md).

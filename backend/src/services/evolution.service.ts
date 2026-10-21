@@ -24,6 +24,7 @@ export async function sendWhatsAppMessage(
   const response = await fetch(
     `${apiUrl}/message/sendText/${instance}`,
     {
+      signal: AbortSignal.timeout(15000),
       method: "POST",
 
       headers: {

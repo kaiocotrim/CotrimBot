@@ -28,6 +28,7 @@ generated/
 
 # Logs
 *.log
+backend/.bot-test-dist/
 
 # Sistema
 .DS_Store

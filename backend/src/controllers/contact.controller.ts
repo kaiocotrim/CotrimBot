@@ -528,12 +528,16 @@ export async function setContactAssignment(req: Request, res: Response) {
   if (contact.isGroup) return res.status(400).json({ message: "Grupos não podem ser atribuídos" });
   const currentIds = contact.assignments.map((assignment) => assignment.userId).sort();
   const nextIds = [...assigneeIds].sort();
+  const assignedToInforbot = assigneeIds.some((assigneeId) => userNames.get(assigneeId)?.trim().toLocaleLowerCase("pt-BR") === "inforbot");
   if (currentIds.length === nextIds.length && currentIds.every((value, index) => value === nextIds[index])) {
     const { assignments, ...unchanged } = contact;
     return res.json({ ...unchanged, name: contactDisplayName(unchanged), assignedUserIds: assignments.map((assignment) => assignment.userId) });
   }
 
   const { updated, systemMessage } = await prisma.$transaction(async (transaction) => {
+    if (assignedToInforbot) {
+      await transaction.botSession.deleteMany({ where: { contactId: id } });
+    }
     await transaction.contactAssignment.deleteMany({ where: { contactId: id } });
     if (assigneeIds.length) {
       await transaction.contactAssignment.createMany({

@@ -129,6 +129,8 @@ export function useChat() {
       const isOpenConversation =
         selectedContact?.id ===
         data.contact.id;
+      const isReadingConversation = isOpenConversation
+        && document.visibilityState === "visible" && document.hasFocus();
 
       // INCOMING:
       // WhatsApp -> CotrimBot
@@ -188,7 +190,7 @@ export function useChat() {
         // Se for uma mensagem recebida e
         // o usuário já está vendo a conversa,
         // marcamos como lida.
-        if (isIncoming) {
+        if (isIncoming && isReadingConversation) {
           await markMessagesAsRead(
             data.contact.id
           );
@@ -246,7 +248,7 @@ export function useChat() {
               data.message,
             ],
 
-            // Se a conversa estiver aberta,
+            // Se a conversa estiver aberta e em primeiro plano,
             // unread = 0.
             //
             // Se estiver fechada e for INCOMING,
@@ -254,7 +256,7 @@ export function useChat() {
             //
             // OUTGOING não aumenta unread.
             unreadCount:
-              isOpenConversation
+              isReadingConversation
                 ? 0
                 : isIncoming
                   ? (
@@ -293,6 +295,9 @@ export function useChat() {
 
     function handleMessageRead(data: { messageId: number; readAt: string }) {
       setMessages((current) => current.map((message) => message.id === data.messageId ? { ...message, readAt: data.readAt } : message));
+      setContacts((current) => current.map((contact) => contact.messages?.some((message) => message.id === data.messageId)
+        ? { ...contact, messages: contact.messages.map((message) => message.id === data.messageId ? { ...message, readAt: data.readAt } : message) }
+        : contact));
     }
 
     function handleMessageDeleted(data: { messageId: number; deletedAt: string }) {
@@ -542,9 +547,9 @@ export function useChat() {
           setHasOlderMessages(page.hasMore);
         }
 
-        return markMessagesAsRead(
-          selectedContactId
-        );
+        if (active && document.visibilityState === "visible" && document.hasFocus()) {
+          return markMessagesAsRead(selectedContactId);
+        }
       })
 
       .then(() => {
@@ -567,6 +572,30 @@ export function useChat() {
 
     return () => {
       active = false;
+    };
+  }, [selectedContactId]);
+
+  // Uma conversa aberta em segundo plano fica pendente até o membro voltar a ela.
+  useEffect(() => {
+    if (selectedContactId === undefined) return;
+    const contactId = selectedContactId;
+    let active = true;
+    async function markVisibleConversationRead() {
+      if (document.visibilityState !== "visible" || !document.hasFocus()) return;
+      try {
+        await markMessagesAsRead(contactId);
+        const updatedContacts = await getContacts();
+        if (active) setContacts(updatedContacts);
+      } catch (error) {
+        console.error("Erro ao ler conversa ao voltar para a aba:", error);
+      }
+    }
+    window.addEventListener("focus", markVisibleConversationRead);
+    document.addEventListener("visibilitychange", markVisibleConversationRead);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", markVisibleConversationRead);
+      document.removeEventListener("visibilitychange", markVisibleConversationRead);
     };
   }, [selectedContactId]);
 

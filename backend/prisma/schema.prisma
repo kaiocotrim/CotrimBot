@@ -32,6 +32,7 @@ model Contact {
   assignments       ContactAssignment[]
   messages          Message[]
   notifications     Notification[]
+  botSessions       BotSession[]
 
 }
 
@@ -334,6 +335,8 @@ model Organization {
   internalMessages OrganizationMessage[]
   internalConversations InternalConversation[]
   clients     Client[]
+  bots        Bot[]
+  botInstances BotInstance[]
 }
 
 model OrganizationMessage {
@@ -552,4 +555,58 @@ enum GroupPermissionKey {
   SETTINGS_ACCESS
   SETTINGS_WHATSAPP_MANAGE
   SETTINGS_COMPANY_MANAGE
+}
+
+// Immutable published snapshots keep drafts out of live conversations.
+model Bot {
+  id             String @id @default(cuid())
+  organizationId String
+  name           String @db.VarChar(100)
+  draft          Json
+  published      Json?
+  revision       Int @default(0)
+  publishedRevision Int @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sessions       BotSession[]
+  @@unique([organizationId, id])
+}
+
+// One organization owns the server's single Evolution instance.
+model BotInstance {
+  instance       String @id @db.VarChar(191)
+  organizationId String
+  activeBotId    String?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model BotSession {
+  id             String @id @default(cuid())
+  instance       String @db.VarChar(191)
+  contactId      Int
+  botId          String
+  revision       Int
+  state          Json
+  status         BotSessionStatus @default(BOT_ACTIVE)
+  updatedAt      DateTime @updatedAt
+  bot            Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
+  contact        Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  @@unique([instance, contactId])
+}
+
+enum BotSessionStatus {
+  BOT_ACTIVE
+  WAITING_HUMAN
+  HUMAN_ACTIVE
+  CLOSED
+}
+
+model BotExecutionLog {
+  id             String @id @default(cuid())
+  messageId      Int @unique
+  botId          String
+  outcome        String @db.VarChar(32)
+  createdAt      DateTime @default(now())
+  @@index([botId, createdAt])
 }

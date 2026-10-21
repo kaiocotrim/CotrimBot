@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: ["typing.spec.ts", "responsive.spec.ts", "clients.spec.ts"],
+  testMatch: ["typing.spec.ts", "responsive.spec.ts", "clients.spec.ts", "bots.spec.ts"],
   workers: 1,
   timeout: 30_000,
   reporter: [["line"], ["html", { open: "never" }]],
@@ -17,7 +17,7 @@ export default defineConfig({
   webServer: {
     command: "node tests/serve-static.mjs",
     url: "http://127.0.0.1:3100",
-    reuseExistingServer: false,
+    reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === "1",
     timeout: 15_000,
   },
 });

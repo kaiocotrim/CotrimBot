@@ -42,7 +42,8 @@ npm run prisma:generate
 npm run dev
 ```
 
-`npm run dev` executa `src/server.ts` com recarregamento automático via `tsx`.
+`npm run dev` aplica as migrações pendentes, gera o cliente Prisma e compila o
+backend antes de iniciar o servidor com recarregamento automático.
 O banco e as variáveis de ambiente do arquivo `.env` devem estar configurados.
 O cliente Prisma exige `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`,
 `DATABASE_PASSWORD` e `DATABASE_NAME`.
@@ -56,6 +57,8 @@ npm start
 
 `npm run build` compila tanto `src/` quanto o cliente Prisma em `generated/`.
 Por isso, o ponto de entrada compilado é `dist/src/server.js`.
+`npm start` aplica as migrações pendentes antes de iniciar o servidor, inclusive
+no container. Se uma migração falhar, a inicialização é interrompida.
 Os imports locais nos arquivos TypeScript usam a extensão `.js`, conforme
 a configuração ESM/NodeNext do projeto.
 

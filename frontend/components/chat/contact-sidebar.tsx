@@ -1253,7 +1253,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
                       <div className="mt-0.5 flex items-center gap-2 pr-7">
                         <p className="min-w-0 flex-1 truncate text-sm leading-tight font-normal text-zinc-400 lg:text-[12px] lg:text-zinc-500">
                           {typingPreview ? <TypingIndicator label={typingPreview} showLabel className="text-zinc-400" /> : <>
-                            {!draft && lastMessage && !lastMessage.deletedAt && lastMessage.direction === "OUTGOING" && "✓✓ "}
+                            {!draft && lastMessage && !lastMessage.deletedAt && lastMessage.direction === "OUTGOING" && <span className={lastMessage.readAt ? "text-white" : undefined} aria-label={lastMessage.readAt ? "Mensagem visualizada" : "Mensagem enviada"}>✓✓ </span>}
                             {draft ? <><span className="font-medium text-zinc-400">Rascunho:</span> {draft.replace(/\s+/g, " ")}</> : <MessageText content={lastMessage ? lastMessage.deletedAt ? "Mensagem apagada" : lastMessage.type === "SYSTEM" ? systemMessageLabel(lastMessage.content, userId) : lastMessage.content : "Nenhuma mensagem"} showSignature={Boolean(lastMessage && !lastMessage.deletedAt && !lastMessage.private && lastMessage.direction === "OUTGOING")} linkify={false} />}
                           </>}
                         </p>

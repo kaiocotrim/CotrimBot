@@ -199,7 +199,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
       </span>
     ) : (
       <span className={`transition-colors duration-200 ${message.readAt ? isPrivate ? "text-zinc-800" : "text-white" : isPrivate ? "text-zinc-500" : "text-white/50"}`} title={message.readAt ? "Visualizada" : "Enviada"} aria-label={message.readAt ? "Mensagem visualizada" : "Mensagem enviada"}>
-        <svg className="h-2.5 w-[15px]" viewBox="0 0 18 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg className="h-2.5 w-[15px]" viewBox="0 0 18 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="m1 6 3 3 6-7" />
           <path d="m7 8 2 2 8-8" />
         </svg>

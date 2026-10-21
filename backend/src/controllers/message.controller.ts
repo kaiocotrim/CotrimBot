@@ -738,6 +738,9 @@ export async function closeConversationWithBot(req: Request, res: Response) {
     }
 
     const { message, systemMessage } = await prisma.$transaction(async (transaction) => {
+      await transaction.$queryRaw`SELECT id FROM Contact WHERE id = ${contactId} FOR UPDATE`;
+      // Keep the satisfaction survey; the next incoming message restarts the menu.
+      await transaction.botSession.deleteMany({ where: { contactId } });
       const createdMessage = await transaction.message.create({
         data: {
           externalId,

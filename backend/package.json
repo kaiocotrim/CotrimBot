@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:bots": "tsc -p tsconfig.bot-tests.json && node --test .bot-test-dist/tests/bot-*.test.js",
     "dev": "node scripts/dev.mjs",
     "build": "npm run prisma:generate && tsc",
+    "prestart": "npm run prisma:deploy",
     "start": "node dist/src/server.js",
     "prisma:generate": "prisma generate --config prisma.config.ts",
     "prisma:migrate": "prisma migrate dev --config prisma.config.ts",
