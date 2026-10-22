@@ -6,12 +6,13 @@ import type { prisma } from "../src/lib/prisma.js";
 
 function harness() {
   const flow = fixture();
-  const state = { sent: [] as string[], mediaSent: [] as any[], cachedMedia: [] as any[], outgoing: [] as any[], emitted: [] as unknown[], logs: new Map<number, Record<string, unknown>>(), session: null as any,
+  const state = { sent: [] as string[], mediaSent: [] as any[], cachedMedia: [] as any[], outgoing: [] as any[], emitted: [] as unknown[], contactEvents: [] as unknown[], logs: new Map<number, Record<string, unknown>>(), session: null as any,
     contact: { id: 1, phone: "5511999999999", name: "Cliente", isGroup: false, blocked: false, assignments: [{ userId: "inforbot-id" }] as unknown[] },
     members: [{ userId: "inforbot-id", organizationId: "company-a", displayName: "Inforbot", user: { name: "Bot de atendimento" } }] as { userId: string; organizationId: string; displayName: string | null; user: { name: string } }[],
     message: { id: 1, contactId: 1, direction: "INCOMING", type: "TEXT", content: "Oi" }, failSend: false, imageAvailable: true };
   const db: any = {
     $queryRaw: async () => [],
+    contactAssignment: { deleteMany: async ({ where }: any) => { state.contact.assignments = state.contact.assignments.filter((assignment: any) => assignment.userId !== where.userId); return { count: 1 }; } },
     contact: { findUniqueOrThrow: async () => state.contact },
     message: { findUnique: async () => state.message, upsert: async ({ create }: any) => { state.outgoing.push(create); return { id: 100, ...create }; } },
     messageMedia: { upsert: async ({ create }: any) => { state.cachedMedia.push(create); } },
@@ -35,7 +36,7 @@ function harness() {
   };
   let queue = Promise.resolve();
   db.$transaction = (fn: any) => { const next = queue.then(() => fn(db)); queue = next.catch(() => {}); return next; };
-  const process = createBotProcessor(db as typeof prisma, async (_phone, text) => { state.sent.push(text); if (state.failSend) throw new Error("timeout"); return { key: { id: `sent-${state.sent.length}` } }; }, event => { state.emitted.push(event); }, async input => { state.mediaSent.push(input); if (state.failSend) throw new Error("timeout"); return { key: { id: `image-${state.mediaSent.length}` } }; });
+  const process = createBotProcessor(db as typeof prisma, async (_phone, text) => { state.sent.push(text); if (state.failSend) throw new Error("timeout"); return { key: { id: `sent-${state.sent.length}` } }; }, event => { state.emitted.push(event); }, async input => { state.mediaSent.push(input); if (state.failSend) throw new Error("timeout"); return { key: { id: `image-${state.mediaSent.length}` } }; }, event => { state.contactEvents.push(event); });
   return { state, process, flow };
 }
 

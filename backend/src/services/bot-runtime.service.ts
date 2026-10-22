@@ -11,7 +11,7 @@ export async function lockBotContact(tx: Prisma.TransactionClient, contactId: nu
 }
 
 // Contact row locks serialize bot replies and assignment changes across workers.
-export function createBotProcessor(database = prisma, send = sendWhatsAppMessage, emit: (payload: unknown) => void = payload => { getSocketServer().emit("new_message", payload); }, sendMedia = sendWhatsAppMedia) {
+export function createBotProcessor(database = prisma, send = sendWhatsAppMessage, emit: (payload: unknown) => void = payload => { getSocketServer().emit("new_message", payload); }, sendMedia = sendWhatsAppMedia, emitContact: (payload: unknown) => void = payload => { getSocketServer().emit("contact_updated", payload); }) {
 return async function processBotMessage(messageId: number, instance: unknown) {
   const runtimeInstance = process.env.EVOLUTION_INSTANCE;
   if (!runtimeInstance || typeof instance !== "string" || instance.trim() !== runtimeInstance.trim()) return;
@@ -87,6 +87,13 @@ return async function processBotMessage(messageId: number, instance: unknown) {
         await tx.messageMedia.upsert({ where: { messageId: message.id }, create: { messageId: message.id, ...media }, update: media });
         messages.push(message);
       }
+      // Release the bot's assignment so a human can pick the conversation up.
+      const assignments = result.state.status === "WAITING_HUMAN"
+        ? contact.assignments.filter(assignment => assignment.userId !== inforbotMember.userId)
+        : contact.assignments;
+      if (result.state.status === "WAITING_HUMAN") {
+        await tx.contactAssignment.deleteMany({ where: { contactId: contact.id, userId: inforbotMember.userId } });
+      }
       await tx.botSession.upsert({ where: { instance_contactId: { instance: runtimeInstance, contactId: contact.id } },
         create: { instance: runtimeInstance, contactId: contact.id, botId: bot.id, revision: bot.publishedRevision, state: result.state as unknown as PrismaTypes.InputJsonValue, status: result.state.status },
         update: { botId: bot.id, revision: bot.publishedRevision, state: result.state as unknown as PrismaTypes.InputJsonValue, status: result.state.status } });
@@ -95,9 +102,10 @@ return async function processBotMessage(messageId: number, instance: unknown) {
       // updateMany writes directly, so saving the reply/session can commit.
       const completed = await tx.botExecutionLog.updateMany({ where: { messageId }, data: { outcome: "SENT" } });
       if (completed.count !== 1) throw new Error("Missing bot execution claim");
-      return { messages, contact: { ...contact, name: contactDisplayName(contact), assignedUserIds: contact.assignments.map(assignment => assignment.userId) } };
+      return { assignmentChanged: result.state.status === "WAITING_HUMAN", messages, contact: { ...contact, assignments, name: contactDisplayName(contact), assignedUserIds: assignments.map(assignment => assignment.userId) } };
     }, { timeout: 30000, maxWait: 10000 });
     if (emitted) {
+      if (emitted.assignmentChanged) emitContact(emitted.contact);
       for (const message of emitted.messages) emit({ message, contact: emitted.contact });
     }
   } catch {

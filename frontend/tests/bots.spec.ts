@@ -2,6 +2,80 @@ import { test, expect } from "@playwright/test";
 import type { BotFlow } from "../lib/bot-api";
 import { advanceBot, validateFlow } from "../../backend/src/services/bot-flow";
 
+test("botão direito na mensagem 4 cria o menu de opções ligado a ela", async ({ page }) => {
+  const draft: BotFlow = { rootMenuId: "root", backLabel: "Voltar", invalidMessage: "Escolha uma opção válida.", menus: [
+    { id: "root", name: "Principal", text: "Escolha o assunto", options: [
+      { id: "other", number: "1", label: "Outro assunto", active: true, action: "MESSAGE", targetMenuId: "", response: "Outra resposta" },
+      { id: "scanner", number: "4", label: "Problemas com scanner", active: true, action: "MESSAGE", targetMenuId: "", response: "Qual problema ocorre no scanner?", imageId: "scanner-photo" },
+    ] },
+  ] };
+  let saved: BotFlow | undefined;
+  await page.route("**/api/**", async route => {
+    const request = route.request(), pathname = new URL(request.url()).pathname;
+    if (pathname.endsWith("/auth/get-session")) {
+      await route.fulfill({ json: { user: { id: "admin", name: "Administrador", email: "admin@example.invalid" }, session: { id: "session", userId: "admin", activeOrganizationId: "org", expiresAt: "2099-01-01T00:00:00Z" } } }); return;
+    }
+    if (pathname.endsWith("/bots/scanner") && request.method() === "PUT") {
+      const body = request.postDataJSON();
+      validateFlow(body.draft);
+      saved = body.draft;
+      await route.fulfill({ json: { ...body, id: "scanner", revision: body.revision + 1, published: null } }); return;
+    }
+    if (pathname.endsWith("/bots")) {
+      await route.fulfill({ json: { bots: [{ id: "scanner", name: "Suporte", revision: 1, draft, published: null }], activeBotId: null, instanceAvailable: true } }); return;
+    }
+    if (pathname.endsWith("/bots/images/scanner-photo")) {
+      await route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64") }); return;
+    }
+    await route.fulfill({ json: {} });
+  });
+  await page.setViewportSize({ width: 1720, height: 1050 });
+  await page.goto("/dashboard/bots/");
+  await page.getByRole("button", { name: "Editar opção 1: Outro assunto", exact: true }).click();
+  await page.getByRole("button", { name: "Ajustar", exact: true }).click();
+  const expanded = page.getByRole("dialog", { name: "Visualização ampliada do fluxo" });
+  await expanded.getByRole("button", { name: "Editar opção 4: Problemas com scanner", exact: true }).click({ button: "right" });
+  const context = page.getByRole("menu", { name: "Opções do fluxo" });
+  await expect(context.getByRole("menuitem", { name: "Adicionar submenu", exact: true })).toHaveCount(0);
+  await context.getByRole("menuitem", { name: "Menu de opções", exact: true }).click();
+  await expect(context).toHaveCount(0);
+  await expect(expanded.getByRole("textbox", { name: "Nome do menu", exact: true })).toHaveValue("Menu da opção 4");
+  await expect(expanded.getByRole("textbox", { name: "Mensagem do submenu" })).toHaveValue("Qual problema ocorre no scanner?");
+  await expect(expanded.getByRole("img", { name: "Prévia da imagem do bot" })).toHaveAttribute("src", /\/bots\/images\/scanner-photo$/);
+  await expanded.getByRole("button", { name: /^Salvar rascunho/ }).click();
+  await expect(expanded.getByRole("status")).toContainText("Rascunho salvo");
+  expect(saved!.menus).toHaveLength(2);
+  expect(saved!.menus[0].options).toHaveLength(2);
+  expect(saved!.menus[0].options[0].action).toBe("MESSAGE");
+  const parent = saved!.menus[0].options[1];
+  expect(parent).toMatchObject({ id: "scanner", number: "4", action: "SUBMENU" });
+  expect(parent.targetMenuId).toBe(saved!.menus[1].id);
+  validateFlow(saved!, true);
+  const reply = advanceBot(saved!, advanceBot(saved!, null, "Oi").state, "4");
+  expect(reply.state.menuId).toBe(parent.targetMenuId);
+  expect(reply.text).toContain("Qual problema ocorre no scanner?");
+  expect(reply.imageId).toBe("scanner-photo");
+  await expanded.getByRole("button", { name: "Editar opções", exact: true }).click();
+  await expanded.getByRole("region", { name: "Editar nó", exact: true }).getByRole("button", { name: "Adicionar opção", exact: true }).click();
+  await expanded.getByRole("textbox", { name: "Nome da opção", exact: true }).fill("Voltar ao início");
+  await expanded.getByRole("combobox", { name: "Tipo de ação" }).selectOption("SUBMENU");
+  const destination = expanded.getByRole("combobox", { name: "Menu de destino" });
+  await expect(destination.getByRole("option", { name: "Principal — voltar ao início", exact: true })).toHaveCount(1);
+  await destination.selectOption("root");
+  await expanded.getByRole("button", { name: /^Salvar rascunho/ }).click();
+  await expect(expanded.getByRole("status")).toContainText("Rascunho salvo");
+  validateFlow(saved!, true);
+  const entered = advanceBot(saved!, advanceBot(saved!, null, "Oi").state, "4");
+  const returned = advanceBot(saved!, entered.state, "1");
+  expect(returned.state.menuId).toBe("root");
+  expect(returned.state.stack).toEqual([]);
+  expect(returned.text).toContain("Escolha o assunto");
+  await expanded.getByRole("combobox", { name: "Menu do fluxo" }).selectOption("root");
+  await expanded.getByRole("button", { name: "Editar opção 4: Problemas com scanner", exact: true }).click({ button: "right" });
+  await context.getByRole("menuitem", { name: "Abrir menu de opções", exact: true }).click();
+  await expect(expanded.getByRole("textbox", { name: "Nome do menu", exact: true })).toHaveValue("Menu da opção 4");
+});
+
 for (const width of [1440, 390]) {
   test(`Central de Bots: editar, salvar e testar (${width}px)`, async ({ page }, testInfo) => {
     const saved: Record<string, unknown>[] = [];
@@ -96,7 +170,8 @@ for (const width of [1440, 390]) {
     await page.getByRole("button", { name: "Editar Mensagem", exact: true }).click();
     await page.getByRole("button", { name: "Menu de opções Cria um novo submenu", exact: true }).click();
     await page.getByRole("textbox", { name: "Nome do menu", exact: true }).fill("Menu sem uso");
-    await page.getByRole("button", { name: "Menu principal", exact: true }).click();
+    await page.getByRole("region", { name: "Menus do fluxo", exact: true }).getByRole("button", { name: "Ver menu Menu principal", exact: true }).click();
+    await page.getByRole("dialog", { name: "Menu principal", exact: true }).getByRole("button", { name: "Editar menu", exact: true }).click();
     await page.getByRole("button", { name: "Publicar", exact: true }).click();
     await expect(page.getByRole("status")).toContainText('Sem conexão › Menu sem uso');
     await expect(page.getByRole("textbox", { name: "Nome do menu", exact: true })).toHaveValue("Menu sem uso");
@@ -130,12 +205,67 @@ test("designer visual: selecionar nós, arrastar, salvar posições e abrir subm
   await page.setViewportSize({ width: 1720, height: 1050 });
   await page.goto("/dashboard/bots/");
   await expect(page.getByRole("textbox", { name: "Mensagem inicial", exact: true })).toHaveValue(draft.menus[0].text);
+  const menuList = page.getByRole("region", { name: "Menus do fluxo", exact: true });
+  const scannerMenuButton = menuList.getByRole("button", { name: "Ver menu Menu principal › Scanner", exact: true });
+  await scannerMenuButton.click();
+  const menuDetails = page.getByRole("dialog", { name: "Scanner", exact: true });
+  await expect(menuDetails).toBeVisible();
+  await expect(menuDetails.getByLabel("Caminho do menu")).toHaveText("Menu principal › Scanner");
+  await expect(menuDetails).toContainText("3 — Scanner com problema");
+  await expect(menuDetails).toContainText("Qual problema você está enfrentando?");
+  await expect(menuDetails).toContainText("Falar com suporte");
+  await expect(menuDetails).toContainText("Transfere para um atendente");
+  await page.screenshot({ path: testInfo.outputPath("menu-details-desktop.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const cardBounds = (await menuDetails.boundingBox())!;
+  expect(cardBounds.x).toBeGreaterThanOrEqual(0);
+  expect(cardBounds.x + cardBounds.width).toBeLessThanOrEqual(390);
+  expect(cardBounds.y).toBeGreaterThanOrEqual(0);
+  expect(cardBounds.y + cardBounds.height).toBeLessThanOrEqual(844);
+  await page.screenshot({ path: testInfo.outputPath("menu-details-mobile.png") });
+  await page.keyboard.press("Escape");
+  await expect(menuDetails).toHaveCount(0);
+  await page.setViewportSize({ width: 1720, height: 1050 });
+  await expect(scannerMenuButton).toBeFocused();
+  await expect(page.getByRole("textbox", { name: "Mensagem inicial", exact: true })).toHaveValue(draft.menus[0].text);
+  await scannerMenuButton.click();
+  await menuDetails.getByRole("button", { name: "Editar menu", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Mensagem do submenu" })).toHaveValue(draft.menus[1].text);
+  await menuList.getByRole("button", { name: "Ver menu Menu principal", exact: true }).click();
+  const rootDetails = page.getByRole("dialog", { name: "Menu principal", exact: true });
+  await expect(rootDetails).toContainText("Este é o primeiro menu");
+  await expect(rootDetails).toContainText("Inativa · não aparece para o cliente");
+  await rootDetails.getByRole("button", { name: "Ver menu Scanner", exact: true }).click();
+  await expect(menuDetails).toBeVisible();
+  await page.keyboard.press("Escape");
+  await menuList.getByRole("button", { name: "Ver menu Menu principal", exact: true }).click();
+  await rootDetails.getByRole("button", { name: "Editar menu", exact: true }).click();
   await page.getByRole("button", { name: "Ajustar", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Visualização ampliada do fluxo" })).toBeVisible();
   const expandedMessage = page.locator('[data-flow-node="root:message"]');
   const canvasViewport = page.locator('[data-flow-viewport]');
   const viewportBounds = (await canvasViewport.boundingBox())!;
   const beforePan = (await expandedMessage.boundingBox())!;
+  await expandedMessage.click({ button: "right" });
+  const contextMenu = page.getByRole("menu", { name: "Opções do fluxo" });
+  await expect(contextMenu.getByRole("menuitem", { name: "Editar nó", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(contextMenu).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Visualização ampliada do fluxo" })).toBeVisible();
+  expect((await expandedMessage.boundingBox())!.x).toBeCloseTo(beforePan.x, 0);
+  await expandedMessage.click({ button: "right" });
+  await contextMenu.getByRole("menuitem", { name: "Editar nó", exact: true }).click();
+  await expect(page.getByRole("dialog").getByRole("textbox", { name: "Mensagem inicial", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Ocultar edição", exact: true }).click();
+  const zoomPoint = { x: beforePan.x + beforePan.width / 2, y: beforePan.y + beforePan.height / 2 };
+  await page.mouse.move(zoomPoint.x, zoomPoint.y);
+  await page.mouse.wheel(0, -120);
+  await expect.poll(async () => (await expandedMessage.boundingBox())!.width).toBeGreaterThan(beforePan.width);
+  const zoomed = (await expandedMessage.boundingBox())!;
+  expect(zoomed.x + zoomed.width / 2).toBeCloseTo(zoomPoint.x, 0);
+  expect(zoomed.y + zoomed.height / 2).toBeCloseTo(zoomPoint.y, 0);
+  await page.mouse.wheel(0, 120);
+  await expect.poll(async () => Math.abs((await expandedMessage.boundingBox())!.width - beforePan.width)).toBeLessThan(1);
   await expect(canvasViewport).toHaveCSS("cursor", /grabbing-small\.svg.*grabbing/);
   await page.mouse.move(viewportBounds.x + 20, viewportBounds.y + 200);
   await page.mouse.down();
@@ -174,7 +304,14 @@ test("designer visual: selecionar nós, arrastar, salvar posições e abrir subm
   await expect(page.getByRole("button", { name: "Navegar pelo minimapa" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("bot-designer-desktop.png"), fullPage: true });
   const palette = page.getByRole("button", { name: "Transferir para humano Encaminha para atendimento", exact: true });
-  await palette.dragTo(page.getByRole("region", { name: "Designer de fluxo" }), { targetPosition: { x: 100, y: 180 } });
+  await expect(palette).toBeVisible();
+  const background = (await canvasViewport.boundingBox())!;
+  await canvasViewport.click({ button: "right", position: { x: background.width - 20, y: background.height - 50 } });
+  const contextBounds = (await contextMenu.boundingBox())!;
+  expect(contextBounds.x + contextBounds.width).toBeLessThanOrEqual(background.x + background.width + 1);
+  expect(contextBounds.y + contextBounds.height).toBeLessThanOrEqual(background.y + background.height + 1);
+  await contextMenu.getByRole("menuitem", { name: "Transferir para humano", exact: true }).click();
+  await expect(contextMenu).toHaveCount(0);
   await expect(page.getByRole("combobox", { name: "Tipo de ação" })).toHaveValue("HUMAN");
   await page.getByRole("textbox", { name: "Conteúdo da resposta" }).fill("Aguarde um técnico.");
   await page.getByRole("button", { name: /^Salvar rascunho/ }).click();

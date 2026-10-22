@@ -87,5 +87,17 @@ test("administrative API enforces membership, tenant isolation, optimistic revis
     assert.equal((await request(`/${imageBot.id}/publish`, { revision: 0 })).status, 200);
     const imageSimulation = await request("/simulate", { flow: imageFlow, inputs: [] });
     assert.equal((await imageSimulation.json() as any).messages[0].imageId, image.id);
+    const returnFlow = fixture();
+    returnFlow.menus[1]!.options.push({ id: "restart", number: "5", label: "Voltar ao início", active: true, action: "SUBMENU", response: "", targetMenuId: returnFlow.rootMenuId });
+    const returnBotResponse = await request("", { name: "Com retorno ao início", draft: returnFlow });
+    assert.equal(returnBotResponse.status, 201);
+    const returnBot = await returnBotResponse.json() as any;
+    assert.equal((await request(`/${returnBot.id}/publish`, { revision: 0 })).status, 200);
+    const returnSimulation = await request("/simulate", { flow: returnFlow, inputs: ["3", "5", "0"] });
+    assert.equal(returnSimulation.status, 200);
+    const returned = await returnSimulation.json() as any;
+    assert.equal(returned.state.menuId, returnFlow.rootMenuId);
+    assert.deepEqual(returned.state.stack, []);
+    assert.match(returned.messages.at(-1).text, /Assistente Infordoc/);
   } finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
 });

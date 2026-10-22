@@ -143,15 +143,24 @@ botRouter.post("/bots/simulate", (req, res) => {
     // Rebuild simulator state by replaying inputs; never trust client state pointers.
     const inputs: unknown = req.body?.inputs;
     if (!Array.isArray(inputs) || inputs.length > 100 || inputs.some(v => typeof v !== "string" || v.length > 100)) throw new Error("Simulação inválida (máximo 100 passos).");
+    const startMenuId: unknown = req.body?.startMenuId;
+    if (startMenuId !== undefined && (typeof startMenuId !== "string" || !req.body.flow.menus.some((menu: { id: string }) => menu.id === startMenuId))) throw new Error("Menu inicial do teste inexistente.");
+    // Only a menu ID may be chosen; status/history still come from server replay.
+    const testFlow = startMenuId ? { ...req.body.flow, rootMenuId: startMenuId } : req.body.flow;
     let state: BotState | null = null;
-    const messages: { role: string; text: string; imageId?: string }[] = [];
+    const messages: { role: string; text: string; imageId?: string; menuId?: string; optionId?: string }[] = [];
+    const steps: { menuId: string; optionId?: string; status: string }[] = [];
     for (const input of ["", ...inputs]) {
+      if (state && state.status !== "BOT_ACTIVE") break;
+      const selectedOption = state && input.trim() !== "0" ? testFlow.menus.find((menu: { id: string }) => menu.id === state!.menuId)?.options.find((option: { active: boolean; number: string }) => option.active && option.number === input.trim()) : undefined;
       if (state) messages.push({ role: "user", text: input });
-      const result = advanceBot(req.body.flow, state, input);
+      const result = advanceBot(state ? req.body.flow : testFlow, state, input);
       state = result.state;
-      if (result.text || result.imageId) messages.push({ role: "bot", text: result.text, ...(result.imageId ? { imageId: result.imageId } : {}) });
+      const step = { menuId: state.menuId, status: state.status, ...(selectedOption ? { optionId: selectedOption.id } : {}) };
+      steps.push(step);
+      if (result.text || result.imageId) messages.push({ role: "bot", text: result.text, menuId: state.menuId, ...(selectedOption ? { optionId: selectedOption.id } : {}), ...(result.imageId ? { imageId: result.imageId } : {}) });
     }
-    res.json({ state, messages });
+    res.json({ state, messages, steps });
   } catch (error) { res.status(400).json({ message: error instanceof Error ? error.message : "Simulação inválida." }); }
 });
 return botRouter;

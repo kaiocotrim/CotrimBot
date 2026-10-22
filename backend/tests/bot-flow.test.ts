@@ -33,11 +33,9 @@ test("draft edits do not mutate the published snapshot; add, edit, duplicate and
   draft.menus[0]!.options.splice(3, 1); validateFlow(draft, true);
 });
 
-test("reject duplicate numbers, non-string numbers, cycles, missing menus and incomplete publication", () => {
+test("reject duplicate numbers, non-string numbers, missing menus and incomplete publication", () => {
   const duplicate = fixture(); duplicate.menus[0]!.options[1]!.number = "1";
   assert.throws(() => validateFlow(duplicate), /duplicado/);
-  const cycle = fixture(); cycle.menus[0]!.options[1]!.targetMenuId = "main";
-  assert.throws(() => validateFlow(cycle), /circulares/);
   const missing = fixture(); missing.menus[0]!.options[1]!.targetMenuId = "missing";
   assert.throws(() => validateFlow(missing), /existente/);
   const incomplete = fixture(); incomplete.menus[0]!.options[0]!.response = "";
@@ -46,6 +44,45 @@ test("reject duplicate numbers, non-string numbers, cycles, missing menus and in
   for (const value of [null, {}, { ...fixture(), menus: [] }]) assert.throws(() => validateFlow(value));
   const numeric = fixture(); (numeric.menus[0]!.options[0] as unknown as { number: unknown }).number = 1;
   assert.throws(() => validateFlow(numeric));
+});
+
+test("options can return to the start and show its image without keeping obsolete back history", () => {
+  const flow = fixture();
+  flow.menus[0]!.imageId = "welcome-photo";
+  flow.menus[1]!.options.push({ id: "restart", number: "5", label: "Voltar ao início", active: true, action: "SUBMENU", response: "", targetMenuId: flow.rootMenuId });
+  validateFlow(flow);
+  validateFlow(flow, true);
+  let reply = advanceBot(flow, null, "Oi");
+  for (let i = 0; i < 50; i++) {
+    reply = advanceBot(flow, reply.state, "3");
+    assert.deepEqual(reply.state.stack, [flow.rootMenuId]);
+    reply = advanceBot(flow, reply.state, "5");
+    assert.equal(reply.state.menuId, flow.rootMenuId);
+    assert.deepEqual(reply.state.stack, []);
+    assert.equal(reply.imageId, "welcome-photo");
+    assert.match(reply.text, /Assistente Infordoc/);
+  }
+  assert.equal(advanceBot(flow, reply.state, "0").state.menuId, flow.rootMenuId);
+});
+
+test("returning to an ancestor or the current menu preserves a bounded back stack", () => {
+  const flow = fixture();
+  flow.menus[1]!.options.push({ id: "details", number: "5", label: "Detalhes", active: true, action: "SUBMENU", response: "", targetMenuId: "details" });
+  flow.menus.push({ id: "details", name: "Detalhes", text: "Escolha uma opção", options: [
+    { id: "back-scanner", number: "6", label: "Voltar ao scanner", active: true, action: "SUBMENU", response: "", targetMenuId: "scanner-menu" },
+    { id: "repeat", number: "7", label: "Mostrar novamente", active: true, action: "SUBMENU", response: "", targetMenuId: "details" },
+  ] });
+  validateFlow(flow, true);
+  let reply = advanceBot(flow, advanceBot(flow, null, "Oi").state, "3");
+  for (let i = 0; i < 50; i++) {
+    reply = advanceBot(flow, reply.state, "5");
+    reply = advanceBot(flow, reply.state, "7");
+    assert.deepEqual(reply.state.stack, ["main", "scanner-menu"]);
+    reply = advanceBot(flow, reply.state, "6");
+    assert.equal(reply.state.menuId, "scanner-menu");
+    assert.deepEqual(reply.state.stack, ["main"]);
+  }
+  assert.equal(advanceBot(flow, reply.state, "0").state.menuId, "main");
 });
 
 test("bot webhook requires a configured secret with an exact match", () => {

@@ -1,8 +1,12 @@
-export type BotOption = { id: string; number: string; label: string; active: boolean; action: "MESSAGE" | "SUBMENU" | "HUMAN" | "IMAGE"; response: string; targetMenuId: string; imageId?: string };
+export type BotOption = { id: string; number: string; label: string; description?: string; active: boolean; action: "MESSAGE" | "SUBMENU" | "HUMAN" | "IMAGE" | "CLOSE"; response: string; targetMenuId: string; imageId?: string };
 export type BotMenu = { id: string; name: string; text: string; options: BotOption[]; imageId?: string };
 export type BotFlow = { rootMenuId: string; invalidMessage: string; backLabel: string; menus: BotMenu[]; layout?: Record<string, { x: number; y: number }> };
 export type BotState = { menuId: string; stack: string[]; status: "BOT_ACTIVE" | "WAITING_HUMAN" | "HUMAN_ACTIVE" | "CLOSED" };
 export type BotReply = { state: BotState; text: string; imageId?: string };
+
+export function isProvisionalReply(text: string): boolean {
+  return /^(?:fase\s+beta|teste|testando|em\s+breve)[\s.!…]*$/i.test(text.trim());
+}
 
 export function validateFlow(value: unknown, publish = false): asserts value is BotFlow {
   const fail = (message: string): never => { throw new Error(message); };
@@ -24,33 +28,26 @@ export function validateFlow(value: unknown, publish = false): asserts value is 
     const numbers = new Set<string>();
     for (const o of m.options) {
       if (!o || !string(o.id, 80) || !o.id || optionIds.has(o.id) || typeof o.number !== "string" || !/^[1-9]\d{0,2}$/.test(o.number)
-        || numbers.has(o.number) || !string(o.label, 200) || !string(o.response, 8000)
-        || !string(o.targetMenuId, 80) || !image(o.imageId) || typeof o.active !== "boolean" || !["MESSAGE", "SUBMENU", "HUMAN", "IMAGE"].includes(o.action)) fail("Opção inválida ou número duplicado. Use números de 1 a 999; 0 é reservado.");
+        || numbers.has(o.number) || !string(o.label, 200) || o.description !== undefined && !string(o.description, 500) || !string(o.response, 8000)
+        || !string(o.targetMenuId, 80) || !image(o.imageId) || typeof o.active !== "boolean" || !["MESSAGE", "SUBMENU", "HUMAN", "IMAGE", "CLOSE"].includes(o.action)) fail("Opção inválida ou número duplicado. Use números de 1 a 999; 0 é reservado.");
       numbers.add(o.number); optionIds.add(o.id);
-      if (publish && o.active && (!o.label.trim() || (["MESSAGE", "HUMAN"].includes(o.action) && !o.response.trim()))) fail("Preencha o nome e a resposta das opções ativas.");
+      if (publish && o.active && (!o.label.trim() || (["MESSAGE", "HUMAN", "CLOSE"].includes(o.action) && !o.response.trim()))) fail("Preencha o nome e a resposta das opções ativas.");
+      if (publish && o.active && o.action !== "SUBMENU" && isProvisionalReply(o.response)) fail(`Substitua a resposta provisória da opção ${o.number} — ${o.label} no menu "${m.name}" antes de publicar.`);
       if (publish && o.active && o.action === "IMAGE" && !o.imageId) fail(`Envie uma imagem para a opção ${o.number} do menu "${m.name}".`);
     }
     if (publish && !m.text.trim() && !m.imageId) fail(`Preencha a mensagem do menu "${m.name || m.id}".`);
+    if (publish && isProvisionalReply(m.text)) fail(`Substitua a mensagem provisória do menu "${m.name}" antes de publicar.`);
   }
   if (!ids.has(f.rootMenuId)) fail("Menu principal inexistente.");
-  const visiting = new Set<string>(), visited = new Set<string>();
-  const visit = (id: string) => {
-    if (visiting.has(id)) fail("Submenus circulares não são permitidos.");
-    if (visited.has(id)) return;
-    visiting.add(id);
-    for (const o of f.menus.find(m => m.id === id)!.options) if (o.action === "SUBMENU") {
-      if (!ids.has(o.targetMenuId)) fail("Selecione um submenu existente.");
-      visit(o.targetMenuId);
-    }
-    visiting.delete(id); visited.add(id);
-  };
-  for (const id of ids) visit(id);
+  for (const menu of f.menus) for (const option of menu.options) {
+    if (option.action === "SUBMENU" && !ids.has(option.targetMenuId)) fail("Selecione um submenu existente.");
+  }
   if (publish && (!f.invalidMessage.trim() || !f.backLabel.trim())) fail("Preencha a orientação de opção inválida e o texto de retorno.");
 }
 
 export function renderMenu(flow: BotFlow, id: string): string {
   const menu = flow.menus.find(m => m.id === id)!;
-  return [menu.text, ...menu.options.filter(o => o.active).map(o => `${o.number} — ${o.label}`), `0 — ${flow.backLabel}`].filter(Boolean).join("\n\n");
+  return [menu.text, ...menu.options.filter(o => o.active).map(o => `${o.number} — ${o.label}${o.description?.trim() ? `\n${o.description.trim()}` : ""}`), `0 — ${flow.backLabel}`].filter(Boolean).join("\n\n");
 }
 
 // Both the simulator and WhatsApp runtime call this pure transition function.
@@ -71,11 +68,20 @@ export function advanceBot(flow: BotFlow, state: BotState | null, input: string)
   }
   const option = flow.menus.find(m => m.id === state.menuId)!.options.find(o => o.active && o.number === input.trim());
   if (!option) return { state, text: `${flow.invalidMessage}\n\n${renderMenu(flow, state.menuId)}` };
-  if (option.action === "SUBMENU") return menuReply(flow, { ...state, menuId: option.targetMenuId, stack: [...state.stack, state.menuId] });
+  if (option.action === "SUBMENU") {
+    // Navigation advances once per client reply, so returning to a menu is safe.
+    // Reuse its existing history instead of accumulating loops in the back stack.
+    const previousIndex = state.stack.indexOf(option.targetMenuId);
+    const stack = option.targetMenuId === flow.rootMenuId ? []
+      : option.targetMenuId === state.menuId ? [...state.stack]
+      : previousIndex >= 0 ? state.stack.slice(0, previousIndex)
+      : [...state.stack, state.menuId];
+    return menuReply(flow, { ...state, menuId: option.targetMenuId, stack });
+  }
   if (option.action === "IMAGE") {
     if (!option.imageId) throw new Error("Opção incompleta: envie uma imagem antes de publicar.");
     return { state, imageId: option.imageId, text: [option.response, `0 — ${flow.backLabel}`].filter(Boolean).join("\n\n") };
   }
   if (!option.response.trim()) throw new Error("Opção incompleta: cadastre uma resposta antes de publicar.");
-  return { state: { ...state, status: option.action === "HUMAN" ? "WAITING_HUMAN" : "BOT_ACTIVE" }, text: `${option.response}${option.action === "MESSAGE" ? `\n\n0 — ${flow.backLabel}` : ""}`, ...(option.action === "MESSAGE" && option.imageId ? { imageId: option.imageId } : {}) };
+  return { state: { ...state, status: option.action === "HUMAN" ? "WAITING_HUMAN" : option.action === "CLOSE" ? "CLOSED" : "BOT_ACTIVE" }, text: `${option.response}${option.action === "MESSAGE" ? `\n\n0 — ${flow.backLabel}` : ""}`, ...(["MESSAGE", "CLOSE"].includes(option.action) && option.imageId ? { imageId: option.imageId } : {}) };
 }

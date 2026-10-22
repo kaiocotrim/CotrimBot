@@ -54,6 +54,8 @@ Durante o cadastro, o sistema solicitará um CNPJ. É importante utilizar o CNPJ
 
 Opções podem ser editadas, duplicadas, excluídas e reordenadas pelas setas. A ordem de exibição não altera o número que o cliente deve digitar. O número `0` é reservado para voltar: em submenus, retorna ao menu anterior; no principal ou depois de uma resposta, reapresenta o menu atual/principal conforme a pilha de navegação.
 
+Para criar uma escolha **Voltar ao início**, use a ação **Abrir submenu** e selecione o menu principal em **Menu de destino**. Retornos a menus anteriores são permitidos: cada escolha exige uma nova mensagem do cliente. Ao retornar ao início, o histórico de navegação é limpo; o comando `0` permanece no menu principal. Ao voltar a outro menu anterior, o histórico é encurtado até esse ponto.
+
 ### Designer visual
 
 O editor tem lista de bots e componentes à esquerda, canvas central, painel **Editar nó** e simulador de conversa à direita. Em telas menores, o teste abre em um painel; no celular, as áreas ficam empilhadas. O canvas tem zoom, ajuste automático, minimapa, arraste dos nós e navegação por arraste do fundo.
@@ -64,7 +66,7 @@ As posições são guardadas em `Bot.draft.layout`, validadas no servidor e pres
 
 **Testar bot** executa o rascunho no motor existente. **Histórico do teste** mostra os passos daquela simulação; não é um relatório de conversas de produção. A interface oferece as ações já suportadas pelo motor: mensagem, submenu e transferência humana.
 
-Limites: 50 menus, 50 opções por menu, números únicos de 1 a 999, mensagens de até 8.000 caracteres, nomes de opção de até 200 caracteres. Publicação rejeita ciclos, destinos inexistentes, mensagens de menu vazias e opções ativas sem nome/resposta. Rascunhos permitem respostas vazias, mas precisam ter uma estrutura válida.
+Limites: 50 menus, 50 opções por menu, números únicos de 1 a 999, mensagens de até 8.000 caracteres, nomes de opção de até 200 caracteres. Publicação rejeita destinos inexistentes, mensagens de menu vazias e opções ativas sem nome/resposta. Rascunhos permitem respostas vazias, mas precisam ter uma estrutura válida.
 
 ## Arquitetura e integração
 
