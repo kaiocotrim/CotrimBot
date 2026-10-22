@@ -133,6 +133,18 @@ test("designer visual: selecionar nós, arrastar, salvar posições e abrir subm
   await page.getByRole("button", { name: "Ajustar", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Visualização ampliada do fluxo" })).toBeVisible();
   const expandedMessage = page.locator('[data-flow-node="root:message"]');
+  const canvasViewport = page.locator('[data-flow-viewport]');
+  const viewportBounds = (await canvasViewport.boundingBox())!;
+  const beforePan = (await expandedMessage.boundingBox())!;
+  await expect(canvasViewport).toHaveCSS("cursor", /grabbing-small\.svg.*grabbing/);
+  await page.mouse.move(viewportBounds.x + 20, viewportBounds.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(viewportBounds.x + 110, viewportBounds.y + 240, { steps: 8 });
+  await page.mouse.up();
+  const afterPan = (await expandedMessage.boundingBox())!;
+  expect(afterPan.x - beforePan.x).toBeCloseTo(90, 0);
+  expect(afterPan.y - beforePan.y).toBeCloseTo(40, 0);
+  await page.getByRole("button", { name: "Ajustar", exact: true }).click();
   const expandedPosition = await expandedMessage.boundingBox();
   expect(expandedPosition).not.toBeNull();
   await page.mouse.move(expandedPosition!.x + 80, expandedPosition!.y + 15);

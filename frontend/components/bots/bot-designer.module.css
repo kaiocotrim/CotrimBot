@@ -78,7 +78,7 @@
 .toolButton { min-height: 29px; padding: 5px 8px; font-size: 10px; }
 .zoom { display: flex; align-items: center; gap: 8px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: #111; font-size: 10px; }
 .zoom button { display: grid; place-items: center; width: 20px; height: 20px; }
-.canvasViewport { position: absolute; inset: 58px 0 0; overflow: auto; touch-action: pan-x pan-y; }
+.canvasViewport { --apple-cursor: url("/cursors/grabbing-small.svg") 11 11, grabbing; position: absolute; inset: 58px 0 0; overflow: auto; touch-action: none; user-select: none; }
 .stage { position: relative; transform-origin: 0 0; }
 .edges { position: absolute; inset: 0; pointer-events: none; }
 .edges path:not(marker path) { stroke: var(--flow-line); stroke-width: 1.5; fill: none; marker-end: url(#flow-arrow); }

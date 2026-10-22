@@ -24,7 +24,8 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
   const closeButton = useRef<HTMLButtonElement>(null);
   const wasExpanded = useRef(false);
   const drag = useRef<{ id: string; pointer: Point; origin: Point; moved: boolean } | null>(null);
-  const pan = useRef<{ pointer: Point; scroll: Point } | null>(null);
+  const pan = useRef<{ pointer: Point; origin: Point } | null>(null);
+  const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(0.8);
   const [minimap, setMinimap] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -52,6 +53,7 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
       const rect = entries[0]?.contentRect;
       if (!rect || initialFit.current === fitKey) return;
       initialFit.current = fitKey;
+      setOffset({ x: 0, y: 0 });
       setZoom(Math.max(0.25, Math.min(0.8, (rect.width - 24) / width, (rect.height - 50) / height)));
     });
     observer.observe(viewport.current);
@@ -92,6 +94,7 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
     onLayout({ ...flow.layout, [node.id]: { x: Math.max(12, Math.min(10000, drag.current.origin.x + dx)), y: Math.max(12, Math.min(10000, drag.current.origin.y + dy)) } });
   }
   function fit() {
+    setOffset({ x: 0, y: 0 });
     if (viewport.current) { setZoom(Math.max(0.25, Math.min(1, (viewport.current.clientWidth - 32) / width, (viewport.current.clientHeight - 50) / height))); viewport.current.scrollTo({ left: 0, top: 0, behavior: "smooth" }); }
   }
   function closeExpanded() {
@@ -107,10 +110,10 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
       {expanded && <button className={styles.toolButton} aria-pressed={editing} onClick={() => setEditing(!editing)}>{editing ? "Ocultar edição" : "Editar nó"}</button>}
       {expanded && <button ref={closeButton} className={styles.toolButton} onClick={closeExpanded} aria-label="Fechar visualização do fluxo" title="Fechar (Esc)"><X size={15} /><span>Fechar</span></button>}
     </div></div>
-    <div ref={viewport} className={styles.canvasViewport} onDragOver={e => { if (e.dataTransfer.types.includes("application/cotrimbot-action")) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } }} onDrop={e => { e.preventDefault(); const action = e.dataTransfer.getData("application/cotrimbot-action"); const rect = e.currentTarget.getBoundingClientRect(); const inset = Math.max(0, (e.currentTarget.clientWidth - width * zoom) / 2); if (["MESSAGE", "SUBMENU", "HUMAN", "IMAGE"].includes(action)) onAdd(action as BotOption["action"], { x: Math.max(12, Math.min(10000, (e.clientX - rect.left - inset + e.currentTarget.scrollLeft) / zoom)), y: Math.max(12, Math.min(10000, (e.clientY - rect.top + e.currentTarget.scrollTop) / zoom)) }); }}
-      onPointerDown={e => { if ((e.target as HTMLElement).closest("[data-flow-node]")) return; pan.current = { pointer: { x: e.clientX, y: e.clientY }, scroll: { x: e.currentTarget.scrollLeft, y: e.currentTarget.scrollTop } }; e.currentTarget.setPointerCapture(e.pointerId); }}
-      onPointerMove={e => { if (pan.current) { e.currentTarget.scrollLeft = pan.current.scroll.x - (e.clientX - pan.current.pointer.x); e.currentTarget.scrollTop = pan.current.scroll.y - (e.clientY - pan.current.pointer.y); } }} onPointerUp={() => { pan.current = null; }} onPointerCancel={() => { pan.current = null; }}>
-      <div style={{ width: width * zoom, height: height * zoom, marginInline: "auto" }}><div className={styles.stage} style={{ width, height, transform: `scale(${zoom})` }}>
+    <div ref={viewport} data-flow-viewport className={styles.canvasViewport} onDragOver={e => { if (e.dataTransfer.types.includes("application/cotrimbot-action")) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } }} onDrop={e => { e.preventDefault(); const action = e.dataTransfer.getData("application/cotrimbot-action"); const rect = e.currentTarget.getBoundingClientRect(); const inset = Math.max(0, (e.currentTarget.clientWidth - width * zoom) / 2); if (["MESSAGE", "SUBMENU", "HUMAN", "IMAGE"].includes(action)) onAdd(action as BotOption["action"], { x: Math.max(12, Math.min(10000, (e.clientX - rect.left - inset + e.currentTarget.scrollLeft - offset.x) / zoom)), y: Math.max(12, Math.min(10000, (e.clientY - rect.top + e.currentTarget.scrollTop - offset.y) / zoom)) }); }}
+      onPointerDown={e => { if (e.button !== 0 || !e.isPrimary || (e.target as HTMLElement).closest("[data-flow-node]")) return; e.preventDefault(); pan.current = { pointer: { x: e.clientX, y: e.clientY }, origin: offset }; e.currentTarget.setPointerCapture(e.pointerId); }}
+      onPointerMove={e => { if (pan.current) setOffset({ x: pan.current.origin.x + e.clientX - pan.current.pointer.x, y: pan.current.origin.y + e.clientY - pan.current.pointer.y }); }} onPointerUp={() => { pan.current = null; }} onPointerCancel={() => { pan.current = null; }} onLostPointerCapture={() => { pan.current = null; }}>
+      <div style={{ width: width * zoom, height: height * zoom, marginInline: "auto" }}><div className={styles.stage} style={{ width, height, transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})` }}>
         <svg className={styles.edges} width={width} height={height} aria-hidden="true"><defs><marker id="flow-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="var(--flow-line)" strokeWidth="1.3" /></marker></defs>
           <path d={curve(start, message)} /><path d={curve(message, options)} />
           {nodes.filter(n => n.option).map(n => <g key={n.id}><path d={curve(options, n)} style={{ opacity: n.option!.active ? 1 : 0.3 }} />{["MESSAGE", "IMAGE"].includes(n.option!.action) && <path d={curve(n, end)} className={styles.returnEdge} />}<rect x={n.x + n.w / 2 - 18} y={n.y - 38} width="36" height="26" rx="8" fill="var(--flow-label)" stroke="var(--flow-label-border)" /><text x={n.x + n.w / 2} y={n.y - 20} textAnchor="middle" fill="var(--flow-label-text)" fontSize="13">{n.option!.number}</text></g>)}
@@ -133,7 +136,7 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
       </div></div>
     </div>
     <div className={styles.canvasHint}><GripHorizontal size={13} /> Arraste os nós para organizar · selecione para editar{expanded ? " · Esc para fechar" : ""}</div>
-    {minimap && <button className={styles.minimap} aria-label="Navegar pelo minimapa" onClick={e => { const rect = e.currentTarget.getBoundingClientRect(); viewport.current?.scrollTo({ left: ((e.clientX - rect.left) / rect.width) * width * zoom - viewport.current.clientWidth / 2, top: ((e.clientY - rect.top) / rect.height) * height * zoom - viewport.current.clientHeight / 2, behavior: "smooth" }); }}><svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">{nodes.map(n => <rect key={n.id} x={n.x} y={n.y} width={n.w} height={n.h} rx="12" fill="var(--flow-map)" />)}</svg></button>}
+    {minimap && <button className={styles.minimap} aria-label="Navegar pelo minimapa" onClick={e => { setOffset({ x: 0, y: 0 }); const rect = e.currentTarget.getBoundingClientRect(); viewport.current?.scrollTo({ left: ((e.clientX - rect.left) / rect.width) * width * zoom - viewport.current.clientWidth / 2, top: ((e.clientY - rect.top) / rect.height) * height * zoom - viewport.current.clientHeight / 2, behavior: "smooth" }); }}><svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">{nodes.map(n => <rect key={n.id} x={n.x} y={n.y} width={n.w} height={n.h} rx="12" fill="var(--flow-map)" />)}</svg></button>}
     <button className={styles.addFloating} onClick={() => { if (expanded) setEditing(true); onAdd("MESSAGE"); }}><Plus size={14} /> Adicionar opção</button>
   </section>;
   return expanded ? <dialog ref={dialog} className={styles.flowDialog} aria-label="Visualização ampliada do fluxo" onCancel={closeExpanded}>{canvas}<fieldset disabled={disabled} className={styles.expandedEditor} hidden={!editing}><div ref={onEditorHost} className={styles.expandedEditorContent} /></fieldset></dialog> : canvas;
