@@ -36,34 +36,42 @@ const client = new CotrimBotClient({
 });
 ```
 
-Para obter um token de sessão para chamadas server-to-server, autentique-se com
-Better Auth. O plugin disponibiliza o token no cabeçalho `set-auth-token`, que o
-SDK captura:
+Para integração server-to-server, você pode fornecer credenciais Better Auth.
+O SDK fará login sob demanda, guardará o token de sessão em memória e o enviará
+nas chamadas seguintes:
 
 ```ts
-await client.auth.signInEmail({ email, password });
-const sessionToken = client.auth.getToken();
-
-const integração = new CotrimBotClient({
+const client = new CotrimBotClient({
   baseUrl: "https://backend.exemplo.com",
-  token: sessionToken,
+  auth: {
+    email: process.env.COTRIMBOT_EMAIL!,
+    password: process.env.COTRIMBOT_PASSWORD!,
+  },
 });
-await integração.contacts.list();
+
+const { contacts } = await client.contacts.list(); // login automático na primeira chamada
 ```
 
-O token é o token de sessão assinado pelo Better Auth, não uma chave
-permanente independente. Ele segue a duração, revogação e as políticas de sessão
-do backend; após expirar, autentique-se novamente. O SDK usa
-`credentials: "omit"` por padrão quando `token` é informado; é possível
-sobrescrever em `credentials`. Proteja o token como uma credencial e não o
-exponha em código cliente ou logs.
+Se uma chamada retornar `401` por sessão expirada ou revogada, o SDK fará novo
+login com as credenciais configuradas e repetirá a chamada uma única vez.
+`client.auth.signOut()` encerra a sessão e desativa o login automático nessa
+instância; uma chamada explícita a `client.auth.signInEmail()` o reativa.
+
+Esse token é uma sessão Better Auth, não uma chave permanente independente.
+Armazene as credenciais em um secret manager e use o login automático somente
+em ambientes confiáveis server-to-server. Nunca inclua e-mail/senha em frontend,
+aplicativos distribuídos ou logs. Para navegador, prefira a sessão por cookie
+(`credentials: "include"`) e o fluxo de autenticação da aplicação.
 
 As opções são:
 
 - `baseUrl` (obrigatória): origem do backend.
+- `auth`: credenciais Better Auth (`email` e `password`) para login e
+  reautenticação automáticos. Recomendado apenas em servidor confiável.
 - `token`: token de sessão Better Auth; enviado no cabeçalho `Authorization`
   usando o esquema Bearer. Se omitido, o SDK captura o cabeçalho
-  `set-auth-token` das respostas de autenticação.
+  `set-auth-token` das respostas de autenticação. Com `auth`, o token é obtido
+  automaticamente e renovado via novo login após um `401`.
 - `credentials`: encaminha credenciais de `fetch`. O padrão é `"include"` para
   sessões por cookie e `"omit"` ao configurar `token`.
 - `headers`: cabeçalhos enviados em todas as chamadas, por exemplo um

@@ -154,3 +154,83 @@ test("captures the session token returned by Better Auth, reuses it, and clears 
   await client.auth.signOut();
   assert.equal(client.auth.getToken(), undefined);
 });
+
+test("autentica automaticamente na primeira chamada e reutiliza o token", async () => {
+  const requests = [];
+  const client = new CotrimBotClient({
+    baseUrl: "https://api.example.test",
+    auth: { email: "user@example.test", password: "password" },
+    fetch: async (url, init) => {
+      requests.push({ url, init });
+      if (requests.length === 1) {
+        return Response.json({ token: "session" }, { headers: { "set-auth-token": "automatic-token" } });
+      }
+      return Response.json({ contacts: [] });
+    },
+  });
+
+  await client.contacts.list();
+  assert.equal(new URL(requests[0].url).pathname, "/api/auth/sign-in/email");
+  assert.deepEqual(JSON.parse(requests[0].init.body), {
+    email: "user@example.test",
+    password: "password",
+  });
+  assert.equal(new Headers(requests[1].init.headers).get("authorization"), ["Bearer ", "automatic-token"].join(""));
+  assert.equal(client.auth.getToken(), "automatic-token");
+  await client.contacts.list();
+  assert.equal(requests.length, 3);
+  assert.equal(new Headers(requests[2].init.headers).get("authorization"), ["Bearer ", "automatic-token"].join(""));
+});
+
+test("renova automaticamente a sessão revogada e repete a chamada uma vez", async () => {
+  const requests = [];
+  const client = new CotrimBotClient({
+    baseUrl: "https://api.example.test",
+    auth: { email: "user@example.test", password: "password" },
+    fetch: async (url, init) => {
+      requests.push({ url, init });
+      if (requests.length === 1) {
+        return Response.json({}, { headers: { "set-auth-token": "old-token" } });
+      }
+      if (requests.length === 2) {
+        return Response.json({ error: "Não autenticado." }, { status: 401 });
+      }
+      if (requests.length === 3) {
+        return Response.json({}, { headers: { "set-auth-token": "new-token" } });
+      }
+      return Response.json({ contacts: [] });
+    },
+  });
+
+  await client.contacts.list();
+  assert.equal(requests.length, 4);
+  assert.equal(new URL(requests[2].url).pathname, "/api/auth/sign-in/email");
+  assert.equal(new Headers(requests[3].init.headers).get("authorization"), ["Bearer ", "new-token"].join(""));
+  assert.equal(client.auth.getToken(), "new-token");
+});
+
+test("logout explícito não inicia novamente o login automático", async () => {
+  const requests = [];
+  const client = new CotrimBotClient({
+    baseUrl: "https://api.example.test",
+    auth: { email: "user@example.test", password: "password" },
+    fetch: async (url, init) => {
+      requests.push({ url, init });
+      if (requests.length === 1) {
+        return Response.json({}, { headers: { "set-auth-token": "session-token" } });
+      }
+      return Response.json({});
+    },
+  });
+
+  await client.contacts.list();
+  await client.auth.signOut();
+  await client.contacts.list();
+  assert.deepEqual(requests.map(({ url }) => new URL(url).pathname), [
+    "/api/auth/sign-in/email",
+    "/api/contacts",
+    "/api/auth/sign-out",
+    "/api/contacts",
+  ]);
+  assert.equal(new Headers(requests[3].init.headers).has("authorization"), false);
+});

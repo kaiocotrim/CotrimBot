@@ -5,6 +5,7 @@ export type Query = Record<string, QueryValue>;
 export interface CotrimBotClientOptions {
   baseUrl: string;
   token?: string;
+  auth?: { email: string; password: string };
   fetch?: typeof fetch;
   headers?: HeadersInit;
   credentials?: RequestCredentials;
@@ -129,7 +130,10 @@ export class CotrimBotClient {
   private readonly fetcher: typeof fetch;
   private readonly defaultHeaders: Headers;
   private readonly credentials: RequestCredentials;
+  private readonly authCredentials?: { email: string; password: string };
   private authToken?: string;
+  private automaticAuthEnabled: boolean;
+  private authenticationPromise?: Promise<unknown>;
 
   constructor(options: CotrimBotClientOptions) {
     if (!options.baseUrl.trim()) throw new TypeError("Informe a URL base do backend CotrimBot.");
@@ -139,13 +143,19 @@ export class CotrimBotClient {
     this.fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.defaultHeaders = new Headers(options.headers);
     this.authToken = options.token;
+    this.authCredentials = options.auth;
+    this.automaticAuthEnabled = Boolean(options.auth);
     this.credentials = options.credentials ?? (options.token ? "omit" : "include");
 
     this.auth = {
-      signInEmail: (input) => this.json("/auth/sign-in/email", "POST", input),
+      signInEmail: (input) => {
+        this.automaticAuthEnabled = true;
+        return this.json("/auth/sign-in/email", "POST", input, true);
+      },
       signOut: async () => {
-        const result = await this.json("/auth/sign-out", "POST", {});
+        const result = await this.json("/auth/sign-out", "POST", {}, true);
         this.authToken = undefined;
+        this.automaticAuthEnabled = false;
         return result;
       },
       getSession: () => this.request("/auth/get-session"),
@@ -485,14 +495,14 @@ export class CotrimBotClient {
     return this.upload(this.internalPath(organizationId, `/${encode(conversationId)}/${kind}`), form);
   }
 
-  private json<T = unknown>(path: string, method: string, body?: unknown): Promise<T> {
+  private json<T = unknown>(path: string, method: string, body?: unknown, skipAutoAuth = false): Promise<T> {
     const headers = new Headers();
     if (body !== undefined) headers.set("Content-Type", "application/json");
     return this.perform<T>(path, {
       method,
       headers,
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-    }, "json");
+    }, "json", { skipAutoAuth });
   }
 
   private upload<T = unknown>(path: string, body: FormData): Promise<T> {
@@ -503,19 +513,38 @@ export class CotrimBotClient {
     return this.perform<Blob>(path, { headers }, "blob");
   }
 
-  private async perform<T>(path: string, init: RequestInit, responseType: "json" | "blob"): Promise<T> {
-    const headers = new Headers(this.defaultHeaders);
-    if (this.authToken && !headers.has("authorization")) {
-      headers.set("Authorization", ["Bearer ", this.authToken].join(""));
-    }
-    new Headers(init.headers).forEach((value, key) => headers.set(key, value));
-    const response = await this.fetcher(`${this.apiUrl}${path.startsWith("/") ? path : `/${path}`}`, {
-      ...init,
-      headers,
-      credentials: init.credentials ?? this.credentials,
-    });
+  private async perform<T>(
+    path: string,
+    init: RequestInit,
+    responseType: "json" | "blob",
+    options: { skipAutoAuth?: boolean } = {},
+  ): Promise<T> {
+    const url = `${this.apiUrl}${path.startsWith("/") ? path : `/${path}`}`;
+    const send = () => {
+      const headers = new Headers(this.defaultHeaders);
+      if (this.authToken && !headers.has("authorization")) {
+        headers.set("Authorization", ["Bearer ", this.authToken].join(""));
+      }
+      new Headers(init.headers).forEach((value, key) => headers.set(key, value));
+      return this.fetcher(url, {
+        ...init,
+        headers,
+        credentials: init.credentials ?? this.credentials,
+      });
+    };
+    const autoAuth = !options.skipAutoAuth && this.automaticAuthEnabled && this.authCredentials !== undefined;
+    if (autoAuth) await this.ensureAuthentication();
+    const requestToken = this.authToken;
+    let response = await send();
     const newAuthToken = response.headers.get("set-auth-token");
     if (newAuthToken) this.authToken = newAuthToken;
+    if (response.status === 401 && autoAuth) {
+      if (this.authToken === requestToken) this.authToken = undefined;
+      await this.ensureAuthentication();
+      response = await send();
+      const refreshedToken = response.headers.get("set-auth-token");
+      if (refreshedToken) this.authToken = refreshedToken;
+    }
     if (!response.ok) {
       const text = await response.text();
       let body: unknown = text;
@@ -531,6 +560,23 @@ export class CotrimBotClient {
     if (response.status === 205) return undefined as T;
     const text = await response.text();
     return (text ? JSON.parse(text) as T : undefined) as T;
+  }
+
+  private async ensureAuthentication(): Promise<void> {
+    if (!this.automaticAuthEnabled || !this.authCredentials || this.authToken) return;
+    if (!this.authenticationPromise) {
+      this.authenticationPromise = this.json(
+        "/auth/sign-in/email",
+        "POST",
+        this.authCredentials,
+        true,
+      );
+    }
+    try {
+      await this.authenticationPromise;
+    } finally {
+      this.authenticationPromise = undefined;
+    }
   }
 }
 
