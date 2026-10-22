@@ -14,6 +14,7 @@ ENV TZ=America/Sao_Paulo
 COPY package.json turbo.json ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/
+COPY sdk/package.json ./sdk/
 
 
 # 2. Remover qualquer lockfile ou .npmrc residual e limpar o cache
