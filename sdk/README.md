@@ -36,14 +36,38 @@ const client = new CotrimBotClient({
 });
 ```
 
+Para integrações backend-to-backend, crie um token na aplicação enquanto estiver
+autenticado por sessão e use-o no SDK:
+
+```ts
+const criado = await client.apiTokens.create("Integração ERP");
+// Armazene criado.token em um secret manager; ele só é exibido nesta resposta.
+
+const integração = new CotrimBotClient({
+  baseUrl: "https://backend.exemplo.com",
+  token: process.env.COTRIMBOT_API_TOKEN,
+});
+await integração.contacts.list();
+```
+
+Tokens não expiram automaticamente e são vinculados ao usuário Better Auth que
+os criou. A aplicação armazena apenas o hash, exibe o segredo uma única vez e
+permite listar/revogar tokens em `client.apiTokens`. A criação, listagem e
+revogação exigem a sessão por cookie; não é possível usar um token para criar ou
+gerenciar outros tokens. Trate tokens como senhas, armazene-os em um secret
+manager e revogue-os quando não forem mais necessários. O SDK usa
+`credentials: "omit"` por padrão quando `token` é informado; é possível
+sobrescrever em `credentials`.
+
 As opções são:
 
 - `baseUrl` (obrigatória): origem do backend.
+- `token`: token de API do usuário; enviado no cabeçalho `Authorization` com o
+  esquema Bearer.
 - `credentials`: encaminha credenciais de `fetch`. O padrão é `"include"` para
-  que sessões por cookie funcionem em navegadores. Em acesso entre origens,
-  o servidor também precisa permitir credenciais e a origem do seu site.
+  sessões por cookie e `"omit"` ao configurar `token`.
 - `headers`: cabeçalhos enviados em todas as chamadas, por exemplo um
-  `Authorization` ou um identificador próprio do seu gateway.
+  identificador próprio do seu gateway.
 - `fetch`: implementação alternativa de `fetch`, útil para testes ou ambientes
   com transporte customizado.
 
@@ -54,6 +78,9 @@ são criadas por convite. Convites podem ser consultados e aceitos sem sessão e
 `client.invitations`. O método `setActiveOrganization` atualiza a organização
 ativa da sessão, usada por rotas de bots e outras operações que dependem do
 contexto da empresa. As rotas de organizações também recebem o ID explicitamente.
+O token fornece autenticação para servidores sem depender de cookies; em
+navegadores, as chamadas externas ainda precisam ser permitidas pela política
+CORS do backend.
 
 ## Exemplos
 
@@ -192,6 +219,7 @@ do backend para integrações realtime; esse transporte não faz parte deste SDK
 | `calendarEvents` | `list`, `create`, `setCompleted`, `delete` | `GET|POST /calendar-events`, `PATCH /calendar-events/:id/completed`, `DELETE /calendar-events/:id` |
 | `scheduledMessages` | `list`, `create`, `delete` | `GET|POST /scheduled-messages`, `DELETE /scheduled-messages/:id` |
 | `clients` | `list`, `create`, `update`, `delete` | `GET|POST /clients`, `PUT|DELETE /clients/:id` |
+| `apiTokens` | `list`, `create`, `revoke` | `GET|POST /tokens`, `DELETE /tokens/:id` (gerenciamento exige sessão Better Auth) |
 
 As rotas da Evolution que gerenciam conexão/QR Code e as rotas de bots exigem
 perfil administrativo conforme as regras do backend. As rotas de organização,

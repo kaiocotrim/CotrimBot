@@ -4,6 +4,7 @@ export type Query = Record<string, QueryValue>;
 
 export interface CotrimBotClientOptions {
   baseUrl: string;
+  token?: string;
   fetch?: typeof fetch;
   headers?: HeadersInit;
   credentials?: RequestCredentials;
@@ -136,7 +137,8 @@ export class CotrimBotClient {
     this.apiUrl = baseUrl.endsWith("/api") ? baseUrl : `${baseUrl}/api`;
     this.fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.defaultHeaders = new Headers(options.headers);
-    this.credentials = options.credentials ?? "include";
+    if (options.token) this.defaultHeaders.set("Authorization", "Bearer " + options.token);
+    this.credentials = options.credentials ?? (options.token ? "omit" : "include");
 
     this.auth = {
       signInEmail: (input) => this.json("/auth/sign-in/email", "POST", input),
@@ -322,6 +324,12 @@ export class CotrimBotClient {
       update: (id, input) => this.json(`/clients/${encode(id)}`, "PUT", input),
       delete: (id) => this.json(`/clients/${encode(id)}`, "DELETE"),
     };
+
+    this.apiTokens = {
+      list: () => this.request("/tokens"),
+      create: (name) => this.json("/tokens", "POST", { name }),
+      revoke: (id) => this.json(`/tokens/${encode(id)}`, "DELETE"),
+    };
   }
 
   readonly auth: {
@@ -458,6 +466,11 @@ export class CotrimBotClient {
     create(input: ClientProfileInput): Promise<{ client: ClientProfile }>;
     update(id: string, input: ClientProfileInput): Promise<{ client: ClientProfile }>;
     delete(id: string): Promise<void>;
+  };
+  readonly apiTokens: {
+    list(): Promise<{ tokens: ApiTokenSummary[] }>;
+    create(name: string): Promise<ApiTokenCreated>;
+    revoke(id: string): Promise<void>;
   };
 
   request<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
@@ -601,4 +614,14 @@ export interface ClientProfileInput {
   name: string;
   image: string | null;
   links: string[];
+}
+export interface ApiTokenSummary {
+  id: string;
+  name: string;
+  tokenPrefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+export interface ApiTokenCreated extends Omit<ApiTokenSummary, "lastUsedAt"> {
+  token: string;
 }

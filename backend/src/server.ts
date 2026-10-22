@@ -29,6 +29,7 @@ import { internalConversationRouter } from "./routes/internal-conversation.route
 import { calendarEventRouter } from "./routes/calendar-event.routes.js";
 import { scheduledMessageRouter } from "./routes/scheduled-message.routes.js";
 import { clientRouter } from "./routes/client-profile.routes.js";
+import { apiTokenRouter } from "./routes/api-token.routes.js";
 import { startScheduledMessageWorker } from "./services/scheduled-message.service.js";
 import { createContactTypingPresence } from "./services/contact-typing.service.js";
 
@@ -52,6 +53,7 @@ app.use(express.json({ limit: "250mb" }));
 // Registra as rotas da aplicação.
 app.use("/api", webhookRoutes);
 app.use("/api", invitationRouter);
+app.use("/api", apiTokenRouter);
 app.use("/api", requireAuth, organizationRouter);
 app.use("/api", requireAuth, evolutionRouter);
 app.use("/api", requireAuth, contactRouter);

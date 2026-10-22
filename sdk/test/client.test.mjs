@@ -119,3 +119,31 @@ test("respeita baseUrl terminada em /api e credentials customizadas", async () =
   assert.equal(request.url, "https://api.example.test/api/ai/rewrite");
   assert.equal(request.init.credentials, "same-origin");
 });
+
+test("envia token de API como autorização e usa credentials omit por padrão", async () => {
+  const requests = [];
+  const client = new CotrimBotClient({
+    baseUrl: "https://api.example.test",
+    token: "cbt_example-token",
+    fetch: async (url, init) => {
+      requests.push({ url, init });
+      return Response.json({});
+    },
+  });
+  await client.contacts.list();
+  assert.equal(new Headers(requests[0].init.headers).get("authorization"), ["Bearer ", "cbt_example-token"].join(""));
+  assert.equal(requests[0].init.credentials, "omit");
+});
+
+test("expõe gerenciamento de tokens sob sessão Better Auth", async () => {
+  const { client, requests } = mockedClient();
+  await client.apiTokens.list();
+  await client.apiTokens.create("Integração");
+  await client.apiTokens.revoke("token-id");
+  assert.deepEqual(requests.map(({ url, init }) => [new URL(url).pathname, init.method ?? "GET"]), [
+    ["/api/tokens", "GET"],
+    ["/api/tokens", "POST"],
+    ["/api/tokens/token-id", "DELETE"],
+  ]);
+  assert.deepEqual(JSON.parse(requests[1].init.body), { name: "Integração" });
+});
