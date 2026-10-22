@@ -60,6 +60,7 @@ export type Message = {
   favorited?: boolean;
   deletedAt?: string | null;
   viewOnce?: boolean;
+  isVoiceMessage?: boolean | null;
 
   // Contato ao qual a mensagem pertence.
   contactId: number;

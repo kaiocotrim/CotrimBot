@@ -10,6 +10,7 @@ type AudioMessageProps = {
   mediaUrl: string;
   messageId: number;
   onTranscribe?: (messageId: number) => Promise<string>;
+  variant?: "voice" | "file";
 };
 
 const PLAYBACK_RATES = [1, 1.5, 2] as const;
@@ -24,7 +25,8 @@ function formatTime(seconds: number) {
   return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 }
 
-export function AudioMessage({ mediaUrl, messageId, onTranscribe }: AudioMessageProps) {
+export function AudioMessage({ mediaUrl, messageId, onTranscribe, variant = "voice" }: AudioMessageProps) {
+  const isFile = variant === "file";
   const audioRef = useRef<HTMLAudioElement>(null);
 
   // Player
@@ -122,12 +124,14 @@ export function AudioMessage({ mediaUrl, messageId, onTranscribe }: AudioMessage
 
       <div>
         {/* Player */}
-        <div className="flex items-center gap-3.5">
+        <div className={`flex items-center ${isFile ? "gap-3" : "gap-3.5"}`}>
           <button
             type="button"
             onClick={handlePlayPause}
             aria-label={isPlaying ? "Pausar áudio" : "Reproduzir áudio"}
-            className="
+            className={isFile
+              ? "flex size-10 shrink-0 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.08] text-zinc-100 shadow-sm transition duration-200 hover:bg-white/[0.14] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 motion-reduce:transition-none"
+              : `
               flex size-11 shrink-0 items-center justify-center
               rounded-full bg-white/10 text-white
               transition duration-200 ease-out
@@ -136,7 +140,7 @@ export function AudioMessage({ mediaUrl, messageId, onTranscribe }: AudioMessage
               focus-visible:ring-white/60 focus-visible:ring-offset-2
               focus-visible:ring-offset-zinc-900
               motion-reduce:transition-none
-            "
+            `}
           >
             {isPlaying ? (
               <svg viewBox="0 0 24 24" fill="currentColor" className="size-4" aria-hidden="true">
@@ -150,12 +154,13 @@ export function AudioMessage({ mediaUrl, messageId, onTranscribe }: AudioMessage
           </button>
 
           <div className="min-w-0 flex-1">
+            {isFile && <p className="mb-0.5 text-[11px] font-medium tracking-[0.01em] text-zinc-300">Arquivo de áudio</p>}
             {/* Barra de progresso */}
             <div className="group relative flex h-6 items-center">
-              <div className="pointer-events-none absolute inset-x-0 h-1 rounded-full border border-white/15 bg-white/10 shadow-inner" />
+              <div className={`pointer-events-none absolute inset-x-0 rounded-full ${isFile ? "h-[3px] bg-white/[0.12]" : "h-1 border border-white/15 bg-white/10 shadow-inner"}`} />
 
               <div
-                className="pointer-events-none absolute left-0 h-1 rounded-full bg-white/90"
+                className={`pointer-events-none absolute left-0 rounded-full ${isFile ? "h-[3px] bg-zinc-200" : "h-1 bg-white/90"}`}
                 style={{ width: `${progress}%` }}
               />
 
@@ -173,7 +178,9 @@ export function AudioMessage({ mediaUrl, messageId, onTranscribe }: AudioMessage
               />
 
               <div
-                className="
+                className={isFile
+                  ? "pointer-events-none absolute size-2.5 -translate-x-1/2 rounded-full bg-zinc-100 shadow-sm ring-2 ring-zinc-800 transition-[box-shadow,scale] duration-150 group-hover:scale-110 peer-focus-visible:ring-white/40 motion-reduce:transition-none"
+                  : `
                   pointer-events-none absolute size-3.5 -translate-x-1/2
                   rounded-full bg-white shadow-md shadow-black/30
                   opacity-100 scale-100
@@ -184,21 +191,28 @@ export function AudioMessage({ mediaUrl, messageId, onTranscribe }: AudioMessage
                   peer-focus-visible:ring-2 peer-focus-visible:ring-white/50
                   peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-zinc-900
                   motion-reduce:transition-none
-                "
+                `}
                 style={{ left: `${progress}%` }}
               />
             </div>
 
             {/* Tempo */}
             <div className="mt-0.5 flex items-center justify-between text-[11px] tabular-nums text-white/55">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
+              <span>{formatTime(isFile && !isPlaying && currentTime === 0 ? duration : currentTime)}</span>
+              {!isFile && <span>{formatTime(duration)}</span>}
             </div>
           </div>
+          {isFile && (
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.04] text-zinc-400" aria-hidden="true">
+              <svg className="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 14v-3a8 8 0 0 1 16 0v3M6 13H4a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1ZM18 13h2a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1Z" />
+              </svg>
+            </div>
+          )}
         </div>
 
         {/* Ações */}
-        <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3">
+        {!isFile && <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3">
           {!transcription ? (
             <button
               type="button"
@@ -286,7 +300,7 @@ export function AudioMessage({ mediaUrl, messageId, onTranscribe }: AudioMessage
             {/* Configurações do Whisper */}
             <TranscriptionSettings disabled={transcribing} />
           </div>
-        </div>
+        </div>}
 
         {/* Transcrição (abre e fecha com transição suave) */}
         <div

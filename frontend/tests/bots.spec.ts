@@ -7,6 +7,9 @@ for (const width of [1440, 390]) {
     const saved: Record<string, unknown>[] = [];
     const errors: string[] = [];
     page.on("pageerror", error => errors.push(error.message));
+    page.on("console", message => {
+      if (message.type() === "error" && message.text().includes('unique "key"')) errors.push(message.text());
+    });
     await page.route("**/api/**", async route => {
       const path = new URL(route.request().url()).pathname;
       if (path.endsWith("/auth/get-session")) {

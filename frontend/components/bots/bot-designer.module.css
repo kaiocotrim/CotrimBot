@@ -34,8 +34,9 @@
 .amber { color: #b8ad98; background: #ffffff04; }
 .blue, .purple, .red { color: #d4d4d8; background: #ffffff08; }
 .tabs { display: flex; gap: 8px; }
-.tab { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 9px 22px; margin-bottom: 10px; border-radius: 12px; color: #71717a; }
-.tab[aria-selected="true"] { color: #f4f4f5; background: #191919; }
+.tab { position: relative; isolation: isolate; display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 9px 22px; margin-bottom: 10px; border-radius: 12px; color: #71717a; }
+.tab[aria-selected="true"] { color: #f4f4f5; }
+.tabHighlight { position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: #191919; pointer-events: none; }
 .notice { display: flex; align-items: center; gap: 10px; margin: 10px 12px 0; padding: 10px 14px; border: 1px solid var(--line); background: #111; border-radius: 14px; }
 .notice p { flex: 1; }
 .notice button { padding: 4px; }

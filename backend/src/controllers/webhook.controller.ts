@@ -574,6 +574,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
       content,
       direction: fromMe ? "OUTGOING" : "INCOMING",
       type: messageType,
+      ...(messageType === "AUDIO" ? { isVoiceMessage: data.message.audioMessage.ptt === true } : {}),
       ...(messageType === "CONTACT" ? { sharedContacts } : {}),
       ...(poll ? { poll } : {}),
       contactId: contact.id,

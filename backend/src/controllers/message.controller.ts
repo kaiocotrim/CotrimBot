@@ -411,9 +411,11 @@ export async function sendMediaToContact(
     }
 
     // Salva a mídia no histórico local.
+    const audioMetadata = messageType === "AUDIO" ? { isVoiceMessage: false } : {};
     const message = await prisma.message.upsert({
       where: { externalId },
       update: {
+        ...audioMetadata,
         content,
         sentByUserId: req.user!.id,
         quotedExternalId: quotedMessage?.externalId ?? null,
@@ -422,6 +424,7 @@ export async function sendMediaToContact(
         quotedSenderName,
       },
       create: {
+        ...audioMetadata,
         externalId,
         content,
         direction: "OUTGOING",

@@ -168,6 +168,7 @@ model Message {
   favorited               Boolean          @default(false)
   deletedAt               DateTime?
   viewOnce                Boolean          @default(false)
+  isVoiceMessage          Boolean?
   quotedExternalId        String?
   quotedMessageId         Int?
   quotedContent           String?          @db.Text

@@ -108,6 +108,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
   const canTranslate = message.type === "TEXT" && !message.deletedAt && Boolean(translationSource.trim());
   const translation = getTranslation(message.id, translationSource);
   const isAudio = message.type === "AUDIO";
+  const isAudioFile = isAudio && message.isVoiceMessage === false;
   const isImage = message.type === "IMAGE";
   const isVideo = message.type === "VIDEO";
   const isSticker = message.type === "STICKER";
@@ -137,6 +138,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
         return <AudioMessage
           mediaUrl={mediaUrl}
           messageId={message.id}
+          variant={isAudioFile ? "file" : "voice"}
         />
       case "IMAGE":
         return <ImageMessage
@@ -408,7 +410,9 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           : message.type === "CONTACT"
           ? "rounded-[20px] bg-zinc-800 p-3"
           : isAudio
-          ? "relative w-[min(380px,70vw)] overflow-visible sm:w-[min(380px,62vw)] rounded-[24px] bg-zinc-800 px-3.5 py-3"
+          ? isAudioFile
+            ? "relative w-[min(380px,70vw)] overflow-visible sm:w-[min(380px,62vw)] rounded-[24px] bg-zinc-800 px-3.5 py-3 shadow-[0_3px_12px_rgba(0,0,0,0.12)]"
+            : "relative w-[min(380px,70vw)] overflow-visible sm:w-[min(380px,62vw)] rounded-[24px] bg-zinc-800 px-3.5 py-3"
           : isVideo
             ? `rounded-[20px] p-[3px] shadow-[0_3px_12px_rgba(0,0,0,0.16)] bg-zinc-800`
           : isImage
@@ -697,7 +701,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
         </motion.p>
       )}
       {!inlineTime && timestamp && (
-        <div className={`flex items-center justify-end gap-0.5 ${isSticker ? "absolute right-1 bottom-1 rounded-md bg-black/55 px-1.5 py-0.5 shadow-sm backdrop-blur-sm" : (isImage && !imageHasCaption) || (isVideo && message.content === "[Vídeo]") ? "absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-0.5 shadow-sm backdrop-blur-[2px]" : isImage || isVideo ? "px-2 pt-0.5 pb-1" : "-mr-1 -mb-1 mt-1"}`}>
+        <div className={`flex items-center justify-end gap-0.5 ${isAudioFile ? "absolute right-[66px] bottom-2" : isSticker ? "absolute right-1 bottom-1 rounded-md bg-black/55 px-1.5 py-0.5 shadow-sm backdrop-blur-sm" : (isImage && !imageHasCaption) || (isVideo && message.content === "[Vídeo]") ? "absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-0.5 shadow-sm backdrop-blur-[2px]" : isImage || isVideo ? "px-2 pt-0.5 pb-1" : "-mr-1 -mb-1 mt-1"}`}>
           <AnimatePresence initial={false}>
             {message.pinned && (
               <motion.span key="pinned-footer" initial={reduceMotion ? false : { opacity: 0, rotate: -35, scale: 0.4 }} animate={{ opacity: 1, rotate: 0, scale: 1 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, rotate: 25, scale: 0.5 }} transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 650, damping: 20 }} className="flex text-amber-300" title="Mensagem fixada">
