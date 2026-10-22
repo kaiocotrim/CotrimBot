@@ -40,7 +40,7 @@ export async function requireAuth(request: Request, response: Response, next: Ne
     return;
   }
 
-  const user = await authenticateApiToken(request.headers.authorization, prisma);
+  const user = await authenticateApiToken(request.headers.authorization, prisma, process.env.BETTER_AUTH_SECRET!);
   if (!user) {
     response.status(401).json({ error: "Não autenticado." });
     return;

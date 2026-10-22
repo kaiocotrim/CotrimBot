@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { authenticateApiToken, createApiToken, hashApiToken } from "../src/services/api-token.js";
 
+const testSecret = "token-test-pepper";
+
 function userRecord(input: { banned?: boolean | null; banExpires?: Date | null } = {}) {
   return {
     id: "user-1",
@@ -15,21 +17,22 @@ function userRecord(input: { banned?: boolean | null; banExpires?: Date | null }
   };
 }
 
-test("creates unique opaque API tokens and stores only a stable SHA-256 hash", () => {
-  const first = createApiToken();
-  const second = createApiToken();
+test("creates unique opaque tokens and stores a keyed hash rather than the secret", () => {
+  const first = createApiToken(testSecret);
+  const second = createApiToken(testSecret);
 
   assert.match(first.token, /^cbt_[A-Za-z0-9_-]{43}$/);
   assert.equal(first.tokenPrefix, first.token.slice(0, 12));
-  assert.equal(first.tokenHash, hashApiToken(first.token));
+  assert.equal(first.tokenHash, hashApiToken(first.token, testSecret));
   assert.notEqual(first.token, first.tokenHash);
+  assert.notEqual(first.tokenHash, hashApiToken(first.token, "different-test-pepper"));
   assert.notEqual(first.token, second.token);
-  assert.equal(hashApiToken("invalid"), null);
-  assert.equal(hashApiToken("cbt_invalid/"), null);
+  assert.equal(hashApiToken("invalid", testSecret), null);
+  assert.equal(hashApiToken("cbt_invalid/", testSecret), null);
 });
 
 test("authenticates valid, non-revoked API tokens and updates last use", async () => {
-  const created = createApiToken();
+  const created = createApiToken(testSecret);
   const user = userRecord({ banned: false });
   let lookup: unknown;
   let useUpdate: unknown;
@@ -46,7 +49,7 @@ test("authenticates valid, non-revoked API tokens and updates last use", async (
     },
   };
 
-  assert.equal(await authenticateApiToken(["Bearer ", created.token].join(""), database), user);
+  assert.equal(await authenticateApiToken(["Bearer ", created.token].join(""), database, testSecret), user);
   assert.deepEqual(lookup, {
     where: { tokenHash: created.tokenHash, revokedAt: null },
     include: { user: true },
@@ -56,7 +59,7 @@ test("authenticates valid, non-revoked API tokens and updates last use", async (
 });
 
 test("rejects missing, malformed, revoked, and banned API tokens", async () => {
-  const created = createApiToken();
+  const created = createApiToken(testSecret);
   let databaseCalls = 0;
   const database = {
     apiToken: {
@@ -68,11 +71,11 @@ test("rejects missing, malformed, revoked, and banned API tokens", async () => {
     },
   };
 
-  assert.equal(await authenticateApiToken(undefined, database), null);
-  assert.equal(await authenticateApiToken("Basic value", database), null);
-  assert.equal(await authenticateApiToken("Not a token", database), null);
+  assert.equal(await authenticateApiToken(undefined, database, testSecret), null);
+  assert.equal(await authenticateApiToken("Basic value", database, testSecret), null);
+  assert.equal(await authenticateApiToken("Not a token", database, testSecret), null);
   assert.equal(databaseCalls, 0);
-  assert.equal(await authenticateApiToken(["Bearer ", created.token].join(""), database), null);
+  assert.equal(await authenticateApiToken(["Bearer ", created.token].join(""), database, testSecret), null);
 
   const bannedDatabase = {
     apiToken: {
@@ -80,7 +83,7 @@ test("rejects missing, malformed, revoked, and banned API tokens", async () => {
       updateMany: async () => ({ count: 1 }),
     },
   };
-  assert.equal(await authenticateApiToken(["Bearer ", created.token].join(""), bannedDatabase), null);
+  assert.equal(await authenticateApiToken(["Bearer ", created.token].join(""), bannedDatabase, testSecret), null);
 
   const revokedDuringAuthentication = {
     apiToken: {
@@ -88,5 +91,5 @@ test("rejects missing, malformed, revoked, and banned API tokens", async () => {
       updateMany: async () => ({ count: 0 }),
     },
   };
-  assert.equal(await authenticateApiToken(["Bearer ", created.token].join(""), revokedDuringAuthentication), null);
+  assert.equal(await authenticateApiToken(["Bearer ", created.token].join(""), revokedDuringAuthentication, testSecret), null);
 });

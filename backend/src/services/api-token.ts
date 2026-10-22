@@ -1,23 +1,23 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 
 const TOKEN_PREFIX = "cbt_";
 const TOKEN_SECRET_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 export const MAX_API_TOKENS_PER_USER = 20;
 
-export function createApiToken() {
+export function createApiToken(secret: string) {
   const token = `${TOKEN_PREFIX}${randomBytes(32).toString("base64url")}`;
   return {
     token,
-    tokenHash: hashApiToken(token)!,
+    tokenHash: hashApiToken(token, secret)!,
     tokenPrefix: token.slice(0, 12),
   };
 }
 
-export function hashApiToken(token: string): string | null {
+export function hashApiToken(token: string, secret: string): string | null {
   if (!token.startsWith(TOKEN_PREFIX)) return null;
-  const secret = token.slice(TOKEN_PREFIX.length);
-  if (!TOKEN_SECRET_PATTERN.test(secret)) return null;
-  return createHash("sha256").update(token).digest("hex");
+  const tokenSecret = token.slice(TOKEN_PREFIX.length);
+  if (!TOKEN_SECRET_PATTERN.test(tokenSecret)) return null;
+  return createHmac("sha256", secret).update(token).digest("hex");
 }
 
 interface ApiTokenUser {
@@ -48,9 +48,10 @@ interface ApiTokenAuthDatabase<T extends ApiTokenUser> {
 export async function authenticateApiToken<T extends ApiTokenUser>(
   authorization: string | undefined,
   database: ApiTokenAuthDatabase<T>,
+  secret: string,
 ): Promise<T | null> {
   if (!authorization?.startsWith("Bearer ")) return null;
-  const tokenHash = hashApiToken(authorization.slice("Bearer ".length));
+  const tokenHash = hashApiToken(authorization.slice("Bearer ".length), secret);
   if (!tokenHash) return null;
 
   const record = await database.apiToken.findFirst({

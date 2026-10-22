@@ -57,7 +57,8 @@ revogação exigem a sessão por cookie; não é possível usar um token para cr
 gerenciar outros tokens. Trate tokens como senhas, armazene-os em um secret
 manager e revogue-os quando não forem mais necessários. O SDK usa
 `credentials: "omit"` por padrão quando `token` é informado; é possível
-sobrescrever em `credentials`.
+sobrescrever em `credentials`. A rotação de `BETTER_AUTH_SECRET` invalida os
+tokens existentes.
 
 As opções são:
 

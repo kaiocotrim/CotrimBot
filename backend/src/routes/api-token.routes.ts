@@ -28,7 +28,7 @@ apiTokenRouter.post("/tokens", async (request, response) => {
     return response.status(409).json({ error: "Limite de tokens ativos atingido." });
   }
 
-  const generated = createApiToken();
+  const generated = createApiToken(process.env.BETTER_AUTH_SECRET!);
   const token = await prisma.apiToken.create({
     data: {
       userId: request.user!.id,
