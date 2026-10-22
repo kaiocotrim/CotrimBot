@@ -129,6 +129,7 @@ export class CotrimBotClient {
   private readonly fetcher: typeof fetch;
   private readonly defaultHeaders: Headers;
   private readonly credentials: RequestCredentials;
+  private authToken?: string;
 
   constructor(options: CotrimBotClientOptions) {
     if (!options.baseUrl.trim()) throw new TypeError("Informe a URL base do backend CotrimBot.");
@@ -137,13 +138,18 @@ export class CotrimBotClient {
     this.apiUrl = baseUrl.endsWith("/api") ? baseUrl : `${baseUrl}/api`;
     this.fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.defaultHeaders = new Headers(options.headers);
-    if (options.token) this.defaultHeaders.set("Authorization", "Bearer " + options.token);
+    this.authToken = options.token;
     this.credentials = options.credentials ?? (options.token ? "omit" : "include");
 
     this.auth = {
       signInEmail: (input) => this.json("/auth/sign-in/email", "POST", input),
-      signOut: () => this.json("/auth/sign-out", "POST", {}),
+      signOut: async () => {
+        const result = await this.json("/auth/sign-out", "POST", {});
+        this.authToken = undefined;
+        return result;
+      },
       getSession: () => this.request("/auth/get-session"),
+      getToken: () => this.authToken,
       setActiveOrganization: (organizationId) =>
         this.json("/auth/organization/set-active", "POST", { organizationId }),
     };
@@ -325,17 +331,13 @@ export class CotrimBotClient {
       delete: (id) => this.json(`/clients/${encode(id)}`, "DELETE"),
     };
 
-    this.apiTokens = {
-      list: () => this.request("/tokens"),
-      create: (name) => this.json("/tokens", "POST", { name }),
-      revoke: (id) => this.json(`/tokens/${encode(id)}`, "DELETE"),
-    };
   }
 
   readonly auth: {
     signInEmail(input: { email: string; password: string }): Promise<unknown>;
     signOut(): Promise<unknown>;
     getSession(): Promise<unknown>;
+    getToken(): string | undefined;
     setActiveOrganization(organizationId: string): Promise<unknown>;
   };
   readonly contacts: {
@@ -467,11 +469,6 @@ export class CotrimBotClient {
     update(id: string, input: ClientProfileInput): Promise<{ client: ClientProfile }>;
     delete(id: string): Promise<void>;
   };
-  readonly apiTokens: {
-    list(): Promise<{ tokens: ApiTokenSummary[] }>;
-    create(name: string): Promise<ApiTokenCreated>;
-    revoke(id: string): Promise<void>;
-  };
 
   request<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
     return this.perform<T>(path, init, "json");
@@ -508,12 +505,17 @@ export class CotrimBotClient {
 
   private async perform<T>(path: string, init: RequestInit, responseType: "json" | "blob"): Promise<T> {
     const headers = new Headers(this.defaultHeaders);
+    if (this.authToken && !headers.has("authorization")) {
+      headers.set("Authorization", ["Bearer ", this.authToken].join(""));
+    }
     new Headers(init.headers).forEach((value, key) => headers.set(key, value));
     const response = await this.fetcher(`${this.apiUrl}${path.startsWith("/") ? path : `/${path}`}`, {
       ...init,
       headers,
       credentials: init.credentials ?? this.credentials,
     });
+    const newAuthToken = response.headers.get("set-auth-token");
+    if (newAuthToken) this.authToken = newAuthToken;
     if (!response.ok) {
       const text = await response.text();
       let body: unknown = text;
@@ -614,14 +616,4 @@ export interface ClientProfileInput {
   name: string;
   image: string | null;
   links: string[];
-}
-export interface ApiTokenSummary {
-  id: string;
-  name: string;
-  tokenPrefix: string;
-  createdAt: string;
-  lastUsedAt: string | null;
-}
-export interface ApiTokenCreated extends Omit<ApiTokenSummary, "lastUsedAt"> {
-  token: string;
 }

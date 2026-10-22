@@ -120,30 +120,37 @@ test("respeita baseUrl terminada em /api e credentials customizadas", async () =
   assert.equal(request.init.credentials, "same-origin");
 });
 
-test("envia token de API como autorização e usa credentials omit por padrão", async () => {
+test("envia sessão Better Auth como autorização e usa credentials omit por padrão", async () => {
   const requests = [];
   const client = new CotrimBotClient({
     baseUrl: "https://api.example.test",
-    token: "cbt_example-token",
+    token: "signed-session-token",
     fetch: async (url, init) => {
       requests.push({ url, init });
       return Response.json({});
     },
   });
   await client.contacts.list();
-  assert.equal(new Headers(requests[0].init.headers).get("authorization"), ["Bearer ", "cbt_example-token"].join(""));
+  assert.equal(new Headers(requests[0].init.headers).get("authorization"), ["Bearer ", "signed-session-token"].join(""));
   assert.equal(requests[0].init.credentials, "omit");
 });
 
-test("expõe gerenciamento de tokens sob sessão Better Auth", async () => {
-  const { client, requests } = mockedClient();
-  await client.apiTokens.list();
-  await client.apiTokens.create("Integração");
-  await client.apiTokens.revoke("token-id");
-  assert.deepEqual(requests.map(({ url, init }) => [new URL(url).pathname, init.method ?? "GET"]), [
-    ["/api/tokens", "GET"],
-    ["/api/tokens", "POST"],
-    ["/api/tokens/token-id", "DELETE"],
-  ]);
-  assert.deepEqual(JSON.parse(requests[1].init.body), { name: "Integração" });
+test("captures the session token returned by Better Auth, reuses it, and clears it on sign-out", async () => {
+  const requests = [];
+  const client = new CotrimBotClient({
+    baseUrl: "https://api.example.test",
+    fetch: async (url, init) => {
+      requests.push({ url, init });
+      if (requests.length === 1) {
+        return Response.json({ token: "session" }, { headers: { "set-auth-token": "signed-session-token" } });
+      }
+      return Response.json([]);
+    },
+  });
+  await client.auth.signInEmail({ email: "user@example.test", password: "password" });
+  assert.equal(client.auth.getToken(), "signed-session-token");
+  await client.contacts.list();
+  assert.equal(new Headers(requests[1].init.headers).get("authorization"), ["Bearer ", "signed-session-token"].join(""));
+  await client.auth.signOut();
+  assert.equal(client.auth.getToken(), undefined);
 });

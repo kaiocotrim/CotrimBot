@@ -263,7 +263,6 @@ model User {
   invitations Invitation[]
   messageDeletions MessageDeletion[]
   sentMessages     Message[]
-  apiTokens        ApiToken[]
   contactAssignments ContactAssignment[]
   notifications      Notification[]
   calendarEvents     CalendarEvent[]
@@ -293,20 +292,6 @@ model Session {
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model ApiToken {
-  id          String    @id @default(cuid())
-  userId      String
-  name        String    @db.VarChar(100)
-  tokenHash   String    @unique @db.Char(64)
-  tokenPrefix String    @db.VarChar(16)
-  createdAt   DateTime  @default(now())
-  lastUsedAt  DateTime?
-  revokedAt   DateTime?
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, revokedAt])
 }
 
 model Account {

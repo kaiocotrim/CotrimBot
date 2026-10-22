@@ -36,35 +36,34 @@ const client = new CotrimBotClient({
 });
 ```
 
-Para integrações backend-to-backend, crie um token na aplicação enquanto estiver
-autenticado por sessão e use-o no SDK:
+Para obter um token de sessão para chamadas server-to-server, autentique-se com
+Better Auth. O plugin disponibiliza o token no cabeçalho `set-auth-token`, que o
+SDK captura:
 
 ```ts
-const criado = await client.apiTokens.create("Integração ERP");
-// Armazene criado.token em um secret manager; ele só é exibido nesta resposta.
+await client.auth.signInEmail({ email, password });
+const sessionToken = client.auth.getToken();
 
 const integração = new CotrimBotClient({
   baseUrl: "https://backend.exemplo.com",
-  token: process.env.COTRIMBOT_API_TOKEN,
+  token: sessionToken,
 });
 await integração.contacts.list();
 ```
 
-Tokens não expiram automaticamente e são vinculados ao usuário Better Auth que
-os criou. A aplicação armazena apenas o hash, exibe o segredo uma única vez e
-permite listar/revogar tokens em `client.apiTokens`. A criação, listagem e
-revogação exigem a sessão por cookie; não é possível usar um token para criar ou
-gerenciar outros tokens. Trate tokens como senhas, armazene-os em um secret
-manager e revogue-os quando não forem mais necessários. O SDK usa
+O token é o token de sessão assinado pelo Better Auth, não uma chave
+permanente independente. Ele segue a duração, revogação e as políticas de sessão
+do backend; após expirar, autentique-se novamente. O SDK usa
 `credentials: "omit"` por padrão quando `token` é informado; é possível
-sobrescrever em `credentials`. A rotação de `BETTER_AUTH_SECRET` invalida os
-tokens existentes.
+sobrescrever em `credentials`. Proteja o token como uma credencial e não o
+exponha em código cliente ou logs.
 
 As opções são:
 
 - `baseUrl` (obrigatória): origem do backend.
-- `token`: token de API do usuário; enviado no cabeçalho `Authorization` com o
-  esquema Bearer.
+- `token`: token de sessão Better Auth; enviado no cabeçalho `Authorization`
+  usando o esquema Bearer. Se omitido, o SDK captura o cabeçalho
+  `set-auth-token` das respostas de autenticação.
 - `credentials`: encaminha credenciais de `fetch`. O padrão é `"include"` para
   sessões por cookie e `"omit"` ao configurar `token`.
 - `headers`: cabeçalhos enviados em todas as chamadas, por exemplo um
@@ -72,14 +71,16 @@ As opções são:
 - `fetch`: implementação alternativa de `fetch`, útil para testes ou ambientes
   com transporte customizado.
 
-O backend autentica a maioria das rotas por sessão em cookie Better Auth. O SDK
-inclui `client.auth.signInEmail`, `client.auth.signOut`, `client.auth.getSession`
-e `client.auth.setActiveOrganization`. O cadastro comum está desativado; contas
+O backend autentica a maioria das rotas por sessão em cookie Better Auth. O
+[plugin oficial para autenticação Bearer](https://better-auth.com/docs/plugins/bearer)
+permite autenticar requests com o token de sessão. O SDK inclui
+`client.auth.signInEmail`, `client.auth.signOut`, `client.auth.getSession`,
+`client.auth.getToken` e `client.auth.setActiveOrganization`. O cadastro comum está desativado; contas
 são criadas por convite. Convites podem ser consultados e aceitos sem sessão em
 `client.invitations`. O método `setActiveOrganization` atualiza a organização
 ativa da sessão, usada por rotas de bots e outras operações que dependem do
 contexto da empresa. As rotas de organizações também recebem o ID explicitamente.
-O token fornece autenticação para servidores sem depender de cookies; em
+O token de sessão fornece autenticação para servidores sem depender de cookies; em
 navegadores, as chamadas externas ainda precisam ser permitidas pela política
 CORS do backend.
 
@@ -190,7 +191,7 @@ do backend para integrações realtime; esse transporte não faz parte deste SDK
 
 | Namespace | Método | Rota HTTP |
 | --- | --- | --- |
-| `auth` | `signInEmail`, `signOut`, `getSession`, `setActiveOrganization` | Better Auth: `/auth/sign-in/email`, `/auth/sign-out`, `/auth/get-session`, `/auth/organization/set-active` |
+| `auth` | `signInEmail`, `signOut`, `getSession`, `getToken`, `setActiveOrganization` | Better Auth: `/auth/sign-in/email`, `/auth/sign-out`, `/auth/get-session`, `/auth/organization/set-active`; token `set-auth-token` exposto pelo plugin oficial |
 | `contacts` | `list`, `search`, `assignees`, `get`, `avatar`, `groupParticipants` | `GET /contacts`, `/contacts/search`, `/contacts/assignees`, `/contacts/:id`, `/contacts/:id/avatar`, `/contacts/:id/group-participants` |
 | `contacts` | `create`, `startConversation`, `subscribePresence` | `POST /contacts`, `/contacts/conversation`, `/contacts/:id/presence-subscription` |
 | `contacts` | `update`, `setSaved`, `setArchived`, `setPinned`, `setAssignment`, `setPriority` | `PATCH /contacts/:id`, `/contacts/:id/saved`, `/contacts/:id/archived`, `/contacts/:id/pinned`, `/contacts/:id/assignment`, `/contacts/:id/priority` |
@@ -220,7 +221,6 @@ do backend para integrações realtime; esse transporte não faz parte deste SDK
 | `calendarEvents` | `list`, `create`, `setCompleted`, `delete` | `GET|POST /calendar-events`, `PATCH /calendar-events/:id/completed`, `DELETE /calendar-events/:id` |
 | `scheduledMessages` | `list`, `create`, `delete` | `GET|POST /scheduled-messages`, `DELETE /scheduled-messages/:id` |
 | `clients` | `list`, `create`, `update`, `delete` | `GET|POST /clients`, `PUT|DELETE /clients/:id` |
-| `apiTokens` | `list`, `create`, `revoke` | `GET|POST /tokens`, `DELETE /tokens/:id` (gerenciamento exige sessão Better Auth) |
 
 As rotas da Evolution que gerenciam conexão/QR Code e as rotas de bots exigem
 perfil administrativo conforme as regras do backend. As rotas de organização,

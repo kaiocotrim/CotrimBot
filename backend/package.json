@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "test:bots": "tsc -p tsconfig.bot-tests.json && node --test .bot-test-dist/tests/bot-*.test.js",
-    "test:api-tokens": "node --import tsx --test tests/api-token.test.ts",
     "dev": "node scripts/dev.mjs",
     "build": "npm run prisma:generate && tsc",
     "prestart": "npm run prisma:deploy",
