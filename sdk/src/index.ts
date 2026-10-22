@@ -131,7 +131,8 @@ export class CotrimBotClient {
 
   constructor(options: CotrimBotClientOptions) {
     if (!options.baseUrl.trim()) throw new TypeError("Informe a URL base do backend CotrimBot.");
-    const baseUrl = options.baseUrl.replace(/\/+$/, "");
+    let baseUrl = options.baseUrl.trim();
+    while (baseUrl.endsWith("/")) baseUrl = baseUrl.slice(0, -1);
     this.apiUrl = baseUrl.endsWith("/api") ? baseUrl : `${baseUrl}/api`;
     this.fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.defaultHeaders = new Headers(options.headers);
