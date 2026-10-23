@@ -30,6 +30,16 @@ test("serializa JSON e envia autenticação por header", async () => {
   assert.deepEqual(JSON.parse(requests[0].init.body), { text: "Olá" });
 });
 
+test("usa os campos de payload esperados pelas rotas de mensagens e conversas", async () => {
+  const { client, requests } = mockedClient();
+  await client.messages.react(12, null);
+  await client.messages.delete(12, "everyone");
+  await client.internalConversations.addParticipants("org", "conversation", ["user-1"]);
+  assert.deepEqual(JSON.parse(requests[0].init.body), { reaction: "" });
+  assert.equal(requests[1].url, "https://api.example.test/api/messages/12?scope=everyone");
+  assert.deepEqual(JSON.parse(requests[2].init.body), { participantIds: ["user-1"] });
+});
+
 test("mapeia cada namespace às rotas do backend", async () => {
   const { client, requests } = mockedClient();
   await client.auth.getSession();
@@ -207,6 +217,78 @@ test("renova automaticamente a sessão revogada e repete a chamada uma vez", asy
   assert.equal(new URL(requests[2].url).pathname, "/api/auth/sign-in/email");
   assert.equal(new Headers(requests[3].init.headers).get("authorization"), ["Bearer ", "new-token"].join(""));
   assert.equal(client.auth.getToken(), "new-token");
+});
+
+test("restaura a organização ativa antes de repetir uma chamada após reautenticação", async () => {
+  const requests = [];
+  let signInCount = 0;
+  let botRequestCount = 0;
+  const client = new CotrimBotClient({
+    baseUrl: "https://api.example.test",
+    auth: { email: "user@example.test", password: "password" },
+    fetch: async (url, init) => {
+      requests.push({ url, init });
+      const path = new URL(url).pathname;
+      if (path.endsWith("/auth/sign-in/email")) {
+        signInCount += 1;
+        return Response.json({}, { headers: { "set-auth-token": `session-${signInCount}` } });
+      }
+      if (path.endsWith("/auth/organization/set-active")) return Response.json({});
+      if (path.endsWith("/bots")) {
+        botRequestCount += 1;
+        return botRequestCount === 1
+          ? Response.json({ error: "Não autenticado." }, { status: 401 })
+          : Response.json({ id: "bot-1" });
+      }
+      return Response.json({});
+    },
+  });
+
+  await client.auth.setActiveOrganization("chosen-org");
+  await client.bots.create({ name: "Bot", draft: {} });
+  assert.deepEqual(requests.map(({ url }) => new URL(url).pathname), [
+    "/api/auth/sign-in/email",
+    "/api/auth/organization/set-active",
+    "/api/bots",
+    "/api/auth/sign-in/email",
+    "/api/auth/organization/set-active",
+    "/api/bots",
+  ]);
+  assert.deepEqual(JSON.parse(requests[4].init.body), { organizationId: "chosen-org" });
+  assert.equal(new Headers(requests[4].init.headers).get("authorization"), ["Bearer ", "session-2"].join(""));
+});
+
+test("não repete a chamada se não conseguir restaurar a organização ativa", async () => {
+  const requests = [];
+  let organizationSelectionCount = 0;
+  let botRequestCount = 0;
+  const client = new CotrimBotClient({
+    baseUrl: "https://api.example.test",
+    auth: { email: "user@example.test", password: "password" },
+    fetch: async (url, init) => {
+      requests.push({ url, init });
+      const path = new URL(url).pathname;
+      if (path.endsWith("/auth/sign-in/email")) {
+        return Response.json({}, { headers: { "set-auth-token": `session-${requests.length}` } });
+      }
+      if (path.endsWith("/auth/organization/set-active")) {
+        organizationSelectionCount += 1;
+        return organizationSelectionCount === 1
+          ? Response.json({})
+          : Response.json({ error: "Sem acesso." }, { status: 403 });
+      }
+      if (path.endsWith("/bots")) {
+        botRequestCount += 1;
+        return Response.json({ error: "Não autenticado." }, { status: 401 });
+      }
+      return Response.json({});
+    },
+  });
+
+  await client.auth.setActiveOrganization("chosen-org");
+  await assert.rejects(client.bots.create({ name: "Bot", draft: {} }), { status: 403 });
+  assert.equal(botRequestCount, 1);
+  assert.equal(client.auth.getToken(), undefined);
 });
 
 test("logout explícito não inicia novamente o login automático", async () => {

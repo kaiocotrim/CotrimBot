@@ -132,6 +132,7 @@ export class CotrimBotClient {
   private readonly credentials: RequestCredentials;
   private readonly authCredentials?: { email: string; password: string };
   private authToken?: string;
+  private activeOrganizationId?: string;
   private automaticAuthEnabled: boolean;
   private authenticationPromise?: Promise<unknown>;
 
@@ -155,13 +156,17 @@ export class CotrimBotClient {
       signOut: async () => {
         const result = await this.json("/auth/sign-out", "POST", {}, true);
         this.authToken = undefined;
+        this.activeOrganizationId = undefined;
         this.automaticAuthEnabled = false;
         return result;
       },
       getSession: () => this.request("/auth/get-session"),
       getToken: () => this.authToken,
-      setActiveOrganization: (organizationId) =>
-        this.json("/auth/organization/set-active", "POST", { organizationId }),
+      setActiveOrganization: async (organizationId) => {
+        const result = await this.json("/auth/organization/set-active", "POST", { organizationId });
+        this.activeOrganizationId = organizationId;
+        return result;
+      },
     };
 
     this.contacts = {
@@ -199,7 +204,7 @@ export class CotrimBotClient {
       })),
       senderAvatar: (messageId) => this.request(`/messages/${encode(messageId)}/sender-avatar`),
       info: (messageId) => this.request(`/messages/${encode(messageId)}/info`),
-      react: (messageId, reaction) => this.json(`/messages/${encode(messageId)}/reaction`, "PUT", { reaction }),
+      react: (messageId, reaction) => this.json(`/messages/${encode(messageId)}/reaction`, "PUT", { reaction: reaction ?? "" }),
       updateFlags: (messageId, input) => this.json(`/messages/${encode(messageId)}/flags`, "PATCH", input),
       delete: (messageId, scope) => this.json(withQuery(`/messages/${encode(messageId)}`, { scope }), "DELETE"),
       transcribe: (messageId) => this.json(`/messages/${encode(messageId)}/transcribe`, "POST", {}),
@@ -313,7 +318,7 @@ export class CotrimBotClient {
       participants: (organizationId, conversationId) =>
         this.request(this.internalPath(organizationId, `/${encode(conversationId)}/participants`)),
       addParticipants: (organizationId, conversationId, userIds) =>
-        this.json(this.internalPath(organizationId, `/${encode(conversationId)}/participants`), "POST", { userIds }),
+        this.json(this.internalPath(organizationId, `/${encode(conversationId)}/participants`), "POST", { participantIds: userIds }),
     };
 
     this.invitations = {
@@ -351,7 +356,7 @@ export class CotrimBotClient {
     setActiveOrganization(organizationId: string): Promise<unknown>;
   };
   readonly contacts: {
-    list(query?: Query): Promise<unknown>;
+    list(query?: Query): Promise<Contact[]>;
     search(query: { query: string }): Promise<unknown>;
     assignees(): Promise<unknown>;
     get(id: number): Promise<Contact>;
@@ -370,7 +375,7 @@ export class CotrimBotClient {
   };
   readonly messages: {
     mediaLibrary(query?: Query): Promise<unknown>;
-    list(contactId: number, query?: MessagePageQuery): Promise<unknown>;
+    list(contactId: number, query?: MessagePageQuery): Promise<MessagePage>;
     favorites(contactId: number, query?: MessagePageQuery): Promise<unknown>;
     sendText(contactId: number, input: { text: string }): Promise<unknown>;
     sendPoll(contactId: number, input: PollCreateInput): Promise<unknown>;
@@ -384,8 +389,8 @@ export class CotrimBotClient {
     info(messageId: number): Promise<unknown>;
     react(messageId: number, reaction: string | null): Promise<unknown>;
     updateFlags(messageId: number, input: MessageFlagsInput): Promise<unknown>;
-    delete(messageId: number, scope?: "me" | "everyone"): Promise<unknown>;
-    transcribe(messageId: number): Promise<unknown>;
+    delete(messageId: number, scope: "me" | "everyone"): Promise<unknown>;
+    transcribe(messageId: number): Promise<TranscriptionResult>;
     sendMedia(contactId: number, input: FileUpload): Promise<unknown>;
   };
   readonly ai: {
@@ -416,7 +421,7 @@ export class CotrimBotClient {
     updateCallSettings(input: { rejectCall: boolean; msgCall: string }): Promise<unknown>;
   };
   readonly bots: {
-    list(): Promise<unknown>;
+    list(): Promise<{ bots: Bot[]; activeBotId: string | null; instanceAvailable: boolean }>;
     create(input: BotCreateInput): Promise<Bot>;
     update(id: string, input: BotUpdateInput): Promise<Bot>;
     publish(id: string, revision: number): Promise<Bot>;
@@ -565,12 +570,22 @@ export class CotrimBotClient {
   private async ensureAuthentication(): Promise<void> {
     if (!this.automaticAuthEnabled || !this.authCredentials || this.authToken) return;
     if (!this.authenticationPromise) {
-      this.authenticationPromise = this.json(
-        "/auth/sign-in/email",
-        "POST",
-        this.authCredentials,
-        true,
-      );
+      this.authenticationPromise = (async () => {
+        await this.json("/auth/sign-in/email", "POST", this.authCredentials, true);
+        if (this.activeOrganizationId) {
+          try {
+            await this.json(
+              "/auth/organization/set-active",
+              "POST",
+              { organizationId: this.activeOrganizationId },
+              true,
+            );
+          } catch (error) {
+            this.authToken = undefined;
+            throw error;
+          }
+        }
+      })();
     }
     try {
       await this.authenticationPromise;
@@ -586,15 +601,29 @@ export interface ContactCreateInput {
   companyName?: string;
   jobTitle?: string;
 }
-export type ContactUpdateInput = Partial<ContactCreateInput>;
+export interface ContactUpdateInput {
+  name: string;
+  phone?: string;
+  companyName?: string | null;
+  jobTitle?: string | null;
+}
 export interface MessagePageQuery {
   limit?: number;
   before?: number;
 }
+export interface MessagePage {
+  messages: Message[];
+  hasMore: boolean;
+  nextCursor: number | null;
+}
+export interface TranscriptionResult {
+  messageId: number;
+  transcription: string;
+}
 export interface PollCreateInput {
   question: string;
   options: string[];
-  selectableCount?: number;
+  selectableCount: number;
   [key: string]: JsonValue | undefined;
 }
 export interface MessageFlagsInput {
@@ -603,10 +632,10 @@ export interface MessageFlagsInput {
   favorited?: boolean;
 }
 export interface TranscriptionSettingsInput {
-  model?: string;
-  language?: string;
-  beam_size?: number;
-  vad_filter?: boolean;
+  model: string;
+  language: string;
+  beam_size: number;
+  vad_filter: boolean;
 }
 export interface PushSubscriptionInput {
   endpoint: string;

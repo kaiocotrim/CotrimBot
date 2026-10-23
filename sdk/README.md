@@ -49,7 +49,7 @@ const client = new CotrimBotClient({
   },
 });
 
-const { contacts } = await client.contacts.list(); // login automático na primeira chamada
+const contacts = await client.contacts.list(); // login automático na primeira chamada
 ```
 
 Se uma chamada retornar `401` por sessão expirada ou revogada, o SDK fará novo
@@ -97,7 +97,7 @@ CORS do backend.
 ### Listar contatos e mensagens
 
 ```ts
-const { contacts } = await client.contacts.list();
+const contacts = await client.contacts.list();
 const { messages } = await client.messages.list(contacts[0].id, {
   limit: 30,
 });
