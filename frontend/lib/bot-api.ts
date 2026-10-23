@@ -28,5 +28,5 @@ export async function botRequest<T>(path = "", body?: unknown, method = "POST"):
 }
 
 export function emptyFlow(): BotFlow {
-  return { rootMenuId: "root", invalidMessage: "Opção inválida. Selecione um dos números do menu.", backLabel: "Voltar", menus: [{ id: "root", name: "Menu principal", text: "", options: [] }] };
+  return { rootMenuId: "root", invalidMessage: "Opção inválida. Selecione um dos números do menu.", backLabel: "↩️ Menu principal", menus: [{ id: "root", name: "Menu principal", text: "", options: [] }] };
 }

@@ -100,7 +100,7 @@ export function advanceSacTest(state: BotState, input: string, catalog: SacTestC
     if (text === '2') { delete ticket.cancelPending; return reply('✅ Vamos continuar de onde paramos!'); }
     if (text !== '1') return reply('Opção inválida. Digite 1 para cancelar ou 2 para continuar.');
     const { sacTest: discarded, ...clean } = state;
-    return { state: { ...clean, stack: [] }, text: '❌ *Abertura de chamado cancelada.*\n\nOs dados do preenchimento foram descartados. Nenhum chamado foi aberto no SAC.\n\n0 — Voltar ao menu principal' };
+    return { state: { ...clean, stack: [] }, text: '❌ *Abertura de chamado cancelada.*\n\nOs dados do preenchimento foram descartados. Nenhum chamado foi aberto no SAC.\n\n0 — ↩️ Menu principal' };
   }
   if (text === '0' || text.toLocaleLowerCase('pt-BR') === 'cancelar') { ticket.cancelPending = true; return reply(); }
   if (/^abrir chamado$/i.test(text)) return reply('Você já está preenchendo um chamado. Continue abaixo ou digite cancelar.');
@@ -158,7 +158,7 @@ export function advanceSacTest(state: BotState, input: string, catalog: SacTestC
       const { sacTest: completed, ...clean } = state;
       return {
         state: { ...clean, stack: [] },
-        text: '✅ *Informações recebidas!*\n\nObrigado! O preenchimento foi concluído e o registro de teste foi salvo no CotrimBot.\n\n🧪 *Este atendimento está em modo de teste. Nenhum chamado foi aberto no SAC.*\n\n0 — 🏠 Voltar ao menu principal',
+        text: '✅ *Informações recebidas!*\n\nObrigado! O preenchimento foi concluído e o registro de teste foi salvo no CotrimBot.\n\n🧪 *Este atendimento está em modo de teste. Nenhum chamado foi aberto no SAC.*\n\n0 — ↩️ Menu principal',
         sacTestSubmission: { startMessageId: ticket.startMessageId, data: ticket.data },
       };
   }

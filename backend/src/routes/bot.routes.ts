@@ -163,7 +163,7 @@ botRouter.post("/bots/simulate", (req, res) => {
       if (state) messages.push({ role: "user", text: input });
       const result = advanceBot(state ? req.body.flow : testFlow, state, input);
       // Reexecutar o histórico do simulador nunca grava nem envia mensagens reais.
-      if (result.sacTestSubmission) result.text = '✅ Simulação concluída! Nenhum registro foi salvo e nenhum chamado foi aberto no SAC.\n\n0 — Voltar ao menu principal';
+      if (result.sacTestSubmission) result.text = '✅ Simulação concluída! Nenhum registro foi salvo e nenhum chamado foi aberto no SAC.\n\n0 — ↩️ Menu principal';
       state = result.state;
       const step = { menuId: state.menuId, status: state.status, ...(selectedOption ? { optionId: selectedOption.id } : {}) };
       steps.push(step);
