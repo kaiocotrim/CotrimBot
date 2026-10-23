@@ -5,6 +5,7 @@ import { advanceBot, type BotFlow, type BotState } from "./bot-flow.js";
 import { Prisma, type Prisma as PrismaTypes } from "../../generated/prisma/client.js";
 import { contactDisplayName } from "../utils/contact-name.js";
 import { isInforbotName } from "./bot.service.js";
+import { validSacTestSubmission } from './bot-sac-test.js';
 
 export async function lockBotContact(tx: Prisma.TransactionClient, contactId: number) {
   await tx.$queryRaw`SELECT id FROM Contact WHERE id = ${contactId} FOR UPDATE`;
@@ -47,16 +48,42 @@ return async function processBotMessage(messageId: number, instance: unknown) {
       const previous = savedSession && assignment && assignment.assignedAt > savedSession.updatedAt ? null : savedSession;
       if (previous && ["WAITING_HUMAN", "HUMAN_ACTIVE", "CLOSED"].includes(previous.status)) return;
       // Any incoming message can start service; menu choices require text.
-      if (previous && input.type !== "TEXT") return;
-      const state = previous?.botId === bot.id && previous.revision === bot.publishedRevision
+      if (previous && input.type !== "TEXT" && !(previous.state as unknown as BotState)?.sacTest) return;
+      let state = previous?.botId === bot.id && (previous.revision === bot.publishedRevision || (previous.state as unknown as BotState)?.sacTest)
         ? previous.state as unknown as BotState
         : null;
-      const result = advanceBot(bot.published as unknown as BotFlow, state, input.content);
+      // Coletas válidas sobrevivem à publicação de revisões; expiram por inatividade.
+      const configuredTtl = Number(process.env.SAC_TEST_SESSION_TTL_MINUTES ?? 1440);
+      const ttl = Number.isFinite(configuredTtl) && configuredTtl > 0 ? configuredTtl : 1440;
+      const expired = Boolean(state?.sacTest && previous?.updatedAt && Date.now() - previous.updatedAt.getTime() > ttl * 60000);
+      if (expired) state = null;
+      const flow = bot.published as unknown as BotFlow;
+      const selectedOption = flow.menus.find(menu => menu.id === state?.menuId)?.options.find(option => option.active && option.number === input.content.trim());
+      const needsCatalog = Boolean(state?.sacTest || selectedOption?.action === 'SAC_TEST');
+      const catalog = needsCatalog ? await tx.sacTestCompany.findMany({ include: { equipment: { orderBy: { id: 'asc' } }, addresses: { orderBy: { id: 'asc' } } }, orderBy: { id: 'asc' } }) : [];
+      const result = advanceBot(flow, state, input.content, { catalog, messageId: String(input.id), inputType: input.type });
+      if (expired) result.text = 'O preenchimento anterior expirou por inatividade. Inicie uma nova abertura pelo menu.\n\n' + result.text;
       const image = result.imageId ? await tx.botImage.findFirst({ where: { id: result.imageId, organizationId: bot.organizationId } }) : null;
       if (result.imageId && !image) throw new Error("Bot image not found");
       // Commit the unique claim independently BEFORE contacting Evolution. It survives
       // an ambiguous timeout/transaction rollback and prevents a later duplicate send.
       await database.botExecutionLog.create({ data: { messageId, botId: bot.id, outcome: "PROCESSING" } });
+      if (result.sacTestSubmission) {
+        const submission = result.sacTestSubmission;
+        if (!validSacTestSubmission(submission.data, catalog) || !/^\d+$/.test(submission.startMessageId)) throw new Error('Invalid test ticket submission');
+        // Um registro por início de fluxo, mesmo se houver repetição de confirmação.
+        try {
+          await tx.sacTestTicket.upsert({
+            where: { startMessageId: Number(submission.startMessageId) },
+            create: { organizationId: bot.organizationId, contactId: contact.id, botId: bot.id, startMessageId: Number(submission.startMessageId), confirmationMessageId: input.id, mode: 'TEST', data: submission.data },
+            update: {},
+          });
+        } catch {
+          // Não confirmar sucesso nem apagar a coleta quando a gravação falhar.
+          result.state = state!;
+          result.text = 'Não foi possível salvar o registro de teste. Seus dados foram mantidos.\n\n1 — Tentar salvar novamente\n2 — Corrigir informações\n0 — Solicitar cancelamento';
+        }
+      }
       const messages = [];
       if (!image || result.text.trim()) {
         const response = await send(contact.phone, result.text);

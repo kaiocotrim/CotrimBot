@@ -75,3 +75,9 @@ serviço no Compose. Os serviços da Evolution usam `EVOLUTION_API_URL`,
 requisição `multipart/form-data`, com `caption` opcional. Atualmente, o controller
 valida o contato e devolve os metadados do arquivo. O envio desse arquivo ao
 WhatsApp ainda precisa ser implementado.
+
+## Fluxo de abertura de chamados em modo de teste
+
+A ação **Abrir chamado (teste)** está disponível no editor e no simulador do bot.
+Ela usa o cadastro de demonstração e salva confirmações no MySQL, sem integrar o SAC.
+Veja [como configurar, publicar, testar e consultar os registros](docs/sac-test.md).

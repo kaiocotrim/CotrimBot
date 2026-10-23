@@ -1,8 +1,10 @@
-export type BotOption = { id: string; number: string; label: string; description?: string; active: boolean; action: "MESSAGE" | "SUBMENU" | "HUMAN" | "IMAGE" | "CLOSE"; response: string; targetMenuId: string; imageId?: string };
+import { advanceSacTest, startSacTest, SAC_TEST_CATALOG, type SacTestCatalog, type SacTestState, type SacTestSubmission } from './bot-sac-test.js';
+
+export type BotOption = { id: string; number: string; label: string; description?: string; active: boolean; action: "MESSAGE" | "SUBMENU" | "HUMAN" | "IMAGE" | "CLOSE" | "SAC_TEST"; response: string; targetMenuId: string; imageId?: string };
 export type BotMenu = { id: string; name: string; text: string; options: BotOption[]; imageId?: string };
 export type BotFlow = { rootMenuId: string; invalidMessage: string; backLabel: string; menus: BotMenu[]; layout?: Record<string, { x: number; y: number }> };
-export type BotState = { menuId: string; stack: string[]; status: "BOT_ACTIVE" | "WAITING_HUMAN" | "HUMAN_ACTIVE" | "CLOSED" };
-export type BotReply = { state: BotState; text: string; imageId?: string };
+export type BotState = { menuId: string; stack: string[]; status: "BOT_ACTIVE" | "WAITING_HUMAN" | "HUMAN_ACTIVE" | "CLOSED"; sacTest?: SacTestState };
+export type BotReply = { state: BotState; text: string; imageId?: string; sacTestSubmission?: SacTestSubmission };
 
 export function isProvisionalReply(text: string): boolean {
   return /^(?:fase\s+beta|teste|testando|em\s+breve)[\s.!…]*$/i.test(text.trim());
@@ -29,7 +31,7 @@ export function validateFlow(value: unknown, publish = false): asserts value is 
     for (const o of m.options) {
       if (!o || !string(o.id, 80) || !o.id || optionIds.has(o.id) || typeof o.number !== "string" || !/^[1-9]\d{0,2}$/.test(o.number)
         || numbers.has(o.number) || !string(o.label, 200) || o.description !== undefined && !string(o.description, 500) || !string(o.response, 8000)
-        || !string(o.targetMenuId, 80) || !image(o.imageId) || typeof o.active !== "boolean" || !["MESSAGE", "SUBMENU", "HUMAN", "IMAGE", "CLOSE"].includes(o.action)) fail("Opção inválida ou número duplicado. Use números de 1 a 999; 0 é reservado.");
+        || !string(o.targetMenuId, 80) || !image(o.imageId) || typeof o.active !== "boolean" || !["MESSAGE", "SUBMENU", "HUMAN", "IMAGE", "CLOSE", "SAC_TEST"].includes(o.action)) fail("Opção inválida ou número duplicado. Use números de 1 a 999; 0 é reservado.");
       numbers.add(o.number); optionIds.add(o.id);
       if (publish && o.active && (!o.label.trim() || (["MESSAGE", "HUMAN", "CLOSE"].includes(o.action) && !o.response.trim()))) fail("Preencha o nome e a resposta das opções ativas.");
       if (publish && o.active && o.action !== "SUBMENU" && isProvisionalReply(o.response)) fail(`Substitua a resposta provisória da opção ${o.number} — ${o.label} no menu "${m.name}" antes de publicar.`);
@@ -56,8 +58,14 @@ function menuReply(flow: BotFlow, state: BotState): BotReply {
   return { state, text: renderMenu(flow, state.menuId), ...(imageId ? { imageId } : {}) };
 }
 
-export function advanceBot(flow: BotFlow, state: BotState | null, input: string): BotReply {
+export function advanceBot(flow: BotFlow, state: BotState | null, input: string, context: { catalog?: SacTestCatalog; messageId?: string; inputType?: string } = {}): BotReply {
   if (state && state.status !== "BOT_ACTIVE") return { state, text: "" };
+  if (state?.sacTest) {
+    const result = advanceSacTest(state, input, context.catalog ?? SAC_TEST_CATALOG, context.inputType);
+    // Depois da conclusão/cancelamento, o comando 0 retorna ao menu principal.
+    if (!result.state.sacTest) result.state.menuId = flow.rootMenuId;
+    return result;
+  }
   if (!state || !flow.menus.some(m => m.id === state.menuId)) {
     return menuReply(flow, { menuId: flow.rootMenuId, stack: [], status: "BOT_ACTIVE" });
   }
@@ -68,6 +76,7 @@ export function advanceBot(flow: BotFlow, state: BotState | null, input: string)
   }
   const option = flow.menus.find(m => m.id === state.menuId)!.options.find(o => o.active && o.number === input.trim());
   if (!option) return { state, text: `${flow.invalidMessage}\n\n${renderMenu(flow, state.menuId)}` };
+  if (option.action === 'SAC_TEST') return startSacTest(state, context.messageId ?? 'simulation', context.catalog ?? SAC_TEST_CATALOG);
   if (option.action === "SUBMENU") {
     // Navigation advances once per client reply, so returning to a menu is safe.
     // Reuse its existing history instead of accumulating loops in the back stack.

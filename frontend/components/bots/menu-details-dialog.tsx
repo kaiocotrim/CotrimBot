@@ -52,7 +52,7 @@ export function MenuDetailsDialog({ menu, flow, path, onClose, onEdit, onNavigat
               <h3>Opções deste menu</h3>
               {menu.options.length ? <ul className={styles.menuDialogOptions}>{menu.options.map(option => {
                 const target = option.action === "SUBMENU" ? flow.menus.find(item => item.id === option.targetMenuId) : undefined;
-                const action = option.action === "SUBMENU" ? target ? `Abre o menu ${target.name}` : "Menu de destino não definido" : option.action === "CLOSE" ? "Encerra o atendimento" : option.action === "HUMAN" ? "Transfere para um atendente" : option.action === "IMAGE" || option.imageId ? "Envia uma imagem e a resposta cadastrada" : "Envia a resposta cadastrada";
+                const action = option.action === "SAC_TEST" ? "Coleta dados e salva um chamado de teste no CotrimBot, sem abrir chamado no SAC" : option.action === "SUBMENU" ? target ? `Abre o menu ${target.name}` : "Menu de destino não definido" : option.action === "CLOSE" ? "Encerra o atendimento" : option.action === "HUMAN" ? "Transfere para um atendente" : option.action === "IMAGE" || option.imageId ? "Envia uma imagem e a resposta cadastrada" : "Envia a resposta cadastrada";
                 return <li key={option.id}>
                   <span className={styles.menuDialogNumber}>{option.number}</span>
                   <div><strong>{option.label || "Opção sem nome"}</strong>{option.description && <p>{option.description}</p>}<p>{action}</p>{!option.active && <span className={styles.menuDialogInactive}>Inativa · não aparece para o cliente</span>}</div>

@@ -2,6 +2,53 @@ import { test, expect } from "@playwright/test";
 import type { BotFlow } from "../lib/bot-api";
 import { advanceBot, validateFlow } from "../../backend/src/services/bot-flow";
 
+test('opção de chamado de teste pode ser configurada e executada no simulador existente', async ({ page }) => {
+  const draft: BotFlow = { rootMenuId: 'root', backLabel: 'Voltar', invalidMessage: 'Escolha uma opção válida.', menus: [
+    { id: 'root', name: 'Principal', text: 'Suporte técnico', options: [
+      { id: 'ticket', number: '1', label: 'Abrir chamado', active: true, action: 'MESSAGE', response: 'Resposta anterior', targetMenuId: '' },
+    ] },
+  ] };
+  let saved: BotFlow | undefined;
+  await page.route('**/api/**', async route => {
+    const request = route.request(), path = new URL(request.url()).pathname;
+    if (path.endsWith('/auth/get-session')) return route.fulfill({ json: { user: { id: 'admin', name: 'Admin', email: 'admin@example.invalid' }, session: { id: 'session', userId: 'admin', activeOrganizationId: 'org', expiresAt: '2099-01-01T00:00:00Z' } } });
+    if (path.endsWith('/bots/demo') && request.method() === 'PUT') {
+      const body = request.postDataJSON(); validateFlow(body.draft, true); saved = body.draft;
+      return route.fulfill({ json: { ...body, id: 'demo', revision: 2, published: null } });
+    }
+    if (path.endsWith('/bots/simulate')) {
+      const body = request.postDataJSON();
+      let result = advanceBot(body.flow, null, '');
+      const messages = [{ role: 'bot', text: result.text }];
+      for (const input of body.inputs) {
+        messages.push({ role: 'user', text: input }); result = advanceBot(body.flow, result.state, input);
+        messages.push({ role: 'bot', text: result.text });
+      }
+      return route.fulfill({ json: { state: result.state, messages, quickReplies: ['0'] } });
+    }
+    if (path.endsWith('/bots')) return route.fulfill({ json: { bots: [{ id: 'demo', name: 'Suporte', draft, published: null, revision: 1 }], activeBotId: null, instanceAvailable: true } });
+    return route.fulfill({ json: {} });
+  });
+  await page.setViewportSize({ width: 1720, height: 1050 });
+  await page.goto('/dashboard/bots/');
+  await page.getByRole('button', { name: 'Editar opção 1: Abrir chamado', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Tipo de ação' }).selectOption('SAC_TEST');
+  await expect(page.getByText('Coleta CNPJ, nome, telefone', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: /^Salvar rascunho/ }).click();
+  await expect.poll(() => saved?.menus[0]?.options[0]?.action).toBe('SAC_TEST');
+  await page.getByRole('button', { name: 'Testar esta opção', exact: true }).click();
+  await expect(page.getByText('Você está em:', { exact: false })).toContainText('cnpj');
+  const composer = page.getByRole('textbox', { name: 'Mensagem de teste', exact: true });
+  for (const [input, step] of [
+    ['05540238000123', 'confirmCnpj'], ['1', 'requester'], ['Pessoa Teste', 'phone'], ['27999999999', 'address'],
+    ['1', 'email'], ['teste@example.com', 'equipment'], ['1', 'description'], ['Problema com scanner', 'review'],
+  ]) {
+    await composer.fill(input!); await page.getByRole('button', { name: 'Enviar mensagem de teste', exact: true }).click();
+    await expect(page.getByText('Você está em:', { exact: false })).toContainText(step!);
+  }
+  await expect(page.getByText('Resumo do chamado — TESTE', { exact: false })).toBeVisible();
+});
+
 test("botão direito na mensagem 4 cria o menu de opções ligado a ela", async ({ page }) => {
   const draft: BotFlow = { rootMenuId: "root", backLabel: "Voltar", invalidMessage: "Escolha uma opção válida.", menus: [
     { id: "root", name: "Principal", text: "Escolha o assunto", options: [
@@ -32,14 +79,14 @@ test("botão direito na mensagem 4 cria o menu de opções ligado a ela", async 
   await page.setViewportSize({ width: 1720, height: 1050 });
   await page.goto("/dashboard/bots/");
   await page.getByRole("button", { name: "Editar opção 1: Outro assunto", exact: true }).click();
-  await page.getByRole("button", { name: "Ajustar", exact: true }).click();
+  await page.getByRole("button", { name: "Tela cheia", exact: true }).click();
   const expanded = page.getByRole("dialog", { name: "Visualização ampliada do fluxo" });
   await expanded.getByRole("button", { name: "Editar opção 4: Problemas com scanner", exact: true }).click({ button: "right" });
   const context = page.getByRole("menu", { name: "Opções do fluxo" });
   await expect(context.getByRole("menuitem", { name: "Adicionar submenu", exact: true })).toHaveCount(0);
   await context.getByRole("menuitem", { name: "Menu de opções", exact: true }).click();
   await expect(context).toHaveCount(0);
-  await expect(expanded.getByRole("textbox", { name: "Nome do menu", exact: true })).toHaveValue("Menu da opção 4");
+  await expect(expanded.getByRole("textbox", { name: "Nome do menu", exact: true })).toHaveValue("Problemas com scanner");
   await expect(expanded.getByRole("textbox", { name: "Mensagem do submenu" })).toHaveValue("Qual problema ocorre no scanner?");
   await expect(expanded.getByRole("img", { name: "Prévia da imagem do bot" })).toHaveAttribute("src", /\/bots\/images\/scanner-photo$/);
   await expanded.getByRole("button", { name: /^Salvar rascunho/ }).click();
@@ -73,7 +120,7 @@ test("botão direito na mensagem 4 cria o menu de opções ligado a ela", async 
   await expanded.getByRole("combobox", { name: "Menu do fluxo" }).selectOption("root");
   await expanded.getByRole("button", { name: "Editar opção 4: Problemas com scanner", exact: true }).click({ button: "right" });
   await context.getByRole("menuitem", { name: "Abrir menu de opções", exact: true }).click();
-  await expect(expanded.getByRole("textbox", { name: "Nome do menu", exact: true })).toHaveValue("Menu da opção 4");
+  await expect(expanded.getByRole("textbox", { name: "Nome do menu", exact: true })).toHaveValue("Problemas com scanner");
 });
 
 for (const width of [1440, 390]) {
@@ -113,7 +160,7 @@ for (const width of [1440, 390]) {
     await expect(page.getByRole("status")).toContainText("Rascunho salvo");
     expect(saved).toHaveLength(1);
     expect((saved[0].draft as { menus: { options: { response: string }[] }[] }).menus[0].options[0].response).toContain("sac.infordoc.com.br");
-    await page.getByRole("button", { name: "Ajustar", exact: true }).click();
+    await page.getByRole("button", { name: "Tela cheia", exact: true }).click();
     const expandedFlow = page.getByRole("dialog", { name: "Visualização ampliada do fluxo" });
     await expect(expandedFlow).toBeVisible();
     await expect(expandedFlow.getByRole("region", { name: "Designer de fluxo" })).toBeVisible();
@@ -137,7 +184,7 @@ for (const width of [1440, 390]) {
     expect(editorCloseBounds!.x + editorCloseBounds!.width).toBeLessThanOrEqual(width);
     await page.screenshot({ path: testInfo.outputPath("bot-flow-expanded-editor.png") });
     await expandedEditor.getByRole("button", { name: "Criar menu de opções", exact: true }).click();
-    await expect(expandedEditor.getByRole("textbox", { name: "Nome do menu", exact: true })).toHaveValue("Menu da opção 1");
+    await expect(expandedEditor.getByRole("textbox", { name: "Nome do menu", exact: true })).toHaveValue("Ajuda para abrir chamado");
     await expect(expandedEditor.getByRole("textbox", { name: "Mensagem do submenu" })).toHaveValue("Resposta editada na tela ampliada.");
     await expandedEditor.getByRole("textbox", { name: "Mensagem do submenu" }).fill("Escolha o assunto do atendimento:");
     await expandedEditor.getByRole("button", { name: "Editar opções", exact: true }).click();
@@ -160,7 +207,7 @@ for (const width of [1440, 390]) {
     await page.screenshot({ path: testInfo.outputPath("bot-option-submenu.png") });
     await page.keyboard.press("Escape");
     await expect(expandedFlow).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Ajustar", exact: true })).toBeFocused();
+    await expect(page.getByRole("button", { name: "Tela cheia", exact: true })).toBeFocused();
     await expect(page.getByRole("textbox", { name: "Conteúdo da resposta" })).toHaveValue("Resposta do submenu.");
     await page.screenshot({ path: testInfo.outputPath("bot-editor.png"), fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
@@ -204,6 +251,7 @@ test("designer visual: selecionar nós, arrastar, salvar posições e abrir subm
   });
   await page.setViewportSize({ width: 1720, height: 1050 });
   await page.goto("/dashboard/bots/");
+  await page.getByRole('button', { name: 'Editar Mensagem', exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Mensagem inicial", exact: true })).toHaveValue(draft.menus[0].text);
   const menuList = page.getByRole("region", { name: "Menus do fluxo", exact: true });
   const scannerMenuButton = menuList.getByRole("button", { name: "Ver menu Menu principal › Scanner", exact: true });
@@ -240,7 +288,7 @@ test("designer visual: selecionar nós, arrastar, salvar posições e abrir subm
   await page.keyboard.press("Escape");
   await menuList.getByRole("button", { name: "Ver menu Menu principal", exact: true }).click();
   await rootDetails.getByRole("button", { name: "Editar menu", exact: true }).click();
-  await page.getByRole("button", { name: "Ajustar", exact: true }).click();
+  await page.getByRole("button", { name: "Tela cheia", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Visualização ampliada do fluxo" })).toBeVisible();
   const expandedMessage = page.locator('[data-flow-node="root:message"]');
   const canvasViewport = page.locator('[data-flow-viewport]');
@@ -256,7 +304,7 @@ test("designer visual: selecionar nós, arrastar, salvar posições e abrir subm
   await expandedMessage.click({ button: "right" });
   await contextMenu.getByRole("menuitem", { name: "Editar nó", exact: true }).click();
   await expect(page.getByRole("dialog").getByRole("textbox", { name: "Mensagem inicial", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Ocultar edição", exact: true }).click();
+  await page.getByRole('dialog', { name: 'Visualização ampliada do fluxo' }).getByRole("button", { name: "Ocultar edição", exact: true }).click();
   const zoomPoint = { x: beforePan.x + beforePan.width / 2, y: beforePan.y + beforePan.height / 2 };
   await page.mouse.move(zoomPoint.x, zoomPoint.y);
   await page.mouse.wheel(0, -120);
@@ -300,6 +348,7 @@ test("designer visual: selecionar nós, arrastar, salvar posições e abrir subm
   await expect(page.getByRole("textbox", { name: "Conteúdo da resposta" })).toHaveValue(draft.menus[0].options[0].response);
   await page.getByRole("button", { name: "Testar bot", exact: true }).click();
   await expect(page.getByRole("region", { name: "Simulador do bot" })).toContainText("https://sac.infordoc.com.br/");
+  await page.getByRole('button', { name: 'Fechar teste', exact: true }).click();
   await page.getByRole("button", { name: "Minimapa", exact: true }).click();
   await expect(page.getByRole("button", { name: "Navegar pelo minimapa" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("bot-designer-desktop.png"), fullPage: true });

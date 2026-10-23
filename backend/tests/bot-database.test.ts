@@ -12,6 +12,13 @@ test("MySQL: create bot, persist option CRUD/submenu, isolate organization and p
       const initial = fixture();
       const bot = await tx.bot.create({ data: { organizationId: org.id, name: "Infordoc test", draft: initial as unknown as Prisma.InputJsonValue, published: initial as unknown as Prisma.InputJsonValue } });
       assert.ok(bot.id);
+      const company = await tx.sacTestCompany.findUniqueOrThrow({ where: { cnpj: '05540238000123' }, include: { equipment: true, addresses: true } });
+      assert.equal(company.equipment[0]?.serial, 'HD370664');
+      assert.match(company.addresses[0]?.address ?? '', /CARIACICA - ES/);
+      const contact = await tx.contact.create({ data: { name: 'SAC test rollback', phone: `test-${randomUUID()}` } });
+      const ticket = await tx.sacTestTicket.create({ data: { organizationId: org.id, contactId: contact.id, botId: bot.id, startMessageId: -100, confirmationMessageId: -101, data: { description: 'Rollback test only' } } });
+      assert.equal(ticket.mode, 'TEST');
+      assert.equal(await tx.sacTestTicket.count({ where: { organizationId: 'another-organization', id: ticket.id } }), 0);
       const draft = structuredClone(initial);
       draft.menus[0]!.options.push({ ...draft.menus[0]!.options[0]!, id: "added", number: "5" });
       await tx.bot.update({ where: { id: bot.id }, data: { draft: draft as unknown as Prisma.InputJsonValue } });

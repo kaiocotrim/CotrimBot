@@ -42,7 +42,7 @@ botRouter.use("/bots", async (req, res, next) => {
   const botId = pathParts[1];
   const image = botId === "images" && pathParts[2] && !req.activeOrganizationId
     ? await prisma.botImage.findUnique({ where: { id: pathParts[2] }, select: { organizationId: true } }) : null;
-  const organizationId = req.activeOrganizationId || image?.organizationId || await resolveOrganization(req, botId === "images" ? undefined : botId);
+  const organizationId = req.activeOrganizationId || image?.organizationId || await resolveOrganization(req, ["images", "sac-test"].includes(botId ?? '') ? undefined : botId);
   if (!organizationId) return res.status(409).json({ message: "Não foi possível identificar a empresa do bot." });
   req.activeOrganizationId = organizationId;
   const member = await prisma.member.findUnique({ where: { organizationId_userId: { organizationId, userId: req.user!.id } } });
@@ -85,6 +85,13 @@ botRouter.post("/bots", async (req, res) => {
     if (typeof name !== "string" || !name.trim() || name.length > 100) throw new Error("Informe um nome de até 100 caracteres.");
     res.status(201).json(await prisma.bot.create({ data: { organizationId: req.activeOrganizationId!, name: name.trim(), draft: json(req.body.draft) } }));
   } catch (error) { res.status(400).json({ message: errorMessage(error) }); }
+});
+
+// Resultados acessíveis somente a administradores da empresa do chamado.
+botRouter.get('/bots/sac-test/tickets', async (req, res) => {
+  try {
+    res.json({ mode: 'TEST', tickets: await prisma.sacTestTicket.findMany({ where: { organizationId: req.activeOrganizationId! }, orderBy: { createdAt: 'desc' }, take: 100 }) });
+  } catch { res.status(503).json({ message: 'Não foi possível consultar os chamados de teste. Verifique as migrations e o banco.' }); }
 });
 
 botRouter.put("/bots/:id", async (req, res) => {
@@ -142,7 +149,7 @@ botRouter.post("/bots/simulate", (req, res) => {
     validateFlow(req.body?.flow);
     // Rebuild simulator state by replaying inputs; never trust client state pointers.
     const inputs: unknown = req.body?.inputs;
-    if (!Array.isArray(inputs) || inputs.length > 100 || inputs.some(v => typeof v !== "string" || v.length > 100)) throw new Error("Simulação inválida (máximo 100 passos).");
+    if (!Array.isArray(inputs) || inputs.length > 100 || inputs.some(v => typeof v !== "string" || v.length > 8000)) throw new Error("Simulação inválida (máximo 100 passos de 8000 caracteres).");
     const startMenuId: unknown = req.body?.startMenuId;
     if (startMenuId !== undefined && (typeof startMenuId !== "string" || !req.body.flow.menus.some((menu: { id: string }) => menu.id === startMenuId))) throw new Error("Menu inicial do teste inexistente.");
     // Only a menu ID may be chosen; status/history still come from server replay.
@@ -152,15 +159,22 @@ botRouter.post("/bots/simulate", (req, res) => {
     const steps: { menuId: string; optionId?: string; status: string }[] = [];
     for (const input of ["", ...inputs]) {
       if (state && state.status !== "BOT_ACTIVE") break;
-      const selectedOption = state && input.trim() !== "0" ? testFlow.menus.find((menu: { id: string }) => menu.id === state!.menuId)?.options.find((option: { active: boolean; number: string }) => option.active && option.number === input.trim()) : undefined;
+      const selectedOption = state && !state.sacTest && input.trim() !== "0" ? testFlow.menus.find((menu: { id: string }) => menu.id === state!.menuId)?.options.find((option: { active: boolean; number: string }) => option.active && option.number === input.trim()) : undefined;
       if (state) messages.push({ role: "user", text: input });
       const result = advanceBot(state ? req.body.flow : testFlow, state, input);
+      // Reexecutar o histórico do simulador nunca grava nem envia mensagens reais.
+      if (result.sacTestSubmission) result.text = '✅ Simulação concluída! Nenhum registro foi salvo e nenhum chamado foi aberto no SAC.\n\n0 — Voltar ao menu principal';
       state = result.state;
       const step = { menuId: state.menuId, status: state.status, ...(selectedOption ? { optionId: selectedOption.id } : {}) };
       steps.push(step);
       if (result.text || result.imageId) messages.push({ role: "bot", text: result.text, menuId: state.menuId, ...(selectedOption ? { optionId: selectedOption.id } : {}), ...(result.imageId ? { imageId: result.imageId } : {}) });
     }
-    res.json({ state, messages, steps });
+    const ticket = state?.sacTest;
+    const quickReplies = ticket ? ticket.cancelPending || ['confirmCnpj', 'review'].includes(ticket.step) ? ['1', '2', ...(ticket.cancelPending ? [] : ['0'])]
+      : ticket.step === 'edit' ? ['1', '2', '3', '4', '5', '6', '7', '8', '0']
+      : ['equipment', 'address'].includes(ticket.step) ? ['1', '0'] : ['0']
+      : [...(req.body.flow.menus.find((menu: { id: string }) => menu.id === state?.menuId)?.options.filter((option: { active: boolean }) => option.active).map((option: { number: string }) => option.number) ?? []), '0'];
+    res.json({ state, messages, steps, quickReplies });
   } catch (error) { res.status(400).json({ message: error instanceof Error ? error.message : "Simulação inválida." }); }
 });
 return botRouter;
