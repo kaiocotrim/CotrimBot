@@ -304,3 +304,24 @@ textarea.field { resize: vertical; min-height: 175px; line-height: 1.65; }
 .nodeType strong,
 .settingsPanel h2,
 .integrationPanel h3 { font-weight: 400; }
+.graphPanel { height: calc(100dvh - 92px); min-height: 650px; }
+.graphViewport { overflow: hidden; cursor: grab; }
+.graphViewport:active { cursor: grabbing; }
+.graphNode { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 1px solid; border-radius: 15px; background: #10151e; box-shadow: 0 4px 18px #0004; cursor: grab; touch-action: none; user-select: none; padding: 10px 15px; }
+.graphNode:hover { background: #161d29; }
+.graphNode.graphSelected { outline: 2px solid currentColor; outline-offset: 4px; }
+.graphNode.graphRunning { box-shadow: 0 0 0 5px #4ade8030; }
+.graphIcon { display: flex; align-items: center; justify-content: center; }
+.graphNodeTitle { width: 100%; font-size: 12px; font-weight: 400; color: #e2e8f0; text-align: center; line-height: 1.4; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.graphNode small { color: #8491a5; font-size: 10px; }
+.graphPort { position: absolute; z-index: 2; width: 13px; height: 13px; min-height: 13px; padding: 0; border-radius: 50%; border: 2px solid #0a0d13; background: currentColor; box-shadow: 0 0 0 1px currentColor; top: 50%; transform: translateY(-50%); }
+button.graphPort { cursor: crosshair; }
+button.graphPort:hover, button.graphPort:focus-visible { outline: 3px solid currentColor; outline-offset: 2px; }
+.graphInput { left: -7px; }
+.graphOutput { right: -7px; }
+.graphEdges { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.graphEdges path { fill: none; stroke-width: 1.8; }
+.graphEdges .graphEdgeHit { pointer-events: stroke; stroke: transparent; stroke-width: 16; cursor: pointer; }
+.graphEdges .graphEdgeHit:focus { stroke: #a78bfa33; outline: none; }
+.graphEdgeActions { position: absolute; top: 70px; left: 16px; z-index: 4; display: flex; gap: 6px; }
+@media (max-width: 699px) { .graphPanel { height: 650px; } .graphPanel .canvasToolbar { flex-wrap: wrap; } .graphPanel .canvasTools { flex-wrap: wrap; } .graphPanel .graphViewport { top: 114px; } .graphPanel .canvasHint { max-width: 230px; } }

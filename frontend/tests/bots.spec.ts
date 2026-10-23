@@ -1,6 +1,72 @@
 import { test, expect } from "@playwright/test";
 import type { BotFlow } from "../lib/bot-api";
 import { advanceBot, validateFlow } from "../../backend/src/services/bot-flow";
+import { connectBotOption, graphNodes } from '../lib/bot-graph';
+
+test('modelo visual preserva execução, rejeita destinos inválidos e ações terminais', () => {
+  const flow: BotFlow = { rootMenuId: 'root', invalidMessage: 'Opção inválida.', backLabel: 'Voltar', menus: [
+    { id: 'root', name: 'Principal', text: 'Olá', options: [{ id: 'terminal', number: '1', label: 'Encerrar', action: 'CLOSE', active: true, response: 'Até logo', targetMenuId: '' }] },
+  ] };
+  expect(() => connectBotOption(flow, 'terminal', 'root')).toThrow('não permite');
+  expect(() => connectBotOption(flow, 'terminal', 'inexistente')).toThrow('inexistente');
+  expect(graphNodes(flow).map(node => node.id)).toEqual(['graph:root:menu', 'graph:root:terminal']);
+});
+
+test('visão geral conecta pelos pontos, salva o fluxo e mantém a navegação do bot', async ({ page }, testInfo) => {
+  const original: BotFlow = { rootMenuId: 'root', invalidMessage: 'Opção inválida.', backLabel: 'Voltar', layout: { 'root:message': { x: 200, y: 100 } }, menus: [
+    { id: 'root', name: 'Principal', text: 'Olá! Escolha uma opção.', options: [{ id: 'ticket', number: '1', label: 'Suporte', action: 'MESSAGE', active: true, response: 'Resposta anterior', targetMenuId: '' }] },
+    { id: 'support', name: 'Atendimento', text: 'Como podemos ajudar?', options: [] },
+  ] };
+  let current = { id: 'graph-bot', name: 'TEC', draft: original, published: structuredClone(original), revision: 1 };
+  await page.route('**/api/**', async route => {
+    const req = route.request(), path = new URL(req.url()).pathname;
+    if (path.endsWith('/auth/get-session')) return route.fulfill({ json: { user: { id: 'admin', name: 'Admin', email: 'admin@example.invalid' }, session: { id: 'session', userId: 'admin', expiresAt: '2099-01-01T00:00:00Z' } } });
+    if (path.endsWith('/bots/graph-bot') && req.method() === 'PUT') { const body = req.postDataJSON(); validateFlow(body.draft, true); current = { ...current, ...body, revision: current.revision + 1 }; return route.fulfill({ json: current }); }
+    if (path.endsWith('/bots')) return route.fulfill({ json: { bots: [current], activeBotId: null, instanceAvailable: true } });
+    return route.fulfill({ json: {} });
+  });
+  await page.setViewportSize({ width: 1720, height: 1050 });
+  await page.goto('/dashboard/bots/');
+  const graph = page.getByRole('region', { name: 'Visão geral do fluxo', exact: true });
+  await expect(graph).toBeVisible();
+  const output = graph.getByRole('button', { name: 'Conectar saída da opção 1 de Principal', exact: true });
+  const input = graph.getByRole('button', { name: 'Entrada do menu Atendimento', exact: true });
+  const a = (await output.boundingBox())!, b = (await input.boundingBox())!;
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 12 }); await page.mouse.up();
+  await expect(page.getByRole('combobox', { name: 'Tipo de ação' })).toHaveValue('SUBMENU');
+  await page.getByRole('button', { name: /^Salvar rascunho/ }).click();
+  await expect.poll(() => current.draft.menus[0].options[0].targetMenuId).toBe('support');
+  expect(current.published).toEqual(original);
+  const reply = advanceBot(current.draft, advanceBot(current.draft, null, 'Oi').state, '1');
+  expect(reply.text).toContain('Como podemos ajudar?');
+  const node = graph.locator('[data-graph-node="graph:root:ticket"]');
+  const position = (await node.boundingBox())!;
+  await page.mouse.move(position.x + 70, position.y + 25); await page.mouse.down();
+  await page.mouse.move(position.x + 115, position.y + 55, { steps: 8 }); await page.mouse.up();
+  await page.getByRole('button', { name: /^Salvar rascunho/ }).click();
+  await expect.poll(() => current.draft.layout?.['graph:root:ticket']).toBeDefined();
+  expect(current.draft.layout?.['root:message']).toEqual({ x: 200, y: 100 });
+  await page.screenshot({ path: testInfo.outputPath('visao-geral-desktop.png'), fullPage: true });
+  await page.reload();
+  await expect(graph.getByRole('button', { name: 'Selecionar ligação Suporte para Atendimento', exact: true })).toBeVisible();
+  // Remover pela linha e reconectar pelos pontos com teclado.
+  await graph.getByRole('button', { name: 'Selecionar ligação Suporte para Atendimento', exact: true }).focus(); await page.keyboard.press('Enter');
+  await graph.getByRole('button', { name: 'Remover ligação', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Tipo de ação' })).toHaveValue('MESSAGE');
+  await output.focus(); await page.keyboard.press('Enter'); await input.focus(); await page.keyboard.press('Enter');
+  await expect(page.getByRole('combobox', { name: 'Tipo de ação' })).toHaveValue('SUBMENU');
+  await graph.getByRole('button', { name: 'Tela cheia', exact: true }).click();
+  const expanded = page.getByRole('dialog', { name: 'Visão geral ampliada', exact: true });
+  await expect(expanded).toBeVisible();
+  await expanded.getByRole('button', { name: 'Editar menu Principal', exact: true }).click();
+  await expect(expanded.getByRole('textbox', { name: 'Mensagem inicial', exact: true })).toHaveValue(original.menus[0].text);
+  await expanded.getByRole('button', { name: 'Fechar visão geral', exact: true }).click();
+  await expect(expanded).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.screenshot({ path: testInfo.outputPath('visao-geral-mobile.png'), fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
 
 test('aba Integrações salva quatro operações e exibe prévia de GET e POST', async ({ page }) => {
   let current: any = { id: 'integration-bot', name: 'SAC', revision: 1, published: null, draft: { rootMenuId: 'root', invalidMessage: 'Escolha uma opção.', backLabel: 'Voltar', menus: [{ id: 'root', name: 'Principal', text: 'Olá!', options: [] }] } };
@@ -114,6 +180,7 @@ test("botão direito na mensagem 4 cria o menu de opções ligado a ela", async 
   });
   await page.setViewportSize({ width: 1720, height: 1050 });
   await page.goto("/dashboard/bots/");
+  await page.getByRole("button", { name: "Menu atual", exact: true }).click();
   await page.getByRole("button", { name: "Editar opção 1: Outro assunto", exact: true }).click();
   await page.getByRole("button", { name: "Tela cheia", exact: true }).click();
   const expanded = page.getByRole("dialog", { name: "Visualização ampliada do fluxo" });
@@ -186,6 +253,7 @@ for (const width of [1440, 390]) {
     });
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("/dashboard/bots/");
+  await page.getByRole("button", { name: "Menu atual", exact: true }).click();
     await page.getByRole("button", { name: "Criar bot" }).click();
     await page.getByRole("textbox", { name: "Nome do bot", exact: true }).fill("Assistente Infordoc");
     await page.getByRole("textbox", { name: "Mensagem inicial", exact: true }).fill("Assistente Infordoc\nOlá! Bem-vindo ao suporte técnico.");
@@ -287,6 +355,7 @@ test("designer visual: selecionar nós, arrastar, salvar posições e abrir subm
   });
   await page.setViewportSize({ width: 1720, height: 1050 });
   await page.goto("/dashboard/bots/");
+  await page.getByRole("button", { name: "Menu atual", exact: true }).click();
   await page.getByRole('button', { name: 'Editar Mensagem', exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Mensagem inicial", exact: true })).toHaveValue(draft.menus[0].text);
   const menuList = page.getByRole("region", { name: "Menus do fluxo", exact: true });
