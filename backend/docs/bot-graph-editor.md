@@ -1,8 +1,10 @@
 # Editor visual do fluxo
 
-A Central de Bots abre na **visão geral**, com todos os menus e opções no mesmo
-canvas. Os blocos são compactos, com ícones, cores por função e configuração no
-painel lateral. A edição **Menu atual** continua disponível na barra do canvas.
+O seletor **Modo de visualização**, na barra do canvas, oferece **Padrão** (a edição
+anterior, por menu) e **Modo 2 · n8n** (visão geral, com todos os menus e opções no
+mesmo canvas). A primeira abertura usa Padrão; o navegador lembra a última escolha.
+Os dois modos compartilham as configurações do bot e mantêm suas posições separadas.
+O fundo é cinza neutro, com cores nos blocos para distinguir suas funções.
 
 ## Navegar e editar
 

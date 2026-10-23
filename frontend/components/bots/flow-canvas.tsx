@@ -179,7 +179,7 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
   }
   const canvas = <section className={styles.canvasPanel} aria-label="Designer de fluxo" inert={disabled}>
     <div className={styles.canvasToolbar}><div><strong>Fluxo do bot</strong><span className={`${styles.badge} ${dirty ? styles.amber : styles.green}`}>{dirty ? "Não salvo" : "Salvo"}</span></div><div className={styles.canvasTools}>
-      {onOverview && <button className={styles.toolButton} onClick={onOverview}>Visão geral</button>}
+      {onOverview && <select className={`${styles.toolButton} ${styles.flowMode}`} aria-label="Modo de visualização" value="menu" onChange={event => { if (event.target.value === "overview") onOverview(); }}><option value="menu">Padrão</option><option value="overview">Modo 2 · n8n</option></select>}
       <div className={styles.zoom}><button aria-label="Diminuir zoom" onClick={() => setZoom(z => Math.max(0.25, z - 0.1))}><Minus size={14} /></button><span>{Math.round(zoom * 100)}%</span><button aria-label="Aumentar zoom" onClick={() => setZoom(z => Math.min(1.5, z + 0.1))}><Plus size={14} /></button></div>
       <button className={styles.toolButton} title="Exibir os blocos no tamanho original" onClick={() => { setZoom(1); setOffset({ x: 0, y: 0 }); }}>100%</button>
       <button className={styles.toolButton} onClick={fit} title="Ajustar todo o fluxo à tela"><Maximize2 size={13} /><span>Ajustar</span></button>

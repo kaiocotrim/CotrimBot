@@ -27,6 +27,7 @@ test('visão geral conecta pelos pontos, salva o fluxo e mantém a navegação d
   });
   await page.setViewportSize({ width: 1720, height: 1050 });
   await page.goto('/dashboard/bots/');
+  await page.getByRole('combobox', { name: 'Modo de visualização', exact: true }).selectOption('overview');
   const graph = page.getByRole('region', { name: 'Visão geral do fluxo', exact: true });
   await expect(graph).toBeVisible();
   const output = graph.getByRole('button', { name: 'Conectar saída da opção 1 de Principal', exact: true });
@@ -47,8 +48,13 @@ test('visão geral conecta pelos pontos, salva o fluxo e mantém a navegação d
   await page.getByRole('button', { name: /^Salvar rascunho/ }).click();
   await expect.poll(() => current.draft.layout?.['graph:root:ticket']).toBeDefined();
   expect(current.draft.layout?.['root:message']).toEqual({ x: 200, y: 100 });
+  await page.getByRole('combobox', { name: 'Modo de visualização', exact: true }).selectOption('menu');
+  await expect(page.getByRole('region', { name: 'Designer de fluxo', exact: true })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Modo de visualização', exact: true }).selectOption('overview');
+  await expect(graph).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('visao-geral-desktop.png'), fullPage: true });
   await page.reload();
+  await expect(page.getByRole('combobox', { name: 'Modo de visualização', exact: true })).toHaveValue('overview');
   await expect(graph.getByRole('button', { name: 'Selecionar ligação Suporte para Atendimento', exact: true })).toBeVisible();
   // Remover pela linha e reconectar pelos pontos com teclado.
   await graph.getByRole('button', { name: 'Selecionar ligação Suporte para Atendimento', exact: true }).focus(); await page.keyboard.press('Enter');
@@ -180,7 +186,7 @@ test("botão direito na mensagem 4 cria o menu de opções ligado a ela", async 
   });
   await page.setViewportSize({ width: 1720, height: 1050 });
   await page.goto("/dashboard/bots/");
-  await page.getByRole("button", { name: "Menu atual", exact: true }).click();
+  await page.getByRole("combobox", { name: "Modo de visualização", exact: true }).selectOption("menu");
   await page.getByRole("button", { name: "Editar opção 1: Outro assunto", exact: true }).click();
   await page.getByRole("button", { name: "Tela cheia", exact: true }).click();
   const expanded = page.getByRole("dialog", { name: "Visualização ampliada do fluxo" });
@@ -253,7 +259,7 @@ for (const width of [1440, 390]) {
     });
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("/dashboard/bots/");
-  await page.getByRole("button", { name: "Menu atual", exact: true }).click();
+  await page.getByRole("combobox", { name: "Modo de visualização", exact: true }).selectOption("menu");
     await page.getByRole("button", { name: "Criar bot" }).click();
     await page.getByRole("textbox", { name: "Nome do bot", exact: true }).fill("Assistente Infordoc");
     await page.getByRole("textbox", { name: "Mensagem inicial", exact: true }).fill("Assistente Infordoc\nOlá! Bem-vindo ao suporte técnico.");
@@ -355,7 +361,7 @@ test("designer visual: selecionar nós, arrastar, salvar posições e abrir subm
   });
   await page.setViewportSize({ width: 1720, height: 1050 });
   await page.goto("/dashboard/bots/");
-  await page.getByRole("button", { name: "Menu atual", exact: true }).click();
+  await page.getByRole("combobox", { name: "Modo de visualização", exact: true }).selectOption("menu");
   await page.getByRole('button', { name: 'Editar Mensagem', exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Mensagem inicial", exact: true })).toHaveValue(draft.menus[0].text);
   const menuList = page.getByRole("region", { name: "Menus do fluxo", exact: true });
