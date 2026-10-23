@@ -1,6 +1,6 @@
 import "../config/env.js";
 import { betterAuth } from "better-auth";
-import { admin, organization } from "better-auth/plugins";
+import { admin, bearer, organization } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma.js";
 import { sendEmail } from "./mailer.js";
@@ -63,6 +63,7 @@ export const auth = betterAuth({
 
   // Plugin admin self-hosted (sem depender de serviços externos como o dash() da Better Auth).
   plugins: [
+    bearer(),
     admin(),
     organization({
       allowUserToCreateOrganization: (user) => user.role === "admin",

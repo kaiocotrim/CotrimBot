@@ -267,6 +267,7 @@ O Socket.IO roda na mesma porta do backend, com CORS liberado para o frontend.
 
 ## Documentação por pacote
 
+- [sdk/README.md](sdk/README.md) — SDK TypeScript para integrar clientes à API do backend.
 - [backend/README.md](backend/README.md) — estrutura e comandos do backend.
 - [frontend/AGENTS.md](frontend/AGENTS.md) e [frontend/CLAUDE.md](frontend/CLAUDE.md) — convenções do frontend.
 

@@ -18,12 +18,10 @@ export async function requireAuth(request: Request, response: Response, next: Ne
   const session = await auth.api.getSession({
     headers: fromNodeHeaders(request.headers),
   });
-
   if (!session) {
     response.status(401).json({ error: "Não autenticado." });
     return;
   }
-
   request.user = session.user;
   request.activeOrganizationId = session.session.activeOrganizationId ?? undefined;
   next();
