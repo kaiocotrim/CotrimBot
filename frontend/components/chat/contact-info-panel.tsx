@@ -1,5 +1,7 @@
 "use client";
 
+import headerStyles from "./contact-info-header.module.css";
+
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import { Bot, Building2, Check, ChevronDown, ExternalLink, Link2, LoaderCircle, MessageCircle, Pencil, UserRound, X } from "lucide-react";
 import Image from "next/image";
@@ -365,7 +367,7 @@ export function ContactInfoPanel({
         setMediaOpen(false);
         requestAnimationFrame(() => mediaTriggerRef.current?.querySelector<HTMLButtonElement>("button")?.focus());
       }} /> : <>
-      <header className="flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center gap-3 px-4 pt-[env(safe-area-inset-top)] @min-[1024px]:h-16 @min-[1024px]:pt-0">
+      <header className={`${headerStyles.header} flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center gap-3 px-4 pt-[env(safe-area-inset-top)] @min-[1024px]:h-16 @min-[1024px]:pt-0`}>
         <button
           type="button"
           onClick={onClose}

@@ -1,5 +1,7 @@
 "use client";
 
+import headerStyles from "./contact-info-header.module.css";
+
 import { motion, useReducedMotion } from "framer-motion";
 import { Building2, MessageCircle, Phone, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -74,7 +76,7 @@ export function ParticipantInfoPanel({ profile, groupName, onClose, onStartConve
       transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       className="absolute inset-0 z-40 flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden bg-[#09090b] @min-[1024px]:relative @min-[1024px]:inset-auto @min-[1024px]:z-auto @min-[1024px]:w-[min(24rem,40%)]"
     >
-      <header className="flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center gap-3 px-4 pt-[env(safe-area-inset-top)] @min-[1024px]:h-16 @min-[1024px]:pt-0">
+      <header className={`${headerStyles.header} flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center gap-3 px-4 pt-[env(safe-area-inset-top)] @min-[1024px]:h-16 @min-[1024px]:pt-0`}>
         <button ref={closeRef} type="button" onClick={onClose} aria-label="Fechar informações do participante" className="flex size-10 items-center justify-center rounded-full text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-white/50">
           <X aria-hidden="true" className="size-4" />
         </button>
