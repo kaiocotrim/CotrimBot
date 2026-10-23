@@ -232,14 +232,13 @@ export default function BotDesigner() {
 
   return <main className={styles.root}>
     <motion.header {...entrance} className={styles.header}>
-      <Link href="/" className={styles.back} aria-label="Voltar"><ArrowLeft size={14} /></Link>
       <div className={styles.headerRow}>
+        <Link href="/" className={styles.back} aria-label="Voltar" title="Voltar"><ArrowLeft size={16} /></Link>
         <div className={styles.headerActions}>
           {selected && <span className={`${styles.badge} ${bot?.published && !publishedDiffers ? styles.green : styles.amber}`}><span className={`${styles.dot} ${bot?.published && !publishedDiffers ? styles.live : ""}`} />{publishedDiffers ? "Alterações não publicadas" : bot?.published ? "Publicado" : "Rascunho"}</span>}
           <button className={styles.button} disabled={busy || uploadingImage || loading} onClick={() => startTest()}><BotIcon size={15} /> Testar bot</button>
           <button className={styles.button} aria-pressed={showEditor} onClick={() => setShowEditor(!showEditor)}><Settings2 size={14} /> {showEditor ? "Ocultar edição" : "Editar nó"}</button>
           <button className={styles.primary} disabled={busy || uploadingImage || loading || !name.trim()} onClick={() => void work(publish)}>{busy ? <LoaderCircle size={15} className="animate-spin" /> : <Send size={15} />} Publicar</button>
-          <button className={styles.iconButton} aria-label="Configurações do bot" disabled={busy} onClick={() => setTab("settings")}><Settings2 size={16} /></button>
         </div>
         <div className={styles.tabs} role="tablist" aria-label="Central de Bots">
           {([{ value: "flow", label: "Fluxo", icon: Workflow }, { value: "integrations", label: "Integrações", icon: Workflow }, { value: "settings", label: "Configurações", icon: Settings2 }] as const).map(item => <motion.button key={item.value} role="tab" aria-selected={tab === item.value} className={styles.tab} onClick={() => setTab(item.value)} whileTap={reduceMotion ? undefined : { scale: 0.97 }}>

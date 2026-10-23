@@ -19,9 +19,13 @@
 .root button, .root a, .root input, .root select, .root textarea { outline-offset: 3px; }
 .root button { cursor: pointer; }
 .root button:disabled { opacity: .4; cursor: default; }
-.header { padding: 14px 24px 0; border-bottom: 1px solid var(--line); }
-.back { display: inline-flex; gap: 8px; align-items: center; color: #a1a1aa; font-size: 12px; }
-.headerRow { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 0 22px; }
+.header { padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.back { display: inline-flex; justify-content: center; align-items: center; flex: 0 0 32px; height: 32px; border-radius: 9px; color: #a1a1aa; }
+.back:hover { background: #191919; color: #fafafa; }
+.headerRow { display: flex; align-items: center; gap: 12px; padding: 0; }
+.headerActions { order: 2; margin-left: auto; }
+.header .tabs { order: 1; gap: 4px; margin: 0; }
+.header .tab { padding: 8px 12px; margin: 0; font-size: 12px; }
 .headerActions, .actions, .canvasTools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .button, .primary, .iconButton, .toolButton { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 8px 12px; border: 1px solid #ffffff14; border-radius: 12px; background: #111; color: #d4d4d8; transition: background .15s, border-color .15s, color .15s; font-size: 12px; }
 .button:hover, .toolButton:hover, .iconButton:hover { border-color: #ffffff25; background: #191919; color: #fafafa; }
@@ -40,7 +44,7 @@
 .notice { display: flex; align-items: center; gap: 10px; margin: 10px 12px 0; padding: 10px 14px; border: 1px solid var(--line); background: #111; border-radius: 14px; }
 .notice p { flex: 1; }
 .notice button { padding: 4px; }
-.workspace { display: grid; grid-template-columns: 220px minmax(330px, 1fr) 280px 320px; gap: 12px; padding: 12px; align-items: stretch; min-height: calc(100dvh - 167px); min-inline-size: 0; width: 100%; margin: 0; }
+.workspace { display: grid; grid-template-columns: 220px minmax(330px, 1fr) 280px 320px; gap: 12px; padding: 12px; align-items: stretch; min-height: calc(100dvh - 58px); min-inline-size: 0; width: 100%; margin: 0; }
 .sidebar { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .panel, .inspector, .testPanel { border: 1px solid var(--line); border-radius: 18px; background: #050505; min-width: 0; }
 .panelTitle { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 12px; }
@@ -240,3 +244,20 @@ textarea.field { resize: vertical; min-height: 175px; line-height: 1.65; }
 .integrationMode { border: 1px solid #ffffff20; border-radius: 12px; padding: 12px; color: #d4d4d8; }
 .integrationPreview { white-space: pre-wrap; overflow-wrap: anywhere; background: #111; border: 1px solid #ffffff20; border-radius: 12px; padding: 16px; font-size: 12px; }
 @media (max-width: 699px) { .integrationGrid, .integrationOperations { grid-template-columns: 1fr; } .integrationPanel { width: 100%; } .tabs { flex-wrap: wrap; } .tab { padding-inline: 12px; } }
+.testPanel.testVisible { top: 70px; }
+@media (min-width: 700px) and (max-width: 1099px) {
+  .headerRow { flex-wrap: nowrap; gap: 8px; }
+  .headerActions { margin-left: auto; gap: 5px; }
+  .header .tab { padding-inline: 8px; }
+  .headerActions .button, .headerActions .primary { padding: 7px 9px; gap: 5px; }
+}
+@media (max-width: 699px) {
+  .header { padding: 8px 10px; }
+  .headerRow { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 8px; padding: 0; }
+  .header .tabs { min-width: 0; justify-content: flex-end; flex-wrap: nowrap; }
+  .header .tab { padding: 7px 8px; min-height: 32px; font-size: 11px; }
+  .headerActions { grid-column: 1 / -1; margin: 0; justify-content: flex-end; gap: 6px; }
+  .headerActions .button, .headerActions .primary { min-height: 32px; padding: 6px 9px; gap: 5px; font-size: 11px; }
+  .workspace { min-height: calc(100dvh - 98px); }
+  .testPanel.testVisible { top: 108px; }
+}
