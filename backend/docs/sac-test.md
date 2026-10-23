@@ -1,5 +1,8 @@
 # Abertura de chamados de teste no bot
 
+Para preparar as quatro rotas da integração futura, veja a
+[aba Integrações da Central de Bots](sac-integrations.md).
+
 O bot do CotrimBot agora aceita a ação `SAC_TEST` em uma opção dos menus existentes.
 Ela executa a coleta pelo mesmo motor usado no WhatsApp e no simulador da Central
 de Bots. As respostas reais continuam sendo enviadas pela integração Evolution

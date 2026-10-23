@@ -1,6 +1,6 @@
 export type BotOption = { id: string; number: string; label: string; description?: string; active: boolean; action: "MESSAGE" | "SUBMENU" | "HUMAN" | "IMAGE" | "CLOSE" | "SAC_TEST"; response: string; targetMenuId: string; imageId?: string };
 export type BotMenu = { id: string; name: string; text: string; options: BotOption[]; imageId?: string };
-export type BotFlow = { rootMenuId: string; invalidMessage: string; backLabel: string; menus: BotMenu[]; layout?: Record<string, { x: number; y: number }> };
+export type BotFlow = { rootMenuId: string; invalidMessage: string; backLabel: string; menus: BotMenu[]; integrations?: import('../../backend/src/services/bot-integrations').BotIntegrations; layout?: Record<string, { x: number; y: number }> };
 export type Bot = { id: string; name: string; revision: number; published: BotFlow | null; draft: BotFlow };
 export type BotList = { bots: Bot[]; activeBotId: string | null; instanceAvailable: boolean };
 export type Simulation = { state: { status: string; menuId: string; sacTest?: { step: string } }; quickReplies?: string[]; messages: { role: string; text: string; imageId?: string; menuId?: string; optionId?: string }[]; steps?: { menuId: string; optionId?: string; status: string }[] };

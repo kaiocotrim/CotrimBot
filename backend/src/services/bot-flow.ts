@@ -1,8 +1,9 @@
 import { advanceSacTest, startSacTest, SAC_TEST_CATALOG, type SacTestCatalog, type SacTestState, type SacTestSubmission } from './bot-sac-test.js';
+import { validateBotIntegrations, type BotIntegrations } from './bot-integrations.js';
 
 export type BotOption = { id: string; number: string; label: string; description?: string; active: boolean; action: "MESSAGE" | "SUBMENU" | "HUMAN" | "IMAGE" | "CLOSE" | "SAC_TEST"; response: string; targetMenuId: string; imageId?: string };
 export type BotMenu = { id: string; name: string; text: string; options: BotOption[]; imageId?: string };
-export type BotFlow = { rootMenuId: string; invalidMessage: string; backLabel: string; menus: BotMenu[]; layout?: Record<string, { x: number; y: number }> };
+export type BotFlow = { rootMenuId: string; invalidMessage: string; backLabel: string; menus: BotMenu[]; integrations?: BotIntegrations; layout?: Record<string, { x: number; y: number }> };
 export type BotState = { menuId: string; stack: string[]; status: "BOT_ACTIVE" | "WAITING_HUMAN" | "HUMAN_ACTIVE" | "CLOSED"; sacTest?: SacTestState };
 export type BotReply = { state: BotState; text: string; imageId?: string; sacTestSubmission?: SacTestSubmission };
 
@@ -14,6 +15,7 @@ export function validateFlow(value: unknown, publish = false): asserts value is 
   const fail = (message: string): never => { throw new Error(message); };
   if (!value || typeof value !== "object") fail("Fluxo inválido.");
   const f = value as BotFlow;
+  if (f.integrations !== undefined) validateBotIntegrations(f.integrations);
   const string = (v: unknown, max: number) => typeof v === "string" && v.length <= max;
   const image = (v: unknown) => v === undefined || (typeof v === "string" && (v === "" || /^[a-zA-Z0-9_-]{1,80}$/.test(v)));
   if (f.layout !== undefined && (!f.layout || typeof f.layout !== "object" || Array.isArray(f.layout)

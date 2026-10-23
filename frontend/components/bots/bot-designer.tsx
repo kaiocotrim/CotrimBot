@@ -13,6 +13,7 @@ import { BotImageInput } from "./bot-image-input";
 import { MenuDetailsDialog } from "./menu-details-dialog";
 import { MenuTree } from "./menu-tree";
 import { FlowCanvas, type NodeSelection } from "./flow-canvas";
+import { BotIntegrationsPanel } from './bot-integrations';
 import styles from "./bot-designer.module.css";
 
 const components = [
@@ -40,7 +41,7 @@ export default function BotDesigner() {
   const [menuId, setMenuId] = useState("root");
   const [previewMenuId, setPreviewMenuId] = useState<string | null>(null);
   const [selection, setSelection] = useState<NodeSelection>({ kind: "message" });
-  const [tab, setTab] = useState<"flow" | "settings">("flow");
+  const [tab, setTab] = useState<"flow" | "settings" | "integrations">("flow");
   const [busy, setBusy] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -144,18 +145,18 @@ export default function BotDesigner() {
     setBusy(true); setNotice("");
     try { await action(); } catch (error) { setNotice(error instanceof Error ? error.message : "Falha na operação."); } finally { setBusy(false); }
   }
-  async function save() {
+  async function save(nextFlow = flow) {
     if (!name.trim()) throw new Error("Informe o nome do bot.");
-    for (const m of flow.menus) {
+    for (const m of nextFlow.menus) {
       const numbers = new Set<string>();
       for (const o of m.options) {
         if (!/^[1-9]\d{0,2}$/.test(o.number) || numbers.has(o.number)) throw new Error(`Revise a numeração do menu ${m.name}: use números únicos de 1 a 999.`);
         numbers.add(o.number);
       }
     }
-    const saved = await botRequest<Bot>(selected ? `/${selected}` : "", { name, draft: flow, revision: bot?.revision }, selected ? "PUT" : "POST");
+    const saved = await botRequest<Bot>(selected ? `/${selected}` : "", { name, draft: nextFlow, revision: bot?.revision }, selected ? "PUT" : "POST");
     setList(previous => ({ ...previous, bots: [saved, ...previous.bots.filter(b => b.id !== saved.id)] }));
-    setSelected(saved.id); setDirty(false); setNotice("Rascunho salvo. A versão publicada permanece em produção.");
+    setSelected(saved.id); setFlow(nextFlow); setDirty(false); setNotice("Rascunho salvo. A versão publicada permanece em produção.");
     return saved;
   }
   async function publish() {
@@ -241,7 +242,7 @@ export default function BotDesigner() {
           <button className={styles.iconButton} aria-label="Configurações do bot" disabled={busy} onClick={() => setTab("settings")}><Settings2 size={16} /></button>
         </div>
         <div className={styles.tabs} role="tablist" aria-label="Central de Bots">
-          {([{ value: "flow", label: "Fluxo", icon: Workflow }, { value: "settings", label: "Configurações", icon: Settings2 }] as const).map(item => <motion.button key={item.value} role="tab" aria-selected={tab === item.value} className={styles.tab} onClick={() => setTab(item.value)} whileTap={reduceMotion ? undefined : { scale: 0.97 }}>
+          {([{ value: "flow", label: "Fluxo", icon: Workflow }, { value: "integrations", label: "Integrações", icon: Workflow }, { value: "settings", label: "Configurações", icon: Settings2 }] as const).map(item => <motion.button key={item.value} role="tab" aria-selected={tab === item.value} className={styles.tab} onClick={() => setTab(item.value)} whileTap={reduceMotion ? undefined : { scale: 0.97 }}>
             {tab === item.value && <motion.span aria-hidden="true" className={styles.tabHighlight} layoutId={tabHighlightId} transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 36 }} />}
             <item.icon size={14} /><span>{item.label}</span>
           </motion.button>)}
@@ -264,7 +265,7 @@ export default function BotDesigner() {
         <motion.section {...entrance} transition={{ ...entrance.transition, delay: reduceMotion ? 0 : 0.1 }} className={`${styles.panel} ${styles.menuList}`} aria-label="Menus do fluxo"><h2>Menus do fluxo</h2><MenuTree flow={flow} currentMenuId={menuId} paths={paths} onPreview={setPreviewMenuId} /></motion.section>
       </aside>
 
-      {tab === "settings" ? <motion.section key="settings" {...entrance} className={styles.settingsPanel}><h2>Configurações do bot</h2><label>Nome do bot<input className={styles.field} maxLength={100} value={name} onChange={e => { setName(e.target.value); setDirty(true); }} /></label><label>Resposta para opção inválida<textarea className={styles.field} value={flow.invalidMessage} maxLength={1000} onChange={e => change({ ...flow, invalidMessage: e.target.value })} /></label><label>Texto do comando 0<input className={styles.field} value={flow.backLabel} maxLength={100} onChange={e => change({ ...flow, backLabel: e.target.value })} /></label>
+      {tab === 'integrations' ? <BotIntegrationsPanel value={flow.integrations} onChange={integrations => change({ ...flow, integrations })} onSave={async integrations => { await work(async () => { await save({ ...flow, integrations }); }); }} /> : tab === "settings" ? <motion.section key="settings" {...entrance} className={styles.settingsPanel}><h2>Configurações do bot</h2><label>Nome do bot<input className={styles.field} maxLength={100} value={name} onChange={e => { setName(e.target.value); setDirty(true); }} /></label><label>Resposta para opção inválida<textarea className={styles.field} value={flow.invalidMessage} maxLength={1000} onChange={e => change({ ...flow, invalidMessage: e.target.value })} /></label><label>Texto do comando 0<input className={styles.field} value={flow.backLabel} maxLength={100} onChange={e => change({ ...flow, backLabel: e.target.value })} /></label>
         <p className={styles.helper}>A publicação atualiza o fluxo em produção. Salvar um rascunho mantém a versão publicada.</p><div className={`${styles.actions} mt-5`}><button className={styles.primary} onClick={() => void work(async () => { await save(); })}><Save size={14} /> Salvar rascunho</button>{bot && <button className={styles.button} disabled={!bot.published || !list.instanceAvailable} onClick={() => void work(async () => { await botRequest(`/${bot.id}/activation`, { active: list.activeBotId !== bot.id }); setList(await botRequest<BotList>()); setNotice("Status atualizado."); })}><Power size={14} /> {list.activeBotId === bot.id ? "Desativar" : "Ativar"}</button>}</div>{!list.instanceAvailable && <p className={`${styles.helper} mt-5`}>Ativação indisponível. Verifique a configuração da Evolution e a empresa vinculada à instância.</p>}
       </motion.section> : <>
         <FlowCanvas activeMenuId={showTest ? simulation?.state.menuId : undefined} activeOptionId={currentTestOption} onTestOption={(optionNumber) => startTest(menu.id, optionNumber)} onEditorHost={setEditorHost} flow={flow} menu={menu} selection={selection} dirty={dirty} disabled={busy || uploadingImage} onSelect={selectNode} onLayout={layout => { setFlow(previous => ({ ...previous, layout })); setDirty(true); }} onAdd={(action, position) => addOption(action, undefined, position)} onOpenMenu={openMenu} onCreateSubmenu={optionId => addMenu(menu.options.find(item => item.id === optionId))} />

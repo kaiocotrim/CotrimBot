@@ -2,6 +2,42 @@ import { test, expect } from "@playwright/test";
 import type { BotFlow } from "../lib/bot-api";
 import { advanceBot, validateFlow } from "../../backend/src/services/bot-flow";
 
+test('aba Integrações salva quatro operações e exibe prévia de GET e POST', async ({ page }) => {
+  let current: any = { id: 'integration-bot', name: 'SAC', revision: 1, published: null, draft: { rootMenuId: 'root', invalidMessage: 'Escolha uma opção.', backLabel: 'Voltar', menus: [{ id: 'root', name: 'Principal', text: 'Olá!', options: [] }] } };
+  await page.route('**/api/**', async route => {
+    const req = route.request(), path = new URL(req.url()).pathname;
+    if (path.endsWith('/auth/get-session')) return route.fulfill({ json: { user: { id: 'admin', name: 'Admin', email: 'admin@example.invalid' }, session: { id: 'session', userId: 'admin', expiresAt: '2099-01-01T00:00:00Z' } } });
+    if (path.endsWith('/bots/integration-bot') && req.method() === 'PUT') {
+      const body = req.postDataJSON(); validateFlow(body.draft); current = { ...current, ...body, revision: current.revision + 1 };
+      return route.fulfill({ json: current });
+    }
+    if (path.endsWith('/bots')) return route.fulfill({ json: { bots: [current], activeBotId: null, instanceAvailable: true } });
+    return route.fulfill({ json: {} });
+  });
+  await page.setViewportSize({ width: 390, height: 1000 });
+  await page.goto('/dashboard/bots/');
+  await page.getByRole('tab', { name: 'Integrações', exact: true }).click();
+  const panel = page.getByRole('region', { name: 'Integrações do chamado' });
+  await panel.getByLabel('URL base da API', { exact: true }).fill('https://api.example.com/v1');
+  await panel.getByRole('button', { name: 'Visualizar requisição' }).click();
+  await expect(panel).toContainText('https://api.example.com/v1/empresas?cnpj=05540238000123');
+  await panel.getByRole('button', { name: /4\. Criar chamado/ }).click();
+  await expect(panel.getByLabel('Método HTTP')).toHaveValue('POST');
+  await panel.getByLabel('Rota', { exact: true }).fill('/tickets');
+  await panel.getByRole('button', { name: 'Visualizar requisição' }).click();
+  await expect(panel).toContainText('https://api.example.com/v1/tickets');
+  await panel.getByRole('button', { name: 'Salvar integrações no rascunho' }).click();
+  await expect(page.getByRole('status')).toContainText('Rascunho salvo');
+  expect(current.draft.integrations.routes).toHaveLength(4);
+  expect(current.published).toBeNull();
+  await page.reload();
+  await page.getByRole('tab', { name: 'Integrações', exact: true }).click();
+  await expect(panel.getByLabel('URL base da API')).toHaveValue('https://api.example.com/v1');
+  await panel.getByRole('button', { name: /4\. Criar chamado/ }).click();
+  await expect(panel.getByLabel('Rota', { exact: true })).toHaveValue('/tickets');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
 test('opção de chamado de teste pode ser configurada e executada no simulador existente', async ({ page }) => {
   const draft: BotFlow = { rootMenuId: 'root', backLabel: 'Voltar', invalidMessage: 'Escolha uma opção válida.', menus: [
     { id: 'root', name: 'Principal', text: 'Suporte técnico', options: [
