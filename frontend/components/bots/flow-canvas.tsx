@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight, CornerDownLeft, GitBranch, GripHorizontal, ListTree, Maximize2, ImagePlus, MessageSquare, Minus, Play, Plus, SquareCheck, UserRound, X } from "lucide-react";
 import type { BotFlow, BotMenu, BotOption } from "@/lib/bot-api";
 import styles from "./bot-designer.module.css";
@@ -8,6 +9,14 @@ import styles from "./bot-designer.module.css";
 export type NodeSelection = { kind: "message" | "menu" | "option"; optionId?: string };
 type Point = { x: number; y: number };
 type FlowNode = { id: string; kind: "start" | "return" | NodeSelection["kind"]; x: number; y: number; w: number; h: number; option?: BotOption };
+const accents = { green: '#4ade80', cyan: '#22d3ee', blue: '#60a5fa', purple: '#a78bfa', amber: '#fbbf24', red: '#fb7185', teal: '#2dd4bf', slate: '#94a3b8' };
+function nodeTone(node: FlowNode): keyof typeof accents {
+  if (node.kind === 'start') return 'green';
+  if (node.kind === 'menu') return 'cyan';
+  if (node.kind === 'return') return 'slate';
+  return node.option?.action === 'HUMAN' ? 'amber' : node.option?.action === 'CLOSE' ? 'red'
+    : node.option?.action === 'SUBMENU' ? 'purple' : node.option?.action === 'SAC_TEST' ? 'teal' : 'blue';
+}
 
 export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, onLayout, onAdd, onOpenMenu, onEditorHost, onCreateSubmenu, activeMenuId, activeOptionId, onTestOption }: {
   flow: BotFlow; menu: BotMenu; selection: NodeSelection; dirty: boolean; disabled: boolean;
@@ -19,6 +28,7 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
   onEditorHost: (host: HTMLDivElement | null) => void;
   onCreateSubmenu: (optionId: string) => void;
 }) {
+  const reduceMotion = useReducedMotion();
   const viewport = useRef<HTMLDivElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const expandButton = useRef<HTMLButtonElement>(null);
@@ -105,7 +115,8 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
       if (!rect || initialFit.current === fitKey) return;
       initialFit.current = fitKey;
       setOffset({ x: 0, y: 0 });
-      setZoom(Math.max(0.25, Math.min(0.8, (rect.width - 24) / width, (rect.height - 50) / height)));
+      // Abra com textos legíveis; a visão completa continua disponível em Ajustar.
+      setZoom(Math.max(0.6, Math.min(0.85, (rect.width - 32) / width)));
     });
     observer.observe(viewport.current);
     return () => observer.disconnect();
@@ -168,6 +179,7 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
   const canvas = <section className={styles.canvasPanel} aria-label="Designer de fluxo" inert={disabled}>
     <div className={styles.canvasToolbar}><div><strong>Fluxo do bot</strong><span className={`${styles.badge} ${dirty ? styles.amber : styles.green}`}>{dirty ? "Não salvo" : "Salvo"}</span></div><div className={styles.canvasTools}>
       <div className={styles.zoom}><button aria-label="Diminuir zoom" onClick={() => setZoom(z => Math.max(0.25, z - 0.1))}><Minus size={14} /></button><span>{Math.round(zoom * 100)}%</span><button aria-label="Aumentar zoom" onClick={() => setZoom(z => Math.min(1.5, z + 0.1))}><Plus size={14} /></button></div>
+      <button className={styles.toolButton} title="Exibir os blocos no tamanho original" onClick={() => { setZoom(1); setOffset({ x: 0, y: 0 }); }}>100%</button>
       <button className={styles.toolButton} onClick={fit} title="Ajustar todo o fluxo à tela"><Maximize2 size={13} /><span>Ajustar</span></button>
       {!expanded && <button ref={expandButton} className={styles.toolButton} onClick={() => setExpanded(true)} aria-haspopup="dialog"><Maximize2 size={13} /><span>Tela cheia</span></button>}
       <button className={styles.toolButton} aria-pressed={minimap} onClick={() => setMinimap(!minimap)}>Minimapa</button>
@@ -191,20 +203,20 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
         position: { x: Math.max(12, Math.min(10000, (e.clientX - rect.left - inset + e.currentTarget.scrollLeft - offset.x) / zoom)), y: Math.max(12, Math.min(10000, (e.clientY - rect.top + e.currentTarget.scrollTop - offset.y) / zoom)) },
         ...(node ? { nodeId: node.id } : {}),
       });
-    }} onDragOver={e => { if (e.dataTransfer.types.includes("application/cotrimbot-action")) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } }} onDrop={e => { e.preventDefault(); const action = e.dataTransfer.getData("application/cotrimbot-action"); const rect = e.currentTarget.getBoundingClientRect(); const inset = Math.max(0, (e.currentTarget.clientWidth - width * zoom) / 2); if (["MESSAGE", "SUBMENU", "HUMAN", "IMAGE", "CLOSE"].includes(action)) onAdd(action as BotOption["action"], { x: Math.max(12, Math.min(10000, (e.clientX - rect.left - inset + e.currentTarget.scrollLeft - offset.x) / zoom)), y: Math.max(12, Math.min(10000, (e.clientY - rect.top + e.currentTarget.scrollTop - offset.y) / zoom)) }); }}
+    }} onDragOver={e => { if (e.dataTransfer.types.includes("application/cotrimbot-action")) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } }} onDrop={e => { e.preventDefault(); const action = e.dataTransfer.getData("application/cotrimbot-action"); const rect = e.currentTarget.getBoundingClientRect(); const inset = Math.max(0, (e.currentTarget.clientWidth - width * zoom) / 2); if (["MESSAGE", "SUBMENU", "HUMAN", "IMAGE", "CLOSE", "SAC_TEST"].includes(action)) onAdd(action as BotOption["action"], { x: Math.max(12, Math.min(10000, (e.clientX - rect.left - inset + e.currentTarget.scrollLeft - offset.x) / zoom)), y: Math.max(12, Math.min(10000, (e.clientY - rect.top + e.currentTarget.scrollTop - offset.y) / zoom)) }); }}
       onPointerDown={e => { if (e.button !== 0 || !e.isPrimary || (e.target as HTMLElement).closest("[data-flow-node]")) return; e.preventDefault(); pan.current = { pointer: { x: e.clientX, y: e.clientY }, origin: offset }; e.currentTarget.setPointerCapture(e.pointerId); }}
       onPointerMove={e => { if (pan.current) setOffset({ x: pan.current.origin.x + e.clientX - pan.current.pointer.x, y: pan.current.origin.y + e.clientY - pan.current.pointer.y }); }} onPointerUp={() => { pan.current = null; }} onPointerCancel={() => { pan.current = null; }} onLostPointerCapture={() => { pan.current = null; }}>
       <div style={{ width: width * zoom, height: height * zoom, marginInline: "auto" }}><div className={styles.stage} style={{ width, height, transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})` }}>
         <svg className={styles.edges} width={width} height={height} aria-hidden="true"><defs><marker id="flow-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="var(--flow-line)" strokeWidth="1.3" /></marker></defs>
-          <path d={curve(start, message)} /><path d={curve(message, options)} />
-          {nodes.filter(n => n.option).map(n => <g key={n.id}><path d={curve(options, n)} style={{ opacity: n.option!.active ? 1 : 0.3 }} />{["MESSAGE", "IMAGE"].includes(n.option!.action) && <path d={curve(n, end)} className={styles.returnEdge} />}<rect x={n.x + n.w / 2 - 18} y={n.y - 38} width="36" height="26" rx="8" fill="var(--flow-label)" stroke="var(--flow-label-border)" /><text x={n.x + n.w / 2} y={n.y - 20} textAnchor="middle" fill="var(--flow-label-text)" fontSize="13">{n.option!.number}</text></g>)}
+          <motion.path d={curve(start, message)} style={{ stroke: accents.green }} initial={reduceMotion ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.4 }} /><motion.path d={curve(message, options)} style={{ stroke: accents.cyan }} initial={reduceMotion ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.4 }} />
+          {nodes.filter(n => n.option).map(n => <g key={n.id}><motion.path d={curve(options, n)} style={{ stroke: accents[nodeTone(n)], opacity: n.option!.active ? 0.8 : 0.25 }} initial={reduceMotion ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.45 }} />{["MESSAGE", "IMAGE"].includes(n.option!.action) && <path d={curve(n, end)} className={styles.returnEdge} />}<rect x={n.x + n.w / 2 - 18} y={n.y - 38} width="36" height="26" rx="8" fill="var(--flow-label)" stroke={accents[nodeTone(n)]} /><text x={n.x + n.w / 2} y={n.y - 20} textAnchor="middle" fill={accents[nodeTone(n)]} fontSize="13">{n.option!.number}</text></g>)}
         </svg>
         {nodes.map(node => {
           const active = node.kind === selection.kind && (node.kind !== "option" || node.option?.id === selection.optionId);
-          const tone = node.kind === "start" || node.kind === "menu" ? "green" : node.option?.action === "HUMAN" ? "red" : node.option?.action === "SUBMENU" ? "purple" : "blue";
+          const tone = nodeTone(node);
           const Icon = node.kind === "start" ? Play : node.kind === "return" ? CornerDownLeft : node.kind === "menu" ? ListTree : node.option?.action === "HUMAN" ? UserRound : node.option?.action === "SUBMENU" ? GitBranch : node.option?.action === "IMAGE" ? ImagePlus : node.option?.action === "CLOSE" ? SquareCheck : MessageSquare;
           const title = node.kind === "start" ? "Início" : node.kind === "return" ? "Voltar ao menu anterior" : node.kind === "menu" ? "Menu de opções" : node.option?.action === "HUMAN" ? "Atendimento humano" : node.option?.action === "SUBMENU" ? "Ir para outro menu" : node.option?.action === "IMAGE" ? "Enviar imagem" : node.option?.action === "CLOSE" ? "Encerrar atendimento" : node.option?.action === "SAC_TEST" ? "Abrir chamado (teste)" : "Mensagem";
-          return <div key={node.id} data-flow-node={node.id} role="button" tabIndex={0} aria-label={node.option ? `Editar opção ${node.option.number}: ${node.option.label}` : `Editar ${title}`} aria-pressed={active} className={`${styles.node} ${styles[`node_${tone}`]} ${active ? styles.nodeSelected : ""} ${activeMenuId === menu.id && (activeOptionId ? node.option?.id === activeOptionId : node.kind === "menu") ? styles.nodeStepActive : ""} ${node.option && !node.option.active ? styles.nodeInactive : ""}`} style={{ left: node.x, top: node.y, width: node.w, height: node.h }} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(node); } }}
+          return <motion.div key={node.id} initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: node.option && !node.option.active ? 0.5 : 1 }} transition={{ duration: reduceMotion ? 0 : 0.2 }} data-flow-node={node.id} role="button" tabIndex={0} aria-label={node.option ? `Editar opção ${node.option.number}: ${node.option.label}` : `Editar ${title}`} aria-pressed={active} className={`${styles.node} ${styles[`node_${tone}`]} ${node.option ? styles.optionCard : ''} ${active ? styles.nodeSelected : ""} ${activeMenuId === menu.id && (activeOptionId ? node.option?.id === activeOptionId : node.kind === "menu") ? styles.nodeStepActive : ""} ${node.option && !node.option.active ? styles.nodeInactive : ""}`} style={{ left: node.x, top: node.y, width: node.w, height: node.h }} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(node); } }}
             onPointerDown={e => { if (e.button !== 0 || !e.isPrimary || (e.target as HTMLElement).closest("button")) return; e.stopPropagation(); select(node); drag.current = { id: node.id, pointer: { x: e.clientX, y: e.clientY }, origin: { x: node.x, y: node.y }, moved: false }; e.currentTarget.setPointerCapture(e.pointerId); }}
             onPointerMove={e => moveNode(e, node)} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }}>
             <div className={styles.nodeHeading}><span className={`${styles.nodeIcon} ${styles[tone]}`}><Icon size={17} /></span><strong>{node.option?.label || (node.kind === "menu" || node.kind === "message" ? menu.name : title)}</strong><GripHorizontal size={14} className={styles.nodeGrip} /></div>
@@ -212,7 +224,7 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
             {node.kind === "message" && <p className={styles.nodeText}>{menu.imageId && <span><ImagePlus size={13} /> Imagem configurada<br /></span>}{menu.text || (menu.imageId ? "Legenda opcional" : "Clique para escrever a mensagem inicial…")}</p>}
             {node.kind === "menu" && <><ul className={styles.nodeOptions}>{menu.options.slice(0, 6).map(o => <li key={o.id} className={!o.active ? styles.muted : ""}><i />{o.number} — {o.label}</li>)}</ul>{!menu.options.length && <p>Adicione uma opção para começar.</p>}{menu.options.length > 6 && <p>+ {menu.options.length - 6} opções</p>}<footer>Aguarda a resposta do cliente…</footer></>}
             {node.option && <><p className={styles.optionTitle}>{title}</p>{node.option.description && <p className={styles.nodeText}>{node.option.description}</p>}<p className={styles.nodeText}>{node.option.action === "SUBMENU" ? `Menu: ${flow.menus.find(m => m.id === node.option!.targetMenuId)?.name ?? "Selecione um destino"}` : node.option.action === "SAC_TEST" ? "Coleta de dados, revisão e gravação de teste. Sem integração com o SAC." : node.option.response || "Resposta ainda não configurada"}</p><footer>{node.option.action === "SAC_TEST" ? "0 — Solicitar cancelamento durante a coleta" : node.option.action === "SUBMENU" ? flow.menus.some(item => item.id === node.option!.targetMenuId) ? <button onClick={() => onOpenMenu(node.option!.targetMenuId)}>Abrir submenu <ArrowRight size={14} /></button> : <button onClick={() => { if (expanded) setEditing(true); onCreateSubmenu(node.option!.id); }}>Criar menu de opções <Plus size={14} /></button> : node.option.action === "CLOSE" ? "Atendimento encerrado" : node.option.action === "HUMAN" ? "Automação pausada após a transferência" : <><CornerDownLeft size={13} /> 0 — {flow.backLabel}</>}</footer></>}
-          </div>;
+          </motion.div>;
         })}
       </div></div>
     </div>
@@ -241,7 +253,7 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
       <button role="menuitem" onClick={() => contextAction(() => setMinimap(!minimap))}><ListTree size={14} /> {minimap ? "Ocultar minimapa" : "Mostrar minimapa"}</button>
     </div>}
     <div className={styles.canvasHint}><GripHorizontal size={13} /> Role para dar zoom · arraste o fundo para navegar{expanded ? " · Esc para fechar" : ""}</div>
-    {minimap && <button className={styles.minimap} aria-label="Navegar pelo minimapa" onClick={e => { setOffset({ x: 0, y: 0 }); const rect = e.currentTarget.getBoundingClientRect(); viewport.current?.scrollTo({ left: ((e.clientX - rect.left) / rect.width) * width * zoom - viewport.current.clientWidth / 2, top: ((e.clientY - rect.top) / rect.height) * height * zoom - viewport.current.clientHeight / 2, behavior: "smooth" }); }}><svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">{nodes.map(n => <rect key={n.id} x={n.x} y={n.y} width={n.w} height={n.h} rx="12" fill="var(--flow-map)" />)}</svg></button>}
+    <AnimatePresence>{minimap && <motion.button initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reduceMotion ? 0 : 8 }} transition={{ duration: 0.15 }} className={styles.minimap} aria-label="Navegar pelo minimapa" onClick={e => { setOffset({ x: 0, y: 0 }); const rect = e.currentTarget.getBoundingClientRect(); viewport.current?.scrollTo({ left: ((e.clientX - rect.left) / rect.width) * width * zoom - viewport.current.clientWidth / 2, top: ((e.clientY - rect.top) / rect.height) * height * zoom - viewport.current.clientHeight / 2, behavior: "smooth" }); }}><svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">{nodes.map(n => <rect key={n.id} x={n.x} y={n.y} width={n.w} height={n.h} rx="12" fill={accents[nodeTone(n)]} fillOpacity={0.65} />)}</svg></motion.button>}</AnimatePresence>
     <button className={styles.addFloating} onClick={() => { if (expanded) setEditing(true); onAdd("MESSAGE"); }}><Plus size={14} /> Adicionar opção</button>
   </section>;
   return expanded ? <dialog ref={dialog} className={styles.flowDialog} aria-label="Visualização ampliada do fluxo" onCancel={closeExpanded}>{canvas}<fieldset disabled={disabled} className={styles.expandedEditor} hidden={!editing}><div ref={onEditorHost} className={styles.expandedEditorContent} /></fieldset></dialog> : canvas;

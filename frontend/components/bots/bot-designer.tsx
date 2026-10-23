@@ -17,10 +17,10 @@ import { BotIntegrationsPanel } from './bot-integrations';
 import styles from "./bot-designer.module.css";
 
 const components = [
-  { action: "SAC_TEST", title: "Abrir chamado (teste)", description: "Coleta dados e salva um chamado de teste", icon: Workflow, tone: "purple" },
+  { action: "SAC_TEST", title: "Abrir chamado (teste)", description: "Coleta dados e salva um chamado de teste", icon: Workflow, tone: "teal" },
   { action: "MESSAGE", title: "Mensagem", description: "Envia texto com imagem opcional", icon: MessageSquare, tone: "blue" },
   { action: "IMAGE", title: "Enviar imagem", description: "Envia uma foto com legenda opcional", icon: ImagePlus, tone: "blue" },
-  { action: "HUMAN", title: "Transferir para humano", description: "Encaminha para atendimento", icon: UserRound, tone: "red" },
+  { action: "HUMAN", title: "Transferir para humano", description: "Encaminha para atendimento", icon: UserRound, tone: "amber" },
   { action: "CLOSE", title: "Encerrar atendimento", description: "Finaliza a sessão do bot", icon: SquareCheck, tone: "red" },
   { action: "SUBMENU", title: "Ir para outro menu", description: "Conecta a um submenu do fluxo", icon: GitBranch, tone: "purple" },
 ] as const;
