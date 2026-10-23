@@ -132,7 +132,7 @@ export default function BotDesigner() {
   function addOption(action: BotOption["action"] = "MESSAGE", copy?: BotOption, position?: { x: number; y: number }) {
     if (!menu || menu.options.length >= 50) return;
     let number = 1; while (menu.options.some(o => o.number === String(number))) number++;
-    const next: BotOption = { id: crypto.randomUUID(), number: String(number), label: action === "SAC_TEST" ? "Abrir chamado (teste)" : action === "HUMAN" ? "Falar com atendente" : action === "CLOSE" ? "Encerrar atendimento" : action === "SUBMENU" ? "Abrir submenu" : "Nova opção", active: true, action, response: action === "HUMAN" ? "Vou encaminhar sua solicitação para a equipe de atendimento. Aguarde o retorno de um atendente." : action === "CLOSE" ? "Atendimento encerrado. Obrigado pelo contato!" : "", targetMenuId: "", ...copy };
+    const next: BotOption = { id: crypto.randomUUID(), number: String(number), label: action === "SAC_TEST" ? "🎫 Abrir chamado (teste)" : action === "HUMAN" ? "Falar com atendente" : action === "CLOSE" ? "Encerrar atendimento" : action === "SUBMENU" ? "Abrir submenu" : "Nova opção", active: true, action, response: action === "HUMAN" ? "Vou encaminhar sua solicitação para a equipe de atendimento. Aguarde o retorno de um atendente." : action === "CLOSE" ? "Atendimento encerrado. Obrigado pelo contato!" : "", targetMenuId: "", ...copy };
     next.id = crypto.randomUUID(); next.number = String(number);
     change({ ...flow, menus: flow.menus.map(m => m.id === menu.id ? { ...m, options: [...m.options, next] } : m), ...(position ? { layout: { ...flow.layout, [`${menu.id}:${next.id}`]: position } } : {}) }); selectNode({ kind: "option", optionId: next.id });
   }

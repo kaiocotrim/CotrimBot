@@ -51,25 +51,25 @@ export function validSacTestPhone(value: string): boolean {
 }
 
 const fields: Field[] = ['cnpj', 'requester', 'phone', 'address', 'email', 'equipment', 'description'];
-const labels = ['CNPJ', 'Solicitante', 'Telefone', 'Endereço', 'E-mail', 'Equipamento/Software', 'Motivo'];
-const cancelPrompt = '⚠️ *Cancelar abertura de chamado?*\n\nSe cancelar, os dados deste preenchimento serão descartados.\n\n1 — Sim, cancelar\n2 — Não, continuar';
-const footer = '\n\n0 ou cancelar — Cancelar atendimento';
+const labels = ['🏢 CNPJ', '👤 Solicitante', '📱 Telefone', '📍 Endereço', '📧 E-mail', '🖨️ Equipamento/Software', '📝 Motivo'];
+const cancelPrompt = '⚠️ *Cancelar abertura de chamado?*\n\nVocê ainda não concluiu o preenchimento. Se cancelar agora, as informações preenchidas serão descartadas.\n\n1 — ❌ Sim, cancelar\n2 — ▶️ Não, continuar';
+const footer = '\n\n🚫 Para cancelar, digite *0* ou *cancelar*.';
 
 export function sacTestPrompt(ticket: SacTestState, catalog: SacTestCatalog): string {
   if (ticket.cancelPending) return cancelPrompt;
   const data = ticket.data;
   const company = catalog.find(item => item.id === data.companyId);
   switch (ticket.step) {
-    case 'cnpj': return '🛠️ *InforBot | Abertura de Chamados — TESTE*\n\nInforme o *CNPJ da empresa* (14 números). Nenhum chamado será aberto no SAC.' + footer;
-    case 'confirmCnpj': return `CNPJ encontrado na *base de teste*: ${data.cnpj}\n\n1 — Confirmar CNPJ\n2 — Corrigir CNPJ` + footer;
-    case 'requester': return 'Informe seu *nome completo*.' + footer;
-    case 'phone': return 'Informe seu *telefone com DDD*, preferencialmente um número com WhatsApp.' + footer;
-    case 'email': return 'Informe seu *e-mail*.' + footer;
-    case 'description': return 'Descreva detalhadamente o *problema*. Números fazem parte do texto; 0 e cancelar são comandos de cancelamento.' + footer;
-    case 'equipment': return 'Selecione o *equipamento/software* da base de teste:\n\n' + (company?.equipment ?? []).map((item, i) => `${i + 1} — ${item.name} | ${item.serial}`).join('\n') + footer;
-    case 'address': return 'Selecione o *endereço* da base de teste:\n\n' + (company?.addresses ?? []).map((item, i) => `${i + 1} — ${item.address}`).join('\n') + footer;
-    case 'edit': return 'Qual informação deseja corrigir?\n\n' + labels.map((label, i) => `${i + 1} — ${label}`).join('\n') + '\n8 — Voltar ao resumo' + footer;
-    case 'review': return `📋 *Resumo do chamado — TESTE*\n\nCNPJ: ${data.cnpj}\nSolicitante: ${data.requester}\nTelefone: ${data.phone}\nEndereço: ${data.addressLabel}\nE-mail: ${data.email}\nEquipamento/Software: ${data.equipmentLabel}\nMotivo: ${data.description}\n\n1 — Confirmar e salvar teste\n2 — Corrigir informações` + footer;
+    case 'cnpj': return '🎫 *InforBot | Abertura de Chamados*\n\nOlá! 👋 Vou te ajudar a preencher sua solicitação de suporte.\n\n🏢 Para começar, informe o *CNPJ da empresa*. Pode enviar com ou sem pontuação.\n\n🧪 Estamos em modo de teste: nenhum chamado será aberto no SAC.' + footer;
+    case 'confirmCnpj': return `🏢 *Vamos conferir o CNPJ?*\n\nEncontramos este número na *base de teste*:\n*${data.cnpj?.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')}*\n\nEstá correto?\n\n1 — ✅ Confirmar CNPJ\n2 — ✏️ Corrigir CNPJ` + footer;
+    case 'requester': return '👤 *Como podemos te chamar?*\n\nInforme seu *nome completo* para identificar quem está solicitando o atendimento.' + footer;
+    case 'phone': return '📱 *Qual telefone podemos usar para falar com você?*\n\nEnvie o número com *DDD*, de preferência com WhatsApp.\n\n💡 Exemplo: (27) 99999-9999.' + footer;
+    case 'email': return '📧 *Qual é o seu e-mail de contato?*\n\nInforme o endereço completo.\n\n💡 Exemplo: nome@empresa.com.br.' + footer;
+    case 'description': return '📝 *Conte o que está acontecendo*\n\nDescreva o *problema* e o que você estava tentando fazer quando ele ocorreu. Se aparecer uma mensagem de erro, inclua o texto também.\n\n💡 Exemplo: “O scanner liga, mas não puxa as folhas ao iniciar a digitalização.”' + footer;
+    case 'equipment': return '🖨️ *Qual equipamento ou software precisa de suporte?*\n\nDigite o número da opção desejada:\n\n' + (company?.equipment ?? []).map((item, i) => `${i + 1} — ${item.name}\n🔖 Série: ${item.serial}`).join('\n\n') + footer;
+    case 'address': return '📍 *Onde será o atendimento?*\n\nSelecione o endereço cadastrado na base de teste. Digite o número da opção:\n\n' + (company?.addresses ?? []).map((item, i) => `${i + 1} — ${item.address}`).join('\n\n') + footer;
+    case 'edit': return '✏️ *Vamos corrigir suas informações*\n\nDigite o número do campo que deseja alterar:\n\n' + labels.map((label, i) => `${i + 1} — ${label}`).join('\n') + '\n8 — ↩️ Voltar ao resumo' + footer;
+    case 'review': return `📋 *Resumo do chamado — TESTE*\n\nConfira as informações antes de continuar:\n\n🏢 *CNPJ:* ${data.cnpj?.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')}\n👤 *Solicitante:* ${data.requester}\n📱 *Telefone:* ${data.phone}\n📍 *Endereço:* ${data.addressLabel}\n📧 *E-mail:* ${data.email}\n🖨️ *Equipamento/Software:* ${data.equipmentLabel}\n📝 *Motivo:* ${data.description}\n\nEstá tudo certo?\n\n1 — ✅ Confirmar e salvar teste\n2 — ✏️ Corrigir informações` + footer;
   }
 }
 
@@ -93,7 +93,7 @@ export function advanceSacTest(state: BotState, input: string, catalog: SacTestC
   // Copiamos o estado para não modificar o snapshot anterior da sessão/simulação.
   const ticket = structuredClone(state.sacTest!);
   const next = { ...state, sacTest: ticket };
-  const reply = (error = ''): BotReply => ({ state: next, text: (error ? error + '\n\n' : '') + sacTestPrompt(ticket, catalog) });
+  const reply = (error = ''): BotReply => ({ state: next, text: (error ? (error.startsWith('✅') ? error : '⚠️ ' + error) + '\n\n' : '') + sacTestPrompt(ticket, catalog) });
   const text = input.trim();
   if (inputType !== 'TEXT') return reply('Nesta versão, envie uma resposta em texto. Anexos ainda não são aceitos.');
   if (ticket.cancelPending) {
@@ -158,7 +158,7 @@ export function advanceSacTest(state: BotState, input: string, catalog: SacTestC
       const { sacTest: completed, ...clean } = state;
       return {
         state: { ...clean, stack: [] },
-        text: '✅ *Informações recebidas!*\n\nO preenchimento foi concluído e o registro de teste foi salvo no CotrimBot.\n\n*Este atendimento está em modo de teste. Nenhum chamado foi aberto no SAC.*\n\n0 — Voltar ao menu principal',
+        text: '✅ *Informações recebidas!*\n\nObrigado! O preenchimento foi concluído e o registro de teste foi salvo no CotrimBot.\n\n🧪 *Este atendimento está em modo de teste. Nenhum chamado foi aberto no SAC.*\n\n0 — 🏠 Voltar ao menu principal',
         sacTestSubmission: { startMessageId: ticket.startMessageId, data: ticket.data },
       };
   }

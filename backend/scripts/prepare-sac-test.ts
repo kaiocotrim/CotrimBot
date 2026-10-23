@@ -29,18 +29,18 @@ try {
     const candidates = allOptions.filter(option => optionId ? option.id === optionId : /(?:^|\s)abrir (?:um )?chamado\b/i.test(option.label) || option.action === 'SAC_TEST');
     if (candidates.length > 1) throw new Error('Há mais de uma opção de chamado. Configure a opção desejada pelo editor.');
     const candidate = candidates[0];
-    if (candidate?.action === 'SAC_TEST' && !candidate.imageId && !candidate.targetMenuId && !candidate.response) { console.log('O rascunho já possui a ação SAC_TEST. Nenhuma alteração.'); }
+    if (candidate?.action === 'SAC_TEST' && candidate.label === '🎫 Abrir chamado (teste)' && !candidate.imageId && !candidate.targetMenuId && !candidate.response) { console.log('O rascunho já possui a ação SAC_TEST. Nenhuma alteração.'); }
     else {
       if (candidate) {
         candidate.action = 'SAC_TEST'; candidate.active = true;
-        candidate.label = 'Abrir chamado (teste)'; candidate.response = '';
+        candidate.label = '🎫 Abrir chamado (teste)'; candidate.response = '';
         // Uma coleta não reutiliza a imagem ou o submenu da ação anterior.
         candidate.targetMenuId = ''; delete candidate.imageId;
       }
       else {
         if (root.options.length >= 50) throw new Error('O menu atingiu o limite de opções.');
         let number = 1; while (root.options.some(option => option.number === String(number))) number++;
-        const option: BotOption = { id: 'sac-test-' + Date.now(), number: String(number), label: 'Abrir chamado (teste)', active: true, action: 'SAC_TEST', response: '', targetMenuId: '' };
+        const option: BotOption = { id: 'sac-test-' + Date.now(), number: String(number), label: '🎫 Abrir chamado (teste)', active: true, action: 'SAC_TEST', response: '', targetMenuId: '' };
         root.options.push(option);
       }
       validateFlow(flow);
