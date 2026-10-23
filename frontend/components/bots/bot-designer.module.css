@@ -293,3 +293,14 @@ textarea.field { resize: vertical; min-height: 175px; line-height: 1.65; }
 .canvasToolbar { background: #0a0d13ed; }
 .edges path:not(marker path) { stroke-width: 1.8; }
 @media (prefers-reduced-motion: reduce) { .node { transition: none; } }
+.canvasToolbar strong,
+.nodeHeading strong,
+.panelTitle h2,
+.palette h2,
+.paletteItem strong,
+.botItem strong,
+.menuItem strong,
+.inspectorHeader,
+.nodeType strong,
+.settingsPanel h2,
+.integrationPanel h3 { font-weight: 400; }
