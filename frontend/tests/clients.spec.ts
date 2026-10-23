@@ -72,7 +72,7 @@ for (const width of [1280, 390]) {
 
     await deleteButton.click();
     await page.getByRole("dialog", { name: "Excluir cliente?" }).getByRole("button", { name: "Excluir", exact: true }).click();
-    await expect(page.getByRole("status")).toContainText("Cliente excluído com sucesso.");
+    await expect(page.getByRole("dialog", { name: "Excluir cliente?" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Ver e editar informações de Empresa teste", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Ver e editar informações de Empresa compartilhada", exact: true })).toBeVisible();
     expect(deletes).toEqual(["/api/clients/own-client"]);
@@ -111,7 +111,8 @@ test("qualquer membro pode excluir um cliente compartilhado", async ({ page }) =
   await expect(page.getByRole("button", { name: "Salvar alterações", exact: true })).toBeEnabled();
   await form.getByRole("button", { name: "Excluir cliente", exact: true }).click();
   await page.getByRole("dialog", { name: "Excluir cliente?" }).getByRole("button", { name: "Excluir", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("Cliente excluído com sucesso.");
+  await expect(page.getByRole("button", { name: "Ver e editar informações de Empresa compartilhada", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Ver e editar informações de Empresa teste", exact: true })).toBeVisible();
   expect(deletes).toEqual(["/api/clients/shared-client"]);
   expect(errors).toEqual([]);
 });
@@ -125,7 +126,8 @@ test("resposta da API sem canDelete não esconde a opção de excluir", async ({
   await expect(deleteButton).toBeEnabled();
   await deleteButton.click();
   await page.getByRole("dialog", { name: "Excluir cliente?" }).getByRole("button", { name: "Excluir", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("Cliente excluído com sucesso.");
+  await expect(page.getByRole("button", { name: "Ver e editar informações de Empresa teste", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Ver e editar informações de Empresa compartilhada", exact: true })).toBeVisible();
   expect(deletes).toEqual(["/api/clients/own-client"]);
   expect(errors).toEqual([]);
 });

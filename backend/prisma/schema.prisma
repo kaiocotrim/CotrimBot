@@ -86,9 +86,33 @@ model ScheduledMessage {
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt
   user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  announcementId String?
+  announcementContactId Int?
+  recipientName String? @db.VarChar(191)
+  announcement Announcement? @relation(fields: [announcementId], references: [id], onDelete: Cascade)
 
+  @@index([announcementId])
   @@index([status, scheduledAt])
   @@index([userId, scheduledAt])
+}
+
+// O comunicado e seus destinatários são gravados juntos antes de iniciar os envios.
+model Announcement {
+  id String @id @default(cuid())
+  userId String
+  organizationId String?
+  clientId String?
+  companyName String @db.VarChar(191)
+  content String @db.Text
+  requestKey String @db.VarChar(64)
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  messages ScheduledMessage[]
+
+  @@unique([userId, requestKey])
+  @@index([userId, organizationId, createdAt])
+  @@index([clientId])
 }
 
 model Client {
@@ -102,6 +126,7 @@ model Client {
   updatedAt      DateTime      @updatedAt
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  announcements Announcement[]
 
   @@index([userId])
   @@index([organizationId])
@@ -268,6 +293,7 @@ model User {
   notifications      Notification[]
   calendarEvents     CalendarEvent[]
   scheduledMessages  ScheduledMessage[]
+  announcements Announcement[]
   clients            Client[]
   pushSubscriptions  PushSubscription[]
   organizationMessages OrganizationMessage[]

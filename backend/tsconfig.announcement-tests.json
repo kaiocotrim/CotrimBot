@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "outDir": "./.announcement-test-dist" },
+  "include": ["tests/announcement.test.ts", "src/middlewares/auth.middleware.ts"],
+  "exclude": ["dist", ".announcement-test-dist", "node_modules"]
+}

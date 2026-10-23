@@ -4,7 +4,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Select } from "@base-ui/react/select";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
-import { BadgeCheck, Bell, Bot, Building2, Camera, Check, ChevronDown, ContactRound, Laptop, Link2, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "lucide-react";
+import { BadgeCheck, Bell, Bot, Building2, Camera, Check, ChevronDown, ContactRound, Laptop, Link2, Megaphone, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "lucide-react";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import { SuccessConfetti } from "@/components/chat/success-confetti";
 import { EvolutionConnectionSettings } from "@/components/chat/evolution-connection-settings";
 import { EvolutionCallSettings } from "@/components/chat/evolution-call-settings";
+import { AnnouncementSettings } from "@/components/chat/announcement-settings";
 import { authClient } from "@/lib/auth-client";
 import { checkLocalTranscription, isLocalTranscriptionEnabled, setLocalTranscriptionEnabled } from "@/lib/local-transcription";
 import { readNotificationPermission } from "@/hooks/use-notifications";
@@ -88,6 +89,7 @@ const sections = [
   { value: "whatsapp", label: "WhatsApp", icon: QrCode },
   { value: "calls", label: "Chamadas", icon: PhoneOff },
   { value: "business", label: "Empresa", icon: Building2 },
+  { value: "announcements", label: "Notícias", icon: Megaphone },
   { value: "bots", label: "Central de Bots", icon: Bot },
   { value: "local", label: "Transcrição local", icon: Laptop },
 ] as const;
@@ -344,6 +346,10 @@ function SettingsContent({ user }: { user: SettingsUser }) {
 
           <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="client" data-client-panel="" className={styles.panel}>
             <ClientSettings />
+          </MotionPanel>
+
+          <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="announcements" className={styles.panel}>
+            <AnnouncementSettings />
           </MotionPanel>
 
           <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="pro" className={styles.panel}>

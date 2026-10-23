@@ -21,7 +21,7 @@ export async function getScheduledMessages(request: Request, response: Response)
   }
 
   const messages = await prisma.scheduledMessage.findMany({
-    where: { userId: request.user!.id, scheduledAt: { gte: from, lt: to } },
+    where: { userId: request.user!.id, announcementId: null, scheduledAt: { gte: from, lt: to } },
     orderBy: { scheduledAt: "asc" },
     select: { id: true, phone: true, content: true, scheduledAt: true, status: true, sentAt: true },
   });
@@ -59,7 +59,7 @@ export async function deleteScheduledMessage(request: Request, response: Respons
   const id = request.params.id;
   if (typeof id !== "string" || !id) return response.status(400).json({ error: "Identificador da mensagem inválido." });
   const scheduledMessage = await prisma.scheduledMessage.findFirst({
-    where: { id, userId: request.user!.id },
+    where: { id, userId: request.user!.id, announcementId: null },
     select: { id: true, status: true },
   });
 
@@ -69,7 +69,7 @@ export async function deleteScheduledMessage(request: Request, response: Respons
   }
 
   const deleted = await prisma.scheduledMessage.deleteMany({
-    where: { id, userId: request.user!.id, status: { not: "PROCESSING" } },
+    where: { id, userId: request.user!.id, announcementId: null, status: { not: "PROCESSING" } },
   });
   if (!deleted.count) return response.status(409).json({ error: "Esta mensagem começou a ser enviada e não pode mais ser excluída." });
 

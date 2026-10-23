@@ -1,0 +1,31 @@
+.root { display: grid; gap: 18px; max-width: 650px; min-width: 0; padding-bottom: 24px; }
+.heading { display: flex; align-items: flex-start; gap: 12px; }
+.heading h3 { margin: 0; font-size: 18px; font-weight: 500; }
+.heading p, .card p { margin: 7px 0 0; }
+.heading p, .note, .hint, .historyHeading time { color: #929292; font-size: 12px; line-height: 1.6; }
+.icon { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border: 1px solid #292929; border-radius: 12px; background: #141414; }
+.card { display: grid; min-width: 0; gap: 12px; padding: 20px; border: 1px solid #262626; border-radius: 18px; background: #0b0b0b; }
+.card h4, .historyHeading h4 { margin: 0; font-size: 14px; font-weight: 500; }
+.card label { font-size: 13px; color: #dedede; }
+.card select, .card textarea { width: 100%; min-width: 0; border: 1px solid #303030; border-radius: 10px; padding: 11px 12px; background: #141414; color: #eee; font: inherit; }
+.card textarea { resize: vertical; min-height: 140px; max-height: 360px; }
+.card textarea:focus, .card select:focus { outline: 1px solid #888; outline-offset: 2px; }
+.root button { display: inline-flex; justify-content: center; align-items: center; gap: 8px; border: 1px solid #333; border-radius: 10px; padding: 9px 12px; font-size: 12px; color: #ccc; background: #171717; cursor: pointer; }
+.root button:disabled { opacity: .45; cursor: default; }
+.root button:hover:enabled { filter: brightness(1.15); }
+.root .primary { background: #eee; color: #121212; border-color: #eee; justify-self: end; }
+.hint, .historyHeading, .actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+.hint span:last-child { white-space: nowrap; }
+.message { white-space: pre-wrap; overflow-wrap: anywhere; padding: 14px; background: #181818; border-radius: 10px; font-size: 13px; line-height: 1.65; }
+.recipients { max-height: 240px; overflow-y: auto; }
+.recipients > div { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #222; font-size: 12px; overflow-wrap: anywhere; }
+.recipients > div > span:first-child { min-width: 0; }
+.recipients > div > span:last-child { color: #999; flex-shrink: 0; }
+.recipients small { display: block; color: #999; }
+.recipients span[data-status="SENT"] { color: #91c8ab; }
+.recipients span[data-status="FAILED"], .root .error { color: #eca0a0; }
+.success { display: flex; align-items: flex-start; gap: 9px; color: #91c8ab; font-size: 13px; }
+.success svg { flex-shrink: 0; }
+.counts { display: flex; flex-wrap: wrap; gap: 12px; color: #aaa; font-size: 12px; }
+.card summary { cursor: pointer; color: #ccc; font-size: 12px; }
+@media (max-width: 600px) { .card { padding: 14px; } .actions { align-items: stretch; } .actions button { flex: 1; } .recipients > div { flex-wrap: wrap; gap: 4px; } }

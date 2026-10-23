@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:announcements": "tsc -p tsconfig.announcement-tests.json && node --test .announcement-test-dist/tests/announcement.test.js",
     "test:bots": "tsc -p tsconfig.bot-tests.json && node --test .bot-test-dist/tests/bot-*.test.js",
     "dev": "node scripts/dev.mjs",
     "build": "npm run prisma:generate && tsc",
