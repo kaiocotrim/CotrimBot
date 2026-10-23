@@ -8,12 +8,12 @@
 .header::before {
   content: "";
   position: absolute;
-  inset: 0 0 -20px;
+  inset: 0 0 -28px;
   z-index: -1;
   pointer-events: none;
   background: linear-gradient(to bottom, rgb(9 9 11 / 75%) 0%, rgb(9 9 11 / 40%) 75%, transparent 100%);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
   -webkit-mask-image: linear-gradient(to bottom, black 0%, black 65%, transparent 100%);
   mask-image: linear-gradient(to bottom, black 0%, black 65%, transparent 100%);
 }
