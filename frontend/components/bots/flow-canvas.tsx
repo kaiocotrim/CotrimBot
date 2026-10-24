@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowRight, CornerDownLeft, GitBranch, GripHorizontal, ListTree, Maximize2, ImagePlus, MessageSquare, Minus, Play, Plus, SquareCheck, UserRound, X } from "lucide-react";
+import { ArrowRight, CornerDownLeft, GitBranch, GripHorizontal, ListTree, Maximize2, ImagePlus, MessageSquare, Minus, Play, Plus, SquareCheck, Trash2, UserRound, X } from "lucide-react";
 import type { BotFlow, BotMenu, BotOption } from "@/lib/bot-api";
+import { BotSelect } from "./bot-select";
 import styles from "./bot-designer.module.css";
 
 export type NodeSelection = { kind: "message" | "menu" | "option"; optionId?: string };
@@ -18,10 +19,11 @@ function nodeTone(node: FlowNode): keyof typeof accents {
     : node.option?.action === 'SUBMENU' ? 'purple' : node.option?.action === 'SAC_TEST' ? 'teal' : 'blue';
 }
 
-export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, onLayout, onAdd, onOpenMenu, onEditorHost, onCreateSubmenu, activeMenuId, activeOptionId, onTestOption, onOverview }: {
+export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, onLayout, onAdd, onOpenMenu, onEditorHost, onCreateSubmenu, activeMenuId, activeOptionId, onTestOption, onOverview, onDelete }: {
   flow: BotFlow; menu: BotMenu; selection: NodeSelection; dirty: boolean; disabled: boolean;
   activeMenuId?: string; activeOptionId?: string; onTestOption: (number: string) => void;
   onSelect: (selection: NodeSelection) => void;
+  onDelete: (optionId?: string) => void;
   onLayout: (positions: Record<string, Point>) => void;
   onAdd: (action: BotOption["action"], position?: Point) => void;
   onOpenMenu: (id: string) => void;
@@ -149,6 +151,14 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
     if (node.kind === "option") onSelect({ kind: "option", optionId: node.option!.id });
     else if (node.kind === "message" || node.kind === "menu") onSelect({ kind: node.kind });
   }
+  function deleteNode(node: FlowNode) {
+    if (disabled || !["message", "menu", "option"].includes(node.kind) || (!node.option && menu.id === flow.rootMenuId)) return;
+    drag.current = null;
+    setContextMenu(null);
+    onDelete(node.option?.id);
+    if (expanded) setEditing(false);
+    viewport.current?.focus({ preventScroll: true });
+  }
   function moveNode(event: PointerEvent<HTMLDivElement>, node: FlowNode) {
     if (!drag.current || drag.current.id !== node.id) return;
     const dx = (event.clientX - drag.current.pointer.x) / zoom, dy = (event.clientY - drag.current.pointer.y) / zoom;
@@ -179,13 +189,13 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
   }
   const canvas = <section className={styles.canvasPanel} aria-label="Designer de fluxo" inert={disabled}>
     <div className={styles.canvasToolbar}><div><strong>Fluxo do bot</strong><span className={`${styles.badge} ${dirty ? styles.amber : styles.green}`}>{dirty ? "Não salvo" : "Salvo"}</span></div><div className={styles.canvasTools}>
-      {onOverview && <select className={`${styles.toolButton} ${styles.flowMode}`} aria-label="Modo de visualização" value="menu" onChange={event => { if (event.target.value === "overview") onOverview(); }}><option value="menu">Padrão</option><option value="overview">Modo 2 · n8n</option></select>}
+      {onOverview && <BotSelect compact label="Modo de visualização" value="menu" options={[{ value: "menu", label: "Padrão" }, { value: "overview", label: "Modo 2 · n8n" }]} onChange={value => { if (value === "overview") onOverview(); }} />}
       <div className={styles.zoom}><button aria-label="Diminuir zoom" onClick={() => setZoom(z => Math.max(0.25, z - 0.1))}><Minus size={14} /></button><span>{Math.round(zoom * 100)}%</span><button aria-label="Aumentar zoom" onClick={() => setZoom(z => Math.min(1.5, z + 0.1))}><Plus size={14} /></button></div>
       <button className={styles.toolButton} title="Exibir os blocos no tamanho original" onClick={() => { setZoom(1); setOffset({ x: 0, y: 0 }); }}>100%</button>
       <button className={styles.toolButton} onClick={fit} title="Ajustar todo o fluxo à tela"><Maximize2 size={13} /><span>Ajustar</span></button>
       {!expanded && <button ref={expandButton} className={styles.toolButton} onClick={() => setExpanded(true)} aria-haspopup="dialog"><Maximize2 size={13} /><span>Tela cheia</span></button>}
       <button className={styles.toolButton} aria-pressed={minimap} onClick={() => setMinimap(!minimap)}>Minimapa</button>
-      {expanded && <select className={styles.toolButton} aria-label="Menu do fluxo" value={menu.id} onChange={e => onOpenMenu(e.target.value)}>{flow.menus.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}
+      {expanded && <BotSelect compact label="Menu do fluxo" value={menu.id} onChange={onOpenMenu} options={flow.menus.map(item => ({ value: item.id, label: item.name }))} />}
       {expanded && <button className={styles.toolButton} aria-pressed={editing} onClick={() => setEditing(!editing)}>{editing ? "Ocultar edição" : "Editar nó"}</button>}
       {expanded && <button ref={closeButton} className={styles.toolButton} onClick={closeExpanded} aria-label="Fechar visualização do fluxo" title="Fechar (Esc)"><X size={15} /><span>Fechar</span></button>}
     </div></div>
@@ -218,8 +228,8 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
           const tone = nodeTone(node);
           const Icon = node.kind === "start" ? Play : node.kind === "return" ? CornerDownLeft : node.kind === "menu" ? ListTree : node.option?.action === "HUMAN" ? UserRound : node.option?.action === "SUBMENU" ? GitBranch : node.option?.action === "IMAGE" ? ImagePlus : node.option?.action === "CLOSE" ? SquareCheck : MessageSquare;
           const title = node.kind === "start" ? "Início" : node.kind === "return" ? "Voltar ao menu anterior" : node.kind === "menu" ? "Menu de opções" : node.option?.action === "HUMAN" ? "Atendimento humano" : node.option?.action === "SUBMENU" ? "Ir para outro menu" : node.option?.action === "IMAGE" ? "Enviar imagem" : node.option?.action === "CLOSE" ? "Encerrar atendimento" : node.option?.action === "SAC_TEST" ? "Abrir chamado (teste)" : "Mensagem";
-          return <motion.div key={node.id} initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: node.option && !node.option.active ? 0.5 : 1 }} transition={{ duration: reduceMotion ? 0 : 0.2 }} data-flow-node={node.id} role="button" tabIndex={0} aria-label={node.option ? `Editar opção ${node.option.number}: ${node.option.label}` : `Editar ${title}`} aria-pressed={active} className={`${styles.node} ${styles[`node_${tone}`]} ${node.option ? styles.optionCard : ''} ${active ? styles.nodeSelected : ""} ${activeMenuId === menu.id && (activeOptionId ? node.option?.id === activeOptionId : node.kind === "menu") ? styles.nodeStepActive : ""} ${node.option && !node.option.active ? styles.nodeInactive : ""}`} style={{ left: node.x, top: node.y, width: node.w, height: node.h }} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(node); } }}
-            onPointerDown={e => { if (e.button !== 0 || !e.isPrimary || (e.target as HTMLElement).closest("button")) return; e.stopPropagation(); select(node); drag.current = { id: node.id, pointer: { x: e.clientX, y: e.clientY }, origin: { x: node.x, y: node.y }, moved: false }; e.currentTarget.setPointerCapture(e.pointerId); }}
+          return <motion.div key={node.id} initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: node.option && !node.option.active ? 0.5 : 1 }} transition={{ duration: reduceMotion ? 0 : 0.2 }} data-flow-node={node.id} role="button" tabIndex={0} aria-label={node.option ? `Editar opção ${node.option.number}: ${node.option.label}` : `Editar ${title}`} aria-pressed={active} className={`${styles.node} ${styles[`node_${tone}`]} ${node.option ? styles.optionCard : ''} ${active ? styles.nodeSelected : ""} ${activeMenuId === menu.id && (activeOptionId ? node.option?.id === activeOptionId : node.kind === "menu") ? styles.nodeStepActive : ""} ${node.option && !node.option.active ? styles.nodeInactive : ""}`} style={{ left: node.x, top: node.y, width: node.w, height: node.h }} onKeyDown={e => { if (e.target !== e.currentTarget || disabled) return; if (e.key === "Delete" && active && !e.repeat) { e.preventDefault(); e.stopPropagation(); deleteNode(node); } else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(node); } }}
+            onPointerDown={e => { if (e.button !== 0 || !e.isPrimary || (e.target as HTMLElement).closest("button")) return; e.stopPropagation(); e.currentTarget.focus({ preventScroll: true }); select(node); drag.current = { id: node.id, pointer: { x: e.clientX, y: e.clientY }, origin: { x: node.x, y: node.y }, moved: false }; e.currentTarget.setPointerCapture(e.pointerId); }}
             onPointerMove={e => moveNode(e, node)} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }}>
             <div className={styles.nodeHeading}><span className={`${styles.nodeIcon} ${styles[tone]}`}><Icon size={17} /></span><strong>{node.option?.label || (node.kind === "menu" || node.kind === "message" ? menu.name : title)}</strong><GripHorizontal size={14} className={styles.nodeGrip} /></div>
             {node.kind === "start" && <p>Quando o cliente envia uma mensagem</p>}
@@ -230,7 +240,8 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
         })}
       </div></div>
     </div>
-    {contextMenu && <div ref={contextMenuElement} role="menu" aria-label="Opções do fluxo" className={styles.contextMenu} style={{ left: contextMenu.x, top: contextMenu.y }} onKeyDown={event => {
+    {contextMenu && <div ref={contextMenuElement} role="menu" aria-label="Opções do fluxo" className={styles.contextMenu} style={{ left: contextMenu.x, top: contextMenu.y, maxHeight: `calc(100% - ${contextMenu.y + 8}px)` }} onKeyDown={event => {
+      if (event.key === "Delete" && contextNode && !event.repeat) { event.preventDefault(); event.stopPropagation(); deleteNode(contextNode); return; }
       if (event.key === "Tab") { setContextMenu(null); return; }
       if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
       event.preventDefault();
@@ -245,6 +256,7 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
         else onCreateSubmenu(contextOption.id);
       })}><ListTree size={14} /> {contextSubmenu ? "Abrir menu de opções" : "Menu de opções"}</button>}
       {contextOption && <button role="menuitem" onClick={() => contextAction(() => { closeExpanded(); onTestOption(contextOption.number); })}><Play size={14} /> Testar esta opção</button>}
+      {contextNode && ["message", "menu", "option"].includes(contextNode.kind) && <><button role="menuitem" className={styles.contextDelete} aria-keyshortcuts="Delete" disabled={disabled || (!contextNode.option && menu.id === flow.rootMenuId)} title={!contextNode.option && menu.id === flow.rootMenuId ? "O menu principal não pode ser excluído" : "Excluir nó (Delete)"} onClick={() => deleteNode(contextNode)}><Trash2 size={14} />Excluir<kbd aria-hidden="true">Del</kbd></button><div role="separator" /></>}
       <button role="menuitem" disabled={menu.options.length >= 50} onClick={() => addFromContext("CLOSE")}><SquareCheck size={14} /> Encerrar atendimento</button>
       <button role="menuitem" disabled={menu.options.length >= 50} onClick={() => addFromContext("MESSAGE")}><MessageSquare size={14} /> Adicionar mensagem</button>
       <button role="menuitem" disabled={menu.options.length >= 50} onClick={() => addFromContext("IMAGE")}><ImagePlus size={14} /> Adicionar imagem</button>
@@ -258,5 +270,5 @@ export function FlowCanvas({ flow, menu, selection, dirty, disabled, onSelect, o
     <AnimatePresence>{minimap && <motion.button initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reduceMotion ? 0 : 8 }} transition={{ duration: 0.15 }} className={styles.minimap} aria-label="Navegar pelo minimapa" onClick={e => { setOffset({ x: 0, y: 0 }); const rect = e.currentTarget.getBoundingClientRect(); viewport.current?.scrollTo({ left: ((e.clientX - rect.left) / rect.width) * width * zoom - viewport.current.clientWidth / 2, top: ((e.clientY - rect.top) / rect.height) * height * zoom - viewport.current.clientHeight / 2, behavior: "smooth" }); }}><svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">{nodes.map(n => <rect key={n.id} x={n.x} y={n.y} width={n.w} height={n.h} rx="12" fill={accents[nodeTone(n)]} fillOpacity={0.65} />)}</svg></motion.button>}</AnimatePresence>
     <button className={styles.addFloating} onClick={() => { if (expanded) setEditing(true); onAdd("MESSAGE"); }}><Plus size={14} /> Adicionar opção</button>
   </section>;
-  return expanded ? <dialog ref={dialog} className={styles.flowDialog} aria-label="Visualização ampliada do fluxo" onCancel={closeExpanded}>{canvas}<fieldset disabled={disabled} className={styles.expandedEditor} hidden={!editing}><div ref={onEditorHost} className={styles.expandedEditorContent} /></fieldset></dialog> : canvas;
+  return expanded ? <dialog ref={dialog} className={styles.flowDialog} aria-label="Visualização ampliada do fluxo" onCancel={closeExpanded}>{canvas}<motion.fieldset disabled={disabled} className={styles.expandedEditor} inert={!editing} aria-hidden={!editing} initial={false} animate={{ opacity: editing ? 1 : 0, x: editing || reduceMotion ? 0 : 14 }} transition={{ duration: reduceMotion ? 0 : 0.32, ease: [0.22, 1, 0.36, 1] }} style={{ pointerEvents: editing ? "auto" : "none" }}><div ref={onEditorHost} className={styles.expandedEditorContent} /></motion.fieldset></dialog> : canvas;
 }

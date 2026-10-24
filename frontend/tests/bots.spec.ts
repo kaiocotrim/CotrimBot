@@ -1,7 +1,12 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Locator } from "@playwright/test";
 import type { BotFlow } from "../lib/bot-api";
 import { advanceBot, validateFlow } from "../../backend/src/services/bot-flow";
 import { connectBotOption, graphNodes } from '../lib/bot-graph';
+
+async function selectChoice(trigger: Locator, value: string) {
+  await trigger.click();
+  await trigger.page().getByRole("option").and(trigger.page().locator(`[data-value="${value}"]`)).click();
+}
 
 test('modelo visual preserva execução, rejeita destinos inválidos e ações terminais', () => {
   const flow: BotFlow = { rootMenuId: 'root', invalidMessage: 'Opção inválida.', backLabel: 'Voltar', menus: [
@@ -27,7 +32,7 @@ test('visão geral conecta pelos pontos, salva o fluxo e mantém a navegação d
   });
   await page.setViewportSize({ width: 1720, height: 1050 });
   await page.goto('/dashboard/bots/');
-  await page.getByRole('combobox', { name: 'Modo de visualização', exact: true }).selectOption('overview');
+  await selectChoice(page.getByRole('combobox', { name: 'Modo de visualização', exact: true }), 'overview');
   const graph = page.getByRole('region', { name: 'Visão geral do fluxo', exact: true });
   await expect(graph).toBeVisible();
   const output = graph.getByRole('button', { name: 'Conectar saída da opção 1 de Principal', exact: true });
@@ -35,7 +40,7 @@ test('visão geral conecta pelos pontos, salva o fluxo e mantém a navegação d
   const a = (await output.boundingBox())!, b = (await input.boundingBox())!;
   await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down();
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 12 }); await page.mouse.up();
-  await expect(page.getByRole('combobox', { name: 'Tipo de ação' })).toHaveValue('SUBMENU');
+  await expect(page.getByRole('combobox', { name: 'Tipo de ação' })).toHaveAttribute("data-value", 'SUBMENU');
   await page.getByRole('button', { name: /^Salvar rascunho/ }).click();
   await expect.poll(() => current.draft.menus[0].options[0].targetMenuId).toBe('support');
   expect(current.published).toEqual(original);
@@ -48,20 +53,20 @@ test('visão geral conecta pelos pontos, salva o fluxo e mantém a navegação d
   await page.getByRole('button', { name: /^Salvar rascunho/ }).click();
   await expect.poll(() => current.draft.layout?.['graph:root:ticket']).toBeDefined();
   expect(current.draft.layout?.['root:message']).toEqual({ x: 200, y: 100 });
-  await page.getByRole('combobox', { name: 'Modo de visualização', exact: true }).selectOption('menu');
+  await selectChoice(page.getByRole('combobox', { name: 'Modo de visualização', exact: true }), 'menu');
   await expect(page.getByRole('region', { name: 'Designer de fluxo', exact: true })).toBeVisible();
-  await page.getByRole('combobox', { name: 'Modo de visualização', exact: true }).selectOption('overview');
+  await selectChoice(page.getByRole('combobox', { name: 'Modo de visualização', exact: true }), 'overview');
   await expect(graph).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('visao-geral-desktop.png'), fullPage: true });
   await page.reload();
-  await expect(page.getByRole('combobox', { name: 'Modo de visualização', exact: true })).toHaveValue('overview');
+  await expect(page.getByRole('combobox', { name: 'Modo de visualização', exact: true })).toHaveAttribute("data-value", 'overview');
   await expect(graph.getByRole('button', { name: 'Selecionar ligação Suporte para Atendimento', exact: true })).toBeVisible();
   // Remover pela linha e reconectar pelos pontos com teclado.
   await graph.getByRole('button', { name: 'Selecionar ligação Suporte para Atendimento', exact: true }).focus(); await page.keyboard.press('Enter');
   await graph.getByRole('button', { name: 'Remover ligação', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: 'Tipo de ação' })).toHaveValue('MESSAGE');
+  await expect(page.getByRole('combobox', { name: 'Tipo de ação' })).toHaveAttribute("data-value", 'MESSAGE');
   await output.focus(); await page.keyboard.press('Enter'); await input.focus(); await page.keyboard.press('Enter');
-  await expect(page.getByRole('combobox', { name: 'Tipo de ação' })).toHaveValue('SUBMENU');
+  await expect(page.getByRole('combobox', { name: 'Tipo de ação' })).toHaveAttribute("data-value", 'SUBMENU');
   await graph.getByRole('button', { name: 'Tela cheia', exact: true }).click();
   const expanded = page.getByRole('dialog', { name: 'Visão geral ampliada', exact: true });
   await expect(expanded).toBeVisible();
@@ -74,7 +79,7 @@ test('visão geral conecta pelos pontos, salva o fluxo e mantém a navegação d
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
-test('aba Integrações salva quatro operações e exibe prévia de GET e POST', async ({ page }) => {
+test('aba Integrações salva quatro operações e exibe prévia de GET e POST', async ({ page }, testInfo) => {
   let current: any = { id: 'integration-bot', name: 'SAC', revision: 1, published: null, draft: { rootMenuId: 'root', invalidMessage: 'Escolha uma opção.', backLabel: 'Voltar', menus: [{ id: 'root', name: 'Principal', text: 'Olá!', options: [] }] } };
   await page.route('**/api/**', async route => {
     const req = route.request(), path = new URL(req.url()).pathname;
@@ -90,11 +95,22 @@ test('aba Integrações salva quatro operações e exibe prévia de GET e POST',
   await page.goto('/dashboard/bots/');
   await page.getByRole('tab', { name: 'Integrações', exact: true }).click();
   const panel = page.getByRole('region', { name: 'Integrações do chamado' });
+  await expect(page.getByRole('heading', { name: 'Componentes', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Editar nó', exact: true })).toHaveCount(0);
+  await expect(page.locator('select')).toHaveCount(0);
+  await panel.getByRole('tab', { name: 'Como usar', exact: true }).click();
+  await expect(panel.getByRole('heading', { name: 'Da configuração à prévia' })).toBeVisible();
+  await expect(panel).toContainText('Nenhuma chamada é enviada');
+  await panel.getByRole('button', { name: 'Começar a configurar' }).click();
+  await selectChoice(panel.getByRole('combobox', { name: 'Método HTTP', exact: true }), 'PATCH');
+  await expect(panel.getByLabel('Corpo da requisição (JSON)', { exact: true })).toBeVisible();
+  await selectChoice(panel.getByRole('combobox', { name: 'Método HTTP', exact: true }), 'GET');
+  await expect(panel.getByLabel('Corpo da requisição (JSON)', { exact: true })).toHaveCount(0);
   await panel.getByLabel('URL base da API', { exact: true }).fill('https://api.example.com/v1');
   await panel.getByRole('button', { name: 'Visualizar requisição' }).click();
   await expect(panel).toContainText('https://api.example.com/v1/empresas?cnpj=05540238000123');
   await panel.getByRole('button', { name: /4\. Criar chamado/ }).click();
-  await expect(panel.getByLabel('Método HTTP')).toHaveValue('POST');
+  await expect(panel.getByRole('combobox', { name: 'Método HTTP', exact: true })).toHaveAttribute('data-value', 'POST');
   await panel.getByLabel('Rota', { exact: true }).fill('/tickets');
   await panel.getByRole('button', { name: 'Visualizar requisição' }).click();
   await expect(panel).toContainText('https://api.example.com/v1/tickets');
@@ -108,6 +124,11 @@ test('aba Integrações salva quatro operações e exibe prévia de GET e POST',
   await panel.getByRole('button', { name: /4\. Criar chamado/ }).click();
   await expect(panel.getByLabel('Rota', { exact: true })).toHaveValue('/tickets');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page.screenshot({ path: testInfo.outputPath('integrations-mobile.png'), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await panel.getByRole('button', { name: 'Visualizar requisição' }).click();
+  await expect(panel.getByRole('heading', { name: 'Confira antes de salvar' })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('integrations-desktop.png'), fullPage: true });
 });
 
 test('opção de chamado de teste pode ser configurada e executada no simulador existente', async ({ page }) => {
@@ -140,7 +161,7 @@ test('opção de chamado de teste pode ser configurada e executada no simulador 
   await page.setViewportSize({ width: 1720, height: 1050 });
   await page.goto('/dashboard/bots/');
   await page.getByRole('button', { name: 'Editar opção 1: Abrir chamado', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Tipo de ação' }).selectOption('SAC_TEST');
+  await selectChoice(page.getByRole('combobox', { name: 'Tipo de ação' }), 'SAC_TEST');
   await expect(page.getByText('Coleta CNPJ, nome, telefone', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: /^Salvar rascunho/ }).click();
   await expect.poll(() => saved?.menus[0]?.options[0]?.action).toBe('SAC_TEST');
@@ -186,7 +207,7 @@ test("botão direito na mensagem 4 cria o menu de opções ligado a ela", async 
   });
   await page.setViewportSize({ width: 1720, height: 1050 });
   await page.goto("/dashboard/bots/");
-  await page.getByRole("combobox", { name: "Modo de visualização", exact: true }).selectOption("menu");
+  await selectChoice(page.getByRole("combobox", { name: "Modo de visualização", exact: true }), "menu");
   await page.getByRole("button", { name: "Editar opção 1: Outro assunto", exact: true }).click();
   await page.getByRole("button", { name: "Tela cheia", exact: true }).click();
   const expanded = page.getByRole("dialog", { name: "Visualização ampliada do fluxo" });
@@ -214,10 +235,11 @@ test("botão direito na mensagem 4 cria o menu de opções ligado a ela", async 
   await expanded.getByRole("button", { name: "Editar opções", exact: true }).click();
   await expanded.getByRole("region", { name: "Editar nó", exact: true }).getByRole("button", { name: "Adicionar opção", exact: true }).click();
   await expanded.getByRole("textbox", { name: "Nome da opção", exact: true }).fill("Voltar ao início");
-  await expanded.getByRole("combobox", { name: "Tipo de ação" }).selectOption("SUBMENU");
+  await selectChoice(expanded.getByRole("combobox", { name: "Tipo de ação" }), "SUBMENU");
   const destination = expanded.getByRole("combobox", { name: "Menu de destino" });
-  await expect(destination.getByRole("option", { name: "Principal — voltar ao início", exact: true })).toHaveCount(1);
-  await destination.selectOption("root");
+  await destination.click();
+  await expect(page.getByRole("option", { name: "Principal — voltar ao início", exact: true })).toBeVisible();
+  await page.getByRole("option", { name: "Principal — voltar ao início", exact: true }).click();
   await expanded.getByRole("button", { name: /^Salvar rascunho/ }).click();
   await expect(expanded.getByRole("status")).toContainText("Rascunho salvo");
   validateFlow(saved!, true);
@@ -226,7 +248,7 @@ test("botão direito na mensagem 4 cria o menu de opções ligado a ela", async 
   expect(returned.state.menuId).toBe("root");
   expect(returned.state.stack).toEqual([]);
   expect(returned.text).toContain("Escolha o assunto");
-  await expanded.getByRole("combobox", { name: "Menu do fluxo" }).selectOption("root");
+  await selectChoice(expanded.getByRole("combobox", { name: "Menu do fluxo" }), "root");
   await expanded.getByRole("button", { name: "Editar opção 4: Problemas com scanner", exact: true }).click({ button: "right" });
   await context.getByRole("menuitem", { name: "Abrir menu de opções", exact: true }).click();
   await expect(expanded.getByRole("textbox", { name: "Nome do menu", exact: true })).toHaveValue("Problemas com scanner");
@@ -259,8 +281,29 @@ for (const width of [1440, 390]) {
     });
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("/dashboard/bots/");
-  await page.getByRole("combobox", { name: "Modo de visualização", exact: true }).selectOption("menu");
-    await page.getByRole("button", { name: "Criar bot" }).click();
+  await selectChoice(page.getByRole("combobox", { name: "Modo de visualização", exact: true }), "menu");
+    await expect(page.getByRole("heading", { name: "Bots da empresa", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Criar bot", exact: true })).toHaveCount(0);
+    const components = page.getByRole("button", { name: "Componentes", exact: true });
+    await components.click();
+    await expect(components).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByRole("button", { name: /Menu de opções Cria/ })).toHaveCount(0);
+    const menus = page.getByRole("button", { name: "Menus do fluxo", exact: true });
+    await menus.click();
+    await expect(page.getByRole("textbox", { name: "Buscar menu", exact: true })).toHaveCount(0);
+    await page.reload();
+    await expect(components).toHaveAttribute("aria-expanded", "false");
+    await expect(menus).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByRole("button", { name: /Menu de opções Cria/ })).toHaveCount(0);
+    await expect(page.getByRole("textbox", { name: "Buscar menu", exact: true })).toHaveCount(0);
+    await components.click();
+    await expect(page.getByRole("button", { name: /Menu de opções Cria/ })).toBeVisible();
+    await menus.click();
+    await page.reload();
+    await expect(components).toHaveAttribute("aria-expanded", "true");
+    await expect(menus).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("textbox", { name: "Buscar menu", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Editar nó", exact: true }).click();
     await page.getByRole("textbox", { name: "Nome do bot", exact: true }).fill("Assistente Infordoc");
     await page.getByRole("textbox", { name: "Mensagem inicial", exact: true }).fill("Assistente Infordoc\nOlá! Bem-vindo ao suporte técnico.");
     await page.getByRole("button", { name: "Adicionar opção" }).click();
@@ -324,6 +367,61 @@ for (const width of [1440, 390]) {
     await page.getByRole("button", { name: "Testar bot", exact: true }).click();
     await expect(page.getByText(/nenhuma mensagem será enviada/)).toBeVisible();
     await expect(page.getByRole("region", { name: "Simulador do bot" })).toContainText("1 — Ajuda para abrir chamado");
+    const simulator = page.getByRole("region", { name: "Simulador do bot" });
+    const phone = simulator.getByRole("group", { name: "Prévia de iPhone Pro Max" });
+    await expect(phone).toBeVisible();
+    const phoneBox = (await phone.boundingBox())!;
+    expect(phoneBox.width / phoneBox.height).toBeCloseTo(1320 / 2868, 3);
+    expect(phoneBox.x).toBeGreaterThanOrEqual(0);
+    expect(phoneBox.y).toBeGreaterThanOrEqual(0);
+    expect(phoneBox.x + phoneBox.width).toBeLessThanOrEqual(width);
+    expect(phoneBox.y + phoneBox.height).toBeLessThanOrEqual(1000);
+    await expect(phone.getByRole("textbox", { name: "Mensagem de teste" })).toBeVisible();
+    await expect(phone.getByText("Hoje", { exact: true })).toBeVisible();
+    await phone.getByRole("button", { name: "Emojis do teste", exact: true }).click();
+    await phone.getByRole("group", { name: "Emojis do teste", exact: true }).getByRole("button", { name: "Inserir 👋", exact: true }).click();
+    await expect(phone.getByRole("textbox", { name: "Mensagem de teste" })).toHaveValue("👋");
+    await phone.getByRole("button", { name: "Emojis do teste", exact: true }).click();
+    await phone.getByRole("textbox", { name: "Mensagem de teste" }).fill("");
+    await phone.getByRole("button", { name: "Ocultar respostas rápidas", exact: true }).click();
+    await expect(phone.getByRole("button", { name: "Mostrar respostas rápidas", exact: true })).toHaveAttribute("aria-expanded", "false");
+    await phone.getByRole("button", { name: "Mostrar respostas rápidas", exact: true }).click();
+    await simulator.getByRole("tab", { name: "Histórico do teste" }).click();
+    await expect(simulator).toContainText("1 — Ajuda para abrir chamado");
+    await simulator.getByRole("tab", { name: "Teste do bot", exact: true }).click();
+    await expect(phone).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath("simulador-iphone.png") });
+    await page.setViewportSize({ width, height: 720 });
+    await expect.poll(async () => {
+      const box = (await phone.boundingBox())!;
+      return Math.abs(box.width / box.height - 1320 / 2868) < .001 && box.y >= 0 && box.y + box.height <= 720;
+    }).toBe(true);
+    const compactPhone = (await phone.boundingBox())!;
+    expect(compactPhone.width).toBeLessThan(phoneBox.width);
+    await expect(phone.getByRole("textbox", { name: "Mensagem de teste" })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath("simulador-iphone-baixo.png") });
+    await page.setViewportSize({ width, height: 1000 });
+    await expect(simulator.getByRole("button", { name: "Fechar teste", exact: true })).toHaveCount(0);
+    const closeFrames = page.evaluate(() => new Promise<string[]>(resolve => {
+      const frames: string[] = [];
+      const start = performance.now();
+      function sample() {
+        const panel = document.querySelector("[data-bot-test-panel]");
+        if (!panel) { resolve(frames); return; }
+        const style = getComputedStyle(panel);
+        frames.push(style.transform);
+        if (style.visibility === "hidden" || performance.now() - start > 2000) { resolve(frames); return; }
+        requestAnimationFrame(sample);
+      }
+      sample();
+    }));
+    await page.getByRole("button", { name: "Fechar teste", exact: true }).click();
+    expect(new Set(await closeFrames).size).toBeGreaterThan(3);
+    await expect(simulator).toBeHidden();
+    await page.getByRole("button", { name: "Testar bot", exact: true }).click();
+    await expect(simulator).toBeVisible();
+    await expect(simulator).toContainText("1 — Ajuda para abrir chamado");
+    await page.getByRole("button", { name: "Fechar teste", exact: true }).click();
     await page.getByRole("button", { name: "Editar Mensagem", exact: true }).click();
     await page.getByRole("button", { name: "Menu de opções Cria um novo submenu", exact: true }).click();
     await page.getByRole("textbox", { name: "Nome do menu", exact: true }).fill("Menu sem uso");
@@ -361,11 +459,15 @@ test("designer visual: selecionar nós, arrastar, salvar posições e abrir subm
   });
   await page.setViewportSize({ width: 1720, height: 1050 });
   await page.goto("/dashboard/bots/");
-  await page.getByRole("combobox", { name: "Modo de visualização", exact: true }).selectOption("menu");
+  await selectChoice(page.getByRole("combobox", { name: "Modo de visualização", exact: true }), "menu");
   await page.getByRole('button', { name: 'Editar Mensagem', exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Mensagem inicial", exact: true })).toHaveValue(draft.menus[0].text);
   const menuList = page.getByRole("region", { name: "Menus do fluxo", exact: true });
   const scannerMenuButton = menuList.getByRole("button", { name: "Ver menu Menu principal › Scanner", exact: true });
+  await menuList.getByRole("button", { name: "Recolher Menu principal", exact: true }).click();
+  await expect(scannerMenuButton).toHaveCount(0);
+  await menuList.getByRole("button", { name: "Expandir Menu principal", exact: true }).click();
+  await expect(scannerMenuButton).toBeVisible();
   await scannerMenuButton.click();
   const menuDetails = page.getByRole("dialog", { name: "Scanner", exact: true });
   await expect(menuDetails).toBeVisible();
@@ -444,9 +546,9 @@ test("designer visual: selecionar nós, arrastar, salvar posições e abrir subm
   expect(movedPosition!.x).toBeGreaterThan(expandedPosition!.x + 30);
   expect(movedPosition!.y).toBeGreaterThan(expandedPosition!.y + 20);
   await expect(page.getByRole("dialog").getByRole("textbox", { name: "Mensagem inicial", exact: true })).toBeVisible();
-  await page.getByRole("dialog").getByRole("combobox", { name: "Menu do fluxo" }).selectOption("scanner-menu");
+  await selectChoice(page.getByRole("dialog").getByRole("combobox", { name: "Menu do fluxo" }), "scanner-menu");
   await expect(page.getByRole("dialog").getByRole("textbox", { name: "Mensagem do submenu" })).toHaveValue("Qual problema você está enfrentando?");
-  await page.getByRole("dialog").getByRole("combobox", { name: "Menu do fluxo" }).selectOption("root");
+  await selectChoice(page.getByRole("dialog").getByRole("combobox", { name: "Menu do fluxo" }), "root");
   await page.getByRole("button", { name: "Fechar visualização do fluxo" }).click();
   const messageNode = page.locator('[data-flow-node="root:message"]');
   const bounds = await messageNode.boundingBox(); expect(bounds).not.toBeNull();
@@ -472,7 +574,7 @@ test("designer visual: selecionar nós, arrastar, salvar posições e abrir subm
   expect(contextBounds.y + contextBounds.height).toBeLessThanOrEqual(background.y + background.height + 1);
   await contextMenu.getByRole("menuitem", { name: "Transferir para humano", exact: true }).click();
   await expect(contextMenu).toHaveCount(0);
-  await expect(page.getByRole("combobox", { name: "Tipo de ação" })).toHaveValue("HUMAN");
+  await expect(page.getByRole("combobox", { name: "Tipo de ação" })).toHaveAttribute("data-value", "HUMAN");
   await page.getByRole("textbox", { name: "Conteúdo da resposta" }).fill("Aguarde um técnico.");
   await page.getByRole("button", { name: /^Salvar rascunho/ }).click();
   await expect(page.getByRole("status")).toContainText("Rascunho salvo");
@@ -482,5 +584,248 @@ test("designer visual: selecionar nós, arrastar, salvar posições e abrir subm
   await page.getByRole("button", { name: "Abrir submenu", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Mensagem do submenu" })).toHaveValue("Qual problema você está enfrentando?");
   await page.getByRole("button", { name: "Editar opção 1: Falar com suporte", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "Tipo de ação" })).toHaveValue("HUMAN");
+  await expect(page.getByRole("combobox", { name: "Tipo de ação" })).toHaveAttribute("data-value", "HUMAN");
+});
+
+for (const width of [390, 1440]) {
+  test(`mensagem longa amplia ao centro e preserva o rascunho (${width}px)`, async ({ page }, testInfo) => {
+    const draft: BotFlow = { rootMenuId: "root", backLabel: "Voltar", invalidMessage: "Escolha uma opção.", menus: [
+      { id: "root", name: "Principal", text: "Olá!", options: [] },
+    ] };
+    let saved: BotFlow | undefined;
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.route("**/api/**", async route => {
+      const request = route.request(), path = new URL(request.url()).pathname;
+      if (path.endsWith("/auth/get-session")) return route.fulfill({ json: { user: { id: "admin", name: "Admin", email: "admin@example.invalid" }, session: { id: "session", userId: "admin", expiresAt: "2099-01-01T00:00:00Z" } } });
+      if (path.endsWith("/bots/long-text") && request.method() === "PUT") {
+        saved = request.postDataJSON().draft;
+        return route.fulfill({ json: { id: "long-text", name: "Bot", draft: saved, published: null, revision: 2 } });
+      }
+      if (path.endsWith("/bots")) return route.fulfill({ json: { bots: [{ id: "long-text", name: "Bot", draft, published: null, revision: 1 }], activeBotId: null, instanceAvailable: true } });
+      return route.fulfill({ json: {} });
+    });
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/dashboard/bots/");
+    await page.getByRole("button", { name: "Editar Mensagem", exact: true }).click();
+    const inline = page.getByRole("textbox", { name: "Mensagem inicial", exact: true });
+    const text = "Olá! Esta é uma mensagem com várias linhas.\n".repeat(18);
+    await inline.fill(text);
+    const dialog = page.getByRole("dialog", { name: "Mensagem inicial", exact: true });
+    await expect(dialog).toBeVisible();
+    const enlarged = dialog.getByRole("textbox", { name: "Mensagem inicial", exact: true });
+    await expect(enlarged).toBeFocused();
+    await expect(enlarged).toHaveValue(text);
+    const box = (await dialog.boundingBox())!;
+    expect(Math.abs(box.x + box.width / 2 - width / 2)).toBeLessThan(2);
+    expect(Math.abs(box.y + box.height / 2 - 450)).toBeLessThan(2);
+    const edited = text + "Fim da mensagem.";
+    await enlarged.fill(edited);
+    await expect.poll(async () => {
+      const field = (await enlarged.boundingBox())!;
+      return Math.abs(field.x + field.width / 2 - width / 2) < 1 && Math.abs(field.y + field.height / 2 - 450) < 1;
+    }).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath("mensagem-ampliada.png") });
+    const returnAnimation = page.evaluate(() => new Promise<{ x: number; y: number; width: number; height: number }[]>(resolve => {
+      const frames: { x: number; y: number; width: number; height: number }[] = [];
+      const start = performance.now();
+      function frame() {
+        const field = document.querySelector('dialog[aria-label="Mensagem inicial"] textarea');
+        if (!field || performance.now() - start > 2000) { resolve(frames); return; }
+        const box = field.getBoundingClientRect();
+        frames.push({ x: box.x, y: box.y, width: box.width, height: box.height });
+        requestAnimationFrame(frame);
+      }
+      frame();
+    }));
+    await page.keyboard.press("Escape");
+    const frames = await returnAnimation;
+    expect(frames.length).toBeGreaterThan(3);
+    expect(new Set(frames.map(frame => Math.round(frame.width))).size).toBeGreaterThan(3);
+    await expect(dialog).toBeHidden();
+    const destination = (await inline.boundingBox())!;
+    const last = frames.at(-1)!;
+    expect(Math.abs(last.x - destination.x)).toBeLessThan(3);
+    expect(Math.abs(last.y - destination.y)).toBeLessThan(3);
+    expect(Math.abs(last.width - destination.width)).toBeLessThan(3);
+    expect(Math.abs(last.height - destination.height)).toBeLessThan(3);
+    await expect(inline).toBeFocused();
+    await expect(inline).toHaveValue(edited);
+    await page.getByRole("button", { name: "Ampliar mensagem inicial" }).click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button")).toHaveCount(0);
+    await expect(dialog.getByRole("heading")).toHaveCount(0);
+    expect(await dialog.evaluate(element => {
+      const backdrop = getComputedStyle(element, "::backdrop");
+      return { blur: backdrop.backdropFilter, background: backdrop.backgroundColor };
+    })).toEqual({ blur: "none", background: "rgba(0, 0, 0, 0)" });
+    await page.mouse.click(4, 4);
+    await expect(dialog).toBeHidden();
+    await page.getByRole("button", { name: /^Salvar rascunho/ }).click();
+    await expect.poll(() => saved?.menus[0].text).toBe(edited);
+    await page.getByRole("button", { name: "Tela cheia", exact: true }).click();
+    const fullScreen = page.getByRole("dialog", { name: "Visualização ampliada do fluxo", exact: true });
+    await fullScreen.getByRole("button", { name: "Editar Mensagem", exact: true }).click();
+    await fullScreen.getByRole("button", { name: "Ampliar mensagem inicial" }).click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("textbox", { name: "Mensagem inicial", exact: true })).toHaveValue(edited);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(fullScreen).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+}
+
+for (const height of [720, 1080]) {
+  test(`editor ocupa a altura disponível sem faixa vazia (${height}px)`, async ({ page }, testInfo) => {
+    const draft: BotFlow = { rootMenuId: "root", backLabel: "Voltar", invalidMessage: "Escolha uma opção.", menus: [
+      { id: "root", name: "Principal", text: "Olá!", options: [] },
+    ] };
+    await page.route("**/api/**", async route => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.endsWith("/auth/get-session")) return route.fulfill({ json: { user: { id: "admin", name: "Admin", email: "admin@example.invalid" }, session: { id: "session", userId: "admin", expiresAt: "2099-01-01T00:00:00Z" } } });
+      if (path.endsWith("/bots")) return route.fulfill({ json: { bots: [{ id: "layout", name: "Bot", draft, published: null, revision: 1 }], activeBotId: null, instanceAvailable: true } });
+      return route.fulfill({ json: {} });
+    });
+    await page.setViewportSize({ width: 1920, height });
+    await page.goto("/dashboard/bots/");
+    for (const mode of ["menu", "overview"]) {
+      await selectChoice(page.getByRole("combobox", { name: "Modo de visualização", exact: true }), mode);
+      const canvas = page.getByRole("region", { name: mode === "menu" ? "Designer de fluxo" : "Visão geral do fluxo", exact: true });
+      await expect(canvas).toBeVisible();
+      await expect.poll(async () => {
+        const box = (await canvas.boundingBox())!;
+        return Math.abs(height - box.y - box.height - 12) < 2;
+      }).toBe(true);
+      const sidebar = page.locator("aside");
+      const sidebarBox = (await sidebar.boundingBox())!;
+      const canvasBox = (await canvas.boundingBox())!;
+      expect(Math.abs(sidebarBox.y + sidebarBox.height - canvasBox.y - canvasBox.height)).toBeLessThan(2);
+      expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(height);
+      await expect(sidebar).toHaveCSS("scrollbar-width", "none");
+    }
+    await page.getByRole("button", { name: "Editar menu Principal", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Editar nó", exact: true })).toBeVisible();
+    const editorBox = (await page.getByRole("region", { name: "Editar nó", exact: true }).boundingBox())!;
+    expect(Math.abs(height - editorBox.y - editorBox.height - 12)).toBeLessThan(2);
+    const panel = page.locator("[data-bot-editor-panel]");
+    await expect.poll(async () => (await panel.boundingBox())!.width).toBeCloseTo(312, 0);
+    await page.screenshot({ path: testInfo.outputPath("editor-altura-completa.png") });
+    const closingFrames = page.evaluate(() => new Promise<{ width: number; opacity: number; canvas: number }[]>(resolve => {
+      const frames: { width: number; opacity: number; canvas: number }[] = [];
+      const started = performance.now();
+      function sample() {
+        const panel = document.querySelector("[data-bot-editor-panel]");
+        const canvas = document.querySelector('[aria-label="Visão geral do fluxo"]');
+        if (!panel || !canvas || performance.now() - started > 2000) { resolve(frames); return; }
+        frames.push({ width: panel.getBoundingClientRect().width, opacity: Number(getComputedStyle(panel).opacity), canvas: canvas.getBoundingClientRect().width });
+        requestAnimationFrame(sample);
+      }
+      sample();
+    }));
+    await page.getByRole("button", { name: "Fechar edição", exact: true }).click();
+    const frames = await closingFrames;
+    expect(new Set(frames.map(frame => Math.round(frame.width))).size).toBeGreaterThan(3);
+    expect(new Set(frames.map(frame => frame.opacity)).size).toBeGreaterThan(3);
+    await expect(panel).toHaveCount(0);
+    expect(frames.at(-1)!.width).toBeLessThan(3);
+    expect(frames.at(-1)!.canvas - frames[0].canvas).toBeGreaterThan(300);
+    await page.getByRole("button", { name: "Editar nó", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Editar nó", exact: true })).toBeVisible();
+    await expect.poll(async () => (await panel.boundingBox())!.width).toBeCloseTo(312, 0);
+    await expect(page.getByRole("textbox", { name: "Mensagem inicial", exact: true })).toHaveValue("Olá!");
+  });
+}
+
+test("excluir, desfazer e refazer preserva posições, vínculos e edição de texto", async ({ page }) => {
+  const original: BotFlow = { rootMenuId: "root", backLabel: "Voltar", invalidMessage: "Escolha uma opção.", layout: {
+    "root:context": { x: 20, y: 20 }, "graph:root:context": { x: 20, y: 20 },
+    "root:keyboard": { x: 280, y: 20 }, "graph:root:keyboard": { x: 280, y: 20 },
+    "root:graph": { x: 540, y: 20 }, "graph:root:graph": { x: 540, y: 20 },
+    "unused:menu": { x: 20, y: 20 }, "graph:unused:menu": { x: 20, y: 20 },
+  }, menus: [
+    { id: "root", name: "Principal", text: "Olá", options: [
+      { id: "context", number: "1", label: "Contexto", response: "A", action: "MESSAGE", active: true, targetMenuId: "" },
+      { id: "keyboard", number: "2", label: "Teclado", response: "B", action: "MESSAGE", active: true, targetMenuId: "" },
+      { id: "graph", number: "3", label: "Visão geral", response: "C", action: "MESSAGE", active: true, targetMenuId: "" },
+      { id: "link", number: "4", label: "Submenu", response: "", action: "SUBMENU", active: true, targetMenuId: "child" },
+    ] },
+    { id: "child", name: "Vinculado", text: "Atendimento", options: [] },
+    { id: "unused", name: "Sem vínculo", text: "Menu independente", options: [] },
+  ] };
+  let current = { id: "delete", name: "Bot", draft: original, published: structuredClone(original), revision: 1 };
+  await page.route("**/api/**", async route => {
+    const request = route.request(), path = new URL(request.url()).pathname;
+    if (path.endsWith("/auth/get-session")) return route.fulfill({ json: { user: { id: "admin", name: "Admin", email: "admin@example.invalid" }, session: { id: "session", userId: "admin", expiresAt: "2099-01-01T00:00:00Z" } } });
+    if (path.endsWith("/bots/delete") && request.method() === "PUT") {
+      current = { ...current, ...request.postDataJSON(), revision: current.revision + 1 };
+      return route.fulfill({ json: current });
+    }
+    if (path.endsWith("/bots")) return route.fulfill({ json: { bots: [current], activeBotId: null, instanceAvailable: true } });
+    return route.fulfill({ json: {} });
+  });
+  await page.setViewportSize({ width: 1720, height: 1050 });
+  await page.goto("/dashboard/bots/");
+  const canvas = page.getByRole("region", { name: "Designer de fluxo", exact: true });
+  await canvas.getByRole("button", { name: "Ajustar", exact: true }).click();
+  const keyboard = canvas.locator('[data-flow-node="root:keyboard"]');
+  await keyboard.click();
+  const context = canvas.locator('[data-flow-node="root:context"]');
+  await context.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Excluir", exact: true }).click();
+  await expect(context).toHaveCount(0);
+  await page.keyboard.press("Control+z");
+  await expect(context).toBeVisible();
+  await page.getByRole("button", { name: /^Salvar rascunho/ }).click();
+  await expect.poll(() => current.draft.menus[0].options.map(option => option.id)).toEqual(["context", "keyboard", "graph", "link"]);
+  expect(current.draft.layout?.["root:context"]).toEqual(original.layout?.["root:context"]);
+  expect(current.draft.layout?.["graph:root:context"]).toEqual(original.layout?.["graph:root:context"]);
+  await page.locator("[data-flow-viewport]").focus();
+  await page.keyboard.press("Control+Shift+z");
+  await expect(context).toHaveCount(0);
+  await expect(keyboard).toBeVisible();
+  await keyboard.click();
+  const label = page.getByRole("textbox", { name: "Nome da opção", exact: true });
+  await label.press("Home");
+  await label.press("Delete");
+  await expect(label).toHaveValue("eclado");
+  await label.press("Control+z");
+  await expect(label).toHaveValue("Teclado");
+  await expect(context).toHaveCount(0);
+  await expect(keyboard).toBeVisible();
+  await keyboard.press("Delete");
+  await expect(keyboard).toHaveCount(0);
+  await page.keyboard.press("Control+z");
+  await expect(keyboard).toBeVisible();
+  await expect(keyboard).toBeFocused();
+  await page.keyboard.press("Control+Shift+z");
+  await expect(keyboard).toHaveCount(0);
+  await selectChoice(page.getByRole("combobox", { name: "Modo de visualização", exact: true }), "overview");
+  const overview = page.getByRole("region", { name: "Visão geral do fluxo", exact: true });
+  const graphOption = overview.locator('[data-graph-node="graph:root:graph"]');
+  await graphOption.click();
+  await graphOption.press("Delete");
+  await expect(graphOption).toHaveCount(0);
+  const root = overview.getByRole("button", { name: "Editar menu Principal", exact: true });
+  await root.click();
+  await root.press("Delete");
+  await expect(root).toBeVisible();
+  const linked = overview.getByRole("button", { name: "Editar menu Vinculado", exact: true });
+  await linked.click();
+  await linked.press("Delete");
+  await expect(linked).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Remova as opções que apontam" })).toBeVisible();
+  const unused = overview.getByRole("button", { name: "Editar menu Sem vínculo", exact: true });
+  await unused.click();
+  await unused.press("Delete");
+  await expect(unused).toHaveCount(0);
+  await page.keyboard.press("Control+z");
+  await expect(unused).toBeVisible();
+  await page.keyboard.press("Control+y");
+  await expect(unused).toHaveCount(0);
+  await page.getByRole("button", { name: /^Salvar rascunho/ }).click();
+  await expect.poll(() => current.draft.menus[0].options.map(option => option.id)).toEqual(["link"]);
+  expect(current.draft.menus.map(menu => menu.id)).toEqual(["root", "child"]);
+  for (const key of ["root:context", "graph:root:context", "root:keyboard", "graph:root:keyboard", "root:graph", "graph:root:graph", "unused:menu", "graph:unused:menu"]) expect(current.draft.layout).not.toHaveProperty(key);
+  expect(current.published).toEqual(original);
 });

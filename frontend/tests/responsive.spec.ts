@@ -597,3 +597,47 @@ test("segurar uma mensagem abre as ações e arrastar cancela o gesto", async ({
   expect(await page.locator("html").getAttribute("data-copied-message")).toContain(longWord);
   expect(runtimeErrors).toEqual([]);
 });
+
+for (const width of [320, 480, 1280]) {
+  test(`menu de modelos de áudio permanece dentro da tela (${width}px)`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 700 });
+    const { runtimeErrors } = await mockApi(page);
+    const updates: unknown[] = [];
+    await page.route("**/api/contacts/1/messages*", (route) => {
+      if (!new URL(route.request().url()).pathname.endsWith("/messages")) return route.fallback();
+      return route.fulfill({ json: { messages: ["INCOMING", "OUTGOING"].map((direction, index) => ({
+        id: index + 1, externalId: `audio-${index}`, content: "Áudio", type: "AUDIO", direction,
+        contactId: 1, createdAt: new Date().toISOString(), private: false,
+      })), hasMore: false, nextCursor: null } });
+    });
+    await page.route("**/api/messages/*/media", (route) => route.abort());
+    await page.route("**/api/transcription/settings", async (route) => {
+      if (route.request().method() === "PUT") updates.push(route.request().postDataJSON());
+      await route.fulfill({ json: { model: "base", beam_size: 5, vad_filter: true, language: "pt" } });
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+    const triggers = page.getByRole("button", { name: "Configurações de transcrição" });
+    await expect(triggers).toHaveCount(2);
+    for (const trigger of [triggers.first(), triggers.last()]) {
+      await trigger.click();
+      const popup = page.getByRole("dialog", { name: "Modelo de transcrição" });
+      await expect(popup).toBeVisible();
+      await expect(popup.getByRole("radio", { name: "Base", exact: true })).toBeChecked();
+      await expect.poll(async () => {
+        const box = await popup.boundingBox();
+        return !!box && box.x >= 11 && box.y >= 11 && box.x + box.width <= width - 11 && box.y + box.height <= 689;
+      }).toBe(true);
+      await expectNoHorizontalOverflow(page);
+      await popup.getByText("Medium", { exact: true }).click();
+      await expect(popup.getByRole("radio", { name: "Medium", exact: true })).toBeChecked();
+      await page.screenshot({ path: testInfo.outputPath(`audio-modelo-${await trigger.getAttribute("aria-controls")}.png`) });
+      await page.keyboard.press("Escape");
+      await expect(popup).toBeHidden();
+      await expect(trigger).toBeFocused();
+    }
+    expect(updates).toHaveLength(2);
+    expect(updates[0]).toMatchObject({ model: "medium" });
+    expect(runtimeErrors).toEqual([]);
+  });
+}

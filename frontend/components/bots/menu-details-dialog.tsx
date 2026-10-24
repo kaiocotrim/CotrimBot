@@ -2,27 +2,41 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import Image from "next/image";
+import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "framer-motion";
 import { ArrowRight, ChevronRight, ListTree, MessageSquare, X } from "lucide-react";
 import { MessageText } from "@/components/chat/message-text";
 import { botImageUrl, type BotFlow, type BotMenu } from "@/lib/bot-api";
 import styles from "./bot-designer.module.css";
 
-export function MenuDetailsDialog({ menu, flow, path, onClose, onEdit, onNavigate }: {
+type MenuDetailsProps = {
   menu: BotMenu | undefined;
   flow: BotFlow;
   path: string | undefined;
   onClose: () => void;
   onEdit: (menuId: string, optionId?: string) => void;
   onNavigate: (menuId: string) => void;
-}) {
+};
+
+export function MenuDetailsDialog(props: MenuDetailsProps) {
+  return <AnimatePresence>{props.menu && <MenuDetailsContent key="menu-details" {...props} menu={props.menu} />}</AnimatePresence>;
+}
+
+function MenuDetailsContent({ menu, flow, path, onClose, onEdit, onNavigate }: MenuDetailsProps & { menu: BotMenu }) {
+  const reduced = useReducedMotion();
+  const present = useIsPresent();
+  const transition = reduced ? { duration: 0 } : { type: "spring" as const, stiffness: 300, damping: 32, mass: .8 };
   const entries = menu ? flow.menus.flatMap(parent => parent.options
     .filter(option => option.action === "SUBMENU" && option.targetMenuId === menu.id)
     .map(option => ({ parent, option }))) : [];
   const isRoot = menu?.id === flow.rootMenuId;
-  return <Dialog.Root open={Boolean(menu)} onOpenChange={open => { if (!open) onClose(); }}>
+  return <Dialog.Root open onOpenChange={open => { if (!open) onClose(); }}>
     <Dialog.Portal>
-      <Dialog.Backdrop className={styles.menuDialogBackdrop} />
-      <Dialog.Popup className={styles.menuDialog}>
+      <Dialog.Backdrop className={styles.menuDialogBackdrop} render={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduced ? 0 : .2 }} />} />
+      <div className={styles.menuDialogPositioner}>
+      <Dialog.Popup className={styles.menuDialog} aria-hidden={!present || undefined} style={{ pointerEvents: present ? "auto" : "none" }} render={<motion.div
+        initial={reduced ? false : { opacity: 0, y: 14, scale: .975 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: reduced ? 0 : 8, scale: reduced ? 1 : .985 }} transition={{ ...transition, opacity: { duration: reduced ? 0 : .18 } }}
+      />}>
         {menu && <>
           <header className={styles.menuDialogHeader}>
             <span className={styles.menuDialogIcon}><ListTree size={22} /></span>
@@ -67,6 +81,7 @@ export function MenuDetailsDialog({ menu, flow, path, onClose, onEdit, onNavigat
           </footer>
         </>}
       </Dialog.Popup>
+      </div>
     </Dialog.Portal>
   </Dialog.Root>;
 }

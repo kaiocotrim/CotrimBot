@@ -1,0 +1,16 @@
+.trigger { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-width: 0; margin-top: 8px; padding: 12px 14px; min-height: 42px; border: 1px solid #ffffff13; border-radius: 13px; background: #ffffff04; color: #e4e4e7; font: inherit; font-size: 13px; text-align: left; outline: none; transition: background .2s, border-color .2s; }
+.trigger:hover, .trigger[data-popup-open] { background: #ffffff0a; border-color: #ffffff28; }
+.trigger:focus-visible { outline: 2px solid #a1a1aa; outline-offset: 3px; }
+.trigger svg { flex-shrink: 0; color: #94949e; transition: transform .2s; }
+.trigger[data-popup-open] svg { transform: rotate(180deg); }
+.value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compact { width: auto; max-width: 190px; margin: 0; min-height: 29px; padding: 5px 9px; gap: 14px; border-radius: 10px; font-size: 10px; }
+.positioner { z-index: 180; width: var(--anchor-width); min-width: min(180px, var(--available-width)); max-width: var(--available-width); outline: none; }
+.popup { padding: 6px; border: 1px solid #ffffff1a; border-radius: 16px; background: #232325; color: #e4e4e7; box-shadow: 0 16px 50px #0005; font: 13px/1.45 Arial, sans-serif; transform-origin: var(--transform-origin); transition: opacity .2s, transform .25s cubic-bezier(.2,.8,.2,1); outline: none; }
+.popup[data-starting-style], .popup[data-ending-style] { opacity: 0; transform: translateY(-4px) scale(.98); }
+.list { max-height: min(280px, calc(var(--available-height) - 16px)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.list::-webkit-scrollbar { display: none; }
+.item { display: flex; gap: 16px; align-items: center; min-height: 39px; padding: 10px 11px; border-radius: 10px; outline: none; cursor: default; }
+.item[data-selected] { background: #ffffff08; color: #fafafa; }
+.item[data-highlighted] { background: #ffffff10; }
+@media (prefers-reduced-motion: reduce) { .popup, .trigger, .trigger svg { transition: none; } }
