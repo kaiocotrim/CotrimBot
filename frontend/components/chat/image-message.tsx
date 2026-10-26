@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Avatar } from "@/components/chat/avatar";
@@ -32,6 +32,7 @@ export function ImageMessage({ messageId, mediaUrl, content, showSignature, view
   const [open, setOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [activeIndex, setActiveIndex] = useState(0);
+  const imageViewport = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
   const hasCaption = content !== "[Imagem]";
   const fallbackItem = { id: messageId, mediaUrl, content, showSignature, createdAt, viewOnce };
@@ -58,9 +59,20 @@ export function ImageMessage({ messageId, mediaUrl, content, showSignature, view
       }
     }
     document.addEventListener("keydown", handleKeyDown);
+    const viewport = imageViewport.current;
+    function handleWheel(event: WheelEvent) {
+      if (!Number.isFinite(event.deltaY) || event.deltaY === 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewport?.clientHeight ?? 800 : 1;
+      const delta = Math.max(-240, Math.min(240, event.deltaY * unit));
+      setZoom(value => Math.max(0.5, Math.min(3, value * Math.exp(-delta * 0.0025))));
+    }
+    viewport?.addEventListener("wheel", handleWheel, { passive: false });
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", handleKeyDown);
+      viewport?.removeEventListener("wheel", handleWheel);
     };
   }, [gallery.length, open]);
 
@@ -110,7 +122,7 @@ export function ImageMessage({ messageId, mediaUrl, content, showSignature, view
             </div>
           </header>
 
-          <div onClick={closeViewer} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-6 py-4">
+          <div ref={imageViewport} onClick={closeViewer} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-6 py-4">
             <motion.div
               key={activeItem.id}
               onClick={(event) => event.stopPropagation()}

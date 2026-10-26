@@ -5,7 +5,7 @@ import Image from "next/image";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowDown, ArrowLeft, ArrowUp, BatteryFull, Bot as BotIcon, ChevronDown, ChevronRight, CheckCheck, Copy, GitBranch, Info, ImagePlus, ListTree, LoaderCircle, MessageSquare, Play, Plus, Power, RotateCcw, Save, Send, Settings2, Signal, Smile, SquareCheck, Trash2, UserRound, Wifi, Workflow, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, BatteryFull, Bot as BotIcon, ChevronDown, ChevronRight, CheckCheck, Copy, GitBranch, Info, ImagePlus, ListTree, LoaderCircle, MessageSquare, Play, Plus, RotateCcw, Save, Send, Settings2, Signal, Smile, SquareCheck, Trash2, UserRound, Wifi, Workflow, X } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { MessageText } from "@/components/chat/message-text";
 import { botImageUrl, botRequest, emptyFlow, type Bot, type BotFlow, type BotList, type BotMenu, type BotOption, type Simulation } from "@/lib/bot-api";
@@ -17,8 +17,10 @@ import { BotSelect } from "./bot-select";
 import { BotMessageField } from "./bot-message-field";
 import { BotImageInput } from "./bot-image-input";
 import { MenuDetailsDialog } from "./menu-details-dialog";
+import { MenuNameDialog } from "./menu-name-dialog";
 import { MenuTree } from "./menu-tree";
 import { FlowCanvas, type NodeSelection } from "./flow-canvas";
+import { BotSettingsPanel } from "./bot-settings";
 import { BotIntegrationsPanel } from './bot-integrations';
 import { BotGraphCanvas } from './bot-graph-canvas';
 import { connectBotOption } from '@/lib/bot-graph';
@@ -54,6 +56,7 @@ export default function BotDesigner() {
   const [flow, setFlow] = useState<BotFlow>(emptyFlow);
   const [menuId, setMenuId] = useState("root");
   const [previewMenuId, setPreviewMenuId] = useState<string | null>(null);
+  const [namingMenu, setNamingMenu] = useState<{ mode: "create"; parentOption?: BotOption } | { mode: "rename"; id: string } | null>(null);
   const [selection, setSelection] = useState<NodeSelection>({ kind: "message" });
   const [tab, setTab] = useState<"flow" | "settings" | "integrations">("flow");
   const [busy, setBusy] = useState(false);
@@ -206,12 +209,24 @@ export default function BotDesigner() {
   }
   function addMenu(parentOption?: BotOption) {
     if (flow.menus.length >= 50) return;
+    setNamingMenu({ mode: "create", parentOption });
+  }
+  function confirmMenuName(name: string) {
+    if (!namingMenu || !name.trim()) return;
+    if (namingMenu.mode === "rename") {
+      change({ ...flow, menus: flow.menus.map(item => item.id === namingMenu.id ? { ...item, name: name.trim() } : item) });
+      setNamingMenu(null);
+      return;
+    }
+    if (flow.menus.length >= 50) return;
+    const parentOption = namingMenu.parentOption;
     const id = crypto.randomUUID();
-    const submenu: BotMenu = { id, name: parentOption ? parentOption.label.trim().slice(0, 100) || `Menu da opção ${parentOption.number}` : "Novo submenu", text: parentOption?.response ?? "", options: [], ...(parentOption?.imageId ? { imageId: parentOption.imageId } : {}) };
+    const submenu: BotMenu = { id, name: name.trim(), text: parentOption?.response ?? "", options: [], ...(parentOption?.imageId ? { imageId: parentOption.imageId } : {}) };
     const menus = flow.menus.map(item => item.id === menu.id && parentOption
       ? { ...item, options: item.options.map(itemOption => itemOption.id === parentOption.id ? { ...itemOption, action: "SUBMENU" as const, targetMenuId: id } : itemOption) }
       : item);
     change({ ...flow, menus: [...menus, submenu] }); setMenuId(id); selectNode({ kind: "message" });
+    setNamingMenu(null);
   }
   function addOption(action: BotOption["action"] = "MESSAGE", copy?: BotOption, position?: { x: number; y: number }) {
     if (!menu || menu.options.length >= 50) return;
@@ -231,6 +246,7 @@ export default function BotDesigner() {
   async function save(nextFlow = flow) {
     if (!name.trim()) throw new Error("Informe o nome do bot.");
     for (const m of nextFlow.menus) {
+      if (!m.name.trim()) throw new Error("Dê um nome a cada fluxo antes de salvar.");
       const numbers = new Set<string>();
       for (const o of m.options) {
         if (!/^[1-9]\d{0,2}$/.test(o.number) || numbers.has(o.number)) throw new Error(`Revise a numeração do menu ${m.name}: use números únicos de 1 a 999.`);
@@ -291,7 +307,7 @@ export default function BotDesigner() {
   if (!session) return <main className={`${styles.root} p-8`}><Link href="/login">Entre para acessar a Central de Bots.</Link></main>;
 
   const editor = <section ref={setInspector} className={styles.inspector} aria-label="Editar nó">
-          <div className={styles.inspectorHeader}><h2>Editar nó</h2>{option ? <button className={`${styles.iconButton} ${styles.danger}`} aria-label="Excluir opção" onClick={() => removeOption()}><Trash2 size={15} /></button> : menu.id !== flow.rootMenuId && <button className={`${styles.iconButton} ${styles.danger}`} aria-label="Excluir menu" onClick={() => removeMenu()}><Trash2 size={15} /></button>}</div>
+          <div className={styles.inspectorHeader}><h2>Editar nó</h2></div>
           <div className={styles.nodeType}><span className={`${styles.paletteIcon} ${selection.kind === "menu" ? styles.green : option?.action === "HUMAN" ? styles.red : option?.action === "SUBMENU" ? styles.purple : styles.blue}`}>{selection.kind === "menu" ? <ListTree size={18} /> : option?.action === "HUMAN" ? <UserRound size={18} /> : option?.action === "SUBMENU" ? <GitBranch size={18} /> : option?.action === "IMAGE" ? <ImagePlus size={18} /> : <MessageSquare size={18} />}</span><span><strong>{selection.kind === "menu" ? "Menu de opções" : option?.action === "HUMAN" ? "Transferir para humano" : option?.action === "SUBMENU" ? "Ir para outro menu" : option?.action === "IMAGE" ? "Enviar imagem" : option?.action === "SAC_TEST" ? "Abrir chamado (teste)" : "Mensagem"}</strong><small>{option ? "Configure a ação desta opção" : "Personalize o atendimento"}</small></span></div>
           {option ? <>
             <label>Nome da opção<input className={styles.field} maxLength={200} value={option.label} onChange={e => editOption({ label: e.target.value })} /></label>
@@ -319,6 +335,7 @@ export default function BotDesigner() {
           {option?.action === "HUMAN" && <p className={styles.helper}>Pausa o bot e libera a conversa para um atendente assumir.</p>}
           {editorHost && notice && <p role="status" className={styles.helper}>{notice}</p>}
           <button className={`${styles.primary} ${styles.saveButton}`} onClick={() => void work(async () => { await save(); })}><Save size={15} /> Salvar rascunho{dirty ? " *" : ""}</button>
+          {(option || menu.id !== flow.rootMenuId) && <button type="button" className={`${styles.button} ${styles.deleteButton}`} onClick={() => option ? removeOption() : removeMenu()}><Trash2 size={15} />{option ? "Excluir opção" : "Excluir menu"}</button>}
         </section>;
 
   return <main className={styles.root}>
@@ -352,18 +369,20 @@ export default function BotDesigner() {
     <AnimatePresence initial={false}>
       {notice && <motion.div key="notice" {...entrance} exit={{ opacity: 0, y: reduceMotion ? 0 : -4 }} role="status" className={styles.notice}><p>{notice}</p><button aria-label="Fechar aviso" onClick={() => setNotice("")}><X size={14} /></button></motion.div>}
     </AnimatePresence>
-    {loading ? <p className="p-8">Carregando bots…</p> : <AnimatePresence mode="wait" initial={false}><BotWorkspace key={tab} disabled={busy || uploadingImage} className={`${styles.workspace} ${tab === "integrations" ? styles.integrationWorkspace : ""} ${showEditor && !editorHost ? styles.withEditor : ""}`}>
-      {tab !== "integrations" && <aside className={styles.sidebar}>
+    {loading ? <p className="p-8">Carregando bots…</p> : <AnimatePresence mode="wait" initial={false}><BotWorkspace key={tab} disabled={busy || uploadingImage} className={`${styles.workspace} ${tab === "integrations" ? styles.integrationWorkspace : tab === "settings" ? styles.settingsWorkspace : ""} ${tab === "flow" && showEditor && !editorHost ? styles.withEditor : ""}`}>
+      {tab === "flow" && <aside className={styles.sidebar}>
         <motion.section {...entrance} className={`${styles.panel} ${styles.palette}`}><button className={styles.paletteHeading} aria-expanded={showComponents} aria-controls={`${tabHighlightId}-components`} onClick={() => changeSidebarCard("components", !showComponents)}><h2>Componentes</h2><motion.span className={styles.disclosureChevron} animate={{ rotate: showComponents ? 0 : -90 }} transition={{ duration: reduceMotion ? 0 : .25 }}><ChevronDown size={14} /></motion.span></button><BotDisclosure open={showComponents} id={`${tabHighlightId}-components`}><div className={styles.paletteBody}><p>Arraste para o fluxo ou clique para adicionar</p><div className={styles.paletteItems}>
           <button className={styles.paletteItem} onClick={() => addMenu(option)} disabled={flow.menus.length >= 50}><span className={`${styles.paletteIcon} ${styles.green}`}><ListTree size={18} /></span><span><strong>Menu de opções</strong><small>{option ? `Cria um submenu para a opção ${option.number}` : "Cria um novo submenu"}</small></span></button>
           {components.map(item => <button key={item.action} className={styles.paletteItem} draggable={!busy} disabled={menu.options.length >= 50} onDragStart={e => { e.dataTransfer.setData("application/cotrimbot-action", item.action); e.dataTransfer.effectAllowed = "copy"; }} onClick={() => addOption(item.action)}><span className={`${styles.paletteIcon} ${styles[item.tone]}`}><item.icon size={18} /></span><span><strong>{item.title}</strong><small>{item.description}</small></span></button>)}
         </div></div></BotDisclosure></motion.section>
-        <motion.section {...entrance} transition={{ ...entrance.transition, delay: reduceMotion ? 0 : 0.05 }} className={`${styles.panel} ${styles.menuList}`} aria-label="Menus do fluxo"><button className={styles.paletteHeading} aria-expanded={showMenus} aria-controls={`${tabHighlightId}-menus`} onClick={() => changeSidebarCard("menus", !showMenus)}><h2>Menus do fluxo</h2><motion.span className={styles.disclosureChevron} animate={{ rotate: showMenus ? 0 : -90 }} transition={{ duration: reduceMotion ? 0 : .25 }}><ChevronDown size={14} /></motion.span></button><BotDisclosure open={showMenus} id={`${tabHighlightId}-menus`}><MenuTree flow={flow} currentMenuId={menuId} paths={paths} onPreview={setPreviewMenuId} /></BotDisclosure></motion.section>
+        <motion.section {...entrance} transition={{ ...entrance.transition, delay: reduceMotion ? 0 : 0.05 }} className={`${styles.panel} ${styles.menuList}`} aria-label="Menus do fluxo"><button className={styles.paletteHeading} aria-expanded={showMenus} aria-controls={`${tabHighlightId}-menus`} onClick={() => changeSidebarCard("menus", !showMenus)}><h2>Menus do fluxo</h2><motion.span className={styles.disclosureChevron} animate={{ rotate: showMenus ? 0 : -90 }} transition={{ duration: reduceMotion ? 0 : .25 }}><ChevronDown size={14} /></motion.span></button><BotDisclosure open={showMenus} id={`${tabHighlightId}-menus`}><MenuTree flow={flow} currentMenuId={menuId} paths={paths} onPreview={setPreviewMenuId} onRename={id => setNamingMenu({ mode: "rename", id })} /></BotDisclosure></motion.section>
       </aside>}
 
-      {tab === 'integrations' ? <BotIntegrationsPanel key={selected ?? "new"} botName={name} value={flow.integrations} onChange={integrations => change({ ...flow, integrations })} onSave={async integrations => { setBusy(true); try { await save({ ...flow, integrations }); } finally { setBusy(false); } }} /> : tab === "settings" ? <motion.section key="settings" {...entrance} className={styles.settingsPanel}><h2>Configurações do bot</h2><label>Nome do bot<input className={styles.field} maxLength={100} value={name} onChange={e => { setName(e.target.value); setDirty(true); }} /></label><label>Resposta para opção inválida<textarea className={styles.field} value={flow.invalidMessage} maxLength={1000} onChange={e => change({ ...flow, invalidMessage: e.target.value })} /></label><label>Texto do comando 0<input className={styles.field} value={flow.backLabel} maxLength={100} onChange={e => change({ ...flow, backLabel: e.target.value })} /></label>
-        <p className={styles.helper}>A publicação atualiza o fluxo em produção. Salvar um rascunho mantém a versão publicada.</p><div className={`${styles.actions} mt-5`}><button className={styles.primary} onClick={() => void work(async () => { await save(); })}><Save size={14} /> Salvar rascunho</button>{bot && <button className={styles.button} disabled={!bot.published || !list.instanceAvailable} onClick={() => void work(async () => { await botRequest(`/${bot.id}/activation`, { active: list.activeBotId !== bot.id }); setList(await botRequest<BotList>()); setNotice("Status atualizado."); })}><Power size={14} /> {list.activeBotId === bot.id ? "Desativar" : "Ativar"}</button>}</div>{!list.instanceAvailable && <p className={`${styles.helper} mt-5`}>Ativação indisponível. Verifique a configuração da Evolution e a empresa vinculada à instância.</p>}
-      </motion.section> : <>
+      {tab === 'integrations' ? <BotIntegrationsPanel key={selected ?? "new"} botName={name} value={flow.integrations} onChange={integrations => change({ ...flow, integrations })} onSave={async integrations => { setBusy(true); try { await save({ ...flow, integrations }); } finally { setBusy(false); } }} /> : tab === "settings" ? <BotSettingsPanel name={name} flow={flow} dirty={dirty} busy={busy} hasBot={Boolean(bot)} active={Boolean(bot && list.activeBotId === bot.id)} canActivate={Boolean(bot?.published && list.instanceAvailable)} instanceAvailable={list.instanceAvailable}
+        onNameChange={value => { setName(value); setDirty(true); }} onChange={change}
+        onSave={() => void work(async () => { await save(); })}
+        onActivate={() => { if (bot) void work(async () => { await botRequest(`/${bot.id}/activation`, { active: list.activeBotId !== bot.id }); setList(await botRequest<BotList>()); setNotice("Status atualizado."); }); }}
+      /> : <>
         {canvasMode === 'overview' ? <BotGraphCanvas onDelete={removeNode} flow={flow} dirty={dirty} disabled={busy || uploadingImage} selectedMenuId={menuId} selectedOptionId={option?.id} activeMenuId={showTest ? simulation?.state.menuId : undefined} activeOptionId={currentTestOption} onSelect={(id, optionId) => { openMenu(id); selectNode(optionId ? { kind: 'option', optionId } : { kind: 'message' }); }} onLayout={layout => change({ ...flow, layout }, "layout")} onConnect={(optionId, target) => { try { change(connectBotOption(flow, optionId, target)); const owner = flow.menus.find(item => item.options.some(option => option.id === optionId)); if (owner) { openMenu(owner.id); selectNode({ kind: 'option', optionId }); } } catch (error) { setNotice(error instanceof Error ? error.message : 'Ligação inválida.'); } }} onAdd={(action, position) => addOption(action, undefined, position)} onMenuView={() => changeCanvasMode('menu')} onEditorHost={setEditorHost} /> : <FlowCanvas onDelete={optionId => removeNode(menu.id, optionId)} onOverview={() => changeCanvasMode('overview')} activeMenuId={showTest ? simulation?.state.menuId : undefined} activeOptionId={currentTestOption} onTestOption={(optionNumber) => startTest(menu.id, optionNumber)} onEditorHost={setEditorHost} flow={flow} menu={menu} selection={selection} dirty={dirty} disabled={busy || uploadingImage} onSelect={selectNode} onLayout={layout => change({ ...flow, layout }, "layout")} onAdd={(action, position) => addOption(action, undefined, position)} onOpenMenu={openMenu} onCreateSubmenu={optionId => addMenu(menu.options.find(item => item.id === optionId))} />}
         {editorHost && createPortal(editor, editorHost)}
         <AnimatePresence initial={false}>{!editorHost && showEditor && <BotEditorPanel key="node-editor" onClose={() => setShowEditor(false)}>{editor}</BotEditorPanel>}</AnimatePresence>
@@ -428,6 +447,7 @@ export default function BotDesigner() {
         </motion.section>
       </>}
     </BotWorkspace></AnimatePresence>}
+    {namingMenu && <MenuNameDialog key={namingMenu.mode === "rename" ? namingMenu.id : "create"} creating={namingMenu.mode === "create"} initialName={namingMenu.mode === "rename" ? flow.menus.find(item => item.id === namingMenu.id)?.name ?? "" : ""} onClose={() => setNamingMenu(null)} onConfirm={confirmMenuName} />}
     <MenuDetailsDialog menu={flow.menus.find(item => item.id === previewMenuId)} flow={flow} path={previewMenuId ? paths.get(previewMenuId) : undefined} onClose={() => setPreviewMenuId(null)} onEdit={editPreviewMenu} onNavigate={setPreviewMenuId} />
   </main>;
 }

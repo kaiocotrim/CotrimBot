@@ -2,6 +2,8 @@
 
 Implementação administrativa em `/dashboard/bots/`, acessível em **Configurações → Central de Bots**, abaixo de Empresa. Usa Express, Prisma/MySQL, Better Auth, Lucide e o envio Evolution existente. Não usa IA generativa.
 
+Ao clicar em **Central de Bots**, a rota `/dashboard/bots/entrada/` exibe apenas uma animação curta de abertura com a logo do CotrimBot e abre o editor automaticamente, sem apresentação nem botão intermediário. A animação dura cerca de um segundo; com movimento reduzido, a entrada é imediata. A navegação substitui a rota de entrada no histórico para que Voltar não repita a animação. O endereço `/dashboard/bots/` continua abrindo o editor diretamente.
+
 ## Instalação
 
 Na raiz do repositório (PowerShell: use `npm.cmd`):
@@ -56,7 +58,23 @@ Opções podem ser editadas, duplicadas, excluídas e reordenadas pelas setas. A
 
 Para criar uma escolha **Voltar ao início**, use a ação **Abrir submenu** e selecione o menu principal em **Menu de destino**. Retornos a menus anteriores são permitidos: cada escolha exige uma nova mensagem do cliente. Ao retornar ao início, o histórico de navegação é limpo; o comando `0` permanece no menu principal. Ao voltar a outro menu anterior, o histórico é encurtado até esse ponto.
 
+### Configurações do bot
+
+Abra a aba **Configurações** para ajustar as preferências de atendimento. Os painéis **Componentes** e **Menus do fluxo** ficam apenas na aba **Fluxo**.
+
+- **Nome do bot:** identifica o bot na Central; limite de 100 caracteres.
+- **Resposta para opção inválida:** mensagem enviada quando o cliente escolhe uma opção não reconhecida; limite de 1.000 caracteres. Exemplo: “Não encontrei essa opção. Envie um dos números do menu.”
+- **Texto do comando 0:** rótulo exibido para a opção de retorno, como “↩️ Menu principal”; limite de 100 caracteres. Alterar o texto não muda o funcionamento do comando 0.
+
+Clique em **Salvar rascunho** para persistir os ajustes. Isso mantém a versão publicada em produção. Revise a conversa com **Testar bot** na aba Fluxo e use **Publicar**, no topo, para atualizar a versão publicada. Depois, **Ativar** seleciona o bot na instância da empresa; requer uma versão publicada e uma instância disponível. **Desativar** pausa o bot ativo nessa instância.
+
+O **Guia rápido** na própria tela explica os campos, a diferença entre salvar e publicar e os requisitos de ativação. Clique nas perguntas para abrir ou recolher as respostas. Em telas menores, o guia aparece abaixo do formulário. As transições usam Framer Motion e respeitam a preferência do sistema por movimento reduzido.
+
 ### Designer visual
+
+Cada menu do fluxo tem um nome próprio. Ao criar um menu pela biblioteca ou por uma opção, preencha **Nome do fluxo** e confirme em **Criar fluxo**. O menu só é criado após a confirmação; cancelar mantém o rascunho e as conexões como estavam. Use nomes descritivos, como “Suporte técnico”, “Financeiro” e “Segunda via”.
+
+Para mudar um nome existente, clique no lápis **Renomear fluxo** ao lado dele na árvore **Menus do fluxo**. O nome atualizado aparece na árvore, no canvas e nos destinos dos submenus, preservando as conexões. Também é possível editar o **Nome do menu** no editor do nó. Use **Salvar rascunho** para persistir; nomes vazios impedem o salvamento. Renomear o menu não altera os números nem os nomes das opções que o abrem.
 
 O editor tem lista de bots e componentes à esquerda, canvas central, painel **Editar nó** e simulador de conversa à direita. Em telas menores, o teste abre em um painel; no celular, as áreas ficam empilhadas. O canvas tem zoom, ajuste automático, minimapa, arraste dos nós e navegação por arraste do fundo.
 

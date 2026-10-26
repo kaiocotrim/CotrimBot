@@ -12,6 +12,10 @@ Cada pessoa recebe uma mensagem individual pelo WhatsApp conectado à Evolution 
 
 ## Quem recebe
 
+Na revisão, todos os contatos elegíveis começam selecionados. Desmarque quem não deve receber este comunicado; é possível reincluir contatos ou selecionar/desmarcar todos. A contagem e o botão de envio acompanham a seleção, e o envio é bloqueado quando ela fica vazia. Isso não altera o cadastro nem bloqueia o contato para outros comunicados.
+
+A confirmação pode incluir `recipientIds` (IDs únicos dos contatos marcados). O servidor valida a prévia completa e aceita somente IDs elegíveis dessa lista; apenas os selecionados entram na fila. Reutilizar uma `requestKey` com uma seleção diferente retorna conflito, sem criar outro envio. Requisições legadas sem `recipientIds` continuam incluindo todos os contatos da prévia.
+
 O cadastro atual associa o contato pelo campo `Contact.companyName`, selecionado nas informações do contato. A comparação ignora maiúsculas/minúsculas e espaços nas extremidades. Grupos, contatos bloqueados, números sem código de país ou inválidos e números duplicados não entram na fila. Empresas com nomes iguais impedem o envio, pois o vínculo antigo por nome não permite distinguir seus contatos com segurança.
 
 Antes de transmitir cada mensagem, o worker confere novamente o contato, o telefone, a empresa e o acesso do autor. Se o contato for bloqueado, mudar de empresa ou perder o vínculo, aquela mensagem falha com a razão registrada.

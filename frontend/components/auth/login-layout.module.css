@@ -1,6 +1,8 @@
 .page {
   position: relative;
   isolation: isolate;
+  width: 100%;
+  min-width: 0;
   min-height: 100dvh;
   overflow: clip;
   background: #000;
@@ -12,31 +14,39 @@
   position: relative;
   z-index: 1;
   display: flex;
-  min-height: 100dvh;
+  width: 100%;
+  min-width: 0;
+  height: 100dvh;
+  min-height: 560px;
   flex-direction: column;
   align-items: center;
-  padding: 64px 24px max(40px, env(safe-area-inset-bottom));
+  padding: clamp(16px, 4dvh, 48px) 24px max(16px, env(safe-area-inset-bottom));
 }
+
+.backgroundReveal { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity .9s ease; }
+.formReveal { width: 100%; max-width: 360px; flex-shrink: 0; opacity: 0; transform: translateY(8px); transition: opacity .65s ease, transform .65s ease; }
+.page[data-intro-complete='true'] .backgroundReveal { opacity: 1; }
+.page[data-intro-complete='true'] .formReveal { opacity: 1; transform: translateY(0); }
 
 .logoStage {
   display: flex;
   width: 100%;
   flex: 1;
+  min-height: 0;
   align-items: center;
   justify-content: center;
-  padding-bottom: 48px;
+  padding-bottom: clamp(12px, 2dvh, 24px);
 }
 
-.logo {
-  display: block;
-  width: 300px;
-  height: 300px;
+.logoFlight .glassLogo {
+  max-width: 840px;
+  max-height: 100%;
+  min-height: 0;
   flex-shrink: 0;
-  background: linear-gradient(125deg, #e9e0f7 5%, #d3e3e8 28%, #edebe3 48%, #e5d9ee 70%, #d9e9ef 95%);
-  background-size: 240% 240%;
-  mask: url('/Logo-CotrimBot.png') 50% 53% / 236% 236% no-repeat;
-  filter: drop-shadow(0 1px 0 #ffffff50);
 }
+
+.logoAnchor { position: relative; width: 100%; max-width: 840px; height: 100%; max-height: 480px; min-height: 0; flex-shrink: 0; }
+.logoFlight { width: 100%; height: 100%; }
 
 .form {
   width: 100%;
@@ -68,9 +78,10 @@
 }
 
 .fields {
+  --field-gap: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--field-gap);
 }
 
 .button {
@@ -120,20 +131,31 @@
   border: 1px solid #ffffff1a;
   border-radius: 16px;
   outline: none;
-  background: #ffffff0f;
+  background: #1b1b1de6;
   color: #ededed;
   font-size: 16px;
   line-height: 24px;
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
-  transition: border-color .2s, box-shadow .2s;
+  caret-color: #d4d4d8;
+  transition: border-color .18s, background-color .18s;
 }
 
 .input::placeholder { color: #a3a3a3; opacity: 1; }
-.input:focus { border-color: #ffffff66; box-shadow: 0 0 0 3px #ffffff0d; }
+.input:hover:not(:disabled) { border-color: #ffffff30; }
+.input:focus { border-color: #a1a1aa; background: #202022; box-shadow: none; }
 .input[aria-invalid='true'] { border-color: #fda4af99; }
 .input:disabled { opacity: .65; }
-.input:-webkit-autofill { -webkit-text-fill-color: #ededed; box-shadow: 0 0 0 100px #222 inset; }
+.input:-webkit-autofill { -webkit-text-fill-color: #ededed; caret-color: #d4d4d8; box-shadow: 0 0 0 100px #1b1b1d inset; }
+.input:-webkit-autofill:focus { box-shadow: 0 0 0 100px #202022 inset; }
+
+.passwordReveal { display: grid; grid-template-rows: 0fr; opacity: 0; margin-top: calc(-1 * var(--field-gap)); transition: grid-template-rows .25s ease, opacity .2s ease, margin-top .25s ease; }
+.passwordReveal[data-visible='true'] { grid-template-rows: 1fr; opacity: 1; margin-top: 0; }
+.passwordClip { min-height: 0; overflow: hidden; }
+.passwordField { position: relative; }
+.passwordInput { padding-right: 52px; }
+.passwordToggle { position: absolute; right: 8px; top: 8px; display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 9px; background: transparent; color: #a1a1aa; cursor: pointer; }
+.passwordToggle:hover { color: #ededed; background: #ffffff08; }
+.passwordToggle:focus-visible { outline: 1px solid #a1a1aa; outline-offset: -2px; }
+.passwordToggle:disabled { cursor: default; opacity: .5; }
 
 .continueButton {
   background: #ededed;
@@ -168,11 +190,6 @@
   white-space: nowrap;
 }
 
-@keyframes shimmer {
-  0%, 100% { background-position: 0% 30%; }
-  50% { background-position: 100% 70%; }
-}
-
 @keyframes entrance {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -181,18 +198,23 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @media (prefers-reduced-motion: no-preference) {
-  .logo { animation: shimmer 14s ease-in-out infinite; }
   .form { animation: entrance .6s ease-out both; }
   .spinner { animation: spin 1s linear infinite; }
 }
 
 @media (max-width: 639px) {
-  .container { padding: max(48px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); }
-  .logo { width: 220px; height: 220px; }
+  .container { padding-top: max(20px, env(safe-area-inset-top)); }
   .title { font-size: 36px; letter-spacing: -.9px; }
   .footer { font-size: 11px; }
 }
 
+@media (max-height: 800px) {
+  .container { padding-top: max(16px, env(safe-area-inset-top)); }
+  .title { font-size: 32px; margin-bottom: 22px; }
+  .fields { --field-gap: 12px; }
+  .footer { margin-top: 14px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .input, .button { transition: none; }
+  .input, .button, .backgroundReveal, .formReveal, .passwordReveal { transition: none; }
 }

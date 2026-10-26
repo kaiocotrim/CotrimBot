@@ -34,12 +34,23 @@ export function createAnnouncementRouter(database: typeof prisma = prisma) {
     const content = typeof body?.content === "string" ? body.content.trim() : "";
     if (!clientId || !content || content.length > 5000) return res.status(400).json({ error: "Selecione a empresa e escreva uma mensagem de até 5.000 caracteres." });
     const confirming = req.path === "/announcements";
+    let recipientIds: number[] | undefined;
+    if (confirming && body.recipientIds !== undefined) {
+      if (!Array.isArray(body.recipientIds) || !body.recipientIds.length || body.recipientIds.length > 1000
+        || body.recipientIds.some((id: unknown) => !Number.isSafeInteger(id) || (id as number) <= 0)
+        || new Set(body.recipientIds).size !== body.recipientIds.length) {
+        return res.status(400).json({ error: "Selecione pelo menos um destinatário válido, sem repetições." });
+      }
+      recipientIds = body.recipientIds;
+    }
+    const selectionMatches = (messages: { announcementContactId: number | null }[]) => !recipientIds
+      || (messages.length === recipientIds.length && messages.every(message => message.announcementContactId !== null && recipientIds!.includes(message.announcementContactId)));
     const requestKey = typeof body.requestKey === "string" && /^[a-zA-Z0-9-]{16,64}$/.test(body.requestKey) ? body.requestKey : null;
     if (confirming && !requestKey) return res.status(400).json({ error: "Confirmação inválida. Revise o comunicado novamente." });
     if (confirming) {
-      const existing = await database.announcement.findUnique({ where: { userId_requestKey: { userId: req.user!.id, requestKey: requestKey! } } });
+      const existing = await database.announcement.findUnique({ where: { userId_requestKey: { userId: req.user!.id, requestKey: requestKey! } }, include: { messages: { select: { announcementContactId: true } } } });
       if (existing) {
-        if (existing.organizationId !== res.locals.access.organizationId || existing.clientId !== clientId || existing.content !== content) return res.status(409).json({ error: "Essa confirmação pertence a outro comunicado." });
+        if (existing.organizationId !== res.locals.access.organizationId || existing.clientId !== clientId || existing.content !== content || !selectionMatches(existing.messages)) return res.status(409).json({ error: "Essa confirmação já pertence a outro comunicado ou seleção de destinatários. Revise novamente." });
         return res.json({ announcement: existing });
       }
     }
@@ -60,13 +71,15 @@ export function createAnnouncementRouter(database: typeof prisma = prisma) {
     if (!confirming) return res.json({ companyName: client.name, recipients, excluded, previewToken });
     if (!recipients.length) return res.status(400).json({ error: "Esta empresa não possui destinatários disponíveis." });
     if (body.previewToken !== previewToken) return res.status(409).json({ error: "Os destinatários ou a mensagem mudaram. Revise novamente antes de enviar." });
+    const selectedRecipients = recipientIds ? recipients.filter(contact => recipientIds.includes(contact.id)) : recipients;
+    if (recipientIds && selectedRecipients.length !== recipientIds.length) return res.status(400).json({ error: "A seleção contém contatos que não estão disponíveis nesta revisão." });
 
     try {
       // Uma única gravação transacional: todos entram na fila ou nenhum entra.
       const announcement = await database.announcement.create({ data: {
         userId: req.user!.id, organizationId: res.locals.access.organizationId,
         clientId, companyName: client.name, content, requestKey: requestKey!,
-        messages: { create: recipients.map((contact, index) => ({
+        messages: { create: selectedRecipients.map((contact, index) => ({
           userId: req.user!.id, phone: contact.phone, recipientName: contact.name.slice(0, 191),
           announcementContactId: contact.id, content,
           scheduledAt: new Date(Date.now() + index * 3000),
@@ -76,8 +89,8 @@ export function createAnnouncementRouter(database: typeof prisma = prisma) {
     } catch (error) {
       // Duplo clique/reenvio HTTP concorrente mantém uma única fila.
       if ((error as { code?: string }).code !== "P2002") throw error;
-      const announcement = await database.announcement.findUniqueOrThrow({ where: { userId_requestKey: { userId: req.user!.id, requestKey: requestKey! } } });
-      if (announcement.clientId !== clientId || announcement.content !== content || announcement.organizationId !== res.locals.access.organizationId) return res.status(409).json({ error: "Essa confirmação pertence a outro comunicado." });
+      const announcement = await database.announcement.findUniqueOrThrow({ where: { userId_requestKey: { userId: req.user!.id, requestKey: requestKey! } }, include: { messages: { select: { announcementContactId: true } } } });
+      if (announcement.clientId !== clientId || announcement.content !== content || announcement.organizationId !== res.locals.access.organizationId || !selectionMatches(announcement.messages)) return res.status(409).json({ error: "Essa confirmação já pertence a outro comunicado ou seleção de destinatários. Revise novamente." });
       return res.json({ announcement });
     }
   });

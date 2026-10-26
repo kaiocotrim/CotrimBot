@@ -153,7 +153,7 @@ function SettingsContent({ user }: { user: SettingsUser }) {
 
   function changeSection(value: Section) {
     if (value === "bots") {
-      router.push("/dashboard/bots");
+      router.push("/dashboard/bots/entrada/");
       return;
     }
     if (value === "business") {
