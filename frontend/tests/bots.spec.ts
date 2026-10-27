@@ -337,6 +337,9 @@ for (const width of [1440, 390]) {
     expect(editorCloseBounds!.x + editorCloseBounds!.width).toBeLessThanOrEqual(width);
     await page.screenshot({ path: testInfo.outputPath("bot-flow-expanded-editor.png") });
     await expandedEditor.getByRole("button", { name: "Criar menu de opções", exact: true }).click();
+    const naming = page.getByRole("dialog", { name: "Nomeie este fluxo" });
+    await naming.getByRole("textbox", { name: "Nome do fluxo", exact: true }).fill("Ajuda para abrir chamado");
+    await naming.getByRole("button", { name: "Criar fluxo", exact: true }).click();
     await expect(expandedEditor.getByRole("textbox", { name: "Nome do menu", exact: true })).toHaveValue("Ajuda para abrir chamado");
     await expect(expandedEditor.getByRole("textbox", { name: "Mensagem do submenu" })).toHaveValue("Resposta editada na tela ampliada.");
     await expandedEditor.getByRole("textbox", { name: "Mensagem do submenu" }).fill("Escolha o assunto do atendimento:");
@@ -424,6 +427,9 @@ for (const width of [1440, 390]) {
     await page.getByRole("button", { name: "Fechar teste", exact: true }).click();
     await page.getByRole("button", { name: "Editar Mensagem", exact: true }).click();
     await page.getByRole("button", { name: "Menu de opções Cria um novo submenu", exact: true }).click();
+    const namingUnused = page.getByRole("dialog", { name: "Nomeie este fluxo" });
+    await namingUnused.getByRole("textbox", { name: "Nome do fluxo", exact: true }).fill("Menu sem uso");
+    await namingUnused.getByRole("button", { name: "Criar fluxo", exact: true }).click();
     await page.getByRole("textbox", { name: "Nome do menu", exact: true }).fill("Menu sem uso");
     await page.getByRole("region", { name: "Menus do fluxo", exact: true }).getByRole("button", { name: "Ver menu Menu principal", exact: true }).click();
     await page.getByRole("dialog", { name: "Menu principal", exact: true }).getByRole("button", { name: "Editar menu", exact: true }).click();

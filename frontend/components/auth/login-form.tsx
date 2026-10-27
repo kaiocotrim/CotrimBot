@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { LoaderCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Eye, EyeOff, LoaderCircle } from "lucide-react";
 import styles from "./login-layout.module.css";
 
 interface LoginFormProps {
@@ -16,10 +16,11 @@ interface LoginFormProps {
 
 export function LoginForm(props: LoginFormProps) {
   const passwordInput = useRef<HTMLInputElement>(null);
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const canContinue = props.email.trim() !== "" && (!props.showPassword || props.password !== "");
 
   useEffect(() => {
-    if (props.showPassword) passwordInput.current?.focus();
+    if (props.showPassword) passwordInput.current?.focus({ preventScroll: true });
   }, [props.showPassword]);
 
   return (
@@ -58,7 +59,7 @@ export function LoginForm(props: LoginFormProps) {
             name="email"
             type="email"
             required
-            autoComplete="email"
+            autoComplete="username"
             autoCapitalize="none"
             spellCheck={false}
             disabled={props.loading}
@@ -71,26 +72,31 @@ export function LoginForm(props: LoginFormProps) {
           />
         </div>
 
-        {props.showPassword && (
-          <div>
+        <div className={styles.passwordReveal} data-visible={props.showPassword} aria-hidden={!props.showPassword} inert={!props.showPassword}>
+          <div className={styles.passwordClip}>
+          <div className={styles.passwordField}>
             <label htmlFor="login-password" className={styles.srOnly}>Senha</label>
             <input
               ref={passwordInput}
               id="login-password"
               name="password"
-              type="password"
-              required
+              type={passwordVisible ? "text" : "password"}
+              required={props.showPassword}
               autoComplete="current-password"
-              disabled={props.loading}
+              disabled={props.loading || !props.showPassword}
               placeholder="Sua senha"
               value={props.password}
               onChange={(event) => props.onPasswordChange(event.target.value)}
               aria-invalid={props.error ? true : undefined}
               aria-describedby={props.error ? "login-error" : undefined}
-              className={styles.input}
+              className={`${styles.input} ${styles.passwordInput}`}
             />
+            <button type="button" className={styles.passwordToggle} aria-label={passwordVisible ? "Ocultar senha" : "Mostrar senha"} aria-pressed={passwordVisible} disabled={props.loading || !props.showPassword} onClick={() => setPasswordVisible(value => !value)}>
+              {passwordVisible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+            </button>
           </div>
-        )}
+          </div>
+        </div>
 
         {props.error && <p id="login-error" role="alert" className={styles.error}>{props.error}</p>}
 
@@ -100,7 +106,7 @@ export function LoginForm(props: LoginFormProps) {
           className={`${styles.button} ${styles.continueButton}`}
         >
           {props.loading && <LoaderCircle aria-hidden="true" className={styles.spinner} />}
-          {props.loading ? "Entrando..." : "Continuar"}
+          {props.loading ? "Entrando..." : props.showPassword ? "Entrar" : "Continuar"}
         </button>
       </form>
 

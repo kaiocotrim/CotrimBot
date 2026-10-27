@@ -50,6 +50,15 @@
 .recipients { max-height: 240px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #39393d transparent; }
 .recipients > div { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
 .recipients > div:last-child { border-bottom: 0; }
+.recipientHeading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.recipientHeading button { color: #a1a1aa; font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
+.recipientHeading button:hover { color: #e4e4e7; }
+.recipientHeading button:disabled { opacity: .5; cursor: default; }
+.recipientChoice { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 12px; cursor: pointer; }
+.recipientChoice:last-child { border-bottom: 0; }
+.recipientChoice[data-selected='false'] .contact { opacity: .5; }
+.recipientChoice input { width: 17px; height: 17px; flex: none; accent-color: #d4d4d8; cursor: pointer; }
+.recipientChoice input:focus-visible { outline: 2px solid #a1a1aa; outline-offset: 3px; }
 .avatar { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%; background: #252528; color: #b9b9c1; font-size: 12px; }
 .contact { min-width: 0; flex: 1; overflow-wrap: anywhere; line-height: 1.6; }
 .contact small { display: block; color: var(--muted); font-size: 11px; }

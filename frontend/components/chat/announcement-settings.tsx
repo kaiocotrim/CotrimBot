@@ -28,6 +28,7 @@ export function AnnouncementSettings() {
   const [companySearch, setCompanySearch] = useState("");
   const [content, setContent] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [selectedRecipientIds, setSelectedRecipientIds] = useState<number[]>([]);
   const [history, setHistory] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -85,21 +86,22 @@ export function AnnouncementSettings() {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId, content }),
       });
       requestKey.current = crypto.randomUUID();
+      setSelectedRecipientIds(data.recipients.map(contact => contact.id));
       setPreview(data);
     } catch (err) { setError(err instanceof Error ? err.message : "Falha ao revisar o comunicado."); }
     finally { lock.current = false; setBusy(false); }
   }
 
   async function send() {
-    if (lock.current || !preview?.recipients.length) return;
+    if (lock.current || !preview || !selectedRecipientIds.length) return;
     lock.current = true;
     setBusy(true); setError("");
     try {
       await api("/announcements", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, content, previewToken: preview.previewToken, requestKey: requestKey.current }),
+        body: JSON.stringify({ clientId, content, previewToken: preview.previewToken, requestKey: requestKey.current, recipientIds: selectedRecipientIds }),
       });
-      setFeedback(`Comunicado colocado na fila para ${preview.recipients.length} contato(s). Acompanhe os envios abaixo.`);
+      setFeedback(`Comunicado colocado na fila para ${selectedRecipientIds.length} contato(s). Acompanhe os envios abaixo.`);
       setPreview(null); setContent("");
       void loadHistory();
     } catch (err) { setError(err instanceof Error ? err.message : "Falha ao confirmar o envio."); }
@@ -165,16 +167,16 @@ export function AnnouncementSettings() {
           <div className={styles.footer}><span>Você revisa os destinatários antes de enviar.</span><motion.button whileTap={press} className={styles.primary} disabled={busy || !clientId || !content.trim()}>{busy ? <Loader2 className={styles.spinner} size={15} /> : <ArrowRight size={15} aria-hidden="true" />}{busy ? "Consultando…" : "Revisar destinatários"}</motion.button></div>
         </motion.form> : <motion.div key="review" {...reveal} onAnimationComplete={() => reviewHeading.current?.focus()} className={styles.card} aria-busy={busy}>
           <div className={styles.reviewTitle}><span className={styles.reviewIcon}><Send size={20} strokeWidth={1.5} aria-hidden="true" /></span><h4 ref={reviewHeading} tabIndex={-1}>Revise antes de enviar</h4><p>Confira a mensagem e quem vai recebê-la.</p></div>
-          <div className={styles.reviewSummary}><strong>{preview.companyName}</strong><span><Users size={14} aria-hidden="true" />{preview.recipients.length} destinatário(s)</span></div>
+          <div className={styles.reviewSummary}><strong>{preview.companyName}</strong><span aria-live="polite"><Users size={14} aria-hidden="true" />{selectedRecipientIds.length} destinatário(s)</span></div>
           <div className={styles.messagePreview}><span className={styles.eyebrow}>Sua mensagem</span><p className={styles.message}>{content.trim()}</p></div>
-          <div className={styles.field}><span className={styles.eyebrow}>Destinatários</span><div className={styles.recipients} aria-label="Destinatários do comunicado" tabIndex={0}>
-            {preview.recipients.map((contact) => <div key={contact.id}><span className={styles.avatar} aria-hidden="true">{contact.name.trim().charAt(0).toLocaleUpperCase("pt-BR") || "?"}</span><span className={styles.contact}>{contact.name}<small>{contact.phone}</small></span><Check size={15} className={styles.contactCheck} aria-label="Incluído" /></div>)}
+          <div className={styles.field}><div className={styles.recipientHeading}><span className={styles.eyebrow}>Destinatários</span>{preview.recipients.length > 0 && <button type="button" disabled={busy} onClick={() => setSelectedRecipientIds(selectedRecipientIds.length === preview.recipients.length ? [] : preview.recipients.map(contact => contact.id))}>{selectedRecipientIds.length === preview.recipients.length ? "Desmarcar todos" : "Selecionar todos"}</button>}</div><p className={styles.note}>Desmarque quem não deve receber. A seleção vale apenas para este comunicado.</p><div className={styles.recipients} aria-label="Destinatários do comunicado" tabIndex={0}>
+            {preview.recipients.map((contact) => <label className={styles.recipientChoice} data-selected={selectedRecipientIds.includes(contact.id)} key={contact.id}><span className={styles.avatar} aria-hidden="true">{contact.name.trim().charAt(0).toLocaleUpperCase("pt-BR") || "?"}</span><span className={styles.contact}>{contact.name}<small>{contact.phone}</small></span><input type="checkbox" aria-label={`Incluir ${contact.name} no comunicado`} checked={selectedRecipientIds.includes(contact.id)} disabled={busy} onChange={event => setSelectedRecipientIds(previous => event.target.checked ? [...previous, contact.id] : previous.filter(id => id !== contact.id))} /></label>)}
             {!preview.recipients.length && <p className={styles.empty}>Nenhum contato disponível. Confira o campo Empresa nas informações dos contatos.</p>}
           </div></div>
           <p className={styles.note}>Grupos, contatos bloqueados, números inválidos e duplicados ficam de fora.{preview.excluded > 0 && ` ${preview.excluded} contato(s) excluído(s).`}</p>
           <div className={styles.actions}>
             <motion.button whileTap={press} type="button" className={styles.secondary} disabled={busy} onClick={() => { setPreview(null); setError(""); }}><ArrowLeft size={15} aria-hidden="true" />Editar</motion.button>
-            <motion.button whileTap={press} type="button" className={styles.primary} disabled={busy || !preview.recipients.length} onClick={() => void send()}>{busy ? <Loader2 size={15} className={styles.spinner} /> : <Send size={15} aria-hidden="true" />}{busy ? "Confirmando…" : `Enviar para ${preview.recipients.length} contato(s)`}</motion.button>
+            <motion.button whileTap={press} type="button" className={styles.primary} disabled={busy || !selectedRecipientIds.length} onClick={() => void send()}>{busy ? <Loader2 size={15} className={styles.spinner} /> : <Send size={15} aria-hidden="true" />}{busy ? "Confirmando…" : `Enviar para ${selectedRecipientIds.length} contato(s)`}</motion.button>
           </div>
         </motion.div>}
       </AnimatePresence>

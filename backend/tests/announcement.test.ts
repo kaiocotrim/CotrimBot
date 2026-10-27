@@ -40,7 +40,10 @@ async function harness(t: TestContext) {
     },
     contact: { findMany: async () => contacts },
     announcement: {
-      findUnique: async ({ where }: { where: { userId_requestKey: RecordData } }) => stored.find((item) => matches(item, where.userId_requestKey)) ?? null,
+      findUnique: async ({ where }: { where: { userId_requestKey: RecordData } }) => {
+        const item = stored.find((item) => matches(item, where.userId_requestKey));
+        return item ? { ...item, messages: (item.messages as { create: RecordData[] }).create } : null;
+      },
       findMany: async ({ where }: { where: RecordData }) => stored.filter((item) => matches(item, where)),
       create: async ({ data }: { data: RecordData }) => { const item = { id: "announcement-1", ...data }; stored.push(item); return item; },
     },
@@ -85,6 +88,37 @@ test("mudança de destinatários/texto exige nova revisão", async (t) => {
   h.contacts[0]!.blocked = true;
   h.contacts.push(contact(3));
   assert.equal((await h.request("/announcements", { ...h.body, previewToken: preview.previewToken })).status, 409);
+  assert.equal(h.stored.length, 0);
+});
+
+test("confirmação enfileira apenas os contatos selecionados e mantém a seleção em repetições", async (t) => {
+  const h = await harness(t);
+  h.contacts.push(contact(3));
+  const preview = await (await h.request("/announcements/preview", h.body)).json();
+  const body = { ...h.body, previewToken: preview.previewToken, recipientIds: [3] };
+  assert.equal((await h.request("/announcements", body)).status, 201);
+  const messages = (h.stored[0]!.messages as { create: RecordData[] }).create;
+  assert.deepEqual(messages.map(message => message.announcementContactId), [3]);
+  assert.equal((await h.request("/announcements", body)).status, 200);
+  assert.equal((await h.request("/announcements", { ...body, recipientIds: [1] })).status, 409);
+  assert.equal(h.stored.length, 1);
+});
+
+test("seleção vazia, repetida, inválida ou fora da prévia não cria fila", async (t) => {
+  const h = await harness(t);
+  const preview = await (await h.request("/announcements/preview", h.body)).json();
+  for (const recipientIds of [[], [1, 1], [2], [999], [0], [-1], [1.5], ["1"], null]) {
+    assert.equal((await h.request("/announcements", { ...h.body, previewToken: preview.previewToken, recipientIds })).status, 400);
+  }
+  assert.equal(h.stored.length, 0);
+});
+
+test("selecionar um subconjunto não dispensa a validação da prévia", async (t) => {
+  const h = await harness(t);
+  h.contacts.push(contact(3));
+  const preview = await (await h.request("/announcements/preview", h.body)).json();
+  h.contacts[0]!.blocked = true;
+  assert.equal((await h.request("/announcements", { ...h.body, previewToken: preview.previewToken, recipientIds: [3] })).status, 409);
   assert.equal(h.stored.length, 0);
 });
 

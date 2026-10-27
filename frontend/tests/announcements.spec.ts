@@ -47,6 +47,33 @@ async function setup(page: Page) {
 }
 
 for (const width of [1280, 390]) {
+  test(`revisão permite excluir e reincluir destinatários antes de enviar (${width}px)`, async ({ page }) => {
+    const { sends, errors } = await setup(page);
+    await page.setViewportSize({ width, height: 900 });
+    await selectCompany(page);
+    await page.getByRole("textbox", { name: "Mensagem do comunicado" }).fill("Comunicado para contatos selecionados");
+    await page.getByRole("button", { name: "Revisar destinatários" }).click();
+    const ana = page.getByRole("checkbox", { name: "Incluir Ana teste no comunicado" });
+    const pedro = page.getByRole("checkbox", { name: "Incluir Pedro teste no comunicado" });
+    await expect(ana).toBeChecked();
+    await expect(pedro).toBeChecked();
+    await ana.uncheck();
+    await expect(page.getByRole("button", { name: "Enviar para 1 contato(s)" })).toBeEnabled();
+    await pedro.uncheck();
+    await expect(page.getByRole("button", { name: "Enviar para 0 contato(s)" })).toBeDisabled();
+    await page.getByRole("button", { name: "Selecionar todos", exact: true }).click();
+    await expect(ana).toBeChecked();
+    await expect(pedro).toBeChecked();
+    await ana.uncheck();
+    await page.getByRole("button", { name: "Enviar para 1 contato(s)" }).click();
+    await expect(page.getByRole("status")).toContainText("Comunicado colocado na fila para 1 contato(s)");
+    expect(sends).toHaveLength(1);
+    expect(sends[0]!.recipientIds).toEqual([2]);
+    expect(errors).toEqual([]);
+  });
+}
+
+for (const width of [1280, 390]) {
   test(`comunicado exige revisão e confirmação e exibe histórico (${width}px)`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     const { sends, errors } = await setup(page);
