@@ -12,6 +12,7 @@ export function useMobileVisualViewport() {
     if (!root) return;
 
     const mobile = window.matchMedia("(max-width: 1023px)");
+    const standalone = window.matchMedia("(display-mode: standalone), (display-mode: fullscreen)");
     const viewport = window.visualViewport;
     let frame = 0;
     let restingHeight = window.innerHeight;
@@ -21,6 +22,7 @@ export function useMobileVisualViewport() {
 
     const sync = () => {
       frame = 0;
+      root.dataset.standalone = String(standalone.matches || (navigator as Navigator & { standalone?: boolean }).standalone === true);
       if (!mobile.matches || !viewport) {
         root.style.removeProperty("--chat-viewport-height");
         root.style.removeProperty("--chat-viewport-top");
@@ -71,6 +73,7 @@ export function useMobileVisualViewport() {
     document.addEventListener("focusin", scheduleSync);
     document.addEventListener("focusout", scheduleSync);
     mobile.addEventListener("change", scheduleSync);
+    standalone.addEventListener("change", scheduleSync);
 
     return () => {
       if (frame) cancelAnimationFrame(frame);
@@ -82,9 +85,11 @@ export function useMobileVisualViewport() {
       document.removeEventListener("focusin", scheduleSync);
       document.removeEventListener("focusout", scheduleSync);
       mobile.removeEventListener("change", scheduleSync);
+      standalone.removeEventListener("change", scheduleSync);
       root.style.removeProperty("--chat-viewport-height");
       root.style.removeProperty("--chat-viewport-top");
       delete root.dataset.keyboardOpen;
+      delete root.dataset.standalone;
     };
   }, []);
 

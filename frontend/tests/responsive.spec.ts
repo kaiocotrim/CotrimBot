@@ -230,6 +230,57 @@ test("bolhas mobile compactas preservam texto longo e mensagem privada", async (
   expect(runtimeErrors).toEqual([]);
 });
 
+for (const installedMode of ["ios", "standalone"] as const) {
+  test(`PWA ${installedMode} não reserva faixa abaixo do campo`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript((mode) => {
+      if (mode === "ios") {
+        Object.defineProperty(navigator, "standalone", { value: true });
+      } else {
+        const matchMedia = window.matchMedia.bind(window);
+        window.matchMedia = (query) => {
+          const result = matchMedia(query);
+          if (query.includes("display-mode: standalone")) Object.defineProperty(result, "matches", { value: true });
+          return result;
+        };
+      }
+    }, installedMode);
+    const { runtimeErrors } = await mockApi(page, 40);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+    // Simula o inset do iPhone; a regra de PWA deve removê-lo do rodapé.
+    await page.addStyleTag({ content: '[data-chat-root] { --chat-bottom-safe-area: 34px; }' });
+    const root = page.locator("[data-chat-root]");
+    const composer = page.locator("[data-message-composer]");
+    const field = composer.locator("[data-composer-field]");
+    const input = composer.getByRole("textbox", { name: "Mensagem", exact: true });
+    const fieldBottom = async () => {
+      const box = (await field.boundingBox())!;
+      return Math.round(box.y + box.height);
+    };
+    await expect(root).toHaveAttribute("data-standalone", "true");
+    await expect.poll(() => composer.evaluate((element) => getComputedStyle(element).paddingBottom)).toBe("0px");
+    await expect.poll(fieldBottom).toBe(844);
+    await input.focus();
+    await page.evaluate(() => {
+      Object.defineProperty(window.visualViewport!, "height", { configurable: true, value: 500 });
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+    });
+    await expect(root).toHaveAttribute("data-keyboard-open", "true");
+    await expect.poll(fieldBottom).toBe(500);
+    await input.blur();
+    await page.evaluate(() => {
+      Reflect.deleteProperty(window.visualViewport!, "height");
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+    });
+    await expect(root).toHaveAttribute("data-keyboard-open", "false");
+    await expect.poll(fieldBottom).toBe(844);
+    await expectNoHorizontalOverflow(page);
+    await page.screenshot({ path: testInfo.outputPath(`pwa-${installedMode}-footer.png`) });
+    expect(runtimeErrors).toEqual([]);
+  });
+}
+
 test("teclado reduz só a conversa e mantém a posição de leitura", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const { runtimeErrors } = await mockApi(page, 40);

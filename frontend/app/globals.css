@@ -24,6 +24,8 @@ html:has([data-chat-root]) body {
     height: var(--chat-viewport-height, 100dvh);
   }
 
+  /* No app instalado, o recuo inferior criava uma faixa sob o composer. */
+  [data-chat-root][data-standalone="true"],
   [data-chat-root][data-keyboard-open="true"] {
     --chat-bottom-safe-area: 0px;
   }
