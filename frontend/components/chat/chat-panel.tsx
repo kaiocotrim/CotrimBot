@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Pin, Search, Send, Star, Trash2, X } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
@@ -9,10 +9,11 @@ import { ChatHeader, SidebarMenuButton } from "@/components/chat/chat-header";
 import { EmptyChatAnimation } from "@/components/chat/empty-chat-animation";
 import { ContactInfoPanel } from "@/components/chat/contact-info-panel";
 import { ParticipantInfoPanel, type ParticipantProfile } from "@/components/chat/participant-info-panel";
-import { MessageComposer } from "@/components/chat/message-composer";
+import { MessageComposer, type MessageComposerHandle } from "@/components/chat/message-composer";
 import { MessageList } from "@/components/chat/message-list";
 import { useContactTeamTyping } from "@/hooks/use-contact-team-typing";
 import { getFavoriteMessages, type GroupParticipant } from "@/lib/chat-api";
+import { captureConversation } from "@/lib/capture-screenshot";
 import type { Contact, ContactPresence, Message, Poll } from "@/types/chat";
 
 type ChatPanelProps = {
@@ -100,6 +101,19 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const { typingLabel, typingMembers, sendTyping } = useContactTeamTyping(contact?.id, userId);
   const [conversationPanel, setConversationPanel] = useState<HTMLElement | null>(null);
+  const composerRef = useRef<MessageComposerHandle>(null);
+  const printGenerationRef = useRef(0);
+  const [printRange, setPrintRange] = useState<{ contactId: number; startId: number | null; endId: number | null } | null>(null);
+  const [printBusy, setPrintBusy] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const activePrintRange = printRange?.contactId === contact?.id ? printRange : null;
+  const printMessages = useMemo(() => {
+    if (!activePrintRange || activePrintRange.startId === null) return [];
+    const start = messages.findIndex((message) => message.id === activePrintRange.startId);
+    const end = activePrintRange.endId === null ? start : messages.findIndex((message) => message.id === activePrintRange.endId);
+    return start < 0 || end < 0 ? [] : messages.slice(Math.min(start, end), Math.max(start, end) + 1);
+  }, [activePrintRange, messages]);
+  useEffect(() => () => { printGenerationRef.current++; }, [contact?.id]);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [composerFocusKey, setComposerFocusKey] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -253,6 +267,45 @@ export function ChatPanel({
     });
   }
 
+  function startPrint() {
+    if (!contact) return;
+    printGenerationRef.current++;
+    closeSelection();
+    setSearchOpen(false);
+    setSearchQuery("");
+    setContactInfoOpen(false);
+    setParticipantProfile(null);
+    setFavoritesOpen(false);
+    setPrintError(null);
+    setPrintBusy(false);
+    setPrintRange({ contactId: contact.id, startId: null, endId: null });
+  }
+
+  function cancelPrint() {
+    printGenerationRef.current++;
+    setPrintRange(null);
+    setPrintBusy(false);
+    setPrintError(null);
+  }
+
+  async function generatePrint() {
+    const source = conversationPanel?.querySelector<HTMLElement>("[data-message-list-content]");
+    if (!source || !contact || !activePrintRange || activePrintRange.endId === null || !printMessages.length || printBusy) return;
+    const generation = printGenerationRef.current;
+    setPrintBusy(true);
+    setPrintError(null);
+    try {
+      const file = await captureConversation(source, printMessages.map((message) => message.id), contact.name, contact.profilePictureUrl);
+      if (generation !== printGenerationRef.current) return;
+      composerRef.current?.addAttachments([file]);
+      setPrintRange(null);
+    } catch (error) {
+      if (generation === printGenerationRef.current) setPrintError(error instanceof Error ? error.message : "Não foi possível gerar o print da conversa.");
+    } finally {
+      if (generation === printGenerationRef.current) setPrintBusy(false);
+    }
+  }
+
   async function startParticipantConversation(participant: GroupParticipant) {
     const target = contacts.find((item) => !item.isGroup && item.phone.replace(/\D/g, "") === participant.phone);
     if (target) {
@@ -330,6 +383,7 @@ export function ChatPanel({
         <div ref={setConversationPanel} className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {/* Papel de parede fornecido pelo usuário via Unsplash. */}
           <div
+            data-chat-wallpaper
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 hidden bg-cover bg-center bg-no-repeat lg:block"
             style={{ backgroundImage: "url('/mesh-gradient2.png')" }}
@@ -352,6 +406,7 @@ export function ChatPanel({
               selectedCount={selectedMessageIds.size}
               selectionBusy={selectionBusy}
               onOpenSearch={() => { setParticipantProfile(null); setContactInfoOpen(false); setSearchOpen(true); }}
+              onTakeScreenshot={async () => { startPrint(); }}
               onOpenFavorites={() => { setParticipantProfile(null); setContactInfoOpen(false); void openFavoriteMessages(); }}
               onStartSelection={startSelection}
               onCloseSelection={closeSelection}
@@ -402,6 +457,14 @@ export function ChatPanel({
             </AnimatePresence>
           </div>
 
+          {activePrintRange && <div role="region" aria-label="Selecionar trecho para print" className="relative z-30 mx-4 mt-20 mb-2 flex shrink-0 flex-wrap items-center gap-3 rounded-2xl border border-zinc-400/25 bg-zinc-950/95 px-4 py-3 text-sm text-zinc-200 shadow-xl">
+            <p role="status" className="min-w-48 flex-1 text-xs leading-5">{printBusy ? "Gerando imagem da conversa..." : activePrintRange.startId === null ? "Selecione a mensagem inicial do print." : activePrintRange.endId === null ? "Agora selecione a mensagem final. Todas entre elas entrarão na imagem." : `${printMessages.length} mensagens no print, incluindo início e fim.`}</p>
+            <button type="button" disabled={printBusy || activePrintRange.startId === null} onClick={startPrint} className="rounded-lg px-2 py-2 text-xs text-zinc-400 hover:text-white disabled:opacity-40">Recomeçar</button>
+            <button type="button" disabled={printBusy || activePrintRange.endId === null} onClick={() => void generatePrint()} className="rounded-lg bg-zinc-200 px-3 py-2 text-xs font-medium text-zinc-950 disabled:opacity-40">{printBusy ? "Gerando..." : "Gerar print"}</button>
+            <button type="button" onClick={cancelPrint} className="rounded-lg px-2 py-2 text-xs text-zinc-300 hover:bg-white/10">Cancelar</button>
+            {printError && <p role="alert" className="w-full text-xs text-red-300">{printError}</p>}
+          </div>}
+          <div className="flex min-h-0 flex-1 flex-col" style={activePrintRange ? { "--chat-message-top-space": "8px" } as React.CSSProperties : undefined}>
           <MessageList
             currentUser={currentUser}
             contact={contact}
@@ -414,6 +477,13 @@ export function ChatPanel({
             hasPinnedMessage={showPinnedMessage}
             selectionMode={selectionMode}
             selectedMessageIds={selectedMessageIds}
+            printSelection={activePrintRange ? {
+              startId: activePrintRange.startId,
+              endId: activePrintRange.endId,
+              selectedIds: new Set(printMessages.map((message) => message.id)),
+              busy: printBusy,
+              onSelect: (id) => setPrintRange((current) => current ? { ...current, startId: current.startId ?? id, endId: current.startId === null ? null : id } : null),
+            } : undefined}
             onLoadOlderMessages={onLoadOlderMessages}
             onReactToMessage={onReactToMessage}
             onUpdateMessageFlags={onUpdateMessageFlags}
@@ -431,8 +501,9 @@ export function ChatPanel({
               setParticipantProfile(profile);
             }}
           />
-
+          </div>
           <MessageComposer
+            ref={composerRef}
             key={userId}
             userId={userId}
             dropZoneContainer={conversationPanel}

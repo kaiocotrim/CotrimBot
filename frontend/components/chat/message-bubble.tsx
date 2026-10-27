@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { Dialog } from "@base-ui/react/dialog";
+import { Popover } from "@base-ui/react/popover";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import {
@@ -93,6 +94,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
   const [updatingFlags, setUpdatingFlags] = useState(false);
   const [pinAnimationKey, setPinAnimationKey] = useState(0);
   const actionControlsRef = useRef<HTMLDivElement>(null);
+  const actionMenuRef = useRef<HTMLDivElement>(null);
   const reactionControlsRef = useRef<HTMLDivElement>(null);
   const reactionPickerRef = useRef<HTMLDivElement>(null);
   const reactionTriggerRef = useRef<HTMLButtonElement>(null);
@@ -160,6 +162,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
         />;
       case "VIDEO":
         return <VideoMessage
+          gifPlayback={Boolean(message.gifPlayback)}
           messageId={message.id}
           mediaUrl={mediaUrl}
           content={message.content}
@@ -169,6 +172,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           gallery={mediaMessages.map((media) => ({
             id: media.id,
             type: media.type as "IMAGE" | "VIDEO",
+            gifPlayback: Boolean(media.gifPlayback),
             mediaUrl: `${API_URL}/messages/${media.id}/media`,
             content: media.content,
             showSignature: media.direction === "OUTGOING" && !media.private,
@@ -212,7 +216,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
   useEffect(() => {
     if (!actionsOpen && !reactionPickerOpen) return;
     function closeOnOutsideClick(event: PointerEvent) {
-      if (!actionControlsRef.current?.contains(event.target as Node) && !reactionControlsRef.current?.contains(event.target as Node) && !reactionPickerRef.current?.contains(event.target as Node)) {
+      if (!actionControlsRef.current?.contains(event.target as Node) && !actionMenuRef.current?.contains(event.target as Node) && !reactionControlsRef.current?.contains(event.target as Node) && !reactionPickerRef.current?.contains(event.target as Node)) {
         setActionsOpen(false);
         setReactionPickerOpen(false);
       }
@@ -450,7 +454,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           {message.senderName}
         </p>
       )}
-      <div ref={reactionControlsRef} className={`absolute top-1/2 z-50 hidden -translate-y-1/2 lg:block ${outgoing ? "-left-6" : "-right-6"}`}>
+      <div data-print-exclude ref={reactionControlsRef} className={`absolute top-1/2 z-50 hidden -translate-y-1/2 lg:block ${outgoing ? "-left-6" : "-right-6"}`}>
         <button
           ref={reactionTriggerRef}
           type="button"
@@ -480,32 +484,27 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
         </AnimatePresence>,
         document.body
       )}
-      <div ref={actionControlsRef} className="absolute top-1 right-1 z-40 lg:top-1.5 lg:right-2">
-        <button
+      <Popover.Root open={actionsOpen} onOpenChange={(open) => {
+        setActionsOpen(open);
+        if (open) {
+          setReactionPickerOpen(false);
+          setCopyError(false);
+          setActionError(null);
+        }
+      }}>
+      <div data-print-exclude ref={actionControlsRef} className="absolute top-1 right-1 z-40 lg:top-1.5 lg:right-2">
+        <Popover.Trigger
           type="button"
           aria-label="Ações da mensagem"
           aria-haspopup="menu"
           aria-expanded={actionsOpen}
-          onClick={() => {
-            setActionsOpen((open) => !open);
-            setReactionPickerOpen(false);
-            setCopyError(false);
-            setActionError(null);
-          }}
           className={`flex size-8 items-center justify-center rounded-full transition-[opacity,transform,color] duration-150 focus-visible:opacity-100 focus-visible:outline-2 [@media(hover:none)]:opacity-100 lg:size-5 ${isPrivate ? "text-zinc-500 hover:text-zinc-800 focus-visible:outline-zinc-500/60" : "text-zinc-300 hover:text-white focus-visible:outline-white/50"} ${actionsOpen ? "opacity-100" : "opacity-0 group-hover/message:opacity-100"}`}
         >
           <CaretDown size={13} weight="bold" aria-hidden="true" />
-        </button>
-        <AnimatePresence>
-        {actionsOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -5, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-            className={`absolute top-9 flex min-w-[210px] flex-col lg:top-7 lg:min-w-[178px] ${outgoing ? "right-0 origin-top-right items-end" : "left-0 origin-top-left items-start"}`}
-          >
-            <div role="menu" aria-label="Ações da mensagem" className="w-[210px] overflow-hidden rounded-xl border border-white/10 bg-zinc-900/95 p-1 text-sm font-medium leading-tight text-zinc-100 shadow-xl backdrop-blur-xl lg:w-[178px] lg:text-[12px]">
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Positioner side="bottom" align="end" sideOffset={4} positionMethod="fixed" collisionPadding={12} collisionAvoidance={{ side: "flip", align: "shift", fallbackAxisSide: "start" }} className="z-[110]">
+            <Popover.Popup ref={actionMenuRef} role="menu" aria-label="Ações da mensagem" initialFocus={false} finalFocus={false} className="max-h-[var(--available-height)] w-[210px] max-w-[calc(100vw-24px)] origin-[var(--transform-origin)] overflow-y-auto rounded-xl border border-white/10 bg-zinc-900/95 p-1 text-sm font-medium leading-tight text-zinc-100 shadow-xl outline-none backdrop-blur-xl transition-[opacity,transform] duration-150 data-[starting-style]:scale-[0.97] data-[starting-style]:opacity-0 data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 motion-reduce:transition-none lg:w-[178px] lg:text-[12px]">
               <>
                   {contact.isGroup && outgoing && !isPrivate && message.id > 0 && !message.deletedAt && <button type="button" role="menuitem" onClick={() => { setActionsOpen(false); setMessageInfoOpen(true); }} className={menuButtonClass}><Info size={15} className="shrink-0 text-zinc-200" /><span>Dados da mensagem</span></button>}
                   <button type="button" role="menuitem" onClick={() => { onReply(message); setActionsOpen(false); }} className={menuButtonClass}>
@@ -555,11 +554,11 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
                   {copyError && <p role="alert" className="px-3 py-1 text-[11px] text-red-300">Não foi possível copiar</p>}
                   {actionError && <p role="alert" className="px-3 py-1 text-[11px] text-red-300">{actionError}</p>}
               </>
-            </div>
-          </motion.div>
-        )}
-        </AnimatePresence>
+            </Popover.Popup>
+          </Popover.Positioner>
+        </Popover.Portal>
       </div>
+      </Popover.Root>
       {pinDialogOpen && (
         <Dialog.Root open onOpenChange={(open) => {
           if (updatingFlags) return;

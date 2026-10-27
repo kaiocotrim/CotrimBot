@@ -1,4 +1,5 @@
 import type { Contact, ContactAvatar, Message, MessagesPage, Poll, PollResults } from "@/types/chat";
+import type { GifFile } from "@/lib/giphy";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
@@ -268,6 +269,7 @@ export async function sendMedia(
   const formData = new FormData();
 
   formData.append("file", file);
+  if ((file as GifFile).gifPlayback) formData.append("gifPlayback", "true");
 
   if (caption?.trim()) {
     formData.append(

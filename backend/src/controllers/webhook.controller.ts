@@ -435,7 +435,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
   // Vídeo: usa a legenda quando disponível.
   else if (data.message?.videoMessage) {
     messageType = "VIDEO";
-    content = data.message.videoMessage.caption || "[Vídeo]";
+    content = data.message.videoMessage.caption || (data.message.videoMessage.gifPlayback === true ? "[GIF]" : "[Vídeo]");
   }
   // Documento: usa o nome do arquivo quando disponível.
   else if (data.message?.documentMessage) {
@@ -574,6 +574,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
       content,
       direction: fromMe ? "OUTGOING" : "INCOMING",
       type: messageType,
+      gifPlayback: messageType === "VIDEO" && data.message?.videoMessage?.gifPlayback === true,
       ...(messageType === "AUDIO" ? { isVoiceMessage: data.message.audioMessage.ptt === true } : {}),
       ...(messageType === "CONTACT" ? { sharedContacts } : {}),
       ...(poll ? { poll } : {}),

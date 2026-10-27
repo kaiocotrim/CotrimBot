@@ -292,6 +292,9 @@ export async function sendMediaToContact(
     return res.status(400).json({ message: "Opção de assinatura inválida" });
   }
   const includeSignature = rawIncludeSignature !== "false";
+  const rawGifPlayback = req.body.gifPlayback;
+  if (rawGifPlayback !== undefined && rawGifPlayback !== "true" && rawGifPlayback !== "false") return res.status(400).json({ message: "Opção de GIF inválida" });
+  const gifPlayback = rawGifPlayback === "true";
   const rawReplyToMessageId = req.body.replyToMessageId;
   const replyToMessageId = rawReplyToMessageId === undefined || rawReplyToMessageId === ""
     ? undefined
@@ -308,6 +311,8 @@ export async function sendMediaToContact(
   }
 
   // Busca o contato para descobrir o telefone.
+  if (gifPlayback && file.mimetype !== "video/mp4") return res.status(400).json({ message: "GIFs animados devem ser enviados como vídeo MP4" });
+  if (gifPlayback && file.size > 16 * 1024 * 1024) return res.status(400).json({ message: "O GIF deve ter no máximo 16 MB" });
   const contact = await prisma.contact.findUnique({
     where: {
       id: contactId,
@@ -376,6 +381,7 @@ export async function sendMediaToContact(
         media: base64,
         fileName: file.originalname,
         caption: outgoingCaption,
+        ...(gifPlayback ? { gifPlayback: true } : {}),
         ...(quotedMessage && !quotedMessage.private ? {
           quoted: {
             externalId: quotedMessage.externalId,
@@ -403,7 +409,7 @@ export async function sendMediaToContact(
     } else if (messageType === "IMAGE") {
       content = "[Imagem]";
     } else if (messageType === "VIDEO") {
-      content = "[Vídeo]";
+      content = gifPlayback ? "[GIF]" : "[Vídeo]";
     } else if (messageType === "AUDIO") {
       content = "[Áudio]";
     } else {
@@ -411,7 +417,7 @@ export async function sendMediaToContact(
     }
 
     // Salva a mídia no histórico local.
-    const audioMetadata = messageType === "AUDIO" ? { isVoiceMessage: false } : {};
+    const audioMetadata = { ...(messageType === "AUDIO" ? { isVoiceMessage: false } : {}), gifPlayback };
     const message = await prisma.message.upsert({
       where: { externalId },
       update: {

@@ -1,0 +1,58 @@
+:root {
+  --app-bg: #09090b;
+  --app-surface: #111113;
+  --app-panel: #171717;
+  --app-control: #292929;
+  --app-text: #f4f4f5;
+  --app-muted: #a1a1aa;
+  --app-line: #ffffff18;
+}
+
+:root[data-theme="light"] {
+  --app-bg: #fafafa;
+  --app-surface: #fff;
+  --app-panel: #f4f4f5;
+  --app-control: #e4e4e7;
+  --app-text: #18181b;
+  --app-muted: #71717a;
+  --app-line: #18181b20;
+  --color-white: #18181b;
+  --color-black: #fff;
+  --color-zinc-50: #18181b;
+  --color-zinc-100: #27272a;
+  --color-zinc-200: #3f3f46;
+  --color-zinc-300: #52525b;
+  --color-zinc-400: #71717a;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #a1a1aa;
+  --color-zinc-700: #d4d4d8;
+  --color-zinc-800: #e4e4e7;
+  --color-zinc-900: #f4f4f5;
+  --color-zinc-950: #fafafa;
+}
+
+/* Superfícies com cores próprias também seguem a preferência. */
+:root[data-theme="light"],
+:root[data-theme="light"] body { background-color: var(--app-bg); }
+:root[data-theme="light"] :is([class~="bg-[#09090b]"], [class~="bg-[#050506]"], [class~="bg-[#111113]"], [class~="max-lg:bg-[#050506]"]) { background-color: var(--app-bg); }
+:root[data-theme="light"] :is([class~="bg-[#171717]"], [class~="bg-[#292929]"]) { background-color: var(--app-panel); }
+:root[data-theme="light"] [data-chat-wallpaper] { opacity: .08; }
+:root[data-theme="light"] [data-chat-header-backdrop] { height: 100%; background: rgb(250 250 250 / 92%); }
+:root[data-theme="light"] [data-chat-root] img[src$="/Logo-CotrimBot-nova.png"] { filter: invert(1); }
+
+/* A nota privada e o PNG mantêm a paleta própria, inclusive dentro do tema claro. */
+:root[data-theme="light"] :is([data-private-message="true"], [data-message-composer][data-private="true"], [data-conversation-print]) {
+  --color-white: #fff;
+  --color-black: #000;
+  --color-zinc-50: #fafafa;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-300: #d4d4d8;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #52525b;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
+  --color-zinc-950: #09090b;
+}

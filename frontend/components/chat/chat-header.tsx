@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, CheckCheck, EllipsisVertical, Forward, Info, Phone, Search, Star, Trash2, UserRoundCheck, UserRoundPlus, X } from "lucide-react";
+import { ArrowLeft, CheckCheck, EllipsisVertical, Forward, Info, Phone, ScanLine, Search, Star, Trash2, UserRoundCheck, UserRoundPlus, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { parsePhoneNumberFromString } from "libphonenumber-js/min";
 import { useEffect, useRef, useState } from "react";
@@ -22,6 +22,7 @@ type ChatHeaderProps = {
   selectedCount: number;
   selectionBusy: boolean;
   onOpenSearch: () => void;
+  onTakeScreenshot: () => Promise<void>;
   onOpenFavorites: () => void;
   onStartSelection: () => void;
   onCloseSelection: () => void;
@@ -56,13 +57,14 @@ export function SidebarMenuButton({ onClick, expanded, className = "" }: { onCli
 
 const actionClass = "flex size-10 shrink-0 items-center sm:size-9 justify-center rounded-full text-zinc-600 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-35";
 
-export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isTyping, contactPresence, searchOpen, searchQuery, currentResult, resultCount, selectionMode, selectedCount, selectionBusy, onOpenSearch, onOpenFavorites, onStartSelection, onCloseSelection, onFavoriteSelected, onDeleteSelected, onOpenForward, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch, onOpenSidebar, sidebarOpen }: ChatHeaderProps) {
+export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isTyping, contactPresence, searchOpen, searchQuery, currentResult, resultCount, selectionMode, selectedCount, selectionBusy, onOpenSearch, onTakeScreenshot, onOpenFavorites, onStartSelection, onCloseSelection, onFavoriteSelected, onDeleteSelected, onOpenForward, onOpenContactInfo, onSearchQueryChange, onPreviousResult, onNextResult, onCloseSearch, onOpenSidebar, sidebarOpen }: ChatHeaderProps) {
   const reduceMotion = useReducedMotion();
   const searchRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [assigning, setAssigning] = useState(false);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [takingScreenshot, setTakingScreenshot] = useState(false);
   const assignedUserIds = contact.assignedUserIds ?? [];
   const assignedToMe = assignedUserIds.includes(currentUserId);
   const phoneNumber = contact.isGroup ? undefined : parsePhoneNumberFromString(`+${contact.phone.replace(/\D/g, "")}`);
@@ -107,6 +109,7 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
   return (
     <header className={`${styles.header} pointer-events-auto relative isolate flex h-[calc(64px+env(safe-area-inset-top))] w-full min-w-0 items-center gap-1.5 px-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-2 sm:gap-3 sm:px-4`}>
       <div
+        data-chat-header-backdrop
         aria-hidden="true"
         className={`${styles.backdrop} pointer-events-none absolute inset-x-0 top-0 -z-10 h-[200px] backdrop-blur-3xl backdrop-saturate-150 [mask-image:linear-gradient(to_bottom,black_0%,black_35%,rgba(0,0,0,0.75)_55%,rgba(0,0,0,0.3)_78%,transparent_100%)]`}
       />
@@ -237,6 +240,21 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
                   >
                     <Search className="size-4 text-zinc-400" aria-hidden="true" />
                     Localizar mensagem
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={takingScreenshot}
+                    onClick={async () => {
+                      setMenuOpen(false);
+                      setTakingScreenshot(true);
+                      try { await onTakeScreenshot(); }
+                      finally { setTakingScreenshot(false); }
+                    }}
+                    className="hidden w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-zinc-200 transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-35 lg:flex"
+                  >
+                    <ScanLine className="size-4 text-zinc-400" aria-hidden="true" />
+                    Tirar print
                   </button>
                 </motion.div>
               )}

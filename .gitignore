@@ -30,6 +30,7 @@ generated/
 *.log
 backend/.bot-test-dist/
 backend/.announcement-test-dist/
+backend/.gif-test-dist/
 backend/.sac-test-backups/
 
 # Sistema

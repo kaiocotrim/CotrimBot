@@ -9,6 +9,27 @@ const originalEnvironment = {
   instance: process.env.EVOLUTION_INSTANCE,
 };
 
+test("envia GIF MP4 com reprodução animada explícita", { concurrency: false }, async () => {
+  process.env.EVOLUTION_API_URL = "https://evolution.example";
+  process.env.EVOLUTION_API_KEY = "test-key";
+  process.env.EVOLUTION_INSTANCE = "test-instance";
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String(init?.body));
+    assert.equal(body.media, "data:video/mp4;base64,AQID");
+    assert.equal(body.gifPlayback, true);
+    assert.equal(body.mediatype, "video");
+    return Response.json({ key: { id: "gif-message" } });
+  };
+  try {
+    await sendWhatsAppMedia({ number: "5511999999999", mediatype: "video", mimetype: "video/mp4", media: "AQID", fileName: "gif-test.mp4", gifPlayback: true });
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of Object.entries({ EVOLUTION_API_URL: originalEnvironment.url, EVOLUTION_API_KEY: originalEnvironment.key, EVOLUTION_INSTANCE: originalEnvironment.instance })) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+});
+
 test("envia mídia como Data URL para a Evolution", { concurrency: false }, async () => {
   process.env.EVOLUTION_API_URL = "https://evolution.example";
   process.env.EVOLUTION_API_KEY = "test-key";

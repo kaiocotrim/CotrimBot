@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "outDir": "./.gif-test-dist" },
+  "include": ["tests/evolution-media.test.ts"],
+  "exclude": ["dist", ".gif-test-dist", "node_modules"]
+}

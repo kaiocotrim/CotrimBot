@@ -11,6 +11,10 @@
   animation: hide-subtitle 400ms ease-in-out 6s forwards;
 }
 
+:global(html[data-theme="light"]) .backButton {
+  color: var(--app-text);
+}
+
 @media (max-width: 1023px) {
   .header {
     height: calc(var(--chat-header-height, 64px) + env(safe-area-inset-top));

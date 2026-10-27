@@ -1,6 +1,310 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 
 const longWord = "a".repeat(160);
+
+for (const width of [1280, 390]) {
+  test(`GIF conecta GIPHY busca prepara animação e envia só após confirmação (${width}px)`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    const sample = await readFile(path.join(__dirname, "fixtures/gif-preview.mp4"));
+    const { runtimeErrors } = await mockApi(page);
+    const sent: { gifPlayback: FormDataEntryValue | null; name: string; type: string }[] = [];
+    let failDownload = true;
+    const item = (id: string, title: string) => ({ id, title, images: { fixed_width: { url: `https://media.giphy.com/media/${id}/preview.gif` }, original: { url: `https://media.giphy.com/media/${id}/giphy.gif`, mp4: `https://media.giphy.com/media/${id}/giphy.mp4` } } });
+    await page.route("https://api.giphy.com/v1/gifs/**", (route) => {
+      const url = new URL(route.request().url());
+      const headers = { "access-control-allow-origin": "*" };
+      if (url.searchParams.get("api_key") === "bad-key") return route.fulfill({ status: 403, headers, json: {} });
+      if (url.searchParams.get("q") === "limite") return route.fulfill({ status: 429, headers, json: {} });
+      const more = url.searchParams.get("q") === "gato";
+      const offset = Number(url.searchParams.get("offset") || 0);
+      return route.fulfill({ headers, json: { data: [more && offset ? item("cat", "Gato feliz") : item("happy", "Feliz")], pagination: { total_count: more ? 2 : 1, offset, count: 1 } } });
+    });
+    await page.route("https://media.giphy.com/media/**", (route) => {
+      const headers = { "access-control-allow-origin": "*" };
+      if (route.request().url().endsWith(".mp4")) return failDownload ? route.fulfill({ status: 500, headers, body: "temporarily unavailable" }) : route.fulfill({ headers, contentType: "video/mp4", body: Buffer.from(sample) });
+      return route.fulfill({ headers, contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160"><rect width="240" height="160" fill="#8b5cf6"/><text x="70" y="94" fill="white" font-size="32">GIF</text></svg>' });
+    });
+    await page.route("**/contacts/1/send-media", async (route) => {
+      const form = await new Response(new Uint8Array(route.request().postDataBuffer()!).buffer, { headers: { "content-type": route.request().headers()["content-type"]! } }).formData();
+      const file = form.get("file") as File;
+      sent.push({ gifPlayback: form.get("gifPlayback"), name: file.name, type: file.type });
+      await route.fulfill({ json: { message: {} } });
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+    const composer = page.locator("[data-message-composer]");
+    const openGifs = async () => {
+      await composer.getByRole("button", { name: "Abrir emojis", exact: true }).click();
+      await page.getByRole("button", { name: "GIFs", exact: true }).click();
+    };
+    await openGifs();
+    await expect(page.getByRole("heading", { name: "Conectar ao GIPHY" })).toBeVisible();
+    await page.getByLabel("Chave da API GIPHY").fill("bad-key");
+    await page.getByRole("button", { name: "Conectar GIPHY", exact: true }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "Chave GIPHY inválida" })).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem("cotrimbot:giphy-api-key"))).toBeNull();
+    await page.getByLabel("Chave da API GIPHY").fill("valid-test-key");
+    await page.getByRole("button", { name: "Conectar GIPHY", exact: true }).click();
+    const search = page.getByRole("searchbox", { name: "Pesquisar GIFs", exact: true });
+    await expect(search).toBeVisible();
+    await search.fill("limite");
+    await expect(page.getByRole("alert").filter({ hasText: "Limite de buscas" })).toBeVisible();
+    await search.fill("gato");
+    await expect(page.getByRole("button", { name: "Escolher GIF: Feliz", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Carregar mais GIFs", exact: true }).click();
+    const choice = page.getByRole("button", { name: "Escolher GIF: Gato feliz", exact: true });
+    await expect(choice).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath("gif-search.png") });
+    await choice.click();
+    await expect(page.getByRole("alert").filter({ hasText: "Não foi possível preparar este GIF" })).toBeVisible();
+    failDownload = false;
+    await choice.click();
+    const preview = composer.locator('video[aria-label="Prévia de gif-cat.mp4"]');
+    await expect(preview).toBeVisible();
+    await expect(preview).toHaveAttribute("loop", "");
+    await expect.poll(() => preview.evaluate((video: HTMLVideoElement) => video.videoWidth)).toBeGreaterThan(0);
+    await expect.poll(() => preview.evaluate((video: HTMLVideoElement) => video.paused)).toBe(false);
+    expect(sent).toEqual([]);
+    await composer.getByRole("button", { name: "Enviar mensagem", exact: true }).click();
+    await expect.poll(() => sent).toEqual([{ gifPlayback: "true", name: "gif-cat.mp4", type: "video/mp4" }]);
+    await expect(preview).toHaveCount(0);
+    await page.reload();
+    if (width >= 1024) await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+    else await expect(composer.getByRole("textbox", { name: "Mensagem", exact: true })).toBeVisible();
+    await openGifs();
+    await expect(search).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem("cotrimbot:giphy-api-key"))).toBe("valid-test-key");
+    expect(runtimeErrors).toEqual([]);
+  });
+}
+
+for (const width of [1280, 390]) {
+  test(`tema claro escuro e sistema persistem nas configurações (${width}px)`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ colorScheme: "light" });
+    const { runtimeErrors } = await mockApi(page, 3);
+    await page.goto("/");
+    const openTheme = async () => {
+      // O acesso atual às configurações fica na barra de navegação do desktop.
+      await page.setViewportSize({ width: 1280, height: 900 });
+      const back = page.getByRole("button", { name: "Voltar para conversas", exact: true });
+      if (await back.isVisible()) await back.click();
+      await page.getByRole("button", { name: "Abrir configurações de Teste local" }).click();
+      await page.getByRole("tab", { name: "Tema", exact: true }).click();
+      await page.setViewportSize({ width, height: 900 });
+    };
+    await openTheme();
+    await expect(page.getByRole("radio", { name: /^Escuro/ })).toBeChecked();
+    await page.getByText("Claro", { exact: true }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect.poll(() => page.getByRole("dialog").evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(255, 255, 255)");
+    await expect.poll(() => page.getByRole("radio", { name: /^Claro/ }).evaluate((element) => getComputedStyle(element.parentElement!).backgroundColor)).toBe("rgb(255, 255, 255)");
+    await page.screenshot({ path: testInfo.outputPath("theme-settings-light.png") });
+    await page.getByRole("button", { name: "Fechar configurações", exact: true }).click();
+    await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+    await expect.poll(() => page.locator('[data-message-id="1"] [data-message-bubble]').evaluate((element) => getComputedStyle(element).color)).toBe("rgb(24, 24, 27)");
+    await expect(page.locator('[data-message-id="3"]')).toHaveCSS("opacity", "1");
+    await page.screenshot({ path: testInfo.outputPath("chat-light.png") });
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await openTheme();
+    await expect(page.getByRole("radio", { name: /^Claro/ })).toBeChecked();
+    await page.getByText("Sistema", { exact: true }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await page.emulateMedia({ colorScheme: "dark" });
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(page.getByRole("radio", { name: /^Sistema/ })).toBeChecked();
+    await page.getByText("Escuro", { exact: true }).click();
+    await page.emulateMedia({ colorScheme: "light" });
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    expect(await page.evaluate(() => localStorage.getItem("cotrimbot:theme"))).toBe("dark");
+    await page.screenshot({ path: testInfo.outputPath("theme-settings-dark.png") });
+    expect(runtimeErrors).toEqual([]);
+  });
+}
+
+test("tirar print seleciona início e fim e gera o trecho inteiro em PNG", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.mediaDevices, "getDisplayMedia", { value: () => { throw new Error("Não deve capturar a tela do computador"); } });
+    new MutationObserver(() => {
+      const snapshot = document.querySelector("[data-conversation-print]");
+      if (!snapshot) return;
+      document.documentElement.dataset.printIds = Array.from(snapshot.querySelectorAll("[data-message-id]")).map((row) => row.getAttribute("data-message-id")).join(",");
+      document.documentElement.dataset.printControls = String(snapshot.querySelectorAll("[data-print-exclude]").length);
+      document.documentElement.dataset.printBrand = snapshot.querySelector("[data-print-brand]")?.textContent ?? "";
+      document.documentElement.dataset.printLogo = String(Boolean(snapshot.querySelector("[data-print-logo]")));
+    }).observe(document, { childList: true, subtree: true });
+  });
+  const { runtimeErrors } = await mockApi(page, 25);
+  let mediaRequests = 0;
+  await page.route("**/contacts/1/send-media", (route) => { mediaRequests++; return route.fulfill({ json: {} }); });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+  await page.getByRole("button", { name: "Mais opções", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Tirar print", exact: true }).click();
+  const toolbar = page.getByRole("region", { name: "Selecionar trecho para print" });
+  await expect(toolbar).toContainText("Selecione a mensagem inicial");
+  await expect(toolbar.getByRole("button", { name: "Gerar print", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Definir início do print na mensagem 2", exact: true }).click();
+  await expect(toolbar).toContainText("Agora selecione a mensagem final");
+  await page.getByRole("button", { name: "Definir fim do print na mensagem 20", exact: true }).click();
+  await expect(toolbar).toContainText("19 mensagens no print");
+  await expect(page.locator('[data-print-selected="true"]')).toHaveCount(19);
+  await page.screenshot({ path: testInfo.outputPath("print-selection-gray.png") });
+  await toolbar.getByRole("button", { name: "Gerar print", exact: true }).click();
+  const preview = page.getByRole("img", { name: /^Prévia de print-conversa-\d+\.png$/ });
+  await expect(preview).toBeVisible();
+  await expect(toolbar).toHaveCount(0);
+  await expect(page.locator("html")).toHaveAttribute("data-print-ids", Array.from({ length: 19 }, (_, i) => i + 2).join(","));
+  await expect(page.locator("html")).toHaveAttribute("data-print-controls", "0");
+  await expect(page.locator("html")).toHaveAttribute("data-print-brand", "CotrimBot");
+  await expect(page.locator("html")).toHaveAttribute("data-print-logo", "true");
+  await expect(page.locator("[data-conversation-print]")).toHaveCount(0);
+  const image = await preview.evaluate(async (element: HTMLImageElement) => {
+    const blob = await (await fetch(element.src)).blob();
+    const bitmap = await createImageBitmap(blob);
+    const result = { type: blob.type, width: bitmap.width, height: bitmap.height };
+    bitmap.close();
+    return result;
+  });
+  expect(image.type).toBe("image/png");
+  expect(image.width).toBeGreaterThan(600);
+  expect(image.height).toBeGreaterThan(1600);
+  const bytes = await preview.evaluate(async (element: HTMLImageElement) => Array.from(new Uint8Array(await (await fetch(element.src)).arrayBuffer())));
+  await writeFile(testInfo.outputPath("conversation-range.png"), Buffer.from(bytes));
+  expect(mediaRequests).toBe(0);
+  await page.getByRole("button", { name: /^Remover print-conversa-\d+\.png$/ }).click();
+  await expect(preview).toHaveCount(0);
+  expect(runtimeErrors).toEqual([]);
+});
+
+test("tirar print inclui mensagens enviadas, foto, vídeo e eventos do intervalo", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.addInitScript(() => {
+    new MutationObserver(() => {
+      const avatar = document.querySelector<HTMLImageElement>("[data-conversation-print] [data-print-avatar]");
+      if (avatar) document.documentElement.dataset.printAvatarPresent = "true";
+    }).observe(document, { childList: true, subtree: true });
+  });
+  const { runtimeErrors } = await mockApi(page);
+  const avatarUrl = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#60a5fa"/><circle cx="40" cy="28" r="14" fill="#fff"/><ellipse cx="40" cy="70" rx="27" ry="24" fill="#fff"/></svg>').toString("base64")}`;
+  await page.route("**/api/contacts", (route) => route.fulfill({ json: [{ id: 1, name: "Contato de teste", phone: "5511999999999", isGroup: false, archived: false, unreadCount: 0, profilePictureUrl: avatarUrl, messages: [{ id: 1, content: "Conversa de teste", type: "TEXT", direction: "INCOMING", createdAt: new Date().toISOString() }] }] }));
+  await page.route("**/api/contacts/1/avatar", (route) => route.fulfill({ json: { profilePictureUrl: avatarUrl } }));
+  await page.route("**/api/contacts/1/messages*", (route) => {
+    if (!new URL(route.request().url()).pathname.endsWith("/messages")) return route.fallback();
+    const examples = [
+      { type: "TEXT", content: "Antes do trecho" },
+      { type: "TEXT", content: "Início da conversa 👋", direction: "OUTGOING" },
+      { type: "SYSTEM", content: "Você atribuiu para o bot" },
+      { type: "IMAGE", content: "Foto da conversa" },
+      { type: "VIDEO", content: "[Vídeo]" },
+      { type: "TEXT", content: "Fim da conversa" },
+      { type: "TEXT", content: "Depois do trecho" },
+    ];
+    return route.fulfill({ json: { messages: examples.map((example, index) => ({ direction: "INCOMING", ...example, id: index + 1, externalId: `mixed-${index}`, contactId: 1, private: false, createdAt: new Date().toISOString() })), hasMore: false, nextCursor: null } });
+  });
+  await page.route("**/api/messages/4/media", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="280" height="160"><rect width="280" height="160" fill="#34d399"/><text x="20" y="80" font-size="24">Foto no trecho</text></svg>' }));
+  await page.route("**/api/messages/5/media*", (route) => route.abort());
+  await page.goto("/");
+  await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+  const liveAvatar = page.locator('[data-chat-header] img[alt="Contato de teste"]');
+  await expect(liveAvatar).toBeVisible();
+  await expect.poll(() => liveAvatar.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "Mais opções", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Tirar print", exact: true }).click();
+  await page.getByRole("button", { name: "Definir início do print na mensagem 2", exact: true }).click();
+  await page.getByRole("button", { name: "Definir fim do print na mensagem 6", exact: true }).click();
+  const toolbar = page.getByRole("region", { name: "Selecionar trecho para print" });
+  await expect(toolbar).toContainText("5 mensagens no print");
+  await toolbar.getByRole("button", { name: "Gerar print", exact: true }).click();
+  const preview = page.getByRole("img", { name: /^Prévia de print-conversa-\d+\.png$/ });
+  await expect(preview).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-print-avatar-present", "true");
+  const bytes = await preview.evaluate(async (element: HTMLImageElement) => Array.from(new Uint8Array(await (await fetch(element.src)).arrayBuffer())));
+  await writeFile(testInfo.outputPath("conversation-mixed.png"), Buffer.from(bytes));
+  expect(runtimeErrors).toEqual([]);
+});
+
+test("tirar print não falha quando foto externa ou mídia bloqueiam exportação", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.addInitScript(() => {
+    new MutationObserver(() => {
+      const snapshot = document.querySelector("[data-conversation-print]");
+      if (snapshot?.textContent?.includes("Imagem indisponível")) document.documentElement.dataset.printUnavailableImage = "true";
+    }).observe(document, { childList: true, subtree: true });
+  });
+  const { runtimeErrors } = await mockApi(page, 3);
+  const avatarUrl = "https://avatar.example.invalid/person.svg";
+  await page.route(avatarUrl, (route) => route.fulfill({ contentType: "image/svg+xml", headers: { "cache-control": "no-store" }, body: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#60a5fa"/></svg>' }));
+  await page.route("**/api/contacts", (route) => route.fulfill({ json: [{ id: 1, name: "Contato de teste", phone: "5511999999999", isGroup: false, archived: false, unreadCount: 0, profilePictureUrl: avatarUrl, messages: [{ id: 1, content: "Teste", type: "TEXT", direction: "INCOMING", createdAt: new Date().toISOString() }] }] }));
+  await page.route("**/api/contacts/1/messages*", (route) => {
+    if (!new URL(route.request().url()).pathname.endsWith("/messages")) return route.fallback();
+    return route.fulfill({ json: { messages: [1, 2, 3].map((id) => ({ id, externalId: `blocked-${id}`, contactId: 1, type: id === 2 ? "IMAGE" : "TEXT", content: id === 2 ? "Foto com acesso expirado" : `Mensagem ${id}`, direction: "INCOMING", private: false, createdAt: new Date().toISOString() })), hasMore: false, nextCursor: null } });
+  });
+  await page.route("**/api/messages/2/media", (route) => route.request().resourceType() === "fetch" ? route.fulfill({ status: 403, body: "Acesso expirado" }) : route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="280" height="160"><rect width="280" height="160" fill="#60a5fa"/></svg>' }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+  const photo = page.locator('[data-chat-header] img[alt="Contato de teste"]');
+  await expect(photo).toBeVisible();
+  await expect.poll(() => photo.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(80);
+  await page.getByRole("button", { name: "Mais opções", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Tirar print", exact: true }).click();
+  await page.getByRole("button", { name: "Definir início do print na mensagem 1", exact: true }).click();
+  await page.getByRole("button", { name: "Definir fim do print na mensagem 3", exact: true }).click();
+  await page.getByRole("button", { name: "Gerar print", exact: true }).click();
+  await expect(page.getByRole("img", { name: /^Prévia de print-conversa-\d+\.png$/ })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-print-unavailable-image", "true");
+  await expect(page.getByRole("region", { name: "Selecionar trecho para print" })).toHaveCount(0);
+  expect(runtimeErrors).toEqual([]);
+});
+
+test("tirar print limita dimensões de trechos longos sem cortar mensagens", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const { runtimeErrors } = await mockApi(page, 140);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+  await page.getByRole("button", { name: "Mais opções", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Tirar print", exact: true }).click();
+  await page.getByRole("button", { name: "Definir início do print na mensagem 1", exact: true }).click();
+  await page.getByRole("button", { name: "Definir fim do print na mensagem 140", exact: true }).click();
+  await expect(page.locator('[data-print-selected="true"]')).toHaveCount(140);
+  await page.getByRole("button", { name: "Gerar print", exact: true }).click();
+  const preview = page.getByRole("img", { name: /^Prévia de print-conversa-\d+\.png$/ });
+  await expect(preview).toBeVisible({ timeout: 20000 });
+  const size = await preview.evaluate(async (element: HTMLImageElement) => {
+    const bitmap = await createImageBitmap(await (await fetch(element.src)).blob());
+    const result = { width: bitmap.width, height: bitmap.height };
+    bitmap.close();
+    return result;
+  });
+  expect(size.height).toBeGreaterThan(8000);
+  expect(size.height).toBeLessThanOrEqual(16000);
+  expect(size.width * size.height).toBeLessThanOrEqual(24000000);
+  expect(runtimeErrors).toEqual([]);
+});
+
+  test("tirar print permite recomeçar, inverter os limites e cancelar", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const { runtimeErrors } = await mockApi(page, 8);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+    await page.getByRole("button", { name: "Mais opções", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Tirar print", exact: true }).click();
+    const toolbar = page.getByRole("region", { name: "Selecionar trecho para print" });
+    await page.getByRole("button", { name: "Definir início do print na mensagem 7", exact: true }).click();
+    await page.getByRole("button", { name: "Definir fim do print na mensagem 3", exact: true }).click();
+    await expect(toolbar).toContainText("5 mensagens no print");
+    await toolbar.getByRole("button", { name: "Recomeçar", exact: true }).click();
+    await expect(toolbar).toContainText("Selecione a mensagem inicial");
+    await expect(page.locator('[data-print-selected="true"]')).toHaveCount(0);
+    await toolbar.getByRole("button", { name: "Cancelar", exact: true }).click();
+    await expect(toolbar).toHaveCount(0);
+    await expect(page.getByRole("img", { name: /^Prévia de print-/ })).toHaveCount(0);
+    expect(runtimeErrors).toEqual([]);
+  });
 
 async function mockApi(page: Page, messageCount = 1, compactExamples = false, contactCount = 1) {
   const runtimeErrors: string[] = [];
@@ -70,7 +374,7 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 414, height: 800 }
     await expect(backButton).toHaveAttribute("aria-expanded", "false");
 
     // As ações do cabeçalho ficam separadas; o emoji pertence ao campo,
-    // enquanto anexos, câmera e microfone ficam fora da cápsula de texto.
+    // enquanto anexos e microfone ficam fora da cápsula de texto.
     const call = page.getByRole("link", { name: "Ligar para Contato de teste" });
     const menu = page.getByRole("button", { name: "Mais opções", exact: true });
     const info = page.getByRole("button", { name: "Informações do contato", exact: true });
@@ -88,17 +392,17 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 414, height: 800 }
     const field = composer.locator("[data-composer-field]");
     const attachments = composer.getByRole("button", { name: "Abrir anexos", exact: true });
     const emojis = composer.getByRole("button", { name: "Abrir emojis", exact: true });
-    const camera = composer.getByRole("button", { name: "Abrir câmera", exact: true });
+    await expect(composer.getByRole("button", { name: "Abrir câmera", exact: true })).toHaveCount(0);
     const microphone = composer.getByRole("button", { name: "Gravar áudio", exact: true });
     await expect(input).toHaveCount(1);
-    for (const control of [field, attachments, emojis, camera, microphone]) await expect(control).toBeVisible();
+    for (const control of [field, attachments, emojis, microphone]) await expect(control).toBeVisible();
     await expect(composer.getByRole("button", { name: "Enviar mensagem", exact: true })).toBeHidden();
-    const [fieldBox, inputBox, attachmentsBox, emojiBox, cameraBox, microphoneBox] = await Promise.all(
-      [field, input, attachments, emojis, camera, microphone].map((control) => control.boundingBox()),
+    const [fieldBox, inputBox, attachmentsBox, emojiBox, microphoneBox] = await Promise.all(
+      [field, input, attachments, emojis, microphone].map((control) => control.boundingBox()),
     );
     expect(attachmentsBox!.x + attachmentsBox!.width).toBeLessThanOrEqual(fieldBox!.x + 1);
-    expect(fieldBox!.x + fieldBox!.width).toBeLessThanOrEqual(cameraBox!.x + 1);
-    expect(cameraBox!.x + cameraBox!.width).toBeLessThanOrEqual(microphoneBox!.x + 1);
+    expect(fieldBox!.x + fieldBox!.width).toBeLessThanOrEqual(microphoneBox!.x + 1);
+    expect(microphoneBox!.x - fieldBox!.x - fieldBox!.width).toBeLessThanOrEqual(9);
     expect(inputBox!.x).toBeGreaterThanOrEqual(fieldBox!.x);
     expect(inputBox!.x + inputBox!.width).toBeLessThanOrEqual(emojiBox!.x + 1);
     expect(emojiBox!.x + emojiBox!.width).toBeLessThanOrEqual(fieldBox!.x + fieldBox!.width);
@@ -136,15 +440,62 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 414, height: 800 }
   });
 }
 
-test("composer mobile abre câmera e emojis e troca microfone por envio", async ({ page }) => {
+for (const width of [320, 390, 768]) {
+  test(`anexos mobile abrem painel inferior em grade (${width}px)`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 844 });
+    const { runtimeErrors } = await mockApi(page, 20);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+    const composer = page.locator("[data-message-composer]");
+    const input = composer.getByRole("textbox", { name: "Mensagem", exact: true });
+    await input.fill("Mensagem em edição");
+    const trigger = composer.getByRole("button", { name: "Abrir anexos", exact: true });
+    await trigger.click();
+    const panel = page.locator("[data-mobile-attachment-panel]");
+    await expect(panel).toBeVisible();
+    for (const name of ["Fotos", "Vídeo", "Áudio", "Documento", "Enquete"]) {
+      await expect(panel.getByRole("menuitem", { name, exact: true })).toBeVisible();
+    }
+    await expect(panel.getByRole("menuitemcheckbox", { name: "Mensagem privada", exact: true })).toHaveAttribute("aria-checked", "false");
+    await expect.poll(async () => {
+      const box = (await panel.boundingBox())!;
+      const field = (await composer.locator("[data-composer-field]").boundingBox())!;
+      const send = (await composer.getByRole("button", { name: "Enviar mensagem", exact: true }).boundingBox())!;
+      return box.x >= 0 && box.x + box.width <= width && box.y + box.height <= 844 && field.y + field.height <= box.y && Math.abs(send.y + send.height - field.y - field.height) < 2;
+    }).toBe(true);
+    const photos = (await panel.getByRole("menuitem", { name: "Fotos", exact: true }).boundingBox())!;
+    const document = (await panel.getByRole("menuitem", { name: "Documento", exact: true }).boundingBox())!;
+    expect(Math.abs(photos.y - document.y)).toBeLessThan(2);
+    const signature = panel.getByRole("menuitemcheckbox", { name: "Assinar mensagens", exact: true });
+    const previous = await signature.getAttribute("aria-checked");
+    await signature.click();
+    await expect(signature).toHaveAttribute("aria-checked", previous === "true" ? "false" : "true");
+    await expect(panel).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await page.screenshot({ path: testInfo.outputPath("mobile-attachment-panel.png") });
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
+    await expect(trigger).toBeFocused();
+    await expect(input).toHaveValue("Mensagem em edição");
+    await trigger.click();
+    await expect(panel).toBeVisible();
+    await page.locator("[data-chat-header]").click({ position: { x: 5, y: 5 } });
+    await expect(panel).toBeHidden();
+    expect(runtimeErrors).toEqual([]);
+  });
+}
+
+test("composer mobile anexa imagem e abre emojis e troca microfone por envio", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const { runtimeErrors } = await mockApi(page);
   const sentTexts: string[] = [];
+  const sentPrivacy: boolean[] = [];
   await page.route("**/contacts/1/send", async (route) => {
     const payload = route.request().postDataJSON() as { text: string; clientId: string; private: boolean };
     sentTexts.push(payload.text);
+    sentPrivacy.push(payload.private);
     await route.fulfill({ json: { message: {
-      id: 2, externalId: "sent-2", contactId: 1, content: payload.text,
+      id: sentTexts.length + 1, externalId: `sent-${sentTexts.length + 1}`, contactId: 1, content: payload.text,
       clientId: payload.clientId, private: payload.private, direction: "OUTGOING", type: "TEXT",
       createdAt: new Date().toISOString(), readAt: null, reaction: null,
       senderName: null, senderPhone: null, senderProfilePictureUrl: null,
@@ -158,11 +509,13 @@ test("composer mobile abre câmera e emojis e troca microfone por envio", async 
   const microphone = composer.getByRole("button", { name: "Gravar áudio", exact: true });
   const send = composer.getByRole("button", { name: "Enviar mensagem", exact: true });
   await expect(microphone).toBeVisible();
+  await expect(composer.getByRole("button", { name: "Abrir câmera", exact: true })).toHaveCount(0);
+  await composer.getByRole("button", { name: "Abrir anexos", exact: true }).click();
   const chooserPromise = page.waitForEvent("filechooser");
-  await composer.getByRole("button", { name: "Abrir câmera", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Fotos", exact: true }).click();
   const chooser = await chooserPromise;
   expect(await chooser.element().getAttribute("accept")).toBe("image/*");
-  expect(await chooser.element().getAttribute("capture")).toBe("environment");
+  expect(await chooser.element().getAttribute("capture")).toBeNull();
   await chooser.setFiles({
     name: "camera.png", mimeType: "image/png",
     buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a6XcAAAAASUVORK5CYII=", "base64"),
@@ -196,6 +549,31 @@ test("composer mobile abre câmera e emojis e troca microfone por envio", async 
   await expect(page.locator('[data-message-id="2"]')).toContainText("Olá");
   await expect(microphone).toBeVisible();
   await expect(send).toBeHidden();
+  await composer.getByRole("button", { name: "Abrir anexos", exact: true }).click();
+  const privateOption = page.getByRole("menuitemcheckbox", { name: "Mensagem privada", exact: true });
+  await privateOption.click();
+  await expect(composer).toHaveAttribute("data-private", "true");
+  await expect(page.locator("[data-mobile-attachment-panel]")).toBeHidden();
+  await expect(input).toHaveAttribute("placeholder", "Digite uma mensagem privada...");
+  const field = composer.locator("[data-composer-field]");
+  const attachments = composer.getByRole("button", { name: "Abrir anexos", exact: true });
+  const emojis = composer.getByRole("button", { name: "Abrir emojis", exact: true });
+  for (const control of [field, attachments, emojis, microphone]) {
+    await expect.poll(() => control.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(255, 255, 255)");
+  }
+  await page.screenshot({ path: testInfo.outputPath("mobile-private-white.png") });
+  await input.fill("Nota interna de teste");
+  await expect.poll(() => send.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(255, 255, 255)");
+  await expect.poll(() => send.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(63, 63, 70)");
+  await send.click();
+  await expect.poll(() => sentPrivacy).toEqual([false, true]);
+  await expect(page.locator('[data-message-id="3"] [data-message-bubble]')).toHaveAttribute("data-private", "true");
+  await composer.getByRole("button", { name: "Abrir anexos", exact: true }).click();
+  await expect(privateOption).toHaveAttribute("aria-checked", "true");
+  await privateOption.click();
+  await expect(composer).toHaveAttribute("data-private", "false");
+  await expect(input).toHaveAttribute("placeholder", "Digite uma mensagem...");
+  await expect.poll(() => attachments.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(36, 36, 38)");
   await expectNoHorizontalOverflow(page);
   expect(runtimeErrors).toEqual([]);
 });
@@ -603,8 +981,17 @@ test("segurar uma mensagem abre as ações e arrastar cancela o gesto", async ({
   expect(await bubble.evaluate((element) => getComputedStyle(element).userSelect)).toBe("none");
   expect(await message.evaluate((element) => getComputedStyle(element).userSelect)).toBe("none");
   expect(await bubble.evaluate((element) => getComputedStyle(element).getPropertyValue("-webkit-user-select"))).toBe("none");
+  for (const surface of ["html", "body", "[data-chat-root]", "[data-chat-header]", "[data-message-list-content]", "[data-message-composer]", '[data-message-id="1"] [role="separator"]']) {
+    expect(await page.locator(surface).evaluate((element) => getComputedStyle(element).userSelect)).toBe("none");
+  }
   expect(await message.evaluate((element) => element.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })))).toBe(false);
   expect(await page.getByRole("textbox", { name: "Mensagem", exact: true }).evaluate((element) => getComputedStyle(element).userSelect)).not.toBe("none");
+  const input = page.getByRole("textbox", { name: "Mensagem", exact: true });
+  await input.fill("Texto editável");
+  await input.evaluate((element: HTMLTextAreaElement) => element.setSelectionRange(0, 5));
+  expect(await input.evaluate((element: HTMLTextAreaElement) => element.value.slice(element.selectionStart, element.selectionEnd))).toBe("Texto");
+  await input.fill("");
+  await input.blur();
   const menu = page.getByRole("menu", { name: "Ações da mensagem" });
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
@@ -648,6 +1035,49 @@ test("segurar uma mensagem abre as ações e arrastar cancela o gesto", async ({
   expect(await page.locator("html").getAttribute("data-copied-message")).toContain(longWord);
   expect(runtimeErrors).toEqual([]);
 });
+
+for (const width of [320, 390, 1280]) {
+  test(`menu de ações da mensagem permanece dentro da tela (${width}px)`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 700 });
+    const { runtimeErrors } = await mockApi(page);
+    await page.route("**/api/contacts/1/messages*", (route) => {
+      if (!new URL(route.request().url()).pathname.endsWith("/messages")) return route.fallback();
+      const examples = [
+        { type: "TEXT", content: "Oi" },
+        { type: "TEXT", content: longWord },
+        { type: "AUDIO", content: "[Áudio]" },
+        { type: "IMAGE", content: "[Imagem]" },
+      ];
+      const messages = ["INCOMING", "OUTGOING"].flatMap((direction, directionIndex) => examples.map((example, index) => ({
+        ...example, id: directionIndex * examples.length + index + 1,
+        externalId: `menu-${direction}-${index}`, direction, contactId: 1,
+        createdAt: new Date().toISOString(), private: false,
+      })));
+      return route.fulfill({ json: { messages, hasMore: false, nextCursor: null } });
+    });
+    await page.route("**/api/messages/*/media", (route) => route.abort());
+    await page.goto("/");
+    await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
+    for (let id = 1; id <= 8; id++) {
+      const trigger = page.locator(`[data-message-id="${id}"]`).getByRole("button", { name: "Ações da mensagem", exact: true });
+      await trigger.scrollIntoViewIfNeeded();
+      await trigger.click();
+      const menu = page.getByRole("menu", { name: "Ações da mensagem", exact: true });
+      await expect(menu).toBeVisible();
+      await expect.poll(async () => {
+        const box = (await menu.boundingBox())!;
+        return box.x >= 11 && box.y >= 11 && box.x + box.width <= width - 11 && box.y + box.height <= 689;
+      }).toBe(true);
+      await expect(menu.getByRole("menuitem", { name: "Encaminhar", exact: true })).toBeVisible();
+      await expect(menu.getByRole("menuitem", { name: "Apagar", exact: true })).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+      if (id === 3) await page.screenshot({ path: testInfo.outputPath("incoming-audio-actions.png") });
+      await page.keyboard.press("Escape");
+      await expect(menu).toBeHidden();
+    }
+    expect(runtimeErrors).toEqual([]);
+  });
+}
 
 for (const width of [320, 480, 1280]) {
   test(`menu de modelos de áudio permanece dentro da tela (${width}px)`, async ({ page }, testInfo) => {

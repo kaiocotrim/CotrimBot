@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { patchEvolutionPresence } from './presence-patch.mjs';
 import { patchEvolutionReceipts } from './receipt-patch.mjs';
+import { patchEvolutionGifs } from './gif-patch.mjs';
 
 export async function patchEvolutionPolls(root) {
   if (!root) throw new Error('Usage: node patch.mjs <Evolution source directory>');
@@ -33,4 +34,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   await patchEvolutionPolls(process.argv[2]);
   await patchEvolutionPresence(process.argv[2]);
   await patchEvolutionReceipts(process.argv[2]);
+  await patchEvolutionGifs(process.argv[2]);
 }

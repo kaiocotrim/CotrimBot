@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { PwaRegister } from "@/components/pwa-register";
 import { LoadingCursor } from "@/components/ui/loading-cursor";
+import { ThemeController } from "@/components/theme-controller";
+import { themeBootstrap } from "@/lib/app-theme";
 import "./globals.css";
 
 // Mesmas famílias do UItopic, servidas pelo próprio aplicativo.
@@ -62,9 +64,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      data-theme="dark"
+      suppressHydrationWarning
       className={`${calUI.variable} ${calGeo.variable} h-full font-sans antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}<LoadingCursor /><PwaRegister /></body>
+      <head><script dangerouslySetInnerHTML={{ __html: themeBootstrap }} /></head>
+      <body className="min-h-full flex flex-col"><ThemeController />{children}<LoadingCursor /><PwaRegister /></body>
     </html>
   );
 }

@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { motion, useReducedMotion } from "framer-motion";
-import { useEffect, useRef, type CSSProperties, type RefObject } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { GifPicker } from "@/components/chat/gif-picker";
 import styles from "./emoji-selector.module.css";
 
 async function loadPicker() {
@@ -32,24 +33,24 @@ const Picker = dynamic(preparePicker, { ssr: false, loading: () => <p role="stat
 const pickerStyle = {
   "--epr-bg-color": "transparent",
   "--epr-picker-border-color": "transparent",
-  "--epr-text-color": "#e4e4e7",
-  "--epr-category-label-bg-color": "rgba(24,24,27,0.9)",
-  "--epr-search-input-bg-color": "rgba(255,255,255,0.05)",
-  "--epr-hover-bg-color": "rgba(255,255,255,0.08)",
-  "--epr-focus-bg-color": "rgba(255,255,255,0.08)",
+  "--epr-text-color": "var(--app-text)",
+  "--epr-category-label-bg-color": "var(--app-panel)",
+  "--epr-search-input-bg-color": "color-mix(in srgb, var(--app-text) 5%, transparent)",
+  "--epr-hover-bg-color": "color-mix(in srgb, var(--app-text) 8%, transparent)",
+  "--epr-focus-bg-color": "color-mix(in srgb, var(--app-text) 8%, transparent)",
   "--epr-highlight-color": "#34d399",
   "--epr-emoji-size": "28px",
   "--epr-emoji-padding": "8px",
   "--epr-header-padding": "10px 16px",
   "--epr-search-input-border-radius": "999px",
   "--epr-search-input-height": "42px",
-  "--epr-search-input-bg-color-active": "rgba(9,9,11,0.6)",
-  "--epr-search-border-color": "#2f2f33",
+  "--epr-search-input-bg-color-active": "var(--app-surface)",
+  "--epr-search-border-color": "var(--app-line)",
   "--epr-search-border-color-active": "#34d399",
-  "--epr-search-input-text-color": "#e4e4e7",
-  "--epr-search-input-placeholder-color": "#a1a1aa",
+  "--epr-search-input-text-color": "var(--app-text)",
+  "--epr-search-input-placeholder-color": "var(--app-muted)",
   "--epr-category-icon-active-color": "#34d399",
-  "--epr-category-icon-inactive-color": "#a1a1aa",
+  "--epr-category-icon-inactive-color": "var(--app-muted)",
 } as CSSProperties;
 
 const privatePickerStyle = {
@@ -78,14 +79,18 @@ type EmojiSelectorProps = {
   triggerRef: RefObject<HTMLButtonElement | null>;
   onClose: (restoreFocus?: boolean) => void;
   onSelect: (emoji: string) => void;
+  onSelectGif: (file: File) => void;
+  gifFormat?: "mp4" | "gif";
   fieldHeight: number;
   rightInset: number;
 };
 
-export function EmojiSelector({ id, open, isPrivateMode, triggerRef, onClose, onSelect, fieldHeight, rightInset }: EmojiSelectorProps) {
+export function EmojiSelector({ id, open, isPrivateMode, triggerRef, onClose, onSelect, onSelectGif, gifFormat = "mp4", fieldHeight, rightInset }: EmojiSelectorProps) {
   const selectorRef = useRef<HTMLDivElement>(null);
   const categoryAnimationRef = useRef<{ stop: () => void } | null>(null);
   const reduceMotion = useReducedMotion();
+  const [tab, setTab] = useState<"emoji" | "gif">("emoji");
+  const activeTab = isPrivateMode ? "emoji" : tab;
 
   useEffect(() => {
     return () => {
@@ -173,6 +178,7 @@ export function EmojiSelector({ id, open, isPrivateMode, triggerRef, onClose, on
           }}
         >
           <div>
+          <div hidden={activeTab !== "emoji"}>
           <Picker
             theme={(isPrivateMode ? "light" : "dark") as import("emoji-picker-react").Theme}
             emojiStyle={"apple" as import("emoji-picker-react").EmojiStyle}
@@ -198,12 +204,14 @@ export function EmojiSelector({ id, open, isPrivateMode, triggerRef, onClose, on
             autoFocusSearch={open}
             onEmojiClick={(data) => onSelect(data.emoji)}
           />
+          </div>
+          {activeTab === "gif" && open && <GifPicker onSelect={onSelectGif} format={gifFormat} />}
           <div className="flex items-center justify-center px-4 pb-3 pt-2">
             <div className={`flex h-9 overflow-hidden rounded-full border ${isPrivateMode ? "border-zinc-200 bg-zinc-100" : "border-white/10 bg-black/15"}`} aria-label="Tipos de conteúdo">
-              <span className={`flex w-16 items-center justify-center ${isPrivateMode ? "bg-zinc-200 text-zinc-700" : "bg-white/5 text-emerald-400"}`} aria-label="Emojis">
+              <button type="button" onClick={() => setTab("emoji")} aria-pressed={activeTab === "emoji"} className={`flex w-16 items-center justify-center ${activeTab === "emoji" ? isPrivateMode ? "bg-zinc-200 text-zinc-700" : "bg-white/5 text-emerald-400" : "text-zinc-500"}`} aria-label="Emojis">
                 <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 3 4 3 4-3 4-3M8.5 8.5h.01M15.5 8.5h.01" /></svg>
-              </span>
-              <button type="button" disabled title="GIFs em breve" className={`w-16 border-l text-xs font-semibold ${isPrivateMode ? "border-zinc-200 text-zinc-400" : "border-white/10 text-zinc-600"}`}>GIF</button>
+              </button>
+              <button type="button" onClick={() => setTab("gif")} disabled={isPrivateMode} aria-label="GIFs" aria-pressed={activeTab === "gif"} title={isPrivateMode ? "GIFs estão disponíveis nas mensagens públicas" : "Pesquisar GIFs"} className={`w-16 border-l text-xs font-semibold ${isPrivateMode ? "border-zinc-200 text-zinc-400" : activeTab === "gif" ? "border-white/10 bg-white/5 text-emerald-400" : "border-white/10 text-zinc-500"}`}>GIF</button>
               <button type="button" disabled title="Figurinhas em breve" aria-label="Figurinhas em breve" className={`flex w-16 items-center justify-center border-l ${isPrivateMode ? "border-zinc-200 text-zinc-400" : "border-white/10 text-zinc-600"}`}>
                 <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 21H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8l-6 6Z" /><path d="M15 21v-4a2 2 0 0 1 2-2h4" /></svg>
               </button>

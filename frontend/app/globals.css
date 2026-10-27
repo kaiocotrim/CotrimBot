@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "./themes.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -30,14 +31,17 @@ html:has([data-chat-root]) body {
     --chat-bottom-safe-area: 0px;
   }
 
-  /* Apenas o conteúdo não editável dos balões dispensa a seleção nativa. */
-  [data-message-bubble] {
+  /* Bloqueia a seleção de página do iOS, inclusive em áreas vazias e portais. */
+  html:has([data-chat-root]),
+  html:has([data-chat-root]) body,
+  html:has([data-chat-root]) body * {
     -webkit-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;
   }
 
-  [data-message-bubble] :is(input, textarea, select, [contenteditable]:not([contenteditable="false"])) {
+  /* Mantém seleção, cursor e colagem nos campos editáveis. */
+  html:has([data-chat-root]) body :is(input, textarea, select, [contenteditable]:not([contenteditable="false"])) {
     -webkit-user-select: text;
     user-select: text;
     -webkit-touch-callout: initial;

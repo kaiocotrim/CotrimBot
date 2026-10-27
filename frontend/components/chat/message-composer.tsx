@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from "framer-motion";
 import Image from "next/image";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { AttachmentMenu, type AttachmentKind } from "@/components/chat/attachment-menu";
 import { PollComposer } from "@/components/chat/poll-composer";
@@ -12,12 +12,16 @@ import { MessageText } from "@/components/chat/message-text";
 import { TeamTypingBadge } from "@/components/chat/team-typing-badge";
 import type { TeamTypingMember } from "@/hooks/use-contact-team-typing";
 import { insertEmojiAtSelection } from "@/lib/emoji-text";
+import type { GifFile } from "@/lib/giphy";
 import { getContactAssignees, rewriteMessage, type ContactAssignee } from "@/lib/chat-api";
 import type { Message, Poll } from "@/types/chat";
 import styles from "./message-composer.module.css";
 
 
+export type MessageComposerHandle = { addAttachments: (files: File[]) => void };
+
 type MessageComposerProps = {
+  ref?: Ref<MessageComposerHandle>;
   userId: string;
   dropZoneContainer: HTMLElement | null;
   mode?: "external" | "internal";
@@ -51,7 +55,7 @@ type PendingAttachment = {
   previewUrl: string | null;
 };
 type MentionMatch = { start: number; end: number; query: string };
-type ComposerIconName = "message" | "lock" | "plus" | "sticker" | "smile" | "camera" | "mic" | "send" | "expand" | "collapse" | "sparkles";
+type ComposerIconName = "message" | "lock" | "plus" | "sticker" | "smile" | "mic" | "send" | "expand" | "collapse" | "sparkles";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 const LONG_PASTE_CHARACTER_LIMIT = 1200;
@@ -106,7 +110,6 @@ function ComposerIcon({ name }: { name: ComposerIconName }) {
       {name === "plus" && <path d="M12 5v14M5 12h14" />}
       {name === "sticker" && <><path d="M9 3h6a6 6 0 0 1 6 6v5l-7 7H9a6 6 0 0 1-6-6V9a6 6 0 0 1 6-6ZM14 21v-4a3 3 0 0 1 3-3h4" /><path d="M8 9h.01M15 9h.01M8 13a4 4 0 0 0 5 2" /></>}
       {name === "smile" && <><circle cx="12" cy="12" r="9" /><path d="M8 14a4.5 4.5 0 0 0 8 0M8.5 8.5h.01M15.5 8.5h.01" /></>}
-      {name === "camera" && <><path d="M14.5 4h-5L7.5 7H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2.5L14.5 4Z" /><circle cx="12" cy="13" r="4" /></>}
       {name === "mic" && <><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8" /></>}
       {name === "send" && <><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></>}
       {name === "expand" && <path d="M8 3H3v5m13 13h5v-5M3 3l6 6m12 12-6-6" />}
@@ -122,6 +125,7 @@ const buttonClassName = "flex items-center justify-center rounded-full text-zinc
 const privateButtonClassName = "border-zinc-300 bg-zinc-100 !text-zinc-700 hover:bg-zinc-200 hover:!text-zinc-950 focus-visible:!outline-zinc-500/60 disabled:!text-zinc-400";
 
 export function MessageComposer({
+  ref: handleRef,
   userId,
   dropZoneContainer,
   mode = "external",
@@ -204,7 +208,6 @@ export function MessageComposer({
   const mentionListId = useId();
   const attachmentTriggerRef = useRef<HTMLButtonElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
   const attachmentKindRef = useRef<AttachmentKind>("document");
   const [measurements, setMeasurements] = useState({ compact: 24, stacked: 24 });
   const [availableHeight, setAvailableHeight] = useState(400);
@@ -344,13 +347,20 @@ export function MessageComposer({
   const stagePendingFiles = useCallback((files: File[]) => {
     if (!files.length) return;
     const attachments = files.map((file) => {
-      const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
+      const previewUrl = file.type.startsWith("image/") || (file as GifFile).gifPlayback ? URL.createObjectURL(file) : null;
       if (previewUrl) pendingPreviewUrlsRef.current.add(previewUrl);
       return { id: nextAttachmentIdRef.current++, file, previewUrl };
     });
     setPendingAttachments((current) => [...current, ...attachments]);
     setAttachmentError(null);
   }, []);
+
+  useImperativeHandle(handleRef, () => ({
+    addAttachments(files) {
+      stagePendingFiles(files);
+      textareaRef.current?.focus();
+    },
+  }), [stagePendingFiles]);
 
   const removePendingAttachment = useCallback((id: number) => {
     setPendingAttachments((current) => current.filter((attachment) => {
@@ -743,7 +753,7 @@ export function MessageComposer({
   const fieldHeight = isFullscreen ? availableHeight : isStacked ? Math.min(naturalHeight, availableHeight) : 44;
   const textHeight = isStacked ? Math.max(24, fieldHeight - (isMobile ? 20 : 72)) : 24;
   const controlBottom = isMobile ? 6 : isStacked ? 8 : 6;
-  const mobileRightInset = hasPayload && !isRecording ? 52 : 96;
+  const mobileRightInset = 52;
   const mobileTextInset = (text.trim() ? 88 : 54) + (isPrivateMode ? 24 : 0);
   const compactTextInset = (isRecording ? (isFocused ? 216 : 180) : isFocused ? 178 : showControls ? 144 : 68) + (isPrivateMode && showControls ? 24 : 0);
   const textLayout = isMobile ? {
@@ -872,7 +882,9 @@ export function MessageComposer({
                         transition={{ duration: 0.85, times: [0, 0.3, 1], ease: "easeOut", delay: Math.min(index * 0.045, 0.18) }}
                         className="pointer-events-none absolute inset-0 z-10 rounded-[18px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.42),0_0_22px_rgba(255,255,255,0.1)]"
                       />
-                      {attachment.previewUrl ? (
+                      {(attachment.file as GifFile).gifPlayback && attachment.previewUrl ? (
+                        <video src={attachment.previewUrl} autoPlay loop muted playsInline aria-label={`Prévia de ${attachment.file.name}`} className="size-full object-contain p-2" />
+                      ) : attachment.previewUrl ? (
                         <>
                           <Image unoptimized fill sizes={pendingAttachments.length === 1 ? "(max-width: 768px) 100vw, 672px" : "220px"} src={attachment.previewUrl} alt={`Prévia de ${attachment.file.name}`} className={pendingAttachments.length === 1 ? "object-contain p-2" : "object-cover"} />
                           {pendingAttachments.length > 1 && (
@@ -963,6 +975,7 @@ export function MessageComposer({
             )}
           </AnimatePresence>
 
+          <div className="relative">
           <motion.div
             data-composer-field
             initial={false}
@@ -1134,7 +1147,7 @@ export function MessageComposer({
               type="button"
               initial={false}
               animate={{ opacity: showControls ? 1 : 0, scale: showControls ? attachmentsOpen ? 0.96 : 1 : 0.9, rotate: reduceMotion ? 0 : attachmentsOpen ? 45 : 0, y: 0, bottom: isMobile ? 0 : controlBottom, left: isMobile ? -52 : 8 }}
-              whileTap={reduceMotion || sending ? undefined : { scale: 0.86, backgroundColor: isPrivateMode ? "rgb(228,228,231)" : "rgba(63,63,70,0.8)", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.3)" }}
+              whileTap={reduceMotion || sending ? undefined : { scale: 0.86, ...(isMobile ? {} : { backgroundColor: isPrivateMode ? "rgb(228,228,231)" : "rgba(63,63,70,0.8)" }), boxShadow: "inset 0 2px 4px rgba(0,0,0,0.3)" }}
               transition={{ ...transition, scale: reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 22 } }}
               aria-label="Abrir anexos"
               title="Abrir anexos"
@@ -1295,22 +1308,6 @@ export function MessageComposer({
                 <ComposerIcon name="mic" />
               )}
             </motion.button>
-            {isMobile && !hasPayload && !isRecording && (
-              <button
-                type="button"
-                aria-label="Abrir câmera"
-                title="Abrir câmera"
-                disabled={sending}
-                onClick={() => {
-                  closeAttachments();
-                  closeEmojis();
-                  cameraInputRef.current?.click();
-                }}
-                className={`${styles.mobileCamera} absolute -right-[48px] bottom-0 size-11 ${buttonClassName}`}
-              >
-                <ComposerIcon name="camera" />
-              </button>
-            )}
             <motion.button
               type="button"
               initial={false}
@@ -1348,27 +1345,20 @@ export function MessageComposer({
             tabIndex={isMobile && (!hasPayload || isRecording) ? -1 : 0}
             title="Enviar mensagem"
             style={{ display: isMobile && (!hasPayload || isRecording) ? "none" : undefined }}
-            className={`absolute flex items-center justify-center overflow-hidden rounded-full border bg-gradient-to-br from-white/[0.12] via-white/[0.03] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.16),0_4px_16px_rgba(0,0,0,0.18)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,color,box-shadow] duration-250 focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none ${isPrivateMode ? `focus-visible:outline-zinc-500/60 ${text.trim() || pendingAttachments.length ? "border-zinc-500 bg-zinc-500 text-white enabled:hover:border-zinc-600 enabled:hover:bg-zinc-600" : "border-zinc-300 bg-zinc-100 text-zinc-400"}` : `focus-visible:outline-emerald-400/50 ${text.trim() || pendingAttachments.length ? "border-emerald-200/20 bg-emerald-600/60 text-white enabled:hover:bg-emerald-500/70 enabled:hover:border-emerald-100/30" : "border-white/10 bg-emerald-950/25 text-white/45"}`}`}
+            className={`${isMobile ? styles.mobileSend : ""} absolute flex items-center justify-center overflow-hidden rounded-full border bg-gradient-to-br from-white/[0.12] via-white/[0.03] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.16),0_4px_16px_rgba(0,0,0,0.18)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,color,box-shadow] duration-250 focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none ${isPrivateMode ? `focus-visible:outline-zinc-500/60 ${text.trim() || pendingAttachments.length ? "border-zinc-500 bg-zinc-500 text-white enabled:hover:border-zinc-600 enabled:hover:bg-zinc-600" : "border-zinc-300 bg-zinc-100 text-zinc-400"}` : `focus-visible:outline-emerald-400/50 ${text.trim() || pendingAttachments.length ? "border-emerald-200/20 bg-emerald-600/60 text-white enabled:hover:bg-emerald-500/70 enabled:hover:border-emerald-100/30" : "border-white/10 bg-emerald-950/25 text-white/45"}`}`}
           >
             {sending ? (
               <svg className="size-5 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" opacity=".25" /><path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
             ) : <ComposerIcon name="send" />}
           </motion.button>
-          <AttachmentMenu open={attachmentsOpen && !sending} triggerRef={attachmentTriggerRef} onClose={closeAttachments} onSelect={selectAttachment} closing={closing} onCloseWithBot={onCloseWithBot} allowCloseWithBot={allowCloseWithBot} allowPoll={Boolean(onSendPoll) && !isPrivateMode} signatureEnabled={includeSignature} onToggleSignature={toggleSignature} stacked={isStacked} />
+          </div>
+          <AttachmentMenu open={attachmentsOpen && !sending} triggerRef={attachmentTriggerRef} onClose={closeAttachments} onSelect={selectAttachment} closing={closing} onCloseWithBot={onCloseWithBot} allowCloseWithBot={allowCloseWithBot} allowPoll={Boolean(onSendPoll) && !isPrivateMode} signatureEnabled={includeSignature} onToggleSignature={toggleSignature} stacked={isStacked} mobile={isMobile} privateEnabled={isPrivateMode} onTogglePrivate={() => {
+            setIsPrivateMode((current) => !current);
+            closeAttachments();
+            requestAnimationFrame(() => textareaRef.current?.focus());
+          }} />
           {pollOpen && onSendPoll && <PollComposer onSend={onSendPoll} onClose={() => { setPollOpen(false); requestAnimationFrame(() => attachmentTriggerRef.current?.focus()); }} />}
-          {emojiPickerMounted && <EmojiSelector id={emojiSelectorId} open={emojisOpen && !sending} isPrivateMode={isPrivateMode} triggerRef={emojiTriggerRef} onClose={closeEmojis} onSelect={selectEmoji} fieldHeight={fieldHeight} rightInset={isMobile ? 0 : isStacked ? 0 : 56} />}
-          {isMobile && <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(event) => {
-              const files = Array.from(event.target.files ?? []);
-              if (files.length) stagePendingFiles(files);
-              event.target.value = "";
-            }}
-          />}
+          {emojiPickerMounted && <EmojiSelector id={emojiSelectorId} open={emojisOpen && !sending} isPrivateMode={isPrivateMode} triggerRef={emojiTriggerRef} onClose={closeEmojis} onSelect={selectEmoji} onSelectGif={(file) => { stagePendingFiles([file]); closeEmojis(); textareaRef.current?.focus(); }} gifFormat={mode === "internal" ? "gif" : "mp4"} fieldHeight={fieldHeight} rightInset={isMobile ? 0 : isStacked ? 0 : 56} />}
           {/* Seleciona o arquivo localmente; a integração de envio de mídia é uma etapa separada. */}
           <input
             ref={fileInputRef}

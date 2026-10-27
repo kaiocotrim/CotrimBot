@@ -1,3 +1,21 @@
+:global(html[data-theme="light"]) .dialog {
+  border-color: var(--app-line);
+  background: var(--app-surface);
+  color: var(--app-text);
+  color-scheme: light;
+}
+
+:global(html[data-theme="light"]) .sidebar {
+  border-color: var(--app-line);
+  background: var(--app-bg);
+}
+
+:global(html[data-theme="light"]) :is(.navItem, .footer, .closeButton, .field > span, .card > p, .notificationStatus) { color: var(--app-muted); }
+:global(html[data-theme="light"]) :is(.navItem[data-active], .navItem:hover, .closeButton:hover, .card h3) { color: var(--app-text); }
+:global(html[data-theme="light"]) :is(.navHighlight, .navItem:hover, .closeButton:hover) { background: var(--app-panel); }
+:global(html[data-theme="light"]) :is(.field input, .field select, .inputWithIcon, .testNotificationButton) { border-color: var(--app-line); background: var(--app-panel); color: var(--app-text); }
+:global(html[data-theme="light"]) .field input::placeholder { color: var(--app-muted); }
+
 .avatarTrigger {
   display: block;
   flex-shrink: 0;

@@ -10,6 +10,7 @@ import { MessageText } from "@/components/chat/message-text";
 import type { Contact } from "@/types/chat";
 
 type VideoMessageProps = {
+  gifPlayback?: boolean;
   // Identifica a mensagem atual dentro da galeria da conversa.
   messageId: number;
   // Endpoint que entrega os bytes do vídeo pelo backend.
@@ -21,7 +22,7 @@ type VideoMessageProps = {
   contact: Pick<Contact, "name" | "profilePictureUrl">;
   createdAt: string;
   // Imagens e vídeos disponíveis para navegação no visualizador.
-  gallery: Array<{ id: number; type: "IMAGE" | "VIDEO"; mediaUrl: string; content: string; showSignature: boolean; createdAt: string }>;
+  gallery: Array<{ id: number; type: "IMAGE" | "VIDEO"; mediaUrl: string; content: string; showSignature: boolean; createdAt: string; gifPlayback?: boolean }>;
 };
 
 // Mantém a data do visualizador consistente com o fuso usado no restante do chat.
@@ -34,7 +35,7 @@ const viewerDateFormatter = new Intl.DateTimeFormat("pt-BR", {
 // Estilo compartilhado pelos botões de download e fechamento.
 const controlClass = "flex size-8 shrink-0 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-white/70";
 
-export function VideoMessage({ messageId, mediaUrl, content, showSignature, contact, createdAt, gallery }: VideoMessageProps) {
+export function VideoMessage({ messageId, mediaUrl, content, showSignature, contact, createdAt, gallery, gifPlayback = false }: VideoMessageProps) {
   // Controla a abertura do modal e qual mídia da galeria está selecionada.
   const [viewerOpen, setViewerOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -43,12 +44,12 @@ export function VideoMessage({ messageId, mediaUrl, content, showSignature, cont
   const reduceMotion = useReducedMotion();
 
   // Os marcadores automáticos não devem ser renderizados como legenda visível.
-  const hasCaption = content !== "[Vídeo]";
+  const hasCaption = content !== "[Vídeo]" && content !== "[GIF]";
 
   // Garante que o vídeo clicado continue disponível mesmo se a galeria estiver vazia.
   const fallbackItem = { id: messageId, type: "VIDEO" as const, mediaUrl, content, showSignature, createdAt };
   const activeItem = gallery[activeIndex] ?? fallbackItem;
-  const activeHasCaption = activeItem.content !== (activeItem.type === "VIDEO" ? "[Vídeo]" : "[Imagem]");
+  const activeHasCaption = activeItem.type === "VIDEO" ? !["[Vídeo]", "[GIF]"].includes(activeItem.content) : activeItem.content !== "[Imagem]";
 
   // Enquanto o modal estiver aberto, bloqueia o scroll da página e habilita
   // Escape e as setas do teclado para fechar ou navegar pela galeria.
@@ -90,6 +91,8 @@ export function VideoMessage({ messageId, mediaUrl, content, showSignature, cont
       >
         {/* Um pequeno deslocamento ajuda o navegador a gerar o frame inicial. */}
         <video
+          autoPlay={gifPlayback && !reduceMotion}
+          loop={gifPlayback}
           preload="metadata"
           src={`${mediaUrl}#t=0.1`}
           muted
@@ -97,9 +100,10 @@ export function VideoMessage({ messageId, mediaUrl, content, showSignature, cont
           className="pointer-events-none block max-h-[420px] w-full object-cover"
           aria-label="Vídeo da mensagem"
         />
-        <span className="absolute top-1/2 left-1/2 flex size-[46px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[rgba(30,30,30,0.45)] text-white shadow-[0_3px_12px_rgba(0,0,0,0.18)] backdrop-blur-[14px] transition-transform duration-200 ease-out group-hover/video:scale-[1.04] group-active/video:scale-[0.98] motion-reduce:transition-none">
+        {!gifPlayback && <span className="absolute top-1/2 left-1/2 flex size-[46px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[rgba(30,30,30,0.45)] text-white shadow-[0_3px_12px_rgba(0,0,0,0.18)] backdrop-blur-[14px] transition-transform duration-200 ease-out group-hover/video:scale-[1.04] group-active/video:scale-[0.98] motion-reduce:transition-none">
           <svg className="ml-0.5 size-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10-6.5z" /></svg>
-        </span>
+        </span>}
+        {gifPlayback && <span className="absolute top-2 left-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-semibold text-white">GIF</span>}
       </button>
 
       {/* Exibe somente legendas reais, nunca o marcador interno "[Vídeo]". */}
@@ -143,7 +147,7 @@ export function VideoMessage({ messageId, mediaUrl, content, showSignature, cont
                 <motion.div key={activeItem.id} onClick={(event) => event.stopPropagation()} initial={reduceMotion ? false : { opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: reduceMotion ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }} className="flex h-full w-full items-center justify-center">
                   {activeItem.type === "VIDEO" ? (
                     // No modo aberto, o vídeo inicia automaticamente e pode usar controles nativos.
-                    <video src={activeItem.mediaUrl} controls autoPlay playsInline className="max-h-full max-w-full rounded-lg bg-black shadow-2xl">Seu navegador não suporta reprodução de vídeo.</video>
+                    <video src={activeItem.mediaUrl} controls autoPlay loop={"gifPlayback" in activeItem && activeItem.gifPlayback === true} muted={"gifPlayback" in activeItem && activeItem.gifPlayback === true} playsInline className="max-h-full max-w-full rounded-lg bg-black shadow-2xl">Seu navegador não suporta reprodução de vídeo.</video>
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={activeItem.mediaUrl} alt={activeHasCaption ? activeItem.content : "Imagem recebida"} className="max-h-full max-w-full object-contain shadow-2xl" />

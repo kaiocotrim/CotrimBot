@@ -25,6 +25,13 @@ type MessageListProps = {
   hasPinnedMessage: boolean;
   selectionMode: boolean;
   selectedMessageIds: Set<number>;
+  printSelection?: {
+    startId: number | null;
+    endId: number | null;
+    selectedIds: ReadonlySet<number>;
+    busy: boolean;
+    onSelect: (id: number) => void;
+  };
   onLoadOlderMessages: () => Promise<void>;
   onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
   onUpdateMessageFlags: (messageId: number, flags: { pinned?: boolean; pinDurationHours?: 24 | 168 | 720; favorited?: boolean }) => Promise<void>;
@@ -77,7 +84,7 @@ function identifierDigits(value?: string | null) {
 }
 
 // Posiciona mensagens recebidas à esquerda e enviadas à direita.
-export function MessageList({ currentUser, contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, hasPinnedMessage, selectionMode, selectedMessageIds, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onDeleteMessage, onRequestForward, onReplyToMessage, onEnsureMessageLoaded, onToggleMessageSelection, onSaveSharedContact, onMessageSharedContact, onOpenParticipantInfo }: MessageListProps) {
+export function MessageList({ currentUser, contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, hasPinnedMessage, selectionMode, selectedMessageIds, printSelection, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onDeleteMessage, onRequestForward, onReplyToMessage, onEnsureMessageLoaded, onToggleMessageSelection, onSaveSharedContact, onMessageSharedContact, onOpenParticipantInfo }: MessageListProps) {
   const reduceMotion = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -214,6 +221,21 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
     if (available) setNavigatedMessageId(messageId);
   }
 
+  function printSelector(id: number) {
+    if (!printSelection) return null;
+    const selected = printSelection.selectedIds.has(id);
+    const boundary = id === printSelection.startId ? "Início" : id === printSelection.endId ? "Fim" : null;
+    return <button
+      type="button"
+      data-print-exclude
+      disabled={printSelection.busy}
+      aria-label={`Definir ${printSelection.startId === null ? "início" : "fim"} do print na mensagem ${id}`}
+      aria-pressed={selected}
+      onClick={() => printSelection.onSelect(id)}
+      className={`absolute inset-0 z-[60] rounded-xl border-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white disabled:cursor-wait ${selected ? "border-zinc-400/70 bg-zinc-400/10" : "border-transparent hover:border-white/40 hover:bg-white/5"}`}
+    >{boundary && <span className="absolute top-1 left-1 rounded bg-zinc-300 px-1.5 py-0.5 text-[10px] font-medium text-zinc-950">{boundary}</span>}</button>;
+  }
+
   return (
     <GroupMentionContext.Provider value={mentionTargets}>
     <div className="relative flex min-h-0 flex-1">
@@ -249,12 +271,14 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
             <motion.div
               id={`message-${message.id}`}
               data-message-id={message.id}
+              data-print-selected={printSelection?.selectedIds.has(message.id) || undefined}
               key={message.clientId ?? message.id}
               initial={reduceMotion ? false : { opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={reduceMotion ? { duration: 0 } : { duration: 0.2 }}
-              className="flex w-full flex-col items-center gap-1 py-0.5"
+              className="relative flex w-full flex-col items-center gap-1 py-0.5"
             >
+              {printSelector(message.id)}
               {label && (
                 <div className="flex w-full items-center justify-center py-1" role="separator" aria-label={label}>
                   <span className="rounded-md border border-white/[0.06] bg-zinc-900/90 px-2.5 py-1 text-xs font-medium text-zinc-300 shadow-sm backdrop-blur-md lg:text-[10px]">
@@ -303,6 +327,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
           <motion.div
             id={`message-${message.id}`}
             data-message-id={message.id}
+            data-print-selected={printSelection?.selectedIds.has(message.id) || undefined}
             key={message.clientId ?? message.id}
             initial={!reduceMotion ? {
               opacity: isNewOutgoingMessage ? 0.25 : 0,
@@ -325,6 +350,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
             style={{ transformOrigin: outgoing ? "bottom right" : "bottom left" }}
             className={`relative z-0 flex w-full flex-col gap-2 rounded-2xl transition-[background-color,box-shadow] duration-200 has-[[aria-expanded=true]]:z-30 ${highlightedMessageId === message.id ? "bg-amber-300/10 shadow-[0_0_0_2px_rgba(252,211,77,0.28)]" : navigatedMessageId === message.id ? "bg-zinc-400/10 shadow-[0_0_0_2px_rgba(161,161,170,0.22)]" : ""}`}
           >
+            {printSelector(message.id)}
             {label && (
               <div className="flex w-full items-center justify-center py-1" role="separator" aria-label={label}>
                 <span className="rounded-md border border-white/[0.06] bg-zinc-900/90 px-2.5 py-1 text-xs font-medium text-zinc-300 shadow-sm backdrop-blur-md lg:text-[10px]">

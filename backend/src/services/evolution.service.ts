@@ -379,6 +379,7 @@ type SendMediaInput = {
   media: string;
   fileName: string;
   caption?: string;
+  gifPlayback?: boolean;
   quoted?: { externalId: string; content: string; fromMe: boolean };
 };
 export async function sendWhatsAppMedia({
@@ -388,6 +389,7 @@ export async function sendWhatsAppMedia({
   media,
   fileName,
   caption = "",
+  gifPlayback = false,
   quoted,
 }: SendMediaInput) {
   const apiUrl = process.env.EVOLUTION_API_URL;
@@ -423,6 +425,7 @@ export async function sendWhatsAppMedia({
           media: mediaPayload,
           fileName,
           caption,
+          ...(gifPlayback ? { gifPlayback: true } : {}),
           ...(quoted ? {
             quoted: {
               key: { id: quoted.externalId, fromMe: quoted.fromMe },

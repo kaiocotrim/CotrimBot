@@ -1,0 +1,1 @@
+ALTER TABLE `Message` ADD COLUMN `gifPlayback` BOOLEAN NOT NULL DEFAULT false;

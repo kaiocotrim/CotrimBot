@@ -1,0 +1,23 @@
+.root { display: flex; flex-direction: column; gap: 26px; max-width: 740px; color: var(--app-text); }
+.root h3 { margin: 0 0 7px; font-size: 23px; font-weight: 600; letter-spacing: -.6px; }
+.root p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--app-muted); }
+.options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; min-width: 0; padding: 0; border: 0; }
+.option { display: flex; min-width: 0; flex-direction: column; gap: 12px; padding: 12px; border: 1px solid var(--app-line); border-radius: 18px; background: var(--app-surface); transition: border-color .15s, background-color .15s; }
+.option:hover, .option[data-selected="true"] { border-color: var(--app-muted); }
+.option:has(input:focus-visible) { outline: 2px solid var(--app-text); outline-offset: 3px; }
+.preview { --preview-bg: #fafafa; --preview-side: #f0f0f2; --preview-bubble: #dedee3; display: flex; height: 106px; overflow: hidden; border: 1px solid #8883; border-radius: 10px; background: var(--preview-bg); }
+.preview[data-preview="dark"] { --preview-bg: #101012; --preview-side: #1c1c1f; --preview-bubble: #3f3f46; }
+.preview[data-preview="system"] { background: linear-gradient(90deg, #fafafa 50%, #101012 50%); }
+.previewSidebar { display: flex; width: 29%; flex-direction: column; gap: 9px; padding: 14px 8px; background: var(--preview-side); }
+.previewSidebar i { display: block; height: 5px; border-radius: 4px; background: #8885; }
+.previewChat { display: flex; flex: 1; flex-direction: column; gap: 10px; padding: 20px 12px; }
+.previewChat i { display: block; width: 75%; height: 12px; border-radius: 7px; background: var(--preview-bubble); }
+.previewChat i:nth-child(2) { align-self: flex-end; width: 60%; }
+.previewChat i:nth-child(3) { width: 45%; }
+.preview[data-preview="system"] .previewChat i:nth-child(2) { background: #3f3f46; }
+.optionTitle { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+.radio { display: flex; width: 16px; height: 16px; align-items: center; justify-content: center; margin-left: auto; border: 1px solid var(--app-muted); border-radius: 50%; }
+.option[data-selected="true"] .radio::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--app-text); }
+.description { color: var(--app-muted); font-size: 11px; line-height: 1.6; }
+.root .saved { font-size: 12px; }
+@media (max-width: 599px) { .options { grid-template-columns: 1fr; } .option { display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: center; gap: 4px 14px; } .preview { grid-row: span 2; height: 80px; } .description { align-self: start; } }

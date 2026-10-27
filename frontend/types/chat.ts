@@ -61,6 +61,7 @@ export type Message = {
   deletedAt?: string | null;
   viewOnce?: boolean;
   isVoiceMessage?: boolean | null;
+  gifPlayback?: boolean;
 
   // Contato ao qual a mensagem pertence.
   contactId: number;
