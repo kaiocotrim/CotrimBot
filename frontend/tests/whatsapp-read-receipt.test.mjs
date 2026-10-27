@@ -58,6 +58,17 @@ test("WhatsApp read events turn message checks white and update the conversation
     await page.evaluate(() => window.receive("message_read", { messageId: 7, readAt: "2026-10-21T11:53:00Z" }));
     await expect(page.locator('[data-message="7"] [aria-label="Mensagem visualizada"]')).toHaveClass(/\btext-white\b/);
     await expect.poll(() => page.evaluate(() => window.chat.contacts[0].messages[0].readAt)).toBe("2026-10-21T11:53:00Z");
+    // Uma confirmação posterior deve atualizar o GIF existente, sem duplicar
+    // o balão nem apagar a confirmação de leitura já recebida.
+    await page.evaluate(({ message, contact }) => window.receive("new_message", { message: { ...message, type: "VIDEO", content: "[GIF]", gifPlayback: true }, contact }), { message, contact });
+    const gif = page.locator('[data-message="7"] video[aria-label="Vídeo da mensagem"]');
+    await expect(gif).toHaveAttribute("loop", "");
+    await expect(gif).toHaveAttribute("autoplay", "");
+    await expect(page.locator('[data-message="7"]')).toHaveCount(1);
+    await expect(page.locator('[data-message="7"] [aria-label="Mensagem visualizada"]')).toBeVisible();
+    await page.evaluate(({ message, contact }) => window.receive("new_message", { message: { ...message, type: "VIDEO", content: "[Vídeo]", gifPlayback: false }, contact }), { message, contact });
+    await expect(gif).toHaveAttribute("loop", "");
+    await expect(page.locator('[data-message="7"] [aria-label="Mensagem visualizada"]')).toBeVisible();
     await page.evaluate(() => window.unmount());
     assert.equal(await page.evaluate(() => window.readListenerCount()), 0);
     assert.deepEqual(errors, []);

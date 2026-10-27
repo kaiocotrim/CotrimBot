@@ -18,4 +18,4 @@ docker compose build evolution-api cotrimbot
 docker compose up -d --no-deps evolution-api cotrimbot
 ```
 
-Sem a nova imagem Evolution, o MP4 pode chegar como vídeo comum. A integração completa com WhatsApp deve ser validada na instância conectada depois da publicação; os testes locais simulam GIPHY e Evolution.
+O backend usa a rota dedicada `/message/sendGif/:instanceName`, que força a marcação nativa de GIF. Se a Evolution ainda não tiver essa rota, o envio é recusado com a orientação de atualização; não há fallback para vídeo comum. A integração completa com WhatsApp deve ser validada na instância conectada depois da publicação; os testes locais simulam GIPHY e Evolution.

@@ -14,6 +14,7 @@ test("envia GIF MP4 com reprodução animada explícita", { concurrency: false }
   process.env.EVOLUTION_API_KEY = "test-key";
   process.env.EVOLUTION_INSTANCE = "test-instance";
   globalThis.fetch = async (_input, init) => {
+    assert.equal(String(_input), "https://evolution.example/message/sendGif/test-instance");
     const body = JSON.parse(String(init?.body));
     assert.equal(body.media, "data:video/mp4;base64,AQID");
     assert.equal(body.gifPlayback, true);
@@ -22,6 +23,23 @@ test("envia GIF MP4 com reprodução animada explícita", { concurrency: false }
   };
   try {
     await sendWhatsAppMedia({ number: "5511999999999", mediatype: "video", mimetype: "video/mp4", media: "AQID", fileName: "gif-test.mp4", gifPlayback: true });
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of Object.entries({ EVOLUTION_API_URL: originalEnvironment.url, EVOLUTION_API_KEY: originalEnvironment.key, EVOLUTION_INSTANCE: originalEnvironment.instance })) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+});
+
+test("não envia GIF como vídeo quando a Evolution não oferece a rota nativa", { concurrency: false }, async () => {
+  process.env.EVOLUTION_API_URL = "https://evolution.example";
+  process.env.EVOLUTION_API_KEY = "test-key";
+  process.env.EVOLUTION_INSTANCE = "test-instance";
+  const urls: string[] = [];
+  globalThis.fetch = async (input) => { urls.push(String(input)); return new Response("not found", { status: 404 }); };
+  try {
+    await assert.rejects(sendWhatsAppMedia({ number: "5511999999999", mediatype: "video", mimetype: "video/mp4", media: "AQID", fileName: "gif-test.mp4", gifPlayback: true }), /Recompile e publique o serviço Evolution/);
+    assert.deepEqual(urls, ["https://evolution.example/message/sendGif/test-instance"]);
   } finally {
     globalThis.fetch = originalFetch;
     for (const [key, value] of Object.entries({ EVOLUTION_API_URL: originalEnvironment.url, EVOLUTION_API_KEY: originalEnvironment.key, EVOLUTION_INSTANCE: originalEnvironment.instance })) {

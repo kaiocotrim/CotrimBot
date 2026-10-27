@@ -408,7 +408,7 @@ export async function sendWhatsAppMedia({
 
   for (const [index, mediaPayload] of mediaPayloads.entries()) {
     const response = await fetch(
-      `${apiUrl}/message/sendMedia/${instance}`,
+      `${apiUrl}/message/${gifPlayback ? "sendGif" : "sendMedia"}/${instance}`,
       {
         method: "POST",
         signal: AbortSignal.timeout(15000),
@@ -437,6 +437,8 @@ export async function sendWhatsAppMedia({
     );
 
     if (response.ok) return response.json();
+
+    if (gifPlayback && response.status === 404) throw new Error("A Evolution instalada não suporta envio de GIF. Recompile e publique o serviço Evolution do CotrimBot; o GIF não foi enviado como vídeo.");
 
     const error = await response.text();
     const canRetryWithAlternativeFormat = index === 0 && response.status >= 400 && response.status < 500 && mediaPayloads.length > 1;

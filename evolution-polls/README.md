@@ -2,7 +2,7 @@
 
 This image keeps upstream commit `cd800f2976e1e5b682fbf86a01ee4d85ae61f370`, the original Baileys dependency and the existing poll vote patch. It adds presence diagnostics, an authenticated subscription route and optional GIF playback. Regular media sending, WhatsApp sessions and authentication guards retain their behavior.
 
-The GIF patch accepts an explicit boolean `gifPlayback` for video media. Omitting it keeps the upstream `false` behavior. Rebuild Evolution together with the application for GIF support; [setup and application migration details](../docs/gifs.md).
+The GIF patch accepts an explicit boolean `gifPlayback` for video media. The dedicated authenticated `POST /message/sendGif/:instanceName` route forces native GIF playback; CotrimBot uses this route so an older image cannot silently send a normal video. Regular media still uses `sendMedia` with the upstream default `false`. Rebuild Evolution together with the application; [setup and application migration details](../docs/gifs.md).
 
 The existing `POST /message/sendPollVote/:instanceName` route is preserved. It uses the connected Baileys instance, poll encryption key and native relay. Its routing and encryption regression tests remain in `backend/tests/`.
 

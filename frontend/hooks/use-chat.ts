@@ -175,7 +175,15 @@ export function useChat() {
 
             // Evita mensagens duplicadas.
             if (alreadyExists) {
-              return currentMessages;
+              // O webhook pode chegar antes da confirmação do envio. Atualiza a
+              // mesma mensagem para preservar metadados como GIF e autor.
+              return currentMessages.map((message) => message.externalId === data.message.externalId ? {
+                ...message,
+                ...data.message,
+                readAt: data.message.readAt ?? message.readAt,
+                gifPlayback: Boolean(message.gifPlayback || data.message.gifPlayback),
+                ...(message.clientId && !data.message.clientId ? { clientId: message.clientId } : {}),
+              } : message);
             }
 
             // Adiciona a nova mensagem
