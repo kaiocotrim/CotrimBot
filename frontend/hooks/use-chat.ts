@@ -1,12 +1,13 @@
 "use client";
 
 import { socket } from "@/lib/socket";
+import { useContactAvatars } from "@/hooks/use-contact-avatars";
 import { useEffect, useRef, useState } from "react";
 
 import {
   closeConversationWithBot,
   deleteMessage as deleteMessageRequest,
-  getContactAvatar,
+  editMessage as editMessageRequest,
   getContacts,
   getMessages,
   markMessagesAsRead,
@@ -44,10 +45,10 @@ export function useChat() {
     useState<Contact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(true);
   const [contactsError, setContactsError] = useState<string | null>(null);
-  const avatarRequestsRef = useRef<Set<number>>(new Set());
 
   const [selectedContact, setSelectedContact] =
     useState<Contact | null>(null);
+  useContactAvatars(contacts, setContacts, setSelectedContact);
   const selectedContactIdRef = useRef<number | null>(null);
   const selectedContactId = selectedContact?.id;
 
@@ -314,6 +315,13 @@ export function useChat() {
       ));
     }
 
+    function handleMessageEdited(data: { messageId: number; content: string; editedAt: string }) {
+      const update = (message: Message) => message.id === data.messageId ? { ...message, content: data.content, editedAt: data.editedAt } : message;
+      setMessages((current) => current.map(update));
+      setContacts((current) => current.map((contact) => ({ ...contact, messages: contact.messages?.map(update) })));
+      setSelectedContact((current) => current ? { ...current, messages: current.messages?.map(update) } : current);
+    }
+
     function handleMessageReplyResolved(data: { messageId: number; quotedMessageId: number }) {
       setMessages((current) => current.map((message) =>
         message.id === data.messageId ? { ...message, quotedMessageId: data.quotedMessageId } : message
@@ -380,6 +388,7 @@ export function useChat() {
     socket.on("message_reaction", handleMessageReaction);
     socket.on("message_read", handleMessageRead);
     socket.on("message_deleted", handleMessageDeleted);
+    socket.on("message_edited", handleMessageEdited);
     socket.on("message_reply_resolved", handleMessageReplyResolved);
     socket.on("message_quote_updated", handleMessageQuoteUpdated);
     socket.on("message_flags_updated", handleMessageFlagsUpdated);
@@ -398,6 +407,7 @@ export function useChat() {
       socket.off("message_reaction", handleMessageReaction);
       socket.off("message_read", handleMessageRead);
       socket.off("message_deleted", handleMessageDeleted);
+      socket.off("message_edited", handleMessageEdited);
       socket.off("message_reply_resolved", handleMessageReplyResolved);
       socket.off("message_quote_updated", handleMessageQuoteUpdated);
       socket.off("message_flags_updated", handleMessageFlagsUpdated);
@@ -467,26 +477,6 @@ export function useChat() {
     };
   }, []);
 
-  // As fotos chegam em segundo plano e nunca bloqueiam a lista de conversas.
-  useEffect(() => {
-    for (const contact of contacts) {
-      if (contact.profilePictureUrl || avatarRequestsRef.current.has(contact.id)) continue;
-
-      avatarRequestsRef.current.add(contact.id);
-      void getContactAvatar(contact.id)
-        .then((avatar) => {
-          if (!avatar.profilePictureUrl) return;
-          setContacts((current) => current.map((item) =>
-            item.id === contact.id
-              ? { ...item, profilePictureUrl: avatar.profilePictureUrl }
-              : item
-          ));
-        })
-        .catch(() => {
-          // Uma foto ausente não deve atrasar nem interromper o chat.
-        });
-    }
-  }, [contacts]);
 
 
   // =========================================================
@@ -1074,6 +1064,14 @@ export function useChat() {
     }
   }
 
+  async function editMessage(messageId: number, text: string) {
+    const updated = await editMessageRequest(messageId, text);
+    const update = (message: Message) => message.id === messageId ? { ...message, content: updated.content, editedAt: updated.editedAt } : message;
+    setMessages((current) => current.map(update));
+    setContacts((current) => current.map((contact) => ({ ...contact, messages: contact.messages?.map(update) })));
+    setSelectedContact((current) => current ? { ...current, messages: current.messages?.map(update) } : current);
+  }
+
   async function deleteMessage(messageId: number, scope: "me" | "everyone") {
     const result = await deleteMessageRequest(messageId, scope);
     if (scope === "me") {
@@ -1181,6 +1179,7 @@ export function useChat() {
     sendPoll,
     updateMessageFlags,
     deleteMessage,
+    editMessage,
 
     // Encerramento
     closeWithBot,

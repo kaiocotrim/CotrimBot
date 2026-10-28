@@ -193,6 +193,7 @@ model Message {
   pinnedUntil             DateTime?
   favorited               Boolean          @default(false)
   deletedAt               DateTime?
+  editedAt                DateTime?
   viewOnce                Boolean          @default(false)
   isVoiceMessage          Boolean?
   gifPlayback             Boolean          @default(false)

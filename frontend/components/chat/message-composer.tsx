@@ -2,6 +2,8 @@
 
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from "framer-motion";
 import Image from "next/image";
+import { Pencil } from "lucide-react";
+import { ImageEditorDialog, canEditImage } from "@/components/chat/image-editor-dialog";
 import { useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { AttachmentMenu, type AttachmentKind } from "@/components/chat/attachment-menu";
@@ -159,6 +161,8 @@ export function MessageComposer({
   const [rewriteError, setRewriteError] = useState<string | null>(null);
   const [longTextCollapsed, setLongTextCollapsed] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  const [editingAttachmentId, setEditingAttachmentId] = useState<number | null>(null);
+  const editingAttachment = pendingAttachments.find(attachment => attachment.id === editingAttachmentId);
   const pendingPreviewUrlsRef = useRef(new Set<string>());
   const nextAttachmentIdRef = useRef(1);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
@@ -379,7 +383,20 @@ export function MessageComposer({
     pendingPreviewUrlsRef.current.clear();
     setPendingAttachments([]);
     setAttachmentError(null);
+    setEditingAttachmentId(null);
   }, []);
+
+  function applyEditedAttachment(file: File) {
+    if (!editingAttachment) return;
+    const previewUrl = URL.createObjectURL(file);
+    pendingPreviewUrlsRef.current.add(previewUrl);
+    if (editingAttachment.previewUrl) {
+      URL.revokeObjectURL(editingAttachment.previewUrl);
+      pendingPreviewUrlsRef.current.delete(editingAttachment.previewUrl);
+    }
+    setPendingAttachments(current => current.map(attachment => attachment.id === editingAttachment.id ? { ...attachment, file, previewUrl } : attachment));
+    setAttachmentError(null);
+  }
 
   // Aceita arquivos apenas dentro do painel da conversa aberta.
   useEffect(() => {
@@ -887,6 +904,7 @@ export function MessageComposer({
                       ) : attachment.previewUrl ? (
                         <>
                           <Image unoptimized fill sizes={pendingAttachments.length === 1 ? "(max-width: 768px) 100vw, 672px" : "220px"} src={attachment.previewUrl} alt={`Prévia de ${attachment.file.name}`} className={pendingAttachments.length === 1 ? "object-contain p-2" : "object-cover"} />
+                          {canEditImage(attachment.file) && <button type="button" disabled={sending} onClick={() => setEditingAttachmentId(attachment.id)} aria-label={`Editar foto ${attachment.file.name}`} className="absolute top-2 left-2 z-20 flex items-center gap-1.5 rounded-full border border-white/20 bg-zinc-950/85 px-3 py-2 text-xs font-medium text-zinc-100 shadow-lg backdrop-blur-sm hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-white/70 disabled:opacity-40"><Pencil className="size-3.5" />Editar</button>}
                           {pendingAttachments.length > 1 && (
                             <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/90 via-black/65 to-transparent px-2.5 pt-6 pb-2 text-[11px] text-zinc-100">
                               {attachment.file.name}
@@ -1374,6 +1392,7 @@ export function MessageComposer({
             }}
           />
         </form>
+        {editingAttachment && <ImageEditorDialog key={editingAttachment.id} file={editingAttachment.file} onApply={applyEditedAttachment} onClose={() => setEditingAttachmentId(null)} />}
       </div>
       {dropZoneContainer && createPortal(
         <AnimatePresence>

@@ -36,6 +36,7 @@ type MessageListProps = {
   onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
   onUpdateMessageFlags: (messageId: number, flags: { pinned?: boolean; pinDurationHours?: 24 | 168 | 720; favorited?: boolean }) => Promise<void>;
   onDeleteMessage: (messageId: number, scope: "me" | "everyone") => Promise<void>;
+  onEditMessage: (messageId: number, text: string) => Promise<void>;
   onRequestForward: (message: Message) => void;
   onReplyToMessage: (message: Message) => void;
   onEnsureMessageLoaded: (messageId: number) => Promise<boolean>;
@@ -84,7 +85,7 @@ function identifierDigits(value?: string | null) {
 }
 
 // Posiciona mensagens recebidas à esquerda e enviadas à direita.
-export function MessageList({ currentUser, contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, hasPinnedMessage, selectionMode, selectedMessageIds, printSelection, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onDeleteMessage, onRequestForward, onReplyToMessage, onEnsureMessageLoaded, onToggleMessageSelection, onSaveSharedContact, onMessageSharedContact, onOpenParticipantInfo }: MessageListProps) {
+export function MessageList({ currentUser, contact, contacts, messages, hasOlderMessages, loadingOlderMessages, newMessageId, highlightedMessageId, hasPinnedMessage, selectionMode, selectedMessageIds, printSelection, onLoadOlderMessages, onReactToMessage, onUpdateMessageFlags, onDeleteMessage, onEditMessage, onRequestForward, onReplyToMessage, onEnsureMessageLoaded, onToggleMessageSelection, onSaveSharedContact, onMessageSharedContact, onOpenParticipantInfo }: MessageListProps) {
   const reduceMotion = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -399,7 +400,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
                 : <Avatar contact={contact} />)}
 
               {/* O balão escolhe entre player de áudio e conteúdo textual. */}
-              <MessageBubble savedContacts={contacts} onSaveSharedContact={onSaveSharedContact} onMessageSharedContact={onMessageSharedContact} message={displayMessage} quotedMessage={message.quotedMessageId ? messagesById.get(message.quotedMessageId) : undefined} contact={contact} mediaMessages={mediaMessages} onReact={onReactToMessage} onUpdateFlags={onUpdateMessageFlags} onDelete={onDeleteMessage} onRequestForward={onRequestForward} onReply={onReplyToMessage} onNavigateToMessage={navigateToMessage} />
+              <MessageBubble savedContacts={contacts} onSaveSharedContact={onSaveSharedContact} onMessageSharedContact={onMessageSharedContact} message={displayMessage} quotedMessage={message.quotedMessageId ? messagesById.get(message.quotedMessageId) : undefined} contact={contact} mediaMessages={mediaMessages} onReact={onReactToMessage} onUpdateFlags={onUpdateMessageFlags} onDelete={onDeleteMessage} onEdit={onEditMessage} onRequestForward={onRequestForward} onReply={onReplyToMessage} onNavigateToMessage={navigateToMessage} />
 
               {outgoing && (
                 <OutgoingMessageAvatar

@@ -38,6 +38,7 @@ type ChatPanelProps = {
   onReactToMessage: (messageId: number, reaction: string) => Promise<void>;
   onUpdateMessageFlags: (messageId: number, flags: { pinned?: boolean; pinDurationHours?: 24 | 168 | 720; favorited?: boolean }) => Promise<void>;
   onDeleteMessage: (messageId: number, scope: "me" | "everyone") => Promise<void>;
+  onEditMessage: (messageId: number, text: string) => Promise<void>;
   onForwardMessage: (message: Message, target: Contact) => void;
 
   // Envia arquivos + legenda opcional.
@@ -85,6 +86,7 @@ export function ChatPanel({
   onReactToMessage,
   onUpdateMessageFlags,
   onDeleteMessage,
+  onEditMessage,
   onForwardMessage,
   onSendMedia,
   onSendPoll,
@@ -488,6 +490,7 @@ export function ChatPanel({
             onReactToMessage={onReactToMessage}
             onUpdateMessageFlags={onUpdateMessageFlags}
             onDeleteMessage={onDeleteMessage}
+            onEditMessage={onEditMessage}
             onRequestForward={(message) => openForwardPanel([message])}
             onReplyToMessage={replyToMessage}
             onEnsureMessageLoaded={onEnsureMessageLoaded}

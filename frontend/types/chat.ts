@@ -59,6 +59,7 @@ export type Message = {
   pinnedUntil?: string | null;
   favorited?: boolean;
   deletedAt?: string | null;
+  editedAt?: string | null;
   viewOnce?: boolean;
   isVoiceMessage?: boolean | null;
   gifPlayback?: boolean;

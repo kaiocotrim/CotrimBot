@@ -13,9 +13,17 @@ async function parseResponse<T>(response: Response, errorMessage: string) {
   return (await response.json()) as T;
 }
 
-export async function getContactAvatar(contactId: number) {
-  const response = await fetch(`${API_URL}/contacts/${contactId}/avatar`, { credentials: "include" });
+export async function getContactAvatar(contactId: number, refresh = false) {
+  const response = await fetch(`${API_URL}/contacts/${contactId}/avatar${refresh ? "?refresh=1" : ""}`, { credentials: "include", cache: "no-store" });
   return parseResponse<ContactAvatar>(response, "Erro ao buscar avatar");
+}
+
+export async function editMessage(messageId: number, text: string) {
+  const response = await fetch(`${API_URL}/messages/${messageId}`, {
+    method: "PATCH", credentials: "include",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }),
+  });
+  return parseResponse<Message>(response, "Não foi possível editar a mensagem");
 }
 
 // Busca os contatos e adiciona o avatar quando ele estiver disponível.

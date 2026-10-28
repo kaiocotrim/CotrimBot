@@ -211,6 +211,7 @@ export default function Home() {
           onReactToMessage={chat.reactToMessage}
           onUpdateMessageFlags={chat.updateMessageFlags}
           onDeleteMessage={chat.deleteMessage}
+          onEditMessage={chat.editMessage}
           onForwardMessage={chat.forwardMessage}
           onSendMedia={chat.sendMediaMessage}
           onSendPoll={chat.sendPoll}

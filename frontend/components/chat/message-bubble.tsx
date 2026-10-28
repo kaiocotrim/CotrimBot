@@ -28,7 +28,8 @@ import { SharedContactMessage } from "@/components/chat/shared-contact-message";
 import { PollMessage } from "@/components/chat/poll-message";
 import { TextMessage } from "@/components/chat/text-message";
 import { VideoMessage } from "@/components/chat/video-message";
-import { Info, Languages } from "lucide-react";
+import { Info, Languages, Pencil } from "lucide-react";
+import { EditMessageDialog } from "@/components/chat/edit-message-dialog";
 import { MessageTranslation } from "@/components/chat/message-translation";
 import { useMessageTranslations } from "@/hooks/use-message-translations";
 import { splitMessageSignatures } from "@/lib/message-signature";
@@ -43,6 +44,7 @@ type MessageBubbleProps = {
   onReact: (messageId: number, reaction: string) => Promise<void>;
   onUpdateFlags: (messageId: number, flags: { pinned?: boolean; pinDurationHours?: 24 | 168 | 720; favorited?: boolean }) => Promise<void>;
   onDelete: (messageId: number, scope: "me" | "everyone") => Promise<void>;
+  onEdit?: (messageId: number, text: string) => Promise<void>;
   onRequestForward: (message: Message) => void;
   onReply: (message: Message) => void;
   onNavigateToMessage: (messageId: number) => Promise<void>;
@@ -80,7 +82,15 @@ const messageDateFormatter = new Intl.DateTimeFormat("pt-BR", {
 });
 
 // Mantém o estilo do balão e delega o conteúdo ao componente de cada tipo.
-export function MessageBubble({ message, quotedMessage, contact, mediaMessages, onReact, onUpdateFlags, onDelete, onRequestForward, onReply, onNavigateToMessage, savedContacts, onSaveSharedContact, onMessageSharedContact }: MessageBubbleProps) {
+export function MessageBubble({ message, quotedMessage, contact, mediaMessages, onReact, onUpdateFlags, onDelete, onEdit, onRequestForward, onReply, onNavigateToMessage, savedContacts, onSaveSharedContact, onMessageSharedContact }: MessageBubbleProps) {
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editExpired, setEditExpired] = useState(() => Date.now() - new Date(message.createdAt).getTime() >= 15 * 60_000);
+  useEffect(() => {
+    const remaining = new Date(message.createdAt).getTime() + 15 * 60_000 - Date.now();
+    if (!Number.isFinite(remaining) || remaining <= 0) return;
+    const timer = window.setTimeout(() => setEditExpired(true), remaining);
+    return () => window.clearTimeout(timer);
+  }, [message.createdAt]);
   const [reacting, setReacting] = useState(false);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -124,6 +134,8 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
     : message.quotedSenderName === "Você";
   const createdAt = new Date(message.createdAt);
   const hasValidDate = !Number.isNaN(createdAt.getTime());
+  const canEdit = onEdit && outgoing && !isPrivate && message.type === "TEXT" && message.id > 0 && !message.deletedAt
+    && message.deliveryStatus !== "failed" && message.deliveryStatus !== "sending" && hasValidDate && !editExpired;
   const inlineTime = message.type === "TEXT" && !/[\r\n]/.test(message.content) && !message.deletedAt;
   const reduceMotion = useReducedMotion();
 
@@ -194,7 +206,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
       title={messageDateFormatter.format(createdAt)}
       className={`shrink-0 select-none text-[11px] leading-none font-normal tabular-nums lg:text-[9px] ${isPrivate ? "text-zinc-600" : "text-white/55"}`}
     >
-      {messageTimeFormatter.format(createdAt)}
+      {message.editedAt && <span className="mr-1">editada</span>}{messageTimeFormatter.format(createdAt)}
     </time>
   ) : null;
 
@@ -519,6 +531,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
                     <Languages size={15} className="shrink-0 text-zinc-200" />
                     <span>{translation?.status === "loading" ? "Traduzindo…" : translation?.visible ? "Ocultar tradução" : "Traduzir para português"}</span>
                   </button>}
+                  {canEdit && <button type="button" role="menuitem" onClick={() => { setActionsOpen(false); setEditDialogOpen(true); }} className={menuButtonClass}><Pencil size={15} className="shrink-0 text-zinc-200" /><span>Editar</span></button>}
                   <button type="button" role="menuitem" onClick={(event) => openReactionPicker(event.currentTarget)} className={menuButtonClass}>
                     <Smiley size={15} weight="bold" className="shrink-0 text-zinc-200" />
                     <span>Reagir</span>
@@ -559,6 +572,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
         </Popover.Portal>
       </div>
       </Popover.Root>
+      {editDialogOpen && onEdit && <EditMessageDialog message={message} onSave={onEdit} onClose={() => setEditDialogOpen(false)} />}
       {pinDialogOpen && (
         <Dialog.Root open onOpenChange={(open) => {
           if (updatingFlags) return;

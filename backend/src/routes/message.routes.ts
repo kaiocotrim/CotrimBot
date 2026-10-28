@@ -1,5 +1,9 @@
 ﻿// Router organiza os endpoints registrados por app.use(messageRouter) em server.ts.
 import { Router } from "express";
+import { createEditMessageHandler } from "../controllers/edit-message.controller.js";
+import { prisma } from "../lib/prisma.js";
+import { getSocketServer } from "../lib/socket.js";
+import { editWhatsAppMessage } from "../services/evolution.service.js";
 
 // Multer processa multipart/form-data e disponibiliza o arquivo em req.file.
 import { upload } from "../middlewares/upload.js";
@@ -73,6 +77,7 @@ messageRouter.get("/messages/:id/sender-avatar", getGroupSenderAvatar);
 messageRouter.get("/messages/:id/info", getMessageInfo);
 messageRouter.put("/messages/:id/reaction", reactToMessage);
 messageRouter.patch("/messages/:id/flags", updateMessageFlags);
+messageRouter.patch("/messages/:id", createEditMessageHandler({ database: prisma, sendEdit: editWhatsAppMessage, emit: (event, data) => getSocketServer().emit(event, data) }));
 messageRouter.delete("/messages/:id", deleteMessage);
 
 /**

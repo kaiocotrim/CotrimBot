@@ -96,6 +96,20 @@ export async function sendWhatsAppReaction(input: {
   return response.json();
 }
 
+export async function editWhatsAppMessage(input: { remoteJid: string; id: string; text: string }) {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE;
+  if (!apiUrl || !apiKey || !instance) throw new Error("Configuração da Evolution API incompleta");
+  const response = await fetch(`${apiUrl}/chat/updateMessage/${instance}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: apiKey },
+    signal: AbortSignal.timeout(15_000),
+    body: JSON.stringify({ number: input.remoteJid, key: { remoteJid: input.remoteJid, fromMe: true, id: input.id }, text: input.text }),
+  });
+  if (!response.ok) throw new Error(`Erro ao editar mensagem pela Evolution: ${response.status}`);
+}
+
 export async function deleteWhatsAppMessage(input: {
   remoteJid: string;
   fromMe: boolean;
@@ -286,6 +300,7 @@ export async function getProfilePicture(
     `${apiUrl}/chat/fetchProfilePictureUrl/${instance}`,
     {
       method: "POST",
+      signal: AbortSignal.timeout(10_000),
       headers: {
         "Content-Type": "application/json",
         apikey: apiKey,

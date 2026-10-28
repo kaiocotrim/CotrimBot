@@ -122,7 +122,9 @@ export async function getContactAvatar(req: Request, res: Response) {
     return res.status(404).json({ message: "Contato não encontrado" });
   }
 
-  if (contact.profilePictureUrl) {
+  res.setHeader("Cache-Control", "no-store");
+
+  if (contact.profilePictureUrl && req.query.refresh !== "1") {
     return res.json({ profilePictureUrl: contact.profilePictureUrl });
   }
 
