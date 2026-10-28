@@ -33,7 +33,7 @@ export function EditorHeader({ fileName, ready, saving, canUndo, canRedo, canSav
 }) {
   return <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-white/[0.06] bg-zinc-950 px-3 py-3 sm:px-5 sm:py-4">
     <Button variant="ghost" aria-label="Cancelar" title="Voltar sem salvar" disabled={saving} onClick={onClose} className={`${editorButton} size-11 p-0`}><ArrowLeft className="size-5" /></Button>
-    <div className="min-w-0 flex-1"><Dialog.Title className="text-base font-semibold tracking-tight sm:text-xl">Editar foto</Dialog.Title><p className="mt-0.5 truncate text-xs text-zinc-500 sm:text-sm">{fileName}</p></div>
+    <div className="min-w-0 flex-1"><Dialog.Title className="text-base font-normal tracking-tight sm:text-xl">Editar foto</Dialog.Title><p className="mt-0.5 truncate text-xs text-zinc-500 sm:text-sm">{fileName}</p></div>
     <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
       <Button variant="ghost" aria-label="Desfazer" title="Desfazer" disabled={!canUndo || saving || comparing} onClick={onUndo} className={`${editorButton} size-10 rounded-full p-0`}><Undo2 /></Button>
       <Button variant="ghost" aria-label="Refazer" title="Refazer" disabled={!canRedo || saving || comparing} onClick={onRedo} className={`${editorButton} size-10 rounded-full p-0`}><Redo2 /></Button>
@@ -77,7 +77,7 @@ export function EditorToolPanel(props: EditorPanelProps) {
   const hint = tool === "draw" ? "Arraste sobre a imagem para desenhar." : tool === "shape" ? "Arraste para definir a posição e o tamanho da forma." : tool === "crop" ? "Arraste para selecionar a área. O recorte só é aplicado ao confirmar." : tool === "text" ? "Clique na foto para adicionar texto. Para ajustar a posição, mantenha pressionado e arraste." : "As alterações aparecem na prévia em tempo real.";
   return <section aria-label="Configurações da ferramenta" className="shrink-0 border-t border-white/[0.06] bg-zinc-950">
     <div className="flex items-center gap-3 px-4 py-3 sm:px-5">
-      <button type="button" aria-label="Expandir configurações" aria-expanded={expanded} onClick={props.onExpandedChange} className="flex min-h-8 min-w-0 flex-1 items-center gap-2 text-left text-xs font-semibold text-zinc-200 lg:pointer-events-none"><current.Icon className="size-4 text-zinc-400" />{current.title}<ChevronDown className={`ml-auto size-4 text-zinc-500 transition-transform duration-150 lg:hidden ${expanded ? "rotate-180" : ""}`} /></button>
+      <button type="button" aria-label="Expandir configurações" aria-expanded={expanded} onClick={props.onExpandedChange} className="flex min-h-8 min-w-0 flex-1 items-center gap-2 text-left text-xs font-normal text-zinc-200 lg:pointer-events-none"><current.Icon className="size-4 text-zinc-400" />{current.title}<ChevronDown className={`ml-auto size-4 text-zinc-500 transition-transform duration-150 lg:hidden ${expanded ? "rotate-180" : ""}`} /></button>
       <Button variant="ghost" disabled={!props.canReset || disabled} onClick={props.onReset} className="h-8 gap-1.5 rounded-lg px-2 text-[11px] text-zinc-500 hover:bg-white/5 hover:text-zinc-200"><RotateCcw className="size-3.5" />Restaurar original</Button>
     </div>
     <fieldset disabled={disabled} className={`max-h-[28dvh] overflow-y-auto px-4 pb-4 disabled:opacity-40 lg:max-h-[235px] lg:px-5 lg:pb-5 ${expanded ? "block" : "hidden lg:block"}`}>
