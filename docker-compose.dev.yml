@@ -1,0 +1,41 @@
+services:
+  # Aplicação CotrimBot (frontend + backend)
+  cotrimbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    container_name: cotrimbot-app
+    restart: unless-stopped
+
+    depends_on:
+      - transcription
+
+    #ports:
+      #- "${APP_PORT}:${APP_PORT}"
+
+    env_file:
+      - .env
+
+    # Dentro deste Compose, o backend acessa a Evolution pela rede interna.
+    # Fora do Docker, o .env usa o endereço publicado em EVOLUTION_PORT.
+    environment:
+      TRANSCRIPTION_SERVICE_URL: http://transcription:5000
+      RESENCE_DEBUG: "${PRESENCE_DEBUG:-false}"
+      # Remove DATABASE_URL, DATABASE_HOST, DATABASE_PORT, EVOLUTION_API_URL
+
+  # Microserviço de transcrição de áudio (faster-whisper)
+  transcription:
+    build:
+      context: ./transcription-service
+      dockerfile: Dockerfile
+    container_name: cotrimbot-transcription
+    restart: unless-stopped
+
+    # Sem porta publicada: só o container cotrimbot acessa via rede interna do Compose.
+    volumes:
+      - whisper_models:/root/.cache/huggingface
+
+volumes:
+  whisper_models:
