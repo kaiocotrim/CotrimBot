@@ -36,9 +36,28 @@ const client = new CotrimBotClient({
 });
 ```
 
-Para integração server-to-server, você pode fornecer credenciais Better Auth.
-O SDK fará login sob demanda, guardará o token de sessão em memória e o enviará
-nas chamadas seguintes:
+Para integração server-to-server, gere uma **chave de API** em Configurações >
+API e SDK e envie-a como `apiKey`. A chave não expira por padrão e pode ser
+revogada a qualquer momento na mesma tela; ela não depende de login nem de
+sessão, então não há token que expire no meio da integração:
+
+```ts
+const client = new CotrimBotClient({
+  baseUrl: "https://backend.exemplo.com",
+  apiKey: process.env.COTRIMBOT_API_KEY!,
+});
+
+const contacts = await client.contacts.list();
+```
+
+A chave é enviada no cabeçalho `x-api-key`. Guarde-a em um secret manager e
+nunca a inclua em frontend, aplicativos distribuídos ou logs. A chave é exibida
+somente uma vez, no momento da geração.
+
+Alternativamente, para servidores sem chave de API, você pode fornecer
+credenciais Better Auth. Nesse caso, o SDK fará login sob demanda, guardará o
+token de sessão em memória e o enviará nas chamadas seguintes. Esse token expira
+com a sessão:
 
 ```ts
 const client = new CotrimBotClient({
@@ -57,15 +76,15 @@ login com as credenciais configuradas e repetirá a chamada uma única vez.
 `client.auth.signOut()` encerra a sessão e desativa o login automático nessa
 instância; uma chamada explícita a `client.auth.signInEmail()` o reativa.
 
-Esse token é uma sessão Better Auth, não uma chave permanente independente.
-Armazene as credenciais em um secret manager e use o login automático somente
-em ambientes confiáveis server-to-server. Nunca inclua e-mail/senha em frontend,
-aplicativos distribuídos ou logs. Para navegador, prefira a sessão por cookie
-(`credentials: "include"`) e o fluxo de autenticação da aplicação.
+Nunca inclua e-mail/senha em frontend, aplicativos distribuídos ou logs. Para
+navegador, prefira a sessão por cookie (`credentials: "include"`) e o fluxo de
+autenticação da aplicação.
 
 As opções são:
 
 - `baseUrl` (obrigatória): origem do backend.
+- `apiKey`: chave de API gerada em Configurações > API e SDK; enviada no
+  cabeçalho `x-api-key`. Ao configurar `apiKey`, o padrão de `credentials` é `"omit"`.
 - `auth`: credenciais Better Auth (`email` e `password`) para login e
   reautenticação automáticos. Recomendado apenas em servidor confiável.
 - `token`: token de sessão Better Auth; enviado no cabeçalho `Authorization`
@@ -73,7 +92,7 @@ As opções são:
   `set-auth-token` das respostas de autenticação. Com `auth`, o token é obtido
   automaticamente e renovado via novo login após um `401`.
 - `credentials`: encaminha credenciais de `fetch`. O padrão é `"include"` para
-  sessões por cookie e `"omit"` ao configurar `token`.
+  sessões por cookie e `"omit"` ao configurar `apiKey` ou `token`.
 - `headers`: cabeçalhos enviados em todas as chamadas, por exemplo um
   identificador próprio do seu gateway.
 - `fetch`: implementação alternativa de `fetch`, útil para testes ou ambientes
@@ -88,7 +107,8 @@ são criadas por convite. Convites podem ser consultados e aceitos sem sessão e
 `client.invitations`. O método `setActiveOrganization` atualiza a organização
 ativa da sessão, usada por rotas de bots e outras operações que dependem do
 contexto da empresa. As rotas de organizações também recebem o ID explicitamente.
-O token de sessão fornece autenticação para servidores sem depender de cookies; em
+O token de sessão fornece autenticação para servidores sem depender de cookies; a chave de API
+(`apiKey`) é a opção recomendada para integrações, pois não expira. Em
 navegadores, as chamadas externas ainda precisam ser permitidas pela política
 CORS do backend.
 
@@ -194,7 +214,7 @@ interno, `client.internalConversations.media` aceita `download` e cabeçalho
 ## Referência de métodos
 
 Todas as rotas abaixo são relativas a `/api`. A menos que indicado como pública,
-as rotas exigem sessão válida. O backend também expõe Socket.IO na mesma origem
+as rotas exigem sessão válida ou chave de API (`x-api-key`). O backend também expõe Socket.IO na mesma origem
 do backend para integrações realtime; esse transporte não faz parte deste SDK.
 
 | Namespace | Método | Rota HTTP |

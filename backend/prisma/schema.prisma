@@ -323,6 +323,34 @@ model Session {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model Apikey {
+  id                  String    @id
+  configId            String    @default("default")
+  name                String?
+  start               String?
+  prefix              String?
+  key                 String
+  referenceId         String
+  refillInterval      Int?
+  refillAmount        Int?
+  lastRefillAt        DateTime?
+  enabled             Boolean   @default(true)
+  rateLimitEnabled    Boolean   @default(true)
+  rateLimitTimeWindow Int?
+  rateLimitMax        Int?
+  requestCount        Int?      @default(0)
+  remaining           Int?
+  lastRequest         DateTime?
+  expiresAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  permissions         String?   @db.Text
+  metadata            String?   @db.Text
+
+  @@index([key])
+  @@index([referenceId])
+}
+
 model Account {
   id                    String    @id @default(cuid())
   accountId             String

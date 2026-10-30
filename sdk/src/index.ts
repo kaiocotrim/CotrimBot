@@ -4,6 +4,8 @@ export type Query = Record<string, QueryValue>;
 
 export interface CotrimBotClientOptions {
   baseUrl: string;
+  /** Chave de API gerada em Configurações > API e SDK; enviada no cabeçalho x-api-key e não expira por padrão. */
+  apiKey?: string;
   token?: string;
   auth?: { email: string; password: string };
   fetch?: typeof fetch;
@@ -131,6 +133,7 @@ export class CotrimBotClient {
   private readonly defaultHeaders: Headers;
   private readonly credentials: RequestCredentials;
   private readonly authCredentials?: { email: string; password: string };
+  private readonly apiKey?: string;
   private authToken?: string;
   private activeOrganizationId?: string;
   private automaticAuthEnabled: boolean;
@@ -143,10 +146,11 @@ export class CotrimBotClient {
     this.apiUrl = baseUrl.endsWith("/api") ? baseUrl : `${baseUrl}/api`;
     this.fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.defaultHeaders = new Headers(options.headers);
+    this.apiKey = options.apiKey?.trim() || undefined;
     this.authToken = options.token;
     this.authCredentials = options.auth;
     this.automaticAuthEnabled = Boolean(options.auth);
-    this.credentials = options.credentials ?? (options.token ? "omit" : "include");
+    this.credentials = options.credentials ?? (options.token || this.apiKey ? "omit" : "include");
 
     this.auth = {
       signInEmail: (input) => {
@@ -527,6 +531,7 @@ export class CotrimBotClient {
     const url = `${this.apiUrl}${path.startsWith("/") ? path : `/${path}`}`;
     const send = () => {
       const headers = new Headers(this.defaultHeaders);
+      if (this.apiKey && !headers.has("x-api-key")) headers.set("x-api-key", this.apiKey);
       if (this.authToken && !headers.has("authorization")) {
         headers.set("Authorization", ["Bearer ", this.authToken].join(""));
       }

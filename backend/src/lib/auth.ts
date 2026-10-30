@@ -1,6 +1,7 @@
 import "../config/env.js";
 import { betterAuth } from "better-auth";
 import { admin, bearer, organization } from "better-auth/plugins";
+import { apiKey } from "@better-auth/api-key"
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma.js";
 import { sendEmail } from "./mailer.js";
@@ -65,6 +66,14 @@ export const auth = betterAuth({
   plugins: [
     bearer(),
     admin(),
+    // Chaves de API não expiram por padrão e são enviadas pelo SDK no cabeçalho x-api-key.
+    // enableSessionForAPIKeys faz com que essas chaves autentiquem as rotas como uma sessão.
+    apiKey({
+      apiKeyHeaders: "x-api-key",
+      enableSessionForAPIKeys: true,
+      // O limite padrão (10 requisições por dia) inviabiliza o uso pelo SDK.
+      rateLimit: { enabled: false },
+    }),
     organization({
       allowUserToCreateOrganization: (user) => user.role === "admin",
       organizationLimit: 1,

@@ -130,6 +130,19 @@ test("respeita baseUrl terminada em /api e credentials customizadas", async () =
   assert.equal(request.init.credentials, "same-origin");
 });
 
+test("envia a chave de API em x-api-key sem cookies", async () => {
+  const requests = [];
+  const fetch = async (url, init) => {
+    requests.push({ url, init });
+    return Response.json({ session: {}, user: {} });
+  };
+  const client = new CotrimBotClient({ baseUrl: "https://api.example.test", apiKey: " cb_test_key ", fetch });
+  await client.auth.getSession();
+  assert.equal(new Headers(requests[0].init.headers).get("x-api-key"), "cb_test_key");
+  assert.equal(new Headers(requests[0].init.headers).get("authorization"), null);
+  assert.equal(requests[0].init.credentials, "omit");
+});
+
 test("envia sessão Better Auth como autorização e usa credentials omit por padrão", async () => {
   const requests = [];
   const client = new CotrimBotClient({

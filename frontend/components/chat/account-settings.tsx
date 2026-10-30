@@ -348,7 +348,7 @@ function SettingsContent({ user }: { user: SettingsUser }) {
             <ThemeSettings />
           </MotionPanel>
           <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="sdk" className={styles.panel}>
-            {section === "sdk" && <SdkSettings email={user.email} />}
+            {section === "sdk" && <SdkSettings />}
           </MotionPanel>
           <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="notifications" className={styles.panel}>
             <NotificationSettings />

@@ -1,12 +1,13 @@
 import dotenv from "dotenv";
 import path from "node:path";
-import { fileURLToPath } from "url";
 
 // Permite iniciar o backend tanto dentro de backend/ quanto pela raiz.
 // No container, o Compose já injeta essas variáveis no processo.
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({
-  path: path.resolve(__dirname, "../../../.env"),
+  path: [
+    path.resolve(process.cwd(), ".env"),
+    path.resolve(process.cwd(), "../.env"),
+  ],
 });
 
 // Falha rápido caso as variáveis do Better Auth não estejam configuradas.

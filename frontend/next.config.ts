@@ -21,6 +21,10 @@ const nextConfig: NextConfig = {
 
 
 
+  experimental: {
+    agentUpgrade: "security",
+  },
+
   
   // Se estiver usando tags de imagem do Next.js, adicione isso para evitar erros no export estático:
   images: {
