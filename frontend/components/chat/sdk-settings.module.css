@@ -1,0 +1,14 @@
+.root { display: flex; min-width: 0; flex-direction: column; gap: 28px; }
+.hint { margin: 0; color: var(--app-muted, #a0a0a0); font-size: 12px; line-height: 1.6; }
+.button, .secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.secondary { min-height: 38px; padding: 8px 12px; border: 1px solid var(--app-line, #292929); border-radius: 10px; background: var(--app-panel, #141414); color: var(--app-text, #e6e6e6); font: inherit; cursor: pointer; }
+.secondary:hover:not(:disabled) { border-color: var(--app-muted, #a0a0a0); }
+.secondary:disabled { opacity: .5; cursor: wait; }
+.tokenField { margin-top: 20px; }
+.token { min-width: 0; font-family: monospace; }
+.actions + .hint { margin-top: 14px; }
+.code { max-width: 100%; overflow-x: auto; margin-top: 16px; padding: 18px; border: 1px solid var(--app-line, #292929); border-radius: 12px; background: var(--app-panel, #141414); color: var(--app-text, #e6e6e6); font-size: 12px; line-height: 1.8; }
+.spinner { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

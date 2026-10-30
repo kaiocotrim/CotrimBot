@@ -4,7 +4,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Select } from "@base-ui/react/select";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
-import { BadgeCheck, Bell, Bot, Building2, Camera, Check, ChevronDown, ContactRound, Laptop, Link2, Megaphone, Palette, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "lucide-react";
+import { BadgeCheck, Bell, Bot, Building2, Camera, Check, ChevronDown, ContactRound, KeyRound, Laptop, Link2, Megaphone, Palette, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "lucide-react";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,7 @@ import { EvolutionConnectionSettings } from "@/components/chat/evolution-connect
 import { EvolutionCallSettings } from "@/components/chat/evolution-call-settings";
 import { AnnouncementSettings } from "@/components/chat/announcement-settings";
 import { ThemeSettings } from "@/components/chat/theme-settings";
+import { SdkSettings } from "@/components/chat/sdk-settings";
 import { authClient } from "@/lib/auth-client";
 import { checkLocalTranscription, isLocalTranscriptionEnabled, setLocalTranscriptionEnabled } from "@/lib/local-transcription";
 import { readNotificationPermission } from "@/hooks/use-notifications";
@@ -93,6 +94,7 @@ const sections = [
   { value: "business", label: "Empresa", icon: Building2 },
   { value: "announcements", label: "Notícias", icon: Megaphone },
   { value: "bots", label: "Central de Bots", icon: Bot },
+  { value: "sdk", label: "API e SDK", icon: KeyRound },
   { value: "local", label: "Transcrição local", icon: Laptop },
 ] as const;
 
@@ -344,6 +346,9 @@ function SettingsContent({ user }: { user: SettingsUser }) {
 
           <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="theme" className={styles.panel}>
             <ThemeSettings />
+          </MotionPanel>
+          <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="sdk" className={styles.panel}>
+            {section === "sdk" && <SdkSettings email={user.email} />}
           </MotionPanel>
           <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="notifications" className={styles.panel}>
             <NotificationSettings />
