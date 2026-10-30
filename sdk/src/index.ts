@@ -381,7 +381,8 @@ export class CotrimBotClient {
     mediaLibrary(query?: Query): Promise<unknown>;
     list(contactId: number, query?: MessagePageQuery): Promise<MessagePage>;
     favorites(contactId: number, query?: MessagePageQuery): Promise<unknown>;
-    sendText(contactId: number, input: { text: string }): Promise<unknown>;
+    //sendText(contactId: number, input: { text: string }): Promise<unknown>;
+    sendText(contactId: number, input: SendTextInput): Promise<unknown>;
     sendPoll(contactId: number, input: PollCreateInput): Promise<unknown>;
     poll(messageId: number): Promise<unknown>;
     pollVoterAvatar(messageId: number, voterId: string): Promise<unknown>;
@@ -670,6 +671,13 @@ export interface InternalConversationCreateInput {
   name?: string;
   participantIds: string[];
 }
+
+export interface SendTextInput {
+  text: string;
+  // Mensagem privada: fica salva só no CotrimBot e não é enviada ao WhatsApp.
+  private?: boolean;
+}
+
 export interface InternalMessageCreateInput {
   content: string;
   private?: boolean;

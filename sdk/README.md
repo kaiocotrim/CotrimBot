@@ -130,6 +130,9 @@ const { messages } = await client.messages.list(contacts[0].id, {
 ```ts
 await client.messages.sendText(contacts[0].id, { text: "Olá!" });
 
+// Mensagem privada: fica só no CotrimBot e não é enviada ao WhatsApp.
+await client.messages.sendText(contacts[0].id, { text: "Nota interna", private: true });
+
 const arquivo = new File([conteudo], "documento.pdf", {
   type: "application/pdf",
 });
