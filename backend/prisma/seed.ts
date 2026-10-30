@@ -1,6 +1,6 @@
-import "../src/config/env.js";
+import "../src/config/env.ts";
 import { hashPassword } from "better-auth/crypto";
-import { prisma } from "../src/lib/prisma.js";
+import { prisma } from "../src/lib/prisma.ts";
 
 // Cria (ou atualiza a senha de) o primeiro usuário autorizado a logar no CotrimBot.
 // Uso: SEED_ADMIN_EMAIL=... SEED_ADMIN_PASSWORD=... SEED_ADMIN_NAME=... npm run prisma:seed
