@@ -1,0 +1,14 @@
+services:
+transcription:
+  build:
+    context: ./transcription-service
+    dockerfile: Dockerfile
+  container_name: cotrimbot-transcription
+  restart: unless-stopped
+
+  # Sem porta publicada: só o container cotrimbot acessa via rede interna do Compose.
+  volumes:
+    - whisper_models:/root/.cache/huggingface
+
+volumes:
+  whisper_models:
