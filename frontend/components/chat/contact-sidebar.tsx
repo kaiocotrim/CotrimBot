@@ -16,7 +16,7 @@ import { QuickConversationPreview } from "@/components/chat/quick-conversation-p
 import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
 import { authClient, useSession } from "@/lib/auth-client";
 import { getMessages } from "@/lib/chat-api";
-import { getContactPriorityDetails } from "@/lib/contact-priority";
+import { compareContactsByPriority, getContactPriorityDetails } from "@/lib/contact-priority";
 import { preloadInternalChat, setInternalChatIdentity } from "@/lib/internal-chat-api";
 import type { AppNotification } from "@/lib/notification-api";
 import { systemMessageLabel } from "@/lib/system-message";
@@ -246,7 +246,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
       return contact.name.toLocaleLowerCase("pt-BR").includes(search)
         || contact.phone.includes(search)
         || Boolean(contact.messages?.[0]?.content.toLocaleLowerCase("pt-BR").includes(search));
-    }).sort((first, second) => Number(Boolean(second.pinned)) - Number(Boolean(first.pinned)));
+    }).sort(compareContactsByPriority);
   }, [contacts, conversationFilter, drafts, query, selectedContactId, showArchived, userId]);
 
   const matchingCompanies = useMemo(() => {
