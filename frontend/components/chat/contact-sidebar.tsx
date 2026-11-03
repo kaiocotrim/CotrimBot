@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Archive, ArchiveRestore, ArrowLeft, Bell, Building2, Camera, ChevronDown, Copy, MessageCircle, Mic, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Phone, Search, Sticker, UserRound, UserRoundPlus, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, Bell, Building2, Camera, ChevronDown, Copy, MessageCircle, Mic, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Phone, Search, Sticker, UserRound, UserRoundPlus, Video, X } from "lucide-react";
 import { getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/min";
 import Image from "next/image";
 import { Avatar } from "@/components/chat/avatar";
@@ -1262,7 +1262,12 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
                         <p className="min-w-0 flex-1 truncate text-sm leading-tight font-normal text-zinc-400 lg:text-[12px] lg:text-zinc-500">
                           {typingPreview ? <TypingIndicator label={typingPreview} showLabel className="text-zinc-400" /> : <>
                             {!draft && lastMessage && !lastMessage.deletedAt && lastMessage.direction === "OUTGOING" && <span className={lastMessage.readAt ? "text-white" : undefined} aria-label={lastMessage.readAt ? "Mensagem visualizada" : "Mensagem enviada"}>✓✓ </span>}
-                            {draft ? <><span className="font-medium text-zinc-400">Rascunho:</span> {draft.replace(/\s+/g, " ")}</> : lastMessage && (lastMessage.type === "IMAGE" || lastMessage.type === "AUDIO" || lastMessage.type === "STICKER") && !lastMessage.deletedAt ? (
+                            {draft ? <><span className="font-medium text-zinc-400">Rascunho:</span> {draft.replace(/\s+/g, " ")}</> : lastMessage?.type === "VIDEO" && !lastMessage.deletedAt ? (
+                              <span className="inline-flex max-w-full items-center gap-1 align-bottom">
+                                <Video className="size-3.5 shrink-0 text-zinc-400" aria-hidden="true" />
+                                <span className="truncate">{lastMessage.gifPlayback || lastMessage.content === "[GIF]" ? "GIF" : lastMessage.content === "[Vídeo]" ? "Vídeo" : <MessageText content={lastMessage.content} showSignature={!lastMessage.private && lastMessage.direction === "OUTGOING"} linkify={false} />}</span>
+                              </span>
+                            ) : lastMessage && (lastMessage.type === "IMAGE" || lastMessage.type === "AUDIO" || lastMessage.type === "STICKER") && !lastMessage.deletedAt ? (
                               <span className="inline-flex max-w-full items-center gap-1 align-bottom">
                                 {lastMessage.type === "IMAGE" ? <Camera className="size-3.5 shrink-0 text-zinc-400" aria-hidden="true" /> : lastMessage.type === "AUDIO" ? <Mic className="size-3.5 shrink-0 text-zinc-400" aria-hidden="true" /> : <Sticker className="size-3.5 shrink-0 text-zinc-400" aria-hidden="true" />}
                                 <span className="truncate">{lastMessage.type === "IMAGE" ? "Foto" : lastMessage.type === "AUDIO" ? "Áudio" : "Figurinha"}</span>
