@@ -13,6 +13,7 @@ import { EmojiText } from "@/components/chat/emoji-text";
 import { MessageText } from "@/components/chat/message-text";
 import { TeamTypingBadge } from "@/components/chat/team-typing-badge";
 import type { TeamTypingMember } from "@/hooks/use-contact-team-typing";
+import { useKeyboardPreference } from "@/hooks/use-keyboard-preference";
 import { insertEmojiAtSelection } from "@/lib/emoji-text";
 import type { GifFile } from "@/lib/giphy";
 import { getContactAssignees, rewriteMessage, type ContactAssignee } from "@/lib/chat-api";
@@ -149,6 +150,7 @@ export function MessageComposer({
   replyingTo,
   onCancelReply,
 }: MessageComposerProps) {
+  const { shortcut: newlineShortcut } = useKeyboardPreference(userId);
   const mobileLayout = useSyncExternalStore(subscribeToMobileLayout, getMobileLayout, getServerMobileLayout);
   const isMobile = mode === "external" && mobileLayout;
   const [isFocused, setIsFocused] = useState(false);
@@ -1102,6 +1104,7 @@ export function MessageComposer({
                 selectionRef.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd };
               }}
               onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing) return;
                 if (mentionMatch && event.key === "Escape") {
                   event.preventDefault();
                   setMentionMatch(null);
@@ -1133,13 +1136,19 @@ export function MessageComposer({
                   setIsFullscreen(false);
                 }
                 if (event.key !== "Enter") return;
-                if (event.nativeEvent.isComposing) {
-                  event.preventDefault();
-                  return;
-                }
-                // Enter envia pelo mesmo formulário; Shift+Enter insere uma nova linha.
-                if (!event.shiftKey) {
-                  event.preventDefault();
+                event.preventDefault();
+                const newline = !event.altKey && !event.metaKey && (newlineShortcut === "ctrl-enter"
+                  ? event.ctrlKey && !event.shiftKey
+                  : event.shiftKey && !event.ctrlKey);
+                if (newline) {
+                  const input = event.currentTarget;
+                  const start = input.selectionStart;
+                  const end = input.selectionEnd;
+                  const nextCaret = start + 1;
+                  changeText(`${text.slice(0, start)}\n${text.slice(end)}`, nextCaret);
+                  selectionRef.current = { start: nextCaret, end: nextCaret };
+                  requestAnimationFrame(() => input.setSelectionRange(nextCaret, nextCaret));
+                } else if (!event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
                   event.currentTarget.form?.requestSubmit();
                 }
               }}

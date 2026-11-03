@@ -4,7 +4,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Select } from "@base-ui/react/select";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
-import { BadgeCheck, Bell, Bot, Building2, Camera, Check, ChevronDown, ContactRound, KeyRound, Laptop, Link2, Megaphone, Palette, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "lucide-react";
+import { BadgeCheck, Bell, Bot, Building2, Camera, Check, ChevronDown, ContactRound, Keyboard, KeyRound, Laptop, Link2, Megaphone, Palette, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "lucide-react";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,7 @@ import { EvolutionConnectionSettings } from "@/components/chat/evolution-connect
 import { EvolutionCallSettings } from "@/components/chat/evolution-call-settings";
 import { AnnouncementSettings } from "@/components/chat/announcement-settings";
 import { ThemeSettings } from "@/components/chat/theme-settings";
+import { KeyboardSettings } from "@/components/chat/keyboard-settings";
 import { SdkSettings } from "@/components/chat/sdk-settings";
 import { authClient } from "@/lib/auth-client";
 import { prepareAvatar } from "@/lib/avatar-image";
@@ -45,6 +46,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 const sections = [
   { value: "account", label: "Conta", icon: UserRound },
   { value: "theme", label: "Tema", icon: Palette },
+  { value: "keyboard", label: "Teclado", icon: Keyboard },
   { value: "client", label: "Cliente", icon: ContactRound },
   { value: "notifications", label: "Notificações", icon: Bell },
   { value: "pro", label: "Conta Pro", icon: BadgeCheck },
@@ -305,6 +307,9 @@ function SettingsContent({ user }: { user: SettingsUser }) {
 
           <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="theme" className={styles.panel}>
             <ThemeSettings />
+          </MotionPanel>
+          <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="keyboard" className={styles.panel}>
+            <KeyboardSettings userId={user.id} />
           </MotionPanel>
           <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="sdk" className={styles.panel}>
             {section === "sdk" && <SdkSettings />}

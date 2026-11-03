@@ -1,0 +1,12 @@
+.root { display: flex; flex-direction: column; gap: 24px; max-width: 640px; color: var(--app-text); }
+.root h3 { margin: 0 0 8px; font-size: 23px; font-weight: 600; letter-spacing: -.6px; }
+.root p { margin: 0; color: var(--app-muted); font-size: 13px; line-height: 1.6; }
+.options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; min-width: 0; padding: 0; border: 0; }
+.options legend { margin-bottom: 12px; font-size: 14px; font-weight: 500; }
+.option { display: flex; align-items: center; gap: 14px; padding: 20px 16px; border: 1px solid var(--app-line); border-radius: 16px; background: var(--app-surface); cursor: pointer; }
+.option:hover, .option[data-selected="true"] { border-color: var(--app-muted); }
+.option:has(input:focus-visible) { outline: 2px solid var(--app-text); outline-offset: 3px; }
+.option input { width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--app-text); }
+.keys { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.keys kbd { padding: 5px 8px; border: 1px solid var(--app-line); border-bottom-width: 3px; border-radius: 6px; font-family: inherit; }
+@media (max-width: 599px) { .options { grid-template-columns: 1fr; } }
