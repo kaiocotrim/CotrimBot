@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Archive, ArchiveRestore, ArrowLeft, Building2, Camera, ChevronDown, Copy, MessageCircle, Mic, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Phone, Search, Sticker, UserRound, UserRoundPlus, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, Bell, Building2, Camera, ChevronDown, Copy, MessageCircle, Mic, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Phone, Search, Sticker, UserRound, UserRoundPlus, X } from "lucide-react";
 import { getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/min";
 import Image from "next/image";
 import { Avatar } from "@/components/chat/avatar";
@@ -1061,6 +1061,20 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
             </h1>
             <div className="flex shrink-0 items-center gap-1.5">
               <span className="hidden lg:contents">{headerActions}</span>
+              <motion.button
+                type="button"
+                aria-label={notificationUnreadCount > 0 ? `Notificações, ${notificationUnreadCount} não lidas` : "Notificações"}
+                onClick={() => navigateFromRail("notifications")}
+                whileTap={reduceMotion ? undefined : { scale: 0.9 }}
+                className="relative flex size-11 items-center justify-center rounded-full bg-white/[0.06] text-zinc-200 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/50 lg:hidden"
+              >
+                <Bell aria-hidden="true" className="size-5" strokeWidth={1.8} />
+                {notificationUnreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex min-w-4 items-center justify-center rounded-full bg-zinc-200 px-1 text-[10px] font-semibold leading-4 text-zinc-950">
+                    {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
+                  </span>
+                )}
+              </motion.button>
               <motion.button
                 type="button"
                 aria-label="Nova conversa"
