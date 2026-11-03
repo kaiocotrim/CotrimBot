@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import localFont from "next/font/local";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { animate, motion, useMotionValue } from "framer-motion";
+import { Download } from "lucide-react";
 import { authClient, useSession } from "@/lib/auth-client";
 import { LoginForm } from "@/components/auth/login-form";
 import { LoginBackground } from "@/components/auth/login-background";
@@ -166,6 +167,15 @@ export default function LoginPage() {
         />
         </div>
       </div>
+      <a
+        href="https://www.mediafire.com/file/2p6ayvfeup6bfiv/CotrimBot-Setup-1.0.0-x64.exe/file"
+        target="_blank"
+        rel="noopener noreferrer"
+        className={styles.downloadLink}
+      >
+        <Download size={16} aria-hidden="true" />
+        Baixar para Windows (.exe)
+      </a>
     </main>
   );
 }

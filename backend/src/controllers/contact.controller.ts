@@ -5,10 +5,13 @@ import { getSocketServer } from "../lib/socket.js";
 import { notifyAssignment } from "../services/notification.service.js";
 import { isInforbotName } from "../services/bot.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
+import { createContactPhoneInspector } from "../services/contact-phone.service.js";
+import { createContactPhoneCheckHandler, createContactRegistrationHandler } from "./contact-registration.controller.js";
 import { presenceDebug, presenceIdentifiers } from "../utils/whatsapp-presence.js";
 import { normalizeWhatsAppJid, whatsAppJidIdentifier } from "../utils/whatsapp-jid.js";
 import {
   archiveWhatsAppChat,
+  checkWhatsAppNumber,
   getGroupInfo,
   getProfilePicture,
   subscribeWhatsAppPresence,
@@ -297,33 +300,12 @@ export async function subscribeContactPresence(req: Request, res: Response) {
 }
 
 // POST /contacts - Cria um novo contato
-export async function createContact(req: Request, res: Response) {
-  const name = typeof req.body?.name === "string" ? req.body.name.trim().replace(/\s+/g, " ") : "";
-  const phone = typeof req.body?.phone === "string" ? req.body.phone.replace(/\D/g, "") : "";
-  const companyName = typeof req.body?.companyName === "string" ? req.body.companyName.trim().replace(/\s+/g, " ") : "";
-  const jobTitle = typeof req.body?.jobTitle === "string" ? req.body.jobTitle.trim().replace(/\s+/g, " ") : "";
-  if (!name || !/^\d{7,15}$/.test(phone)) {
-    return res.status(400).json({ message: "Informe um nome e um número internacional válido (7 a 15 dígitos)" });
-  }
-  if (companyName.length > 191) {
-    return res.status(400).json({ message: "A empresa deve ter no máximo 191 caracteres" });
-  }
-
-  if (jobTitle.length > 191) {
-    return res.status(400).json({ message: "O cargo deve ter no máximo 191 caracteres" });
-  }
-
-  const contact = await prisma.contact.upsert({
-    where: { phone },
-    create: { name, phone, companyName: companyName || null, jobTitle: jobTitle || null, isSaved: true },
-    update: { name, ...(typeof req.body?.companyName === "string" ? { companyName: companyName || null } : {}), ...(jobTitle ? { jobTitle } : {}), isSaved: true },
-    include: { assignments: { select: { userId: true } } },
-  });
-  const { assignments, ...savedContact } = contact;
-  const response = { ...savedContact, assignedUserIds: assignments.map((assignment) => assignment.userId) };
-  getSocketServer().emit("contact_updated", response);
-  return res.json(response);
-}
+const inspectContactPhone = createContactPhoneInspector({ database: prisma, checkWhatsApp: checkWhatsAppNumber });
+export const checkContactPhone = createContactPhoneCheckHandler(inspectContactPhone);
+export const createContact = createContactRegistrationHandler({
+  database: prisma, inspect: inspectContactPhone,
+  emit: (event, data) => getSocketServer().emit(event, data),
+});
 
 // PATCH /contacts/:id/saved - Remove ou recoloca um contato na agenda local.
 export async function setContactSaved(req: Request, res: Response) {

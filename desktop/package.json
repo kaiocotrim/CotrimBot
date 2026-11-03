@@ -1,0 +1,45 @@
+{
+  "name": "@cotrimbot/desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aplicativo desktop do CotrimBot",
+  "author": "CotrimBot",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64 --publish never",
+    "pack": "electron-builder --win --x64 --dir --publish never",
+    "test": "node --test tests/*.test.cjs",
+    "test:smoke": "node --test tests/smoke.test.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "electron": "45.2.1",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "net.infordoc.cotrimbot",
+    "productName": "CotrimBot",
+    "asar": true,
+    "directories": { "output": "dist" },
+    "files": ["main.cjs", "policy.cjs", "config.json", "assets/icon.png", "!**/node_modules/**"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "assets/icon.ico",
+      "artifactName": "CotrimBot-Setup-${version}-${arch}.${ext}",
+      "signtoolOptions": { "signingHashAlgorithms": ["sha256"] }
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "CotrimBot",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": false,
+      "installerLanguages": ["pt_BR"]
+    }
+  }
+}

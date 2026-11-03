@@ -181,6 +181,36 @@
 
 .footer strong { color: #a3a3a3; font-weight: 500; }
 
+.downloadLink {
+  position: fixed;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  z-index: 2;
+  display: flex;
+  max-width: calc(100vw - 32px);
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid #ffffff26;
+  border-radius: 999px;
+  background: #ffffff08;
+  color: #d4d4d8;
+  font-size: 13px;
+  line-height: 20px;
+  text-decoration: none;
+  transition: background .2s, border-color .2s, color .2s;
+}
+
+.downloadLink:hover { border-color: #ffffff4d; background: #ffffff12; color: #fff; }
+.downloadLink:focus-visible { outline: 2px solid #e4dcf4; outline-offset: 4px; }
+
+@media (max-width: 899px) {
+  .container { min-height: 640px; padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+  .downloadLink { right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); }
+}
+
 .srOnly {
   position: absolute;
   width: 1px;
@@ -216,5 +246,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .input, .button, .backgroundReveal, .formReveal, .passwordReveal { transition: none; }
+  .input, .button, .downloadLink, .backgroundReveal, .formReveal, .passwordReveal { transition: none; }
 }

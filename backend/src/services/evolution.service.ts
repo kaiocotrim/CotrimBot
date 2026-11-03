@@ -59,6 +59,30 @@ export async function sendWhatsAppMessage(
   return response.json();
 }
 
+export async function checkWhatsAppNumber(phone: string): Promise<{ exists: boolean; phone: string }> {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE;
+  if (!apiUrl || !apiKey || !instance) throw new Error("Configuração da Evolution API incompleta");
+  const response = await fetch(`${apiUrl.replace(/\/$/, "")}/chat/whatsappNumbers/${encodeURIComponent(instance)}`, {
+    method: "POST",
+    signal: AbortSignal.timeout(10_000),
+    headers: { "Content-Type": "application/json", apikey: apiKey },
+    body: JSON.stringify({ numbers: [phone] }),
+  });
+  if (!response.ok) throw new Error(`Falha ao verificar WhatsApp: ${response.status}`);
+  const data: unknown = await response.json();
+  if (!Array.isArray(data) || data.length !== 1) throw new Error("Resposta inválida da verificação do WhatsApp");
+  const result = data[0] as { exists?: unknown; jid?: unknown; number?: unknown } | undefined;
+  if (!result || typeof result.exists !== "boolean" || result.number !== phone) {
+    throw new Error("Resposta inválida da verificação do WhatsApp");
+  }
+  if (!result.exists) return { exists: false, phone };
+  const match = typeof result.jid === "string" ? /^(\d{7,15})(?::\d+)?@s\.whatsapp\.net$/.exec(result.jid) : null;
+  if (!match?.[1]) throw new Error("Identificador inválido na verificação do WhatsApp");
+  return { exists: true, phone: match[1] };
+}
+
 export async function sendWhatsAppPoll(number: string, poll: { question: string; options: string[]; selectableCount: number }) {
   const apiUrl = process.env.EVOLUTION_API_URL;
   const apiKey = process.env.EVOLUTION_API_KEY;

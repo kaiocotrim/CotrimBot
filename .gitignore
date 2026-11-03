@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+desktop/dist/
+desktop/test-results/
 
 # Python
 .venv/

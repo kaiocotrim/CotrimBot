@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from "react";
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from "framer-motion";
 import { Archive, ArchiveRestore, ArrowLeft, Bell, Building2, Camera, ChevronDown, Copy, MessageCircle, Mic, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Phone, Search, Sticker, UserRound, UserRoundPlus, Video, X } from "lucide-react";
-import { getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/min";
+import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/min";
 import Image from "next/image";
 import { Avatar } from "@/components/chat/avatar";
 import { ChatNavigationRail, type ChatRailSection } from "@/components/chat/chat-navigation-rail";
@@ -11,6 +11,8 @@ import { CountryCodePicker } from "@/components/chat/country-code-picker";
 import { MessageText } from "@/components/chat/message-text";
 import { TypingIndicator } from "@/components/chat/typing-indicator";
 import { useContactTypingPreviews } from "@/hooks/use-contact-typing-previews";
+import { useContactPhoneCheck } from "@/hooks/use-contact-phone-check";
+import { normalizeContactPhone } from "@/lib/contact-phone";
 import { NotificationCenter } from "@/components/chat/notification-center";
 import { QuickConversationPreview } from "@/components/chat/quick-conversation-preview";
 import { CompactScrollArea } from "@/components/ui/compact-scroll-area";
@@ -125,6 +127,9 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
   const [activeJobIndex, setActiveJobIndex] = useState(0);
   const [newContactCountry, setNewContactCountry] = useState<CountryCode>("BR");
   const [newContactPhone, setNewContactPhone] = useState("");
+  const normalizedNewPhone = normalizeContactPhone(newContactPhone, newContactCountry);
+  const phoneCheck = useContactPhoneCheck(showNewContact ? normalizedNewPhone.phone : null);
+  const existingPhoneContact = phoneCheck.result?.contact;
   const [savingContact, setSavingContact] = useState(false);
   const [savedActionError, setSavedActionError] = useState<string | null>(null);
   const [holdingContactId, setHoldingContactId] = useState<number | null>(null);
@@ -375,30 +380,20 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
       setSavedActionError("Selecione uma empresa cadastrada.");
       return;
     }
-    const callingCode = getCountryCallingCode(newContactCountry);
-    const enteredDigits = newContactPhone.replace(/\D/g, "");
-    if (newContactPhone.trim().startsWith("+") && !enteredDigits.startsWith(callingCode)) {
-      setSavedActionError(`O número precisa usar o código +${callingCode} do país selecionado.`);
+    if (!normalizedNewPhone.phone) {
+      setSavedActionError(normalizedNewPhone.error ?? "Informe um número de telefone válido.");
       return;
     }
-    const phoneDigits = enteredDigits.startsWith(callingCode)
-      && (newContactPhone.trim().startsWith("+") || newContactCountry === "BR" && enteredDigits.length >= 12)
-      ? enteredDigits.slice(callingCode.length)
-      : enteredDigits;
-    if (newContactCountry === "BR" && !/^\d{10,11}$/.test(phoneDigits)) {
-      setSavedActionError("Informe o DDD e um número de telefone válido.");
-      return;
-    }
-    const internationalPhone = `+${callingCode}${phoneDigits}`;
-    if (!parsePhoneNumberFromString(internationalPhone)?.isPossible()) {
-      setSavedActionError("Informe um número de telefone válido.");
+    if (existingPhoneContact?.isSaved || phoneCheck.checking || phoneCheck.error || phoneCheck.result?.whatsapp !== true) {
+      setSavedActionError(existingPhoneContact?.isSaved ? "Este número já está cadastrado. Abra o contato existente."
+        : phoneCheck.error ?? (phoneCheck.checking ? "Aguarde a verificação do telefone." : "Este número não possui WhatsApp."));
       return;
     }
     setSavingContact(true);
     setSavedActionError(null);
     try {
       const name = `${newContactFirstName.trim()} ${newContactLastName.trim()}`.trim();
-      setSavedContacts(await onSaveContact(name, internationalPhone.slice(1), selectedCompanyId === "__none__" ? "" : newContactCompany.trim(), newContactJobTitle.trim(), !sharedContactDraft));
+      setSavedContacts(await onSaveContact(name, normalizedNewPhone.phone, selectedCompanyId === "__none__" ? "" : newContactCompany.trim(), newContactJobTitle.trim(), !sharedContactDraft));
       setSavedError(null);
       setNewContactFirstName("");
       setNewContactLastName("");
@@ -413,6 +408,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
       onMobileOpenChange(false);
     } catch (actionError) {
       setSavedActionError(actionError instanceof Error ? actionError.message : "Não foi possível salvar o contato");
+      phoneCheck.retry();
     } finally {
       setSavingContact(false);
     }
@@ -972,14 +968,30 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
                 </div>
                 <label className="min-w-0 flex-1 border-b border-zinc-600 focus-within:border-white">
                   <span className="block text-[11px] text-zinc-500">Número de telefone</span>
-                  <input required type="tel" inputMode="tel" autoComplete="tel-national" maxLength={20} value={newContactPhone} onChange={(event) => setNewContactPhone(event.target.value)} placeholder="DDD + número" className="h-11 w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-600" />
+                  <input required type="tel" inputMode="tel" autoComplete="tel-national" maxLength={20} value={newContactPhone} onChange={(event) => { setNewContactPhone(event.target.value); setSavedActionError(null); }} aria-describedby="new-contact-phone-status" aria-invalid={Boolean(phoneCheck.result?.whatsapp === false || phoneCheck.error)} placeholder="DDD + número" className="h-11 w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-600" />
                 </label>
               </div>
+            </div>
+            <div id="new-contact-phone-status" className="mt-3 space-y-2 pl-9 text-xs leading-5" aria-live="polite" aria-atomic="true">
+              {phoneCheck.checking && <p role="status" className="text-zinc-400">Verificando telefone e WhatsApp...</p>}
+              {phoneCheck.error && <div role="alert" className="text-red-300"><p>{phoneCheck.error}</p><button type="button" onClick={phoneCheck.retry} className="mt-1 rounded-sm underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-white">Tentar novamente</button></div>}
+              {existingPhoneContact && <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
+                <p className="text-zinc-300">{existingPhoneContact.isSaved ? "Este número já está cadastrado:" : "Já existe uma conversa com este número:"}</p>
+                <p className="font-medium text-white">{existingPhoneContact.name}</p>
+                <p className="text-zinc-400">+{existingPhoneContact.phone}{existingPhoneContact.companyName ? ` · ${existingPhoneContact.companyName}` : ""}</p>
+                <button type="button" onClick={() => {
+                  onSelectContact(contacts.find(contact => contact.id === existingPhoneContact.id) ?? existingPhoneContact);
+                  setShowNewContact(false); setShowSavedContacts(false); onMobileOpenChange(false);
+                }} className="mt-2 rounded-sm font-medium text-zinc-200 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-white">Abrir conversa</button>
+                {!existingPhoneContact.isSaved && <p className="mt-2 text-zinc-400">Salvar adiciona este contato à sua agenda.</p>}
+              </div>}
+              {phoneCheck.result?.whatsapp === false && <p role="alert" className="text-red-300">Este número não possui WhatsApp. Confira o país, o DDD e o telefone.</p>}
+              {phoneCheck.result?.whatsapp === true && !existingPhoneContact?.isSaved && <p className="text-green-400">Número com WhatsApp confirmado.</p>}
             </div>
             {savedActionError && <p role="alert" className="mt-6 pl-9 text-sm text-red-300">{savedActionError}</p>}
           </div>
           <div className="shrink-0 border-t border-white/[0.08] px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:pb-4">
-            <button type="submit" disabled={savingContact || !newContactFirstName.trim() || !selectedCompanyId || !newContactPhone.trim()} className="w-full rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:bg-zinc-700 disabled:text-zinc-400">
+            <button type="submit" disabled={savingContact || !newContactFirstName.trim() || !selectedCompanyId || !normalizedNewPhone.phone || phoneCheck.checking || Boolean(phoneCheck.error) || Boolean(existingPhoneContact?.isSaved) || phoneCheck.result?.whatsapp !== true} className="w-full rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:bg-zinc-700 disabled:text-zinc-400">
               {savingContact ? "Salvando..." : "Salvar contato"}
             </button>
           </div>

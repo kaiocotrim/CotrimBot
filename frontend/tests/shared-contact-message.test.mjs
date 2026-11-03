@@ -67,10 +67,18 @@ test("shared contact cards open registration, save on submit, and message saved 
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 920 }, reducedMotion: "reduce" });
     const errors = [], mutations = [];
+    let failPhoneCheck = true;
     page.on("pageerror", (error) => errors.push(error.message));
     await page.route("http://shared.test/**", async (route) => {
       const url = new URL(route.request().url());
       if (url.pathname === "/api/clients") await route.fulfill({ json: { clients: [{ id: "company", name: "Empresa de teste" }] } });
+      else if (url.pathname === "/api/contacts/check-phone") {
+        const { phone } = route.request().postDataJSON();
+        if (phone === "5511888888888") await route.fulfill({ json: { phone, whatsapp: false, contact: null } });
+        else if (phone === "5511777777777" && failPhoneCheck) await route.fulfill({ status: 502, json: { message: "Conexão com WhatsApp indisponível. Tente novamente." } });
+        else if (phone === "5511999999999") await route.fulfill({ json: { phone, whatsapp: null, contact: { id: 2, name: "Bruno", phone, isSaved: true, isGroup: false, unreadCount: 0 } } });
+        else await route.fulfill({ json: { phone, whatsapp: true, contact: null } });
+      }
       else if (route.request().method() === "POST") {
         const body = route.request().postDataJSON();
         mutations.push({ path: url.pathname, body });
@@ -109,6 +117,28 @@ test("shared contact cards open registration, save on submit, and message saved 
     await expect(form).toBeVisible();
     await form.getByRole("combobox", { name: "Empresa" }).click();
     await form.getByRole("option", { name: "Empresa de teste" }).click();
+    const phoneInput = form.getByRole("textbox", { name: "Número de telefone", exact: true });
+    const submitContact = form.getByRole("button", { name: "Salvar contato", exact: true });
+    await phoneInput.fill("11888888888");
+    await expect(form.getByRole("alert")).toContainText("Este número não possui WhatsApp");
+    await expect(submitContact).toBeDisabled();
+    await phoneInput.fill("11777777777");
+    await expect(form.getByRole("alert")).toContainText("Conexão com WhatsApp indisponível");
+    await expect(form.getByRole("button", { name: "Tentar novamente" })).toBeVisible();
+    await expect(submitContact).toBeDisabled();
+    failPhoneCheck = false;
+    await form.getByRole("button", { name: "Tentar novamente" }).click();
+    await expect(form.getByText("Número com WhatsApp confirmado.")).toBeVisible();
+    await expect(submitContact).toBeEnabled();
+    await phoneInput.fill("11999999999");
+    await expect(form.getByText("Este número já está cadastrado:")).toBeVisible();
+    await expect(form.getByText("Bruno", { exact: true })).toBeVisible();
+    await expect(form.getByRole("button", { name: "Abrir conversa", exact: true })).toBeVisible();
+    await expect(submitContact).toBeDisabled();
+    assert.equal(mutations.length, 1);
+    await phoneInput.fill("11932075075");
+    await expect(form.getByText("Número com WhatsApp confirmado.")).toBeVisible();
+    await expect(submitContact).toBeEnabled();
     await page.screenshot({ path: path.join(os.tmpdir(), "cotrimbot-shared-contact-form.png") });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
     await page.evaluate(() => { window.failSave = true; });

@@ -38,6 +38,9 @@ flowchart LR
 
 ## Estrutura do repositório
 
+A versão Windows em Electron fica em [`desktop/`](desktop/README.md).
+Use `npm run desktop:build` para gerar o instalador conectado ao servidor publicado.
+
 ```
 backend/                 # API Express + Socket.IO + Prisma (MySQL)
 frontend/                # Chat web em Next.js

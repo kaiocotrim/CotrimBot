@@ -42,6 +42,16 @@ export async function saveContact(name: string, phone: string, companyName?: str
   return parseResponse<Contact>(response, "Não foi possível salvar o contato");
 }
 
+export type ContactPhoneCheck = { phone: string; whatsapp: boolean | null; contact: Contact | null };
+
+export async function checkContactPhone(phone: string, signal?: AbortSignal): Promise<ContactPhoneCheck> {
+  const response = await fetch(`${API_URL}/contacts/check-phone`, {
+    method: "POST", credentials: "include", cache: "no-store", signal,
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone }),
+  });
+  return parseResponse<ContactPhoneCheck>(response, "Não foi possível verificar o número. Tente novamente.");
+}
+
 export async function startContactConversation(phone: string): Promise<Contact> {
   const response = await fetch(`${API_URL}/contacts/conversation`, {
     method: "POST",
