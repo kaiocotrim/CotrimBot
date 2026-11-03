@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AtSign, Bell, CheckCheck, MessageSquare, Search, Trash2, UserRoundPlus } from "lucide-react";
+import { ArrowLeft, AtSign, Bell, CheckCheck, MessageSquare, Search, Trash2, UserRoundPlus } from "lucide-react";
 import type { AppNotification } from "@/lib/notification-api";
 
 type NotificationFilter = "all" | "unread" | "mentions";
@@ -29,6 +29,7 @@ export function NotificationCenter({
   onOpenNotification,
   onMarkAllRead,
   onClear,
+  onBack,
 }: {
   notifications: AppNotification[];
   unreadCount: number;
@@ -37,6 +38,7 @@ export function NotificationCenter({
   onOpenNotification: (notification: AppNotification) => void;
   onMarkAllRead: () => void;
   onClear: () => void;
+  onBack?: () => void;
 }) {
   const [filter, setFilter] = useState<NotificationFilter>("all");
   const [query, setQuery] = useState("");
@@ -56,16 +58,26 @@ export function NotificationCenter({
 
   return (
     <section aria-label="Central de notificações" className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#09090b] text-white">
-      <header className="flex h-16 shrink-0 items-center justify-between gap-4 px-5">
-        <div className="flex min-w-0 items-center gap-2.5">
+      <header className="flex min-h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center justify-between gap-2 px-3 pt-[env(safe-area-inset-top)] lg:min-h-16 lg:gap-4 lg:px-5 lg:pt-0">
+        <div className="flex min-w-0 flex-1 items-center gap-2 lg:gap-2.5">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label="Voltar para conversas"
+              className="flex size-11 shrink-0 items-center justify-center rounded-full text-zinc-200 transition-colors hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-white/50 lg:hidden"
+            >
+              <ArrowLeft aria-hidden="true" className="size-5" strokeWidth={1.8} />
+            </button>
+          )}
           <h1 className="truncate text-base font-normal tracking-tight text-zinc-100">Notificações</h1>
           {unreadCount > 0 && (
-            <span className="flex min-w-5 items-center justify-center rounded-full bg-white/[0.09] px-1.5 text-[10px] font-medium leading-5 text-zinc-300">
+            <span className="flex min-w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.09] px-1.5 text-[10px] font-medium leading-5 text-zinc-300">
               {unreadCount > 99 ? "99+" : unreadCount}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <button type="button" onClick={onMarkAllRead} disabled={!unreadCount} title="Marcar todas como lidas" aria-label="Marcar todas como lidas" className="flex size-8 items-center justify-center rounded-lg text-zinc-600 transition-colors hover:text-white disabled:cursor-default disabled:opacity-25">
             <CheckCheck aria-hidden="true" className="size-4" />
           </button>

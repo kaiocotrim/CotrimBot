@@ -79,7 +79,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
   }
   const [query, setQuery] = useState("");
   const typingPreviews = useContactTypingPreviews(userId);
-  const [conversationFilter, setConversationFilter] = useState<ConversationFilter>("conversations");
+  const [conversationFilter, setConversationFilter] = useState<ConversationFilter>("mine");
   const [showArchived, setShowArchived] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [companyBrand, setCompanyBrand] = useState<{ name: string; logo: string | null } | null>(null);
@@ -712,6 +712,10 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
     return renderShell(
       <aside className={`relative flex h-full min-h-0 ${panelWidthClass} shrink-0 border-r border-white/[0.08]`}>
         <NotificationCenter
+          onBack={() => {
+            onMobileOpenChange(true);
+            setShowNotifications(false);
+          }}
           notifications={notifications}
           unreadCount={notificationUnreadCount}
           permission={notificationPermission}
@@ -725,16 +729,6 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
             }
           }}
         />
-        <button
-          type="button"
-          aria-label="Fechar notificações"
-          onClick={() => {
-            setShowNotifications(false);
-          }}
-          className="absolute top-3 right-3 flex size-10 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-white lg:hidden"
-        >
-          <X aria-hidden="true" className="size-5" />
-        </button>
       </aside>,
     );
   }
