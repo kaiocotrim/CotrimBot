@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useAnimate, useReducedMotion } from "framer-motion";
 import { Archive, ArchiveRestore, ArrowLeft, Bell, Building2, Camera, ChevronDown, Copy, MessageCircle, Mic, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Phone, Search, Sticker, UserRound, UserRoundPlus, Video, X } from "lucide-react";
 import { getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/min";
 import Image from "next/image";
@@ -60,6 +60,28 @@ function formatSidebarDate(value: string) {
   if (key === dayKeyFormatter.format(yesterday)) return "Ontem";
   if (today.getTime() - date.getTime() < 6 * 86_400_000) return weekdayFormatter.format(date);
   return dateFormatter.format(date);
+}
+
+function TabUnreadCount({ count }: { count: number }) {
+  const reduceMotion = useReducedMotion();
+  const [scope, animate] = useAnimate<HTMLSpanElement>();
+  const previousCount = useRef(count);
+
+  useEffect(() => {
+    const increased = count > previousCount.current;
+    previousCount.current = count;
+    if (!scope.current) return;
+    const pulse = increased && !reduceMotion;
+    const animation = animate(scope.current, {
+      scale: pulse ? [1, 1.25, 1] : 1,
+      y: pulse ? [0, -2, 0] : 0,
+    }, { duration: pulse ? 0.3 : 0, ease: "easeOut" });
+    return () => animation.stop();
+  }, [animate, count, reduceMotion, scope]);
+
+  if (count <= 0) return null;
+  const label = `${count} ${count === 1 ? "mensagem não lida" : "mensagens não lidas"}`;
+  return <span ref={scope} title={label} aria-label={label} className="ml-1 inline-flex min-w-3.5 shrink-0 items-center justify-center rounded-full bg-current/5 px-1 py-0.5 text-[9px] font-medium leading-none tabular-nums opacity-75">{count > 99 ? "99+" : count}</span>;
 }
 
 export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {}, loading, error, selectedContactId, onSelectContact, onLoadSavedContacts, onSaveContact, onArchiveContact, onPinContact, headerActions, mobileOpen, revealForSwipe, onMobileOpenChange, notifications, notificationUnreadCount, notificationPermission, onRequestNotificationPermission, onOpenNotification, onMarkAllNotificationsRead, onClearNotifications }: ContactSidebarProps) {
@@ -235,6 +257,20 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
       window.removeEventListener("keydown", closeConversationMenuWithKeyboard);
     };
   }, [conversationMenuContactId]);
+  const tabUnreadCounts = useMemo(() => {
+    const counts = { mine: 0, groups: 0, conversations: 0 };
+    for (const contact of contacts) {
+      if (contact.archived !== showArchived) continue;
+      const unread = Math.max(0, contact.unreadCount ?? 0);
+      if (contact.isGroup) counts.groups += unread;
+      else {
+        counts.conversations += unread;
+        if (contact.assignedUserIds?.includes(userId)) counts.mine += unread;
+      }
+    }
+    return counts;
+  }, [contacts, showArchived, userId]);
+
   const visibleContacts = useMemo(() => {
     const search = query.trim().toLocaleLowerCase("pt-BR");
     return contacts.filter((contact) => {
@@ -246,7 +282,12 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
       return contact.name.toLocaleLowerCase("pt-BR").includes(search)
         || contact.phone.includes(search)
         || Boolean(contact.messages?.[0]?.content.toLocaleLowerCase("pt-BR").includes(search));
-    }).sort(compareContactsByPriority);
+    }).sort((first, second) => {
+      if (conversationFilter !== "conversations") return compareContactsByPriority(first, second);
+      const firstMessageTime = Date.parse(first.messages?.[0]?.createdAt ?? "") || 0;
+      const secondMessageTime = Date.parse(second.messages?.[0]?.createdAt ?? "") || 0;
+      return secondMessageTime - firstMessageTime;
+    });
   }, [contacts, conversationFilter, drafts, query, selectedContactId, showArchived, userId]);
 
   const matchingCompanies = useMemo(() => {
@@ -1116,6 +1157,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
               className={`relative flex h-11 w-full items-center justify-center rounded-full border px-2 text-sm font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:h-8 lg:rounded-none lg:border-0 lg:text-[13px] ${conversationFilter === "mine" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
             >
               Minhas
+              <TabUnreadCount count={tabUnreadCounts.mine} />
               {conversationFilter === "mine" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 hidden h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)] lg:block" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
             </motion.button>
             <motion.button
@@ -1126,6 +1168,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
               className={`relative flex h-11 w-full items-center justify-center rounded-full border px-2 text-sm font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:h-8 lg:rounded-none lg:border-0 lg:text-[13px] ${conversationFilter === "groups" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
             >
               Grupos
+              <TabUnreadCount count={tabUnreadCounts.groups} />
               {conversationFilter === "groups" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 hidden h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)] lg:block" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
             </motion.button>
             <motion.button
@@ -1136,6 +1179,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
               className={`relative flex h-11 w-full items-center justify-center rounded-full border px-2 text-sm font-medium leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40 lg:h-8 lg:rounded-none lg:border-0 lg:text-[13px] ${conversationFilter === "conversations" ? "border-white/20 bg-zinc-700 text-zinc-100 lg:bg-transparent" : "border-white/10 bg-white/[0.035] text-zinc-400 hover:text-zinc-200 lg:bg-transparent lg:text-zinc-500 lg:hover:text-zinc-300"}`}
             >
               Conversas
+              <TabUnreadCount count={tabUnreadCounts.conversations} />
               {conversationFilter === "conversations" && <motion.span layoutId="conversation-filter-underline" aria-hidden="true" className="absolute inset-x-3 bottom-0 hidden h-px rounded-full bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.22)] lg:block" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 36, mass: 0.65 }} />}
             </motion.button>
           </div>
