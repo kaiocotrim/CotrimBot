@@ -2,20 +2,24 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import { motion, useReducedMotion } from "framer-motion";
-import { ShieldCheck, X } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { Camera, ShieldCheck, X } from "lucide-react";
+import { useRef, useState, type FormEvent } from "react";
 import { updateCompanyMemberProfile } from "@/lib/company-api";
+import { authClient } from "@/lib/auth-client";
+import { prepareAvatar } from "@/lib/avatar-image";
+import { CompanyMemberAvatar } from "./company-member-avatar";
 import { permissionLabels, type OrganizationMember } from "./company-types";
 
 const inputClass = "mt-2 min-h-10 w-full border-0 border-b border-white/10 bg-transparent px-0 text-sm text-zinc-100 outline-none placeholder:text-zinc-700 focus:border-white/30 disabled:opacity-50";
 const MotionDialogBackdrop = motion.create(Dialog.Backdrop);
 const MotionDialogPopup = motion.create(Dialog.Popup);
 
-export function CompanyMemberDialog({ organizationId, member, canEdit, canEditSignature, open, onOpenChange, onSaved }: {
+export function CompanyMemberDialog({ organizationId, member, canEdit, canEditSignature, canEditAvatar, open, onOpenChange, onSaved }: {
   organizationId: string;
   member: OrganizationMember | null;
   canEdit: boolean;
   canEditSignature: boolean;
+  canEditAvatar: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => Promise<void>;
@@ -25,6 +29,10 @@ export function CompanyMemberDialog({ organizationId, member, canEdit, canEditSi
   const [signature, setSignature] = useState(member?.signature ?? "");
   const [signatureEnabled, setSignatureEnabled] = useState(member?.signatureEnabled ?? false);
   const [saving, setSaving] = useState(false);
+  const [avatar, setAvatar] = useState(member?.user.image ?? null);
+  const [savedAvatar, setSavedAvatar] = useState(member?.user.image ?? null);
+  const [processingAvatar, setProcessingAvatar] = useState(false);
+  const avatarInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
 
@@ -32,11 +40,19 @@ export function CompanyMemberDialog({ organizationId, member, canEdit, canEditSi
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!member || (!canEdit && !canEditSignature) || saving) return;
+    if (!member || (!canEdit && !canEditSignature && !canEditAvatar) || saving || processingAvatar) return;
     setSaving(true);
     setError(null);
     try {
-      await updateCompanyMemberProfile(organizationId, member.id, { displayName: displayName.trim(), jobTitle: jobTitle.trim(), signature: signature.trim(), signatureEnabled });
+      if (canEditAvatar && avatar !== savedAvatar) {
+        const { error } = await authClient.updateUser({ image: avatar });
+        if (error) throw new Error("Não foi possível salvar sua foto. Tente novamente.");
+        setSavedAvatar(avatar);
+      }
+      if (displayName.trim() !== (member.displayName ?? "") || jobTitle.trim() !== (member.jobTitle ?? "")
+        || signature.trim() !== (member.signature ?? "") || signatureEnabled !== member.signatureEnabled) {
+        await updateCompanyMemberProfile(organizationId, member.id, { displayName: displayName.trim(), jobTitle: jobTitle.trim(), signature: signature.trim(), signatureEnabled });
+      }
       await onSaved();
       onOpenChange(false);
     } catch (saveError) {
@@ -57,6 +73,23 @@ export function CompanyMemberDialog({ organizationId, member, canEdit, canEditSi
 
         <form onSubmit={(event) => void save(event)} className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 space-y-9 overflow-y-auto px-6 py-7">
+          <section className="border-b border-white/[0.07] pb-8">
+            <h3 className="text-sm font-semibold">Foto de perfil</h3>
+            <div className="mt-4 flex flex-wrap items-center gap-4">
+              <CompanyMemberAvatar key={avatar} member={{ ...member, user: { ...member.user, image: avatar } }} />
+              {canEditAvatar && <>
+                <button type="button" disabled={saving || processingAvatar} onClick={() => avatarInput.current?.click()} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 px-4 text-xs text-zinc-300 transition-colors hover:bg-white/[0.06] disabled:opacity-50"><Camera size={15} />{processingAvatar ? "Processando…" : avatar ? "Trocar foto" : "Adicionar foto"}</button>
+                {avatar && <button type="button" disabled={saving || processingAvatar} onClick={() => setAvatar(null)} className="min-h-10 text-xs text-zinc-500 hover:text-zinc-200 disabled:opacity-50">Remover foto</button>}
+                <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Escolher foto de perfil" className="sr-only" disabled={saving || processingAvatar} onChange={event => {
+                  const file = event.target.files?.[0]; event.target.value = "";
+                  if (!file) return;
+                  setProcessingAvatar(true); setError(null);
+                  void prepareAvatar(file).then(setAvatar).catch(error => setError(error instanceof Error ? error.message : "Não foi possível abrir a foto.")).finally(() => setProcessingAvatar(false));
+                }} />
+              </>}
+            </div>
+            {canEditAvatar && <p className="mt-3 text-xs text-zinc-500">JPG, PNG ou WebP de até 5 MB. Salve as alterações para atualizar sua foto no sistema.</p>}
+          </section>
           <section className="border-b border-white/[0.07] pb-8">
             <h3 className="text-sm font-semibold">Informações</h3>
             <div className="mt-4 grid gap-5 sm:grid-cols-2">
@@ -88,7 +121,7 @@ export function CompanyMemberDialog({ organizationId, member, canEdit, canEditSi
 
           {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
           </div>
-          <footer className="flex shrink-0 justify-end gap-3 border-t border-white/[0.07] px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"><Dialog.Close className="px-3 py-2 text-sm text-zinc-500 hover:text-white">Fechar</Dialog.Close>{(canEdit || canEditSignature) && <button type="submit" disabled={saving} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black hover:bg-zinc-200 disabled:opacity-50">{saving ? "Salvando…" : "Salvar alterações"}</button>}</footer>
+          <footer className="flex shrink-0 justify-end gap-3 border-t border-white/[0.07] px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"><Dialog.Close className="px-3 py-2 text-sm text-zinc-500 hover:text-white">Fechar</Dialog.Close>{(canEdit || canEditSignature || canEditAvatar) && <button type="submit" disabled={saving || processingAvatar} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black hover:bg-zinc-200 disabled:opacity-50">{saving ? "Salvando…" : "Salvar alterações"}</button>}</footer>
         </form>
       </MotionDialogPopup>
     </Dialog.Portal>
