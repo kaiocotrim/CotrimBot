@@ -4,8 +4,8 @@ import { Dialog } from "@base-ui/react/dialog";
 import { motion, useReducedMotion } from "framer-motion";
 import { Camera, ShieldCheck, X } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
-import { updateCompanyMemberProfile } from "@/lib/company-api";
-import { authClient } from "@/lib/auth-client";
+import { updateCompanyMemberAvatar, updateCompanyMemberProfile } from "@/lib/company-api";
+import { authClient, useSession } from "@/lib/auth-client";
 import { prepareAvatar } from "@/lib/avatar-image";
 import { CompanyMemberAvatar } from "./company-member-avatar";
 import { permissionLabels, type OrganizationMember } from "./company-types";
@@ -24,6 +24,7 @@ export function CompanyMemberDialog({ organizationId, member, canEdit, canEditSi
   onOpenChange: (open: boolean) => void;
   onSaved: () => Promise<void>;
 }) {
+  const { data: session } = useSession();
   const [displayName, setDisplayName] = useState(member?.displayName ?? "");
   const [jobTitle, setJobTitle] = useState(member?.jobTitle ?? "");
   const [signature, setSignature] = useState(member?.signature ?? "");
@@ -45,8 +46,12 @@ export function CompanyMemberDialog({ organizationId, member, canEdit, canEditSi
     setError(null);
     try {
       if (canEditAvatar && avatar !== savedAvatar) {
-        const { error } = await authClient.updateUser({ image: avatar });
-        if (error) throw new Error("Não foi possível salvar sua foto. Tente novamente.");
+        if (member.userId === session?.user.id) {
+          const { error } = await authClient.updateUser({ image: avatar });
+          if (error) throw new Error("Não foi possível salvar a foto. Tente novamente.");
+        } else {
+          await updateCompanyMemberAvatar(organizationId, member.id, avatar);
+        }
         setSavedAvatar(avatar);
       }
       if (displayName.trim() !== (member.displayName ?? "") || jobTitle.trim() !== (member.jobTitle ?? "")
@@ -88,7 +93,7 @@ export function CompanyMemberDialog({ organizationId, member, canEdit, canEditSi
                 }} />
               </>}
             </div>
-            {canEditAvatar && <p className="mt-3 text-xs text-zinc-500">JPG, PNG ou WebP de até 5 MB. Salve as alterações para atualizar sua foto no sistema.</p>}
+            {canEditAvatar && <p className="mt-3 text-xs text-zinc-500">JPG, PNG ou WebP de até 5 MB. Salve as alterações para atualizar a foto deste membro no sistema.</p>}
           </section>
           <section className="border-b border-white/[0.07] pb-8">
             <h3 className="text-sm font-semibold">Informações</h3>

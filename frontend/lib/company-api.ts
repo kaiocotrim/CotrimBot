@@ -47,3 +47,7 @@ export function deleteCompanyGroup(organizationId: string, groupId: string): Pro
 export function updateCompanyMemberProfile(organizationId: string, memberId: string, input: MemberProfileInput): Promise<{ success: true }> {
   return apiRequest(`${organizationPath(organizationId)}/members/${encodeURIComponent(memberId)}/profile`, { method: "PATCH", body: JSON.stringify(input) });
 }
+
+export function updateCompanyMemberAvatar(organizationId: string, memberId: string, image: string | null): Promise<{ success: true }> {
+  return apiRequest(`${organizationPath(organizationId)}/members/${encodeURIComponent(memberId)}/avatar`, { method: "PATCH", body: JSON.stringify({ image }) });
+}

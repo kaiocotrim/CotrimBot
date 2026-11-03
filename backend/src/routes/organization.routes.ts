@@ -427,6 +427,29 @@ organizationRouter.delete("/organizations/:organizationId/groups/:groupId", asyn
   }
 });
 
+organizationRouter.patch("/organizations/:organizationId/members/:memberId/avatar", async (request, response) => {
+  const { organizationId, memberId } = request.params;
+  const userId = request.user?.id;
+  if (!userId) return response.status(401).json({ error: "Não autenticado." });
+  const image: unknown = request.body?.image;
+  if (image !== null && (typeof image !== "string" || image.length > 56_000
+    || !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(image))) {
+    return response.status(400).json({ error: "Envie uma foto JPG, PNG ou WebP válida." });
+  }
+  try {
+    // Qualquer membro pode editar avatares dentro da própria empresa.
+    const requester = await prisma.member.findUnique({ where: { organizationId_userId: { organizationId, userId } }, select: { id: true } });
+    if (!requester) return response.status(403).json({ error: "Você não pertence a esta empresa." });
+    const target = await prisma.member.findFirst({ where: { id: memberId, organizationId }, select: { userId: true } });
+    if (!target) return response.status(404).json({ error: "Membro não encontrado nesta empresa." });
+    await prisma.user.update({ where: { id: target.userId }, data: { image: image as string | null }, select: { id: true } });
+    return response.json({ success: true });
+  } catch (error) {
+    console.error("Falha ao atualizar avatar do membro:", error);
+    return response.status(500).json({ error: "Não foi possível atualizar a foto do membro." });
+  }
+});
+
 organizationRouter.patch("/organizations/:organizationId/members/:memberId/profile", async (request, response) => {
   const { organizationId, memberId } = request.params;
   const userId = request.user?.id;

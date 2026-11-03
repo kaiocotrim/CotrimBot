@@ -517,7 +517,7 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
                   <span className="mt-1.5 block truncate text-xs text-zinc-400">{member.groups.length ? member.groups.map((group) => group.name).join(" • ") : member.jobTitle || "Sem grupo"}</span>
                 </span>
               </button>
-              {member.userId === currentUserId && <button type="button" aria-label="Trocar minha foto de perfil" onClick={() => openMember(member)} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-white/10 px-3 text-xs text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"><Camera size={15} /><span className="hidden sm:inline">Trocar foto</span></button>}
+              <button type="button" aria-label={`Trocar foto de ${member.displayName || member.user.name}`} onClick={() => openMember(member)} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-white/10 px-3 text-xs text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"><Camera size={15} /><span className="hidden sm:inline">Trocar foto</span></button>
               {canManage && member.role !== "owner" ? (
                 <details className="relative shrink-0">
                   <summary aria-label={`Ações de ${member.user.name}`} className="flex size-9 cursor-pointer list-none items-center justify-center rounded-lg text-zinc-600 transition-colors hover:bg-white/[0.06] hover:text-zinc-200 [&::-webkit-details-marker]:hidden"><MoreHorizontal size={18} /></summary>
@@ -622,7 +622,7 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
         </Dialog.Portal>
       </Dialog.Root>}
       {groupDialogOpen && <CompanyGroupDialog organizationId={organization.id} group={selectedGroup} members={members} open onOpenChange={setGroupDialogOpen} onSaved={loadOrganization} />}
-      {memberDialogOpen && selectedMember && <CompanyMemberDialog organizationId={organization.id} member={selectedMember} open onOpenChange={setMemberDialogOpen} onSaved={loadOrganization} canEditAvatar={selectedMember.userId === currentUserId} canEdit={selectedMember.userId === currentUserId || Boolean(canEditMembers && (selectedMember.role !== "owner" || currentMembership?.role === "owner"))} canEditSignature={Boolean(canManage && (selectedMember.role !== "owner" || currentMembership?.role === "owner"))} />}
+      {memberDialogOpen && selectedMember && <CompanyMemberDialog organizationId={organization.id} member={selectedMember} open onOpenChange={setMemberDialogOpen} onSaved={loadOrganization} canEditAvatar canEdit={selectedMember.userId === currentUserId || Boolean(canEditMembers && (selectedMember.role !== "owner" || currentMembership?.role === "owner"))} canEditSignature={Boolean(canManage && (selectedMember.role !== "owner" || currentMembership?.role === "owner"))} />}
     </div>
   );
 }
