@@ -12,6 +12,7 @@ import {
 } from "@/lib/notification-api";
 import { isNotificationSoundEnabled, playNotificationSound } from "@/lib/notification-sound";
 import { ensurePushSubscription } from "@/lib/pwa";
+import { useCompanyNotificationIcon } from "@/hooks/use-company-notification-icon";
 
 type Options = {
   selectedContactId?: number;
@@ -25,6 +26,7 @@ export function readNotificationPermission(): NotificationPermission | "unsuppor
 }
 
 export function useNotifications({ selectedContactId, onOpenContact, onOpenInternalConversation }: Options) {
+  const notificationIcon = useCompanyNotificationIcon();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(readNotificationPermission);
@@ -89,7 +91,7 @@ export function useNotifications({ selectedContactId, onOpenContact, onOpenInter
         const desktopNotification = new window.Notification(notification.title, {
           body: notification.body,
           tag: `cotrimbot-${notification.id}`,
-          icon: "/favicon.ico",
+          icon: notificationIcon,
         });
         desktopNotification.onclick = () => {
           window.focus();
@@ -122,7 +124,7 @@ export function useNotifications({ selectedContactId, onOpenContact, onOpenInter
       socket.off("notifications_read", handleNotificationsRead);
       socket.off("notifications_read_all", handleAllNotificationsRead);
     };
-  }, [markRead]);
+  }, [markRead, notificationIcon]);
 
   // Cliques em notificações push (service worker) com o app já aberto abrem a conversa.
   useEffect(() => {

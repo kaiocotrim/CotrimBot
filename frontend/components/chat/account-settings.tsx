@@ -18,6 +18,7 @@ import { SdkSettings } from "@/components/chat/sdk-settings";
 import { authClient } from "@/lib/auth-client";
 import { checkLocalTranscription, isLocalTranscriptionEnabled, setLocalTranscriptionEnabled } from "@/lib/local-transcription";
 import { readNotificationPermission } from "@/hooks/use-notifications";
+import { useCompanyNotificationIcon } from "@/hooks/use-company-notification-icon";
 import { usePushSubscription } from "@/hooks/use-push-subscription";
 import {
   getNotificationSoundPath,
@@ -1099,6 +1100,7 @@ function ClientSettings() {
 }
 
 function NotificationSettings() {
+  const notificationIcon = useCompanyNotificationIcon();
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(readNotificationPermission);
   const [soundEnabled, setSoundEnabled] = useState(isNotificationSoundEnabled);
   const [soundPath, setSoundPath] = useState(getNotificationSoundPath);
@@ -1130,7 +1132,7 @@ function NotificationSettings() {
   }
 
   function sendTest() {
-    new window.Notification("CotrimBot", { body: "As notificações do sistema estão funcionando.", icon: "/favicon.ico" });
+    new window.Notification("CotrimBot", { body: "As notificações do sistema estão funcionando.", icon: notificationIcon });
     if (soundEnabled) playNotificationSound();
   }
 

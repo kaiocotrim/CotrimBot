@@ -1,8 +1,9 @@
 // Service worker do CotrimBot: cache básico para uso offline e notificações push.
 // Ao alterar a lista de arquivos ou a estratégia de cache, incremente a versão.
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const STATIC_CACHE = `cotrimbot-static-${CACHE_VERSION}`;
 const PAGES_CACHE = `cotrimbot-pages-${CACHE_VERSION}`;
+const NOTIFICATION_BRAND_CACHE = "cotrimbot-notification-brand";
 
 // Casca mínima do app, disponível mesmo sem rede.
 const PRECACHE_URLS = [
@@ -29,7 +30,7 @@ self.addEventListener("activate", (event) => {
     caches.keys()
       .then((keys) => Promise.all(
         keys
-          .filter((key) => key.startsWith("cotrimbot-") && key !== STATIC_CACHE && key !== PAGES_CACHE)
+          .filter((key) => key.startsWith("cotrimbot-") && key !== STATIC_CACHE && key !== PAGES_CACHE && key !== NOTIFICATION_BRAND_CACHE)
           .map((key) => caches.delete(key)),
       ))
       .then(() => self.clients.claim()),
@@ -125,9 +126,17 @@ self.addEventListener("push", (event) => {
     const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     if (windows.some((client) => client.focused)) return;
 
+    let icon = "/icons/icon-192x192.png";
+    try {
+      const cache = await caches.open(NOTIFICATION_BRAND_CACHE);
+      const brand = await cache.match("/notification-brand");
+      const saved = brand ? await brand.json() : null;
+      if (typeof saved?.icon === "string" && saved.icon) icon = saved.icon;
+    } catch { /* Sem cache disponível, mantém o ícone padrão. */ }
+
     await self.registration.showNotification(title, {
       body: payload.body || "",
-      icon: "/icons/icon-192x192.png",
+      icon,
       badge: "/icons/badge-96x96.png",
       // Mesma tag usada pelas notificações do navegador em use-notifications.ts.
       tag: data.id ? `cotrimbot-${data.id}` : undefined,

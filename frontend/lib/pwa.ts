@@ -3,6 +3,14 @@ import { getPushPublicKey, subscribeToPush, unsubscribeFromPush } from "@/lib/pu
 // Em desenvolvimento o service worker atrapalharia o recarregamento do Next com o cache.
 export const PWA_ENABLED = process.env.NODE_ENV === "production";
 
+// Compartilhado com sw.js para os avisos recebidos com o app fechado.
+const NOTIFICATION_BRAND_CACHE = "cotrimbot-notification-brand";
+export async function cacheNotificationIcon(icon: string) {
+  if (!PWA_ENABLED || !("caches" in window)) return;
+  const cache = await caches.open(NOTIFICATION_BRAND_CACHE);
+  await cache.put("/notification-brand", new Response(JSON.stringify({ icon }), { headers: { "Content-Type": "application/json" } }));
+}
+
 export function isServiceWorkerSupported() {
   return typeof window !== "undefined" && "serviceWorker" in navigator;
 }
@@ -46,6 +54,7 @@ export async function ensurePushSubscription() {
 
 // Usado ao sair da conta: este dispositivo deixa de receber push do usuário atual.
 export async function removePushSubscription() {
+  if ("caches" in window) await caches.delete(NOTIFICATION_BRAND_CACHE).catch(() => false);
   if (!isPushSupported()) return;
   const registration = await navigator.serviceWorker.getRegistration();
   const subscription = await registration?.pushManager.getSubscription();

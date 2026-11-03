@@ -26,8 +26,10 @@ export function getCompanyWorkspace(organizationId: string): Promise<CompanyWork
   return apiRequest(`${organizationPath(organizationId)}/workspace`);
 }
 
-export function updateCompanyLogo(organizationId: string, logo: string | null): Promise<{ logo: string | null }> {
-  return apiRequest(`${organizationPath(organizationId)}/profile`, { method: "PATCH", body: JSON.stringify({ logo }) });
+export async function updateCompanyLogo(organizationId: string, logo: string | null): Promise<{ logo: string | null }> {
+  const result = await apiRequest<{ logo: string | null }>(`${organizationPath(organizationId)}/profile`, { method: "PATCH", body: JSON.stringify({ logo }) });
+  window.dispatchEvent(new Event("cotrimbot:company-logo-updated"));
+  return result;
 }
 
 export function createCompanyGroup(organizationId: string, input: GroupInput): Promise<{ id: string }> {
