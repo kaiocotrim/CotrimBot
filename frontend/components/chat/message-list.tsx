@@ -251,7 +251,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
           data-message-list-content
           className="flex min-h-full flex-col gap-1 px-2 sm:px-5 lg:gap-2"
           style={{
-            paddingTop: `var(--chat-message-top-space, calc(var(--chat-header-height, 64px) + env(safe-area-inset-top) + ${hasPinnedMessage ? "56px" : "var(--chat-message-top-gap, 0px)"}))`,
+            paddingTop: `var(--chat-message-top-space, calc(var(--chat-header-height, 64px) + env(safe-area-inset-top) + var(--chat-message-top-gap, 80px) + ${hasPinnedMessage ? "56px" : "0px"}))`,
             paddingBottom: "var(--chat-message-bottom-space, max(7rem, calc(var(--chat-composer-height, 0px) + 0.75rem)))",
           }}
         >
