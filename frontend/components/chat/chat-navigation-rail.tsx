@@ -28,6 +28,28 @@ const sections = [
   { id: "archived", label: "Arquivadas", icon: Archive },
 ] as const;
 
+function UnreadBadge({ count }: { count: number }) {
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <AnimatePresence>
+      {count > 0 && (
+        <motion.span
+          key={count}
+          aria-hidden="true"
+          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.55, y: 4 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.65, y: -4, transition: { duration: 0.12 } }}
+          transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 28, mass: 0.65 }}
+          className="absolute -top-0.5 -right-1 flex size-5 min-w-5 items-center justify-center rounded-full border border-[#09090b] bg-zinc-300 px-1 text-[10px] font-semibold leading-none text-zinc-950"
+        >
+          {count > 99 ? "99+" : count}
+        </motion.span>
+      )}
+    </AnimatePresence>
+  );
+}
+
 export function ChatNavigationRail({
   activeSection,
   unreadCount,
@@ -81,16 +103,8 @@ export function ChatNavigationRail({
               />
             )}
             <Icon aria-hidden="true" className="relative size-5" strokeWidth={1.8} />
-            {id === "conversations" && unreadCount > 0 && (
-              <span aria-hidden="true" className="absolute -top-0.5 -right-1 flex size-5 min-w-5 items-center justify-center rounded-full border border-[#09090b] bg-zinc-300 px-1 text-[10px] font-semibold leading-none text-zinc-950">
-                {unreadCount > 99 ? "99+" : unreadCount}
-              </span>
-            )}
-            {id === "notifications" && notificationUnreadCount > 0 && (
-              <span aria-hidden="true" className="absolute -top-0.5 -right-1 flex size-5 min-w-5 items-center justify-center rounded-full border border-[#09090b] bg-zinc-300 px-1 text-[10px] font-semibold leading-none text-zinc-950">
-                {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
-              </span>
-            )}
+            {id === "conversations" && <UnreadBadge count={unreadCount} />}
+            {id === "notifications" && <UnreadBadge count={notificationUnreadCount} />}
           </motion.button>
         ))}
         <button
