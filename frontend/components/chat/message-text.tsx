@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useContext } from "react";
+import { Fragment, useContext, type ReactNode } from "react";
 import { EmojiText } from "@/components/chat/emoji-text";
 import { GroupMentionContext } from "@/components/chat/group-mention-context";
 import { splitMessageSignatures } from "@/lib/message-signature";
@@ -43,11 +43,7 @@ function trimUrlPunctuation(value: string) {
   return url;
 }
 
-// O prefixo continua salvo e é enviado ao WhatsApp, mas no CotrimBot a foto do
-// atendente identifica a autoria. Por isso, mensagens de saída exibem só o corpo.
-export function MessageText({ content, showSignature = false, linkify = true }: { content: string; showSignature?: boolean; linkify?: boolean }) {
-  const signed = showSignature ? splitMessageSignatures(content) : null;
-  const body = signed?.body ?? content;
+function LinkedText({ content: body, linkify }: { content: string; linkify: boolean }) {
   const parts = [];
   let offset = 0;
 
@@ -78,4 +74,40 @@ export function MessageText({ content, showSignature = false, linkify = true }: 
   }
 
   return <>{parts}<MentionText content={body.slice(offset)} /></>;
+}
+
+// Code takes precedence and stays literal. Word boundaries keep identifiers such
+// as customer_name intact; URLs are consumed before their internal punctuation.
+const FORMAT_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"'`]+|```([\s\S]+?)```|(?<!`)`([^`\n]+)`(?!`)|(?<![\p{L}\p{N}_])([*_~])(?=\S)([^\n]*?\S)\3(?![\p{L}\p{N}_])/gu;
+
+function FormattedText({ content, linkify, depth = 0 }: { content: string; linkify: boolean; depth?: number }): ReactNode {
+  if (depth >= 16) return <LinkedText content={content} linkify={linkify} />;
+  const parts: ReactNode[] = [];
+  let offset = 0;
+
+  for (const match of content.matchAll(FORMAT_PATTERN)) {
+    parts.push(<LinkedText key={`text-${match.index}`} content={content.slice(offset, match.index)} linkify={linkify} />);
+    let formatted: ReactNode;
+    if (match[1] !== undefined || match[2] !== undefined) {
+      formatted = <code className="font-mono whitespace-pre-wrap [overflow-wrap:anywhere]">{match[1] ?? match[2]}</code>;
+    } else if (match[3]) {
+      const children = <FormattedText content={match[4]} linkify={linkify} depth={depth + 1} />;
+      formatted = match[3] === "*" ? <strong className="font-bold">{children}</strong>
+        : match[3] === "_" ? <em className="italic">{children}</em>
+          : <del className="line-through">{children}</del>;
+    } else {
+      formatted = <LinkedText content={match[0]} linkify={linkify} />;
+    }
+    parts.push(<Fragment key={`format-${match.index}`}>{formatted}</Fragment>);
+    offset = match.index + match[0].length;
+  }
+
+  return <>{parts}<LinkedText content={content.slice(offset)} linkify={linkify} /></>;
+}
+
+// O prefixo continua salvo e é enviado ao WhatsApp, mas no CotrimBot a foto do
+// atendente identifica a autoria. Por isso, mensagens de saída exibem só o corpo.
+export function MessageText({ content, showSignature = false, linkify = true }: { content: string; showSignature?: boolean; linkify?: boolean }) {
+  const signed = showSignature ? splitMessageSignatures(content) : null;
+  return <FormattedText content={signed?.body ?? content} linkify={linkify} />;
 }
