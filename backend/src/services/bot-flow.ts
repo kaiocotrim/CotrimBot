@@ -3,7 +3,7 @@ import { validateBotIntegrations, type BotIntegrations } from './bot-integration
 
 export type BotOption = { id: string; number: string; label: string; description?: string; active: boolean; action: "MESSAGE" | "SUBMENU" | "HUMAN" | "IMAGE" | "CLOSE" | "SAC_TEST"; response: string; targetMenuId: string; imageId?: string };
 export type BotMenu = { id: string; name: string; text: string; options: BotOption[]; imageId?: string };
-export type BotFlow = { rootMenuId: string; invalidMessage: string; backLabel: string; menus: BotMenu[]; integrations?: BotIntegrations; layout?: Record<string, { x: number; y: number }> };
+export type BotFlow = { rootMenuId: string; invalidMessage: string; backLabel: string; assignedUserId?: string; menus: BotMenu[]; integrations?: BotIntegrations; layout?: Record<string, { x: number; y: number }> };
 export type BotState = { menuId: string; stack: string[]; status: "BOT_ACTIVE" | "WAITING_HUMAN" | "HUMAN_ACTIVE" | "CLOSED"; sacTest?: SacTestState };
 export type BotReply = { state: BotState; text: string; imageId?: string; sacTestSubmission?: SacTestSubmission };
 
@@ -15,6 +15,7 @@ export function validateFlow(value: unknown, publish = false): asserts value is 
   const fail = (message: string): never => { throw new Error(message); };
   if (!value || typeof value !== "object") fail("Fluxo inválido.");
   const f = value as BotFlow;
+  if (f.assignedUserId !== undefined && (typeof f.assignedUserId !== "string" || f.assignedUserId.length > 191)) fail("Membro atribuído inválido.");
   if (f.integrations !== undefined) validateBotIntegrations(f.integrations);
   const string = (v: unknown, max: number) => typeof v === "string" && v.length <= max;
   const image = (v: unknown) => v === undefined || (typeof v === "string" && (v === "" || /^[a-zA-Z0-9_-]{1,80}$/.test(v)));

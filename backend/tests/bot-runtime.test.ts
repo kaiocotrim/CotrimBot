@@ -19,7 +19,7 @@ function harness() {
     message: { findUnique: async () => state.message, upsert: async ({ create }: any) => { state.outgoing.push(create); return { id: 100, ...create }; } },
     messageMedia: { upsert: async ({ create }: any) => { state.cachedMedia.push(create); } },
     member: { findMany: async () => state.members },
-    bot: { findFirst: async ({ where }: any) => where.organizationId === "company-a" ? { id: "bot-a", organizationId: "company-a", published: flow, publishedRevision: state.publishedRevision } : null },
+    bot: { findFirst: async ({ where }: any) => (where.OR ? where.OR.some((filter: any) => filter.organizationId === "company-a" && filter.published.equals === flow.assignedUserId) : where.organizationId === "company-a") ? { id: "bot-a", organizationId: "company-a", published: flow, publishedRevision: state.publishedRevision } : null },
     sacTestCompany: { findMany: async () => structuredClone(SAC_TEST_CATALOG) },
     sacTestTicket: { upsert: async ({ where, create }: any) => {
       if (state.failTicketSave) throw new Error('database unavailable');
@@ -49,6 +49,33 @@ function harness() {
 }
 
 process.env.EVOLUTION_INSTANCE = "test-instance";
+
+test("an explicitly selected member runs the bot without the Inforbot name", async () => {
+  const { state, process, flow } = harness();
+  flow.assignedUserId = "tech-id";
+  state.members = [{ userId: "tech-id", organizationId: "company-a", displayName: "Técnico", user: { name: "Kaio" } }];
+  state.contact.assignments = [{ userId: "tech-id" }];
+  await process(1, "test-instance");
+  assert.equal(state.sent.length, 1);
+  state.message = { ...state.message, id: 2, content: "1" };
+  await process(2, "test-instance");
+  assert.match(state.sent[1]!, /sac.infordoc.com.br/);
+});
+
+test("an explicit assignment never falls back to another member or organization", async () => {
+  for (const assignedUserId of ["other-member", ""]) {
+    const { state, process, flow } = harness();
+    flow.assignedUserId = assignedUserId;
+    await process(1, "test-instance");
+    assert.equal(state.sent.length, 0);
+  }
+  const { state, process, flow } = harness();
+  flow.assignedUserId = "tech-id";
+  state.members = [{ userId: "tech-id", organizationId: "other-company", displayName: "Técnico", user: { name: "Kaio" } }];
+  state.contact.assignments = [{ userId: "tech-id" }];
+  await process(1, "test-instance");
+  assert.equal(state.sent.length, 0);
+});
 
 test("runtime persists and emits replies, handles simultaneous duplicates and sends the configured option", async () => {
   const { state, process } = harness();

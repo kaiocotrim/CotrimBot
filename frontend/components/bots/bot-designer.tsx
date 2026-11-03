@@ -270,7 +270,7 @@ export default function BotDesigner() {
     const saved = await save();
     const published = await botRequest<Bot>(`/${saved.id}/publish`, { revision: saved.revision });
     setList(previous => ({ ...previous, bots: previous.bots.map(item => item.id === published.id ? published : item) }));
-    setNotice("Bot publicado e disponível para o Inforbot.");
+    setNotice("Bot publicado e disponível para o membro selecionado.");
   }
   async function simulate(nextInputs: string[], startMenuId = testStartMenuId) {
     const result = await botRequest<Simulation>("/simulate", { flow, inputs: nextInputs, ...(startMenuId ? { startMenuId } : {}) });
@@ -378,7 +378,7 @@ export default function BotDesigner() {
         <motion.section {...entrance} transition={{ ...entrance.transition, delay: reduceMotion ? 0 : 0.05 }} className={`${styles.panel} ${styles.menuList}`} aria-label="Menus do fluxo"><button className={styles.paletteHeading} aria-expanded={showMenus} aria-controls={`${tabHighlightId}-menus`} onClick={() => changeSidebarCard("menus", !showMenus)}><h2>Menus do fluxo</h2><motion.span className={styles.disclosureChevron} animate={{ rotate: showMenus ? 0 : -90 }} transition={{ duration: reduceMotion ? 0 : .25 }}><ChevronDown size={14} /></motion.span></button><BotDisclosure open={showMenus} id={`${tabHighlightId}-menus`}><MenuTree flow={flow} currentMenuId={menuId} paths={paths} onPreview={setPreviewMenuId} onRename={id => setNamingMenu({ mode: "rename", id })} /></BotDisclosure></motion.section>
       </aside>}
 
-      {tab === 'integrations' ? <BotIntegrationsPanel key={selected ?? "new"} botName={name} value={flow.integrations} onChange={integrations => change({ ...flow, integrations })} onSave={async integrations => { setBusy(true); try { await save({ ...flow, integrations }); } finally { setBusy(false); } }} /> : tab === "settings" ? <BotSettingsPanel name={name} flow={flow} dirty={dirty} busy={busy} hasBot={Boolean(bot)} active={Boolean(bot && list.activeBotId === bot.id)} canActivate={Boolean(bot?.published && list.instanceAvailable)} instanceAvailable={list.instanceAvailable}
+      {tab === 'integrations' ? <BotIntegrationsPanel key={selected ?? "new"} botName={name} value={flow.integrations} onChange={integrations => change({ ...flow, integrations })} onSave={async integrations => { setBusy(true); try { await save({ ...flow, integrations }); } finally { setBusy(false); } }} /> : tab === "settings" ? <BotSettingsPanel name={name} flow={flow} members={list.members ?? []} dirty={dirty} busy={busy} hasBot={Boolean(bot)} active={Boolean(bot && list.activeBotId === bot.id)} canActivate={Boolean(bot?.published && list.instanceAvailable)} instanceAvailable={list.instanceAvailable}
         onNameChange={value => { setName(value); setDirty(true); }} onChange={change}
         onSave={() => void work(async () => { await save(); })}
         onActivate={() => { if (bot) void work(async () => { await botRequest(`/${bot.id}/activation`, { active: list.activeBotId !== bot.id }); setList(await botRequest<BotList>()); setNotice("Status atualizado."); }); }}

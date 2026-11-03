@@ -19,6 +19,11 @@ async function validateImages(flow: Parameters<typeof botImageIds>[0], organizat
   const images = await prisma.botImage.findMany({ where: { id: { in: ids }, organizationId }, select: { id: true } });
   if (images.length !== ids.length) throw new Error("Uma imagem não foi encontrada nesta empresa. Envie a foto novamente.");
 }
+async function validateAssignedMember(flow: { assignedUserId?: string }, organizationId: string) {
+  if (flow.assignedUserId && !await prisma.member.findUnique({ where: { organizationId_userId: { organizationId, userId: flow.assignedUserId } }, select: { id: true } })) {
+    throw new Error("O membro selecionado não pertence a esta empresa.");
+  }
+}
 async function resolveBotOrganization(request: Request, botId: string) {
   const bot = await prisma.bot.findUnique({ where: { id: botId }, select: { organizationId: true } });
   if (!bot) return null;
@@ -72,7 +77,9 @@ botRouter.get("/bots/images/:imageId", async (req, res) => {
 botRouter.get("/bots", async (req, res) => {
   const instance = process.env.EVOLUTION_INSTANCE;
   const binding = instance ? await prisma.botInstance.findUnique({ where: { instance } }) : null;
+  const members = await prisma.member.findMany({ where: { organizationId: req.activeOrganizationId! }, select: { userId: true, displayName: true, user: { select: { name: true } } } });
   res.json({ bots: await prisma.bot.findMany({ where: { organizationId: req.activeOrganizationId! }, orderBy: { createdAt: "desc" } }),
+    members: members.map(member => ({ userId: member.userId, name: member.displayName?.trim() || member.user.name })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
     activeBotId: binding && binding.organizationId === req.activeOrganizationId ? binding.activeBotId : null,
     instanceAvailable: Boolean(instance && (!binding || binding.organizationId === req.activeOrganizationId)) });
 });
@@ -80,6 +87,7 @@ botRouter.get("/bots", async (req, res) => {
 botRouter.post("/bots", async (req, res) => {
   try {
     validateFlow(req.body?.draft);
+    await validateAssignedMember(req.body.draft, req.activeOrganizationId!);
     await validateImages(req.body.draft, req.activeOrganizationId!);
     const name = req.body?.name;
     if (typeof name !== "string" || !name.trim() || name.length > 100) throw new Error("Informe um nome de até 100 caracteres.");
@@ -102,6 +110,7 @@ botRouter.put("/bots/:id", async (req, res) => {
     const organizationId = req.activeOrganizationId || await resolveBotOrganization(req, String(req.params.id));
     if (!organizationId) return res.status(403).json({ message: "Você não tem permissão para editar este bot." });
     await validateImages(req.body.draft, organizationId);
+    await validateAssignedMember(req.body.draft, organizationId);
     const result = await prisma.bot.updateMany({ where: { id: String(req.params.id), organizationId, revision }, data: { name: name.trim(), draft: json(req.body.draft), revision: { increment: 1 } } });
     if (!result.count) return res.status(409).json({ message: "Bot alterado por outra sessão ou indisponível. Recarregue a página." });
     res.json(await prisma.bot.findUnique({ where: { id: String(req.params.id) } }));
@@ -116,6 +125,7 @@ botRouter.post("/bots/:id/publish", async (req, res) => {
     const bot = await prisma.bot.findFirst({ where: { id: String(req.params.id), organizationId } });
     if (!bot) return res.status(404).json({ message: "Bot não encontrado." });
     validateFlow(bot.draft, true);
+    await validateAssignedMember(bot.draft, organizationId);
     await validateImages(bot.draft, organizationId);
     const result = await prisma.bot.updateMany({ where: { id: bot.id, revision: req.body.revision }, data: { published: json(bot.draft), revision: { increment: 1 }, publishedRevision: { increment: 1 } } });
     if (!result.count) return res.status(409).json({ message: "Rascunho alterado. Recarregue antes de publicar." });

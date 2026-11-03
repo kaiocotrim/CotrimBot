@@ -30,22 +30,29 @@ return async function processBotMessage(messageId: number, instance: unknown) {
             select: { userId: true, organizationId: true, displayName: true, user: { select: { name: true } } },
           })
         : [];
-      const inforbotMember = assignedMembers.find(member =>
+      let bot = assignedMembers.length ? await tx.bot.findFirst({
+        where: { OR: assignedMembers.map(member => ({ organizationId: member.organizationId, published: { path: "$.assignedUserId", equals: member.userId } })) },
+        orderBy: [{ publishedRevision: "desc" }, { id: "asc" }],
+      }) : null;
+      const configuredMember = bot && assignedMembers.find(member => member.organizationId === bot!.organizationId && member.userId === (bot!.published as unknown as BotFlow)?.assignedUserId);
+      const inforbotMember = configuredMember || assignedMembers.find(member =>
         isInforbotName(member.user.name) || isInforbotName(member.displayName)
       );
       if (!inforbotMember) return;
-      const bot = await tx.bot.findFirst({
+      bot ??= await tx.bot.findFirst({
         where: { organizationId: inforbotMember.organizationId, published: { not: Prisma.JsonNull } },
         orderBy: [{ publishedRevision: "desc" }, { id: "asc" }],
       });
       if (!bot?.published) return;
+      // Explicit assignments replace the legacy account-name convention.
+      if (!configuredMember && (bot.published as unknown as BotFlow).assignedUserId !== undefined) return;
       activeBotId = bot.id;
       if (await tx.botExecutionLog.findUnique({ where: { messageId } })) return;
       const savedSession = await tx.botSession.findUnique({ where: { instance_contactId: { instance: runtimeInstance, contactId: contact.id } } });
       const assignment = contact.assignments.find(item => item.userId === inforbotMember.userId);
       // A return to Inforbot starts a new service, including sessions left paused
       // by an older worker before assignment changes cleared the session.
-      const previous = savedSession && assignment && assignment.assignedAt > savedSession.updatedAt ? null : savedSession;
+      const previous = savedSession && ((savedSession.botId && savedSession.botId !== bot.id) || (assignment && assignment.assignedAt > savedSession.updatedAt)) ? null : savedSession;
       if (previous && ["WAITING_HUMAN", "HUMAN_ACTIVE", "CLOSED"].includes(previous.status)) return;
       // Any incoming message can start service; menu choices require text.
       if (previous && input.type !== "TEXT" && !(previous.state as unknown as BotState)?.sacTest) return;

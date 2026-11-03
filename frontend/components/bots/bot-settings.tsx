@@ -3,7 +3,8 @@
 import { useId, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BookOpen, ChevronDown, LoaderCircle, Power, Save, Settings2 } from "lucide-react";
-import type { BotFlow } from "@/lib/bot-api";
+import type { BotFlow, BotMember } from "@/lib/bot-api";
+import { BotSelect } from "./bot-select";
 import styles from "./bot-settings.module.css";
 
 const guide = [
@@ -12,9 +13,10 @@ const guide = [
   { title: "Como ativar o atendimento?", text: "Depois de publicar, clique em Ativar para usar este bot na instância conectada à empresa. Só um bot pode estar ativo por instância. Para pausar a automação, use Desativar." },
 ] as const;
 
-export function BotSettingsPanel({ name, flow, dirty, busy, canActivate, hasBot, active, instanceAvailable, onNameChange, onChange, onSave, onActivate }: {
+export function BotSettingsPanel({ name, flow, members, dirty, busy, canActivate, hasBot, active, instanceAvailable, onNameChange, onChange, onSave, onActivate }: {
   name: string; flow: BotFlow; dirty: boolean; busy: boolean; canActivate: boolean;
   hasBot: boolean; active: boolean; instanceAvailable: boolean;
+  members: BotMember[];
   onNameChange: (name: string) => void; onChange: (flow: BotFlow) => void;
   onSave: () => void; onActivate: () => void;
 }) {
@@ -39,6 +41,14 @@ export function BotSettingsPanel({ name, flow, dirty, busy, canActivate, hasBot,
         <label htmlFor={`${id}-name`}>Nome do bot</label>
         <p className={styles.hint} id={`${id}-name-help`}>Como ele aparece na sua Central de Bots.</p>
         <input id={`${id}-name`} aria-describedby={`${id}-name-help`} maxLength={100} value={name} onChange={event => onNameChange(event.target.value)} required />
+        <div className={styles.divider} />
+        <label>Atribuir o bot para</label>
+        <p className={styles.hint}>Escolha o membro que vai executar este bot nas conversas atribuídas a ele. {members.length} {members.length === 1 ? "membro disponível" : "membros disponíveis"}.</p>
+        <BotSelect label="Atribuir o bot para" value={flow.assignedUserId ?? ""} options={[
+          { value: "", label: "Selecione um membro" },
+          ...members.map(member => ({ value: member.userId, label: member.name })),
+        ]} onChange={assignedUserId => onChange({ ...flow, assignedUserId })} />
+        <p className={styles.hint}>Salve e publique para aplicar a atribuição.</p>
         <div className={styles.divider} />
         <label htmlFor={`${id}-invalid`}>Resposta para opção inválida</label>
         <p className={styles.hint} id={`${id}-invalid-help`}>Oriente o cliente quando a escolha não existir no menu.</p>

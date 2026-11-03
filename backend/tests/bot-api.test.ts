@@ -16,7 +16,8 @@ test("administrative API enforces membership, tenant isolation, optimistic revis
       findMany: async ({ where }: any) => [...images.values()].filter(image => where.id.in.includes(image.id) && image.organizationId === where.organizationId),
     },
     member: {
-      findUnique: async ({ where }: any) => where.organizationId_userId.userId === "admin" ? { role: "admin" } : { role: "member" },
+      findMany: async () => [{ userId: "admin", displayName: null, user: { name: "Administrador" } }],
+      findUnique: async ({ where }: any) => where.organizationId_userId.userId === "foreign-user" ? null : where.organizationId_userId.userId === "admin" ? { role: "admin" } : { role: "member" },
       findFirst: async ({ where }: any) => where.userId === "admin" ? { organizationId: "a", role: "admin" } : null,
     },
     botInstance: { findUnique: async () => null },
@@ -41,6 +42,8 @@ test("administrative API enforces membership, tenant isolation, optimistic revis
     assert.equal((await request("", undefined, "")).status, 401);
     assert.equal((await request("", undefined, "member")).status, 403);
     assert.equal((await request("", undefined, "admin", "")).status, 200);
+    assert.deepEqual((await (await request("")).json() as any).members, [{ userId: "admin", name: "Administrador" }]);
+    assert.equal((await request("", { name: "Outro membro", draft: { ...fixture(), assignedUserId: "foreign-user" } })).status, 400);
     const created = await request("", { name: "Infordoc", draft: fixture() }); assert.equal(created.status, 201);
     const bot = await created.json() as any;
     assert.equal((await request(`/${bot.id}/publish`, { revision: 0 }, "admin", "b")).status, 404);

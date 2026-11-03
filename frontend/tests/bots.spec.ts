@@ -8,6 +8,31 @@ async function selectChoice(trigger: Locator, value: string) {
   await trigger.page().getByRole("option").and(trigger.page().locator(`[data-value="${value}"]`)).click();
 }
 
+test('configurações listam os membros e salvam a atribuição do bot', async ({ page }, testInfo) => {
+  const flow: BotFlow = { rootMenuId: 'root', invalidMessage: 'Opção inválida.', backLabel: 'Voltar', menus: [{ id: 'root', name: 'Principal', text: 'Olá!', options: [] }] };
+  let current = { id: 'assigned-bot', name: 'Suporte', draft: flow, published: structuredClone(flow), revision: 1 };
+  await page.route('**/api/**', async route => {
+    const req = route.request(), path = new URL(req.url()).pathname;
+    if (path.endsWith('/auth/get-session')) return route.fulfill({ json: { user: { id: 'admin', name: 'Admin', email: 'admin@example.invalid' }, session: { id: 'session', userId: 'admin', expiresAt: '2099-01-01T00:00:00Z' } } });
+    if (path.endsWith('/bots/assigned-bot') && req.method() === 'PUT') { current = { ...current, ...req.postDataJSON(), revision: current.revision + 1 }; return route.fulfill({ json: current }); }
+    if (path.endsWith('/bots')) return route.fulfill({ json: { bots: [current], activeBotId: null, instanceAvailable: true, members: [{ userId: 'kaio', name: 'Kaio Cotrim' }, { userId: 'suporte', name: 'Conta de Suporte' }] } });
+    return route.fulfill({ json: {} });
+  });
+  await page.goto('/dashboard/bots/');
+  await page.getByRole('tab', { name: 'Configurações', exact: true }).click();
+  const select = page.getByRole('combobox', { name: 'Atribuir o bot para', exact: true });
+  await select.click();
+  await expect(page.getByRole('option', { name: 'Kaio Cotrim', exact: true })).toBeVisible();
+  await page.getByRole('option', { name: 'Conta de Suporte', exact: true }).click();
+  await page.getByRole('button', { name: /^Salvar rascunho/ }).last().click();
+  await expect.poll(() => current.draft.assignedUserId).toBe('suporte');
+  expect(current.published.assignedUserId).toBeUndefined();
+  await page.reload();
+  await page.getByRole('tab', { name: 'Configurações', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Atribuir o bot para', exact: true })).toHaveAttribute('data-value', 'suporte');
+  await page.screenshot({ path: testInfo.outputPath('atribuir-bot.png'), fullPage: true });
+});
+
 test('modelo visual preserva execução, rejeita destinos inválidos e ações terminais', () => {
   const flow: BotFlow = { rootMenuId: 'root', invalidMessage: 'Opção inválida.', backLabel: 'Voltar', menus: [
     { id: 'root', name: 'Principal', text: 'Olá', options: [{ id: 'terminal', number: '1', label: 'Encerrar', action: 'CLOSE', active: true, response: 'Até logo', targetMenuId: '' }] },
