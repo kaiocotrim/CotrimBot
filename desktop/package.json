@@ -70,6 +70,9 @@
     "linux": {
       "icon": "assets/icon.png",
       "category": "Network;InstantMessaging",
+      "executableName": "cotrimbot",
+      "desktopName": "cotrimbot.desktop",
+      "syncDesktopName": true,
       "target": [
         { "target": "AppImage", "arch": ["x64"] },
         { "target": "deb", "arch": ["x64"] }
