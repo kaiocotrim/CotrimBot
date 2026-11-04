@@ -25,7 +25,7 @@ flowchart LR
     end
 
     TRANS[transcription-service - FastAPI + faster-whisper]
-    GEMINI[Gemini API]
+    IA[Provedor de IA compatível com OpenAI]
 
     FE <-- HTTP + WebSocket --> BE
     BE <--> DB
@@ -33,7 +33,7 @@ flowchart LR
     EVO <--> PG
     EVO <--> REDIS
     BE -- áudio recebido --> TRANS
-    BE -- reformular texto --> GEMINI
+    BE -- reformular texto --> IA
 ```
 
 ## Estrutura do repositório
@@ -57,7 +57,7 @@ Dockerfile                 # Build da imagem única do frontend + backend
 | Backend | Express 5, Socket.IO, Prisma 7, MySQL |
 | Transcrição | Python 3.11 (Docker) / Python 3.12 (Windows), FastAPI, faster-whisper, ffmpeg |
 | Infraestrutura | Docker Compose, Evolution API, Postgres, Redis |
-| IA | Gemini API (reformulação de texto) |
+| IA | API compatível com OpenAI Chat Completions (reformulação e tradução de texto) |
 
 ## Funcionalidades
 
@@ -66,7 +66,7 @@ Dockerfile                 # Build da imagem única do frontend + backend
 - Reações a mensagens e avatares de contatos/grupos em cache.
 - Arquivamento de contatos e grupos.
 - Transcrição automática de áudios recebidos (microserviço Python com faster-whisper).
-- Reformulação de texto com IA (Gemini) antes de enviar uma mensagem.
+- Reformulação de texto com IA (provedor configurável) antes de enviar uma mensagem.
 - Encerrar uma conversa devolvendo o atendimento ao bot.
 - PWA instalável (celular e desktop) com notificações push, que chegam mesmo com o app fechado.
 
@@ -95,7 +95,9 @@ reais — senhas, chaves de API — não devem ser commitados nem compartilhados
 | `EVOLUTION_API_KEY` | Chave de autenticação da Evolution API. |
 | `EVOLUTION_INSTANCE` | Nome da instância do WhatsApp na Evolution API. |
 | `BOT_WEBHOOK_SECRET` | Segredo compartilhado entre servidor e webhook Evolution para acionar a Central de Bots. |
-| `GEMINI_API_KEY` | Chave da API do Gemini usada para reformular texto. |
+| `AI_BASE_URL` | URL base de uma API compatível com OpenAI Chat Completions (ex.: `https://api.openai.com/v1`, `http://localhost:11434/v1` para Ollama). |
+| `AI_API_KEY` | Chave enviada como `Bearer` ao provedor. Opcional para provedores sem autenticação. |
+| `AI_MODEL` | Modelo usado para reformular e traduzir texto (ex.: `gpt-4o-mini`, `gemini-2.5-flash`). |
 | `TRANSCRIPTION_SERVICE_URL` | URL do microserviço de transcrição. |
 | `VAPID_PUBLIC_KEY` | Chave pública VAPID das notificações push (ver abaixo). |
 | `VAPID_PRIVATE_KEY` | Chave privada VAPID das notificações push. Não compartilhe. |
@@ -260,7 +262,7 @@ Todas as rotas abaixo são servidas pelo backend sob o prefixo `/api`.
 | POST | `/messages/:id/transcribe` | Transcreve o áudio de uma mensagem. |
 | GET | `/transcription/settings` | Consulta as configurações do Whisper. |
 | PUT | `/transcription/settings` | Atualiza as configurações do Whisper. |
-| POST | `/ai/rewrite` | Reformula um texto com o Gemini. |
+| POST | `/ai/rewrite` | Reformula um texto com a IA configurada. |
 | GET | `/push/public-key` | Chave pública VAPID para assinar o push. |
 | POST | `/push/subscribe` | Salva a assinatura push do navegador (`{ endpoint, keys: { p256dh, auth } }`). |
 | POST | `/push/unsubscribe` | Remove a assinatura push do navegador (`{ endpoint }`). |

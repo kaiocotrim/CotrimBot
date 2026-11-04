@@ -1,12 +1,9 @@
 import { Router } from "express";
 import { translateMessage } from "../controllers/translation.controller.js";
+import { chatCompletion, isAiConfigured } from "../lib/ai-client.js";
 
 export const aiRouter = Router();
 aiRouter.post("/ai/translate", translateMessage);
-
-type GeminiResponse = {
-  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-};
 
 const professionalRewriteInstruction = `Você é especialista em comunicação profissional para atendimento por WhatsApp.
 Reescreva a mensagem em português do Brasil com clareza, cordialidade e profissionalismo, mantendo um tom humano e natural.
@@ -33,41 +30,13 @@ aiRouter.post("/ai/rewrite", async (request, response) => {
     return;
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  if (!isAiConfigured()) {
     response.status(503).json({ error: "A integração de IA ainda não foi configurada." });
     return;
   }
 
   try {
-    const model = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
-    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: "POST",
-      headers: {
-        "x-goog-api-key": apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: professionalRewriteInstruction }],
-        },
-        contents: [{ role: "user", parts: [{ text }] }],
-        generationConfig: { maxOutputTokens: 1500, temperature: 0.2 },
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const details = await aiResponse.text();
-      console.error("Erro do Gemini:", aiResponse.status, details);
-      response.status(502).json({ error: "Não foi possível reformular o texto agora." });
-      return;
-    }
-
-    const result = await aiResponse.json() as GeminiResponse;
-    const rewritten = result.candidates?.[0]?.content?.parts
-      ?.map((part) => part.text ?? "")
-      .join("")
-      .trim();
+    const rewritten = (await chatCompletion(professionalRewriteInstruction, text, { temperature: 0.2, maxTokens: 1500 })).text;
 
     if (!rewritten) {
       response.status(502).json({ error: "A IA não retornou um texto válido." });
@@ -77,6 +46,6 @@ aiRouter.post("/ai/rewrite", async (request, response) => {
     response.json({ text: rewritten });
   } catch (error) {
     console.error("Erro ao reformular texto:", error);
-    response.status(502).json({ error: "Não foi possível conectar ao serviço de IA." });
+    response.status(502).json({ error: "Não foi possível reformular o texto agora." });
   }
 });
