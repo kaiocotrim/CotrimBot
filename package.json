@@ -6,7 +6,8 @@
     "frontend",
     "backend",
     "sdk",
-    "desktop"
+    "desktop",
+    "mobile"
   ],
   "scripts": {
     "dev": "turbo run dev",
@@ -17,7 +18,11 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "prisma:generate": "npm run prisma:generate --workspace=@cotrimbot/backend",
-    "prisma:migrate": "npm run prisma:migrate --workspace=@cotrimbot/backend"
+    "prisma:migrate": "npm run prisma:migrate --workspace=@cotrimbot/backend",
+    "mobile:start": "npm run start --workspace=@cotrimbot/mobile",
+    "mobile:android": "npm run android --workspace=@cotrimbot/mobile",
+    "mobile:ios": "npm run ios --workspace=@cotrimbot/mobile",
+    "mobile:check": "npm run typecheck --workspace=@cotrimbot/mobile && npm run lint --workspace=@cotrimbot/mobile"
   },
   "devDependencies": {
     "turbo": "^2.5.8"

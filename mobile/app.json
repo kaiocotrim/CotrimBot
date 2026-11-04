@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "CotrimBot",
+    "slug": "cotrimbot-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/app-icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cotrimbot.mobile"
+    },
+    "android": {
+      "package": "com.cotrimbot.mobile",
+      "predictiveBackGestureEnabled": true,
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permitir que o CotrimBot selecione fotos para enviar nas conversas.",
+          "cameraPermission": false,
+          "microphonePermission": "Permitir que o CotrimBot grave áudios para enviar nas conversas."
+        }
+      ],
+      ["expo-audio", {
+        "microphonePermission": "Permitir que o CotrimBot grave áudios para enviar nas conversas.",
+        "recordAudioAndroid": true,
+        "enableBackgroundPlayback": false,
+        "enableBackgroundRecording": false
+      }]
+    ],
+    "scheme": "cotrimbot",
+    "platforms": [
+      "ios",
+      "android"
+    ]
+  }
+}
