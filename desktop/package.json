@@ -9,6 +9,7 @@
     "start": "electron .",
     "dist": "electron-builder --win nsis --x64 --publish never",
     "pack": "electron-builder --win --x64 --dir --publish never",
+    "release": "electron-builder --publish always",
     "test": "node --test tests/*.test.cjs",
     "test:smoke": "node --test tests/smoke.test.mjs"
   },
@@ -21,13 +22,58 @@
     "appId": "net.infordoc.cotrimbot",
     "productName": "CotrimBot",
     "asar": true,
-    "directories": { "output": "dist" },
-    "files": ["main.cjs", "policy.cjs", "config.json", "assets/icon.png", "!**/node_modules/**"],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "kaiocotrim",
+      "repo": "CotrimBot",
+      "releaseType": "release"
+    },
+    "files": [
+      "main.cjs",
+      "policy.cjs",
+      "config.json",
+      "assets/icon.png",
+      "!**/node_modules/**"
+    ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "assets/icon.ico",
       "artifactName": "CotrimBot-Setup-${version}-${arch}.${ext}",
-      "signtoolOptions": { "signingHashAlgorithms": ["sha256"] }
+      "signtoolOptions": {
+        "signingHashAlgorithms": [
+          "sha256"
+        ]
+      }
+    },
+    "mac": {
+      "category": "public.app-category.business",
+      "icon": "assets/icon.png",
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] },
+        { "target": "zip", "arch": ["x64", "arm64"] }
+      ],
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "linux": {
+      "icon": "assets/icon.png",
+      "category": "Network;InstantMessaging",
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] },
+        { "target": "deb", "arch": ["x64"] }
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -39,7 +85,12 @@
       "shortcutName": "CotrimBot",
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": false,
-      "installerLanguages": ["pt_BR"]
+      "installerLanguages": [
+        "pt_BR"
+      ]
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }

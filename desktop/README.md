@@ -1,9 +1,35 @@
-# CotrimBot para Windows
+# CotrimBot Desktop
 
 Aplicativo Electron que abre **https://cotrim.infordoc.net/** em uma janela
 própria. O servidor, o banco de dados e a Evolution API continuam hospedados.
 É necessário acesso à internet. Atualizações publicadas no site aparecem
 também no aplicativo, sem recompilar o instalador.
+
+## Plataformas e releases
+
+O workflow `.github/workflows/desktop-release.yml` gera pacotes para:
+
+- Windows: `CotrimBot-Setup-<versão>-x64.exe` (NSIS)
+- macOS: `.dmg` e `.zip` para x64 e arm64
+- Linux: `.AppImage` e `.deb` para x64
+
+Para publicar uma versão:
+
+1. Altere `version` em `desktop/package.json`.
+2. Crie e envie a tag correspondente: `git tag desktop-v<versão>` e `git push origin desktop-v<versão>`.
+3. O workflow valida a tag, roda os testes e publica a release direto no GitHub Releases.
+
+O aplicativo instalado verifica atualizações ao iniciar e a cada 4 horas. Quando
+encontra uma versão nova, baixa e instala ao fechar. Atualização automática só
+funciona em builds empacotadas.
+
+Assinatura é opcional e configurada por secrets do repositório. Sem eles, o build
+sai sem assinatura:
+
+- Windows: `WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD`
+- macOS: `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`
+
+Sem assinatura, o SmartScreen (Windows) e o Gatekeeper (macOS) exibem alertas.
 
 ## Instalar e gerar o executável
 

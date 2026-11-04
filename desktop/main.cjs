@@ -1,4 +1,5 @@
 const { app, BrowserWindow, Menu, dialog, session, shell } = require("electron");
+const { autoUpdater } = require("electron-updater");
 const path = require("node:path");
 const config = require("./config.json");
 const { parseServerUrl, isServerUrl, isExternalUrl, canRequestPermission } = require("./policy.cjs");
@@ -28,6 +29,18 @@ async function openExternal(url) {
       await dialog.showMessageBox(mainWindow, { type: "error", message: "Não foi possível abrir o link no navegador." });
     }
   }
+}
+
+const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
+
+function startAutoUpdates() {
+  if (!app.isPackaged) return;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on("error", error => console.error("Falha na atualização:", error?.message ?? error));
+  const check = () => { void autoUpdater.checkForUpdates().catch(() => {}); };
+  check();
+  setInterval(check, UPDATE_CHECK_INTERVAL_MS).unref();
 }
 
 function configureSession(desktopSession) {
@@ -131,6 +144,7 @@ if (!app.requestSingleInstanceLock()) {
       { label: "Exibir", submenu: [{ role: "reload", label: "Recarregar" }, { role: "resetZoom", label: "Zoom original" }, { role: "zoomIn", label: "Aumentar zoom" }, { role: "zoomOut", label: "Diminuir zoom" }, { role: "togglefullscreen", label: "Tela cheia" }, ...(!app.isPackaged ? [{ role: "toggleDevTools", label: "Ferramentas do desenvolvedor" }] : [])] },
     ]));
     createWindow();
+    startAutoUpdates();
   }).catch(error => {
     dialog.showErrorBox("CotrimBot", error.message);
     app.quit();

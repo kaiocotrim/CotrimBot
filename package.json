@@ -12,6 +12,7 @@
     "dev": "turbo run dev",
     "desktop:start": "npm run start --workspace=@cotrimbot/desktop",
     "desktop:build": "npm run dist --workspace=@cotrimbot/desktop",
+    "desktop:release": "npm run release --workspace=@cotrimbot/desktop",
     "desktop:test": "npm run test --workspace=@cotrimbot/desktop",
     "build": "turbo run build",
     "lint": "turbo run lint",

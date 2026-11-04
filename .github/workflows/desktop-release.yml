@@ -1,0 +1,64 @@
+name: Desktop release
+
+on:
+  push:
+    tags:
+      - "desktop-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check tag matches desktop version
+        run: |
+          TAG="${GITHUB_REF_NAME#desktop-v}"
+          PKG=$(node -p "require('./desktop/package.json').version")
+          if [ "$TAG" != "$PKG" ]; then
+            echo "Tag $TAG does not match desktop/package.json version $PKG"
+            exit 1
+          fi
+
+  build:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run desktop:test
+
+      - name: Build and publish (Windows, signed when secrets are set)
+        if: runner.os == 'Windows'
+        run: npm run desktop:release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+
+      - name: Build and publish (macOS, signed and notarized when secrets are set)
+        if: runner.os == 'macOS'
+        run: npm run desktop:release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Build and publish (Linux)
+        if: runner.os == 'Linux'
+        run: npm run desktop:release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
