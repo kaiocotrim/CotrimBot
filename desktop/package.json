@@ -1,6 +1,6 @@
 {
   "name": "@cotrimbot/desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Aplicativo desktop do CotrimBot",
   "author": "CotrimBot",
@@ -57,6 +57,7 @@
       }
     },
     "mac": {
+      "icon": "build/icon.png",
       "category": "public.app-category.business",      
       "target": [
         { "target": "dmg", "arch": ["x64", "arm64"] },
@@ -70,8 +71,6 @@
       "icon": "assets/icon.png",
       "category": "Network;InstantMessaging",
       "executableName": "cotrimbot",
-      "desktopName": "cotrimbot.desktop",
-      "syncDesktopName": true,
       "target": [
         { "target": "AppImage", "arch": ["x64"] },
         { "target": "deb", "arch": ["x64"] }
