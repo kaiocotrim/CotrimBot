@@ -1,9 +1,13 @@
 {
   "name": "@cotrimbot/desktop",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "Aplicativo desktop do CotrimBot",
-  "author": "CotrimBot",
+  "author": {
+    "name": "CotrimBot",
+    "email": "kaioalan40@gmail.com"
+  },
+  "homepage": "https://github.com/kaiocotrim/CotrimBot",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
