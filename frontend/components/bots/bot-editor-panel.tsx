@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore, type ReactNode } from "react";
 import { motion, useIsPresent, useReducedMotion } from "framer-motion";
-import { X } from "lucide-react";
+import { X } from "@/components/icons/animated-lucide";
 import styles from "./bot-designer.module.css";
 
 function subscribeDesktop(notify: () => void) {

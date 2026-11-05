@@ -2,7 +2,7 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import { motion, useReducedMotion } from "framer-motion";
-import { Check, Trash2, X } from "lucide-react";
+import { Check, Trash2, X } from "@/components/icons/animated-lucide";
 import { useState, type FormEvent } from "react";
 import { createCompanyGroup, deleteCompanyGroup, updateCompanyGroup } from "@/lib/company-api";
 import { permissionSections, type CompanyGroup, type OrganizationMember, type PermissionKey } from "./company-types";

@@ -4,7 +4,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Select } from "@base-ui/react/select";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
-import { BadgeCheck, Bell, Bot, Building2, Camera, Check, ChevronDown, ContactRound, Keyboard, KeyRound, Laptop, Link2, Megaphone, Palette, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "lucide-react";
+import { BadgeCheck, Bell, Bot, Building2, Camera, Check, ChevronDown, ContactRound, Keyboard, KeyRound, Laptop, Link2, Megaphone, Palette, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "@/components/icons/animated-lucide";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";

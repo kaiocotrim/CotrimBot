@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { X } from "@/components/icons/animated-lucide";
 import { useRef, useState } from "react";
 import { Avatar } from "@/components/chat/avatar";
 import type { Contact } from "@/types/chat";

@@ -2,7 +2,7 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ChartNoAxesColumnIncreasing, Check, LoaderCircle, RefreshCw, UserRound, Users, X } from "lucide-react";
+import { ChartNoAxesColumnIncreasing, Check, LoaderCircle, RefreshCw, UserRound, Users, X } from "@/components/icons/animated-lucide";
 import { useEffect, useRef, useState } from "react";
 import { getPollResults, voteOnPoll } from "@/lib/chat-api";
 import { socket } from "@/lib/socket";

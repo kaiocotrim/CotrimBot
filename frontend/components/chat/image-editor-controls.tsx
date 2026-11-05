@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowUpRight, Bold, Check, ChevronDown, Circle, Columns2, Crop, Image as ImageIcon, Italic, LoaderCircle, Minus, Pencil, Plus, RectangleHorizontal, Redo2, RotateCcw, RotateCw, Shapes, SlidersHorizontal, Square, Sun, Triangle, Type, Undo2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Bold, Check, ChevronDown, Circle, Columns2, Crop, Image as ImageIcon, Italic, LoaderCircle, Minus, Pencil, Plus, RectangleHorizontal, Redo2, RotateCcw, RotateCw, Shapes, SlidersHorizontal, Square, Sun, Triangle, Type, Undo2 } from "@/components/icons/animated-lucide";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@base-ui/react/dialog";
 import { IMAGE_FILTERS, type ImageAdjustment, type ImageFilter, type ImageShape } from "@/lib/image-editor";

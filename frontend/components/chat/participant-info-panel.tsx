@@ -3,7 +3,7 @@
 import headerStyles from "./contact-info-header.module.css";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { Building2, MessageCircle, Phone, X } from "lucide-react";
+import { Building2, MessageCircle, Phone, X } from "@/components/icons/animated-lucide";
 import { useEffect, useRef, useState } from "react";
 import { ContactPhoto } from "@/components/chat/contact-photo";
 import type { GroupParticipant } from "@/lib/chat-api";

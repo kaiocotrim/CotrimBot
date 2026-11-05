@@ -42,7 +42,7 @@
       "setup.html",
       "setup-preload.cjs",
       "config.json",
-      "assets/icon.png"      
+      "assets/icon.png"
     ],
     "win": {
       "target": [

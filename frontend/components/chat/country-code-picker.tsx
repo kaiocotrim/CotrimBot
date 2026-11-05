@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Popover } from "@base-ui/react/popover";
-import { Check, ChevronDown, Search } from "lucide-react";
+import { Check, ChevronDown, Search } from "@/components/icons/animated-lucide";
 import { getCountries, getCountryCallingCode, type CountryCode } from "libphonenumber-js/min";
 
 const regionNames = new Intl.DisplayNames(["pt-BR"], { type: "region" });

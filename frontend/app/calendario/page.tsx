@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "@/components/icons/animated-lucide";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { CalendarModal } from "@/components/chat/calendar-modal";

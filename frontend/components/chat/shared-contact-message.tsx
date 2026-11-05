@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Check, LoaderCircle, MessageCircle, UserRound, UserRoundPlus } from "lucide-react";
+import { Check, LoaderCircle, MessageCircle, UserRound, UserRoundPlus } from "@/components/icons/animated-lucide";
 import type { Contact, SharedContact } from "@/types/chat";
 
 function SharedContactCard({ contact, alreadySaved, onSave, onMessage }: {

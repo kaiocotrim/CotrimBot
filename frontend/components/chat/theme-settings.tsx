@@ -1,6 +1,6 @@
 "use client";
 
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Sun } from "@/components/icons/animated-lucide";
 import { useSyncExternalStore } from "react";
 import { readTheme, setTheme, subscribeTheme, type ThemePreference } from "@/lib/app-theme";
 import styles from "./theme-settings.module.css";

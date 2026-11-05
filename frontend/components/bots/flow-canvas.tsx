@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowRight, CornerDownLeft, GitBranch, GripHorizontal, ListTree, Maximize2, ImagePlus, MessageSquare, Minus, Play, Plus, SquareCheck, Trash2, UserRound, X } from "lucide-react";
+import { ArrowRight, CornerDownLeft, GitBranch, GripHorizontal, ListTree, Maximize2, ImagePlus, MessageSquare, Minus, Play, Plus, SquareCheck, Trash2, UserRound, X } from "@/components/icons/animated-lucide";
 import type { BotFlow, BotMenu, BotOption } from "@/lib/bot-api";
 import { BotSelect } from "./bot-select";
 import styles from "./bot-designer.module.css";

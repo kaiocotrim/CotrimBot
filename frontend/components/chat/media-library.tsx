@@ -2,10 +2,12 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Copy, Download, FileText, Images, Link2, LoaderCircle, Search, SlidersHorizontal, SquareCheck, Video, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Copy, Download, FileText, Images, Link2, LoaderCircle, Search, SlidersHorizontal, SquareCheck, Video, X } from "@/components/icons/animated-lucide";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { downloadLibraryItem, getMediaLibrary, libraryMediaUrl, type MediaLibraryItem, type MediaLibraryPage, type MediaLibraryTab } from "@/lib/media-library-api";
 import styles from "./media-library.module.css";
+import { AnimatedIconButton } from "@/components/icons/animated-icon-button";
+import { GalleryHorizontalEndIcon } from "@/components/icons/lucide-animated/gallery-horizontal-end";
 
 const tabs = [{ value: "media", label: "Mídias" }, { value: "documents", label: "Documentos" }, { value: "links", label: "Links" }] as const;
 const emptyItems: MediaLibraryItem[] = [];
@@ -65,7 +67,7 @@ function LibrarySkeleton({ tab }: { tab: MediaLibraryTab }) {
 export function MediaLibrary() {
   const [open, setOpen] = useState(false);
   return <Dialog.Root open={open} onOpenChange={setOpen}>
-    <Dialog.Trigger aria-label="Mídias de todas as conversas" title="Mídias" className="flex size-11 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-white/70"><Images className="size-5" strokeWidth={1.8} aria-hidden="true" /></Dialog.Trigger>
+    <Dialog.Trigger render={<AnimatedIconButton icon={GalleryHorizontalEndIcon} />} aria-label="Mídias de todas as conversas" title="Mídias" className="flex size-11 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-white/70" />
     <Dialog.Portal>
       <Dialog.Backdrop className={styles.backdrop} />
       <Dialog.Popup className={styles.dialog}>

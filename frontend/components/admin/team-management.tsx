@@ -4,7 +4,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Building2, Camera, Check, Copy, MoreHorizontal, Pencil, Plus, Search, Shield, Trash2, UsersRound, X } from "lucide-react";
+import { Building2, Camera, Check, Copy, MoreHorizontal, Pencil, Plus, Search, Shield, Trash2, UsersRound, X } from "@/components/icons/animated-lucide";
 import { authClient } from "@/lib/auth-client";
 import { getCompanyWorkspace, updateCompanyLogo } from "@/lib/company-api";
 import { CompanyGroupDialog } from "./company-group-dialog";

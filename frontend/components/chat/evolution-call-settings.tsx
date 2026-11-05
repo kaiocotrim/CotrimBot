@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, LoaderCircle, PhoneOff, RotateCcw } from "lucide-react";
+import { Check, LoaderCircle, PhoneOff, RotateCcw } from "@/components/icons/animated-lucide";
 import styles from "./evolution-call-settings.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";

@@ -13,11 +13,32 @@ import { useNotifications } from "@/hooks/use-notifications";
 import { useSession } from "@/lib/auth-client";
 import type { Contact } from "@/types/chat";
 
-// A página apenas conecta o estado da conversa aos componentes visuais.
 export default function Home() {
   const chatRootRef = useMobileVisualViewport();
   const router = useRouter();
   const { data: session, isPending } = useSession();
+
+  useEffect(() => {
+    if (!isPending && !session) {
+      router.replace("/login");
+    }
+  }, [isPending, session, router]);
+
+  if (isPending || !session) {
+    return (
+      <main ref={chatRootRef} data-chat-root className="flex h-dvh items-center justify-center bg-zinc-950 text-white">
+        <p className="text-sm text-zinc-400">Carregando...</p>
+      </main>
+    );
+  }
+
+  return <AuthenticatedHome key={session.user.id} session={session} />;
+}
+
+// Monta os hooks de contatos e notificações somente após confirmar a sessão.
+function AuthenticatedHome({ session }: { session: NonNullable<ReturnType<typeof useSession>["data"]> }) {
+  const chatRootRef = useMobileVisualViewport();
+  const router = useRouter();
   const chat = useChat();
   const assignedUnreadCount = session?.user.id
     ? chat.contacts.reduce((total, contact) => contact.assignedUserIds?.includes(session.user.id)
@@ -128,19 +149,6 @@ export default function Home() {
     if (contact) queueMicrotask(() => selectContact(contact));
     window.history.replaceState(window.history.state, "", window.location.pathname);
   }, [chat, selectContact]);
-  useEffect(() => {
-    if (!isPending && !session) {
-      router.replace("/login");
-    }
-  }, [isPending, session, router]);
-
-  if (isPending || !session) {
-    return (
-      <main ref={chatRootRef} data-chat-root className="flex h-dvh items-center justify-center bg-zinc-950 text-white">
-        <p className="text-sm text-zinc-400">Carregando...</p>
-      </main>
-    );
-  }
 
   return (
     <main ref={chatRootRef} data-chat-root className="flex h-dvh overflow-hidden bg-zinc-950 text-white">

@@ -1,6 +1,6 @@
 "use client";
 
-import { Languages, LoaderCircle, X } from "lucide-react";
+import { Languages, LoaderCircle, X } from "@/components/icons/animated-lucide";
 import { MessageText } from "@/components/chat/message-text";
 import type { MessageTranslationState } from "@/hooks/use-message-translations";
 

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
-import { Check, LoaderCircle, X } from "lucide-react";
+import { Check, LoaderCircle, X } from "@/components/icons/animated-lucide";
 import { TextMessage } from "@/components/chat/text-message";
 import { splitMessageSignatures } from "@/lib/message-signature";
 import type { Message } from "@/types/chat";

@@ -3,7 +3,7 @@
 import { Dialog } from "@base-ui/react/dialog";
 import Image from "next/image";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "framer-motion";
-import { ArrowRight, ChevronRight, ListTree, MessageSquare, X } from "lucide-react";
+import { ArrowRight, ChevronRight, ListTree, MessageSquare, X } from "@/components/icons/animated-lucide";
 import { MessageText } from "@/components/chat/message-text";
 import { botImageUrl, type BotFlow, type BotMenu } from "@/lib/bot-api";
 import styles from "./bot-designer.module.css";

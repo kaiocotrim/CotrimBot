@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatedSvg } from "@/components/icons/animated-svg";
 import { useId, useRef, useState } from "react";
 import { Popover } from "@base-ui/react/popover";
 import { motion, useReducedMotion } from "framer-motion";
@@ -64,10 +65,10 @@ export function TranscriptionSettings({ disabled }: { disabled: boolean }) {
         aria-label="Configurações de transcrição"
         className="rounded-full p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white/50"
       >
-        <svg className={`size-[18px] transition-transform duration-500 ease-out motion-reduce:transition-none ${open ? "rotate-90" : "rotate-0"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+        <AnimatedSvg className={`size-[18px] transition-transform duration-500 ease-out motion-reduce:transition-none ${open ? "rotate-90" : "rotate-0"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
           <path d="m9 3-.5 2-2 1-2-.5-2 3 1.5 1.5v3L2.5 15l2 3 2-.5 2 1 .5 2h4l.5-2 2-1 2 .5 2-3-1.5-2v-3L20 8.5l-2-3-2 .5-2-1-.5-2Z" />
           <circle cx="11" cy="12" r="3" />
-        </svg>
+        </AnimatedSvg>
       </Popover.Trigger>
 
       <Popover.Portal>
@@ -97,9 +98,9 @@ export function TranscriptionSettings({ disabled }: { disabled: boolean }) {
                         <input type="radio" name={id} value={model.value} checked={selected} onChange={() => void chooseModel(model.value)} className="sr-only" />
                         <span className="min-w-0 flex-1">{model.label}</span>
                         {selected && (
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-3.5 shrink-0 text-zinc-300" aria-hidden="true">
+                          <AnimatedSvg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-3.5 shrink-0 text-zinc-300" aria-hidden="true">
                             <path d="m5 12 4 4L19 6" />
-                          </svg>
+                          </AnimatedSvg>
                         )}
                       </label>
                     );

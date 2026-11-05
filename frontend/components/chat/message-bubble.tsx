@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatedSvg } from "@/components/icons/animated-svg";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { Dialog } from "@base-ui/react/dialog";
@@ -7,16 +8,16 @@ import { Popover } from "@base-ui/react/popover";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import {
-  ArrowBendUpLeft,
-  ArrowBendUpRight,
-  CaretDown,
+  Reply as ArrowBendUpLeft,
+  Forward as ArrowBendUpRight,
+  ChevronDown as CaretDown,
   Copy,
-  PushPin,
-  Smiley,
+  Pin as PushPin,
+  Smile as Smiley,
   Star,
-  Trash,
-  WarningCircle,
-} from "@phosphor-icons/react";
+  Trash2 as Trash,
+  CircleAlert as WarningCircle,
+} from "@/components/icons/animated-lucide";
 import { AudioMessage } from "@/components/chat/audio-message";
 import { DocumentMessage } from "@/components/chat/document-message";
 import { EmojiText } from "@/components/chat/emoji-text";
@@ -28,7 +29,7 @@ import { SharedContactMessage } from "@/components/chat/shared-contact-message";
 import { PollMessage } from "@/components/chat/poll-message";
 import { TextMessage } from "@/components/chat/text-message";
 import { VideoMessage } from "@/components/chat/video-message";
-import { Info, Languages, Pencil } from "lucide-react";
+import { Info, Languages, Pencil } from "@/components/icons/animated-lucide";
 import { EditMessageDialog } from "@/components/chat/edit-message-dialog";
 import { MessageTranslation } from "@/components/chat/message-translation";
 import { useMessageTranslations } from "@/hooks/use-message-translations";
@@ -211,14 +212,14 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
   const readReceipt = outgoing ? (
     message.deliveryStatus === "failed" ? (
       <span className={isPrivate ? "text-red-600" : "text-red-200"} title="Mensagem não enviada" aria-label="Mensagem não enviada">
-        <WarningCircle size={12} weight="fill" aria-hidden="true" />
+        <WarningCircle size={12} strokeWidth={2.3} aria-hidden="true" />
       </span>
     ) : (
       <span className={`transition-colors duration-200 ${message.readAt ? isPrivate ? "text-zinc-800" : "text-white" : isPrivate ? "text-zinc-500" : "text-white/50"}`} title={message.readAt ? "Visualizada" : "Enviada"} aria-label={message.readAt ? "Mensagem visualizada" : "Mensagem enviada"}>
-        <svg className="h-2.5 w-[15px]" viewBox="0 0 18 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <AnimatedSvg className="h-2.5 w-[15px]" viewBox="0 0 18 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="m1 6 3 3 6-7" />
           <path d="m7 8 2 2 8-8" />
-        </svg>
+        </AnimatedSvg>
       </span>
     )
   ) : null;
@@ -449,7 +450,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
       </AnimatePresence>
       {isPrivate && (
         <div className="mb-0.5 flex items-center gap-1 text-[11px] leading-[14px] font-semibold text-zinc-600 lg:mb-1 lg:text-[10px] lg:leading-normal lg:tracking-wide">
-          <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
+          <AnimatedSvg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></AnimatedSvg>
           <span>Privado</span>
         </div>
       )}
@@ -473,7 +474,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           onClick={() => reactionPickerOpen ? setReactionPickerOpen(false) : openReactionPicker()}
           className={`flex size-6 items-center justify-center text-zinc-300 transition-[opacity,transform,color] duration-150 hover:scale-110 hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 group-hover/message:opacity-100 [@media(hover:none)]:opacity-100 ${reactionPickerOpen ? "opacity-100" : "opacity-0"}`}
         >
-          <Smiley size={14} weight="regular" aria-hidden="true" />
+          <Smiley size={14} strokeWidth={1.8} aria-hidden="true" />
         </button>
       </div>
       {typeof document !== "undefined" && createPortal(
@@ -510,7 +511,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           aria-expanded={actionsOpen}
           className={`flex size-8 items-center justify-center rounded-full transition-[opacity,transform,color] duration-150 focus-visible:opacity-100 focus-visible:outline-2 [@media(hover:none)]:opacity-100 lg:size-5 ${isPrivate ? "text-zinc-500 hover:text-zinc-800 focus-visible:outline-zinc-500/60" : "text-zinc-300 hover:text-white focus-visible:outline-white/50"} ${actionsOpen ? "opacity-100" : "opacity-0 group-hover/message:opacity-100"}`}
         >
-          <CaretDown size={13} weight="bold" aria-hidden="true" />
+          <CaretDown size={13} strokeWidth={2.3} aria-hidden="true" />
         </Popover.Trigger>
         <Popover.Portal>
           <Popover.Positioner side="bottom" align="end" sideOffset={4} positionMethod="fixed" collisionPadding={12} collisionAvoidance={{ side: "flip", align: "shift", fallbackAxisSide: "start" }} className="z-[110]">
@@ -518,11 +519,11 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
               <>
                   {contact.isGroup && outgoing && !isPrivate && message.id > 0 && !message.deletedAt && <button type="button" role="menuitem" onClick={() => { setActionsOpen(false); setMessageInfoOpen(true); }} className={menuButtonClass}><Info size={15} className="shrink-0 text-zinc-200" /><span>Dados da mensagem</span></button>}
                   <button type="button" role="menuitem" onClick={() => { onReply(message); setActionsOpen(false); }} className={menuButtonClass}>
-                    <ArrowBendUpLeft size={15} weight="bold" className="shrink-0 text-zinc-200" />
+                    <ArrowBendUpLeft size={15} strokeWidth={2.3} className="shrink-0 text-zinc-200" />
                     <span>Responder</span>
                   </button>
                   <button type="button" role="menuitem" onClick={() => void copyMessage()} disabled={!message.content} className={`${menuButtonClass} disabled:opacity-40`}>
-                    <Copy size={15} weight="bold" className="shrink-0 text-zinc-200" />
+                    <Copy size={15} strokeWidth={2.3} className="shrink-0 text-zinc-200" />
                     <span>Copiar</span>
                   </button>
                   {canTranslate && <button type="button" role="menuitem" disabled={translation?.status === "loading"} onClick={() => { setActionsOpen(false); void toggleTranslation(message.id, translationSource); }} className={`${menuButtonClass} disabled:opacity-40`}>
@@ -531,12 +532,12 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
                   </button>}
                   {canEdit && <button type="button" role="menuitem" onClick={() => { setActionsOpen(false); setEditDialogOpen(true); }} className={menuButtonClass}><Pencil size={15} className="shrink-0 text-zinc-200" /><span>Editar</span></button>}
                   <button type="button" role="menuitem" onClick={(event) => openReactionPicker(event.currentTarget)} className={menuButtonClass}>
-                    <Smiley size={15} weight="bold" className="shrink-0 text-zinc-200" />
+                    <Smiley size={15} strokeWidth={2.3} className="shrink-0 text-zinc-200" />
                     <span>Reagir</span>
                   </button>
                   {message.content && (
                     <button type="button" role="menuitem" onClick={() => { setActionsOpen(false); onRequestForward(message); }} className={menuButtonClass}>
-                      <ArrowBendUpRight size={15} weight="bold" className="shrink-0 text-zinc-200" />
+                      <ArrowBendUpRight size={15} strokeWidth={2.3} className="shrink-0 text-zinc-200" />
                       <span>Encaminhar</span>
                     </button>
                   )}
@@ -550,16 +551,16 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
                     setPinDurationHours(168);
                     setPinDialogOpen(true);
                   }} className={`${menuButtonClass} disabled:opacity-50`}>
-                    <PushPin size={15} weight={message.pinned ? "fill" : "bold"} className="shrink-0 text-zinc-200" />
+                    <PushPin size={15} fill={message.pinned ? "currentColor" : "none"} strokeWidth={2.3} className="shrink-0 text-zinc-200" />
                     <span>{message.pinned ? "Desafixar" : "Fixar"}</span>
                   </button>
                   <button type="button" role="menuitem" disabled={updatingFlags} onClick={() => void updateFlag({ favorited: !message.favorited })} className={`${menuButtonClass} disabled:opacity-50`}>
-                    <Star size={15} weight={message.favorited ? "fill" : "bold"} className="shrink-0 text-zinc-200" />
+                    <Star size={15} fill={message.favorited ? "currentColor" : "none"} strokeWidth={2.3} className="shrink-0 text-zinc-200" />
                     <span>{message.favorited ? "Desfavoritar" : "Favoritar"}</span>
                   </button>
                   <div className="my-1 border-t border-white/10" />
                   <button type="button" role="menuitem" aria-haspopup="dialog" onClick={() => { setActionsOpen(false); setActionError(null); setDeleteDialogOpen(true); }} className={menuButtonClass}>
-                    <Trash size={15} weight="bold" className="shrink-0 text-zinc-200" />
+                    <Trash size={15} strokeWidth={2.3} className="shrink-0 text-zinc-200" />
                     <span>Apagar</span>
                   </button>
                   {copyError && <p role="alert" className="px-3 py-1 text-[11px] text-red-300">Não foi possível copiar</p>}
@@ -632,7 +633,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
               <Dialog.Popup className="pointer-events-auto w-full max-w-[360px] overflow-hidden rounded-3xl border border-white/10 bg-zinc-900 p-5 text-zinc-100 shadow-[0_28px_90px_rgba(0,0,0,0.65)] outline-none transition-[opacity,transform] duration-200 data-[ending-style]:translate-y-2 data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:translate-y-2 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0">
                 <div className="flex flex-col items-center text-center">
                   <div className="flex size-11 items-center justify-center rounded-full bg-red-500/10 text-red-300">
-                    <Trash size={20} weight="regular" aria-hidden="true" />
+                    <Trash size={20} strokeWidth={1.8} aria-hidden="true" />
                   </div>
                   <Dialog.Title className="mt-4 text-base font-semibold tracking-[-0.01em]">Apagar mensagem?</Dialog.Title>
                   <Dialog.Description className="mt-1 text-xs text-zinc-400">
@@ -683,12 +684,12 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
             <AnimatePresence initial={false}>
               {message.pinned && (
                 <motion.span key="pinned-inline" initial={reduceMotion ? false : { opacity: 0, rotate: -35, scale: 0.4 }} animate={{ opacity: 1, rotate: 0, scale: 1 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, rotate: 25, scale: 0.5 }} transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 650, damping: 20 }} className="flex text-amber-300" title="Mensagem fixada">
-                  <PushPin size={9} weight="fill" aria-hidden="true" />
+                  <PushPin size={9} fill="currentColor" aria-hidden="true" />
                 </motion.span>
               )}
               {message.favorited && (
                 <motion.span key="favorite-inline" initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.75 }} transition={{ duration: reduceMotion ? 0 : 0.18 }} className="flex text-amber-300" title="Mensagem favorita">
-                  <Star size={9} weight="fill" aria-hidden="true" />
+                  <Star size={9} fill="currentColor" aria-hidden="true" />
                 </motion.span>
               )}
             </AnimatePresence>
@@ -707,7 +708,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           transition={{ duration: reduceMotion ? 0 : 0.24, ease: [0.22, 1, 0.36, 1] }}
           className={`mt-1.5 flex items-center gap-1.5 text-[11px] italic ${isPrivate ? "text-zinc-600" : "text-white/55"}`}
         >
-          <Trash size={12} weight="regular" aria-hidden="true" />
+          <Trash size={12} strokeWidth={1.8} aria-hidden="true" />
           <span>{message.direction === "INCOMING" ? "Apagada pelo usuário" : "Mensagem apagada"}</span>
         </motion.p>
       )}
@@ -716,12 +717,12 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           <AnimatePresence initial={false}>
             {message.pinned && (
               <motion.span key="pinned-footer" initial={reduceMotion ? false : { opacity: 0, rotate: -35, scale: 0.4 }} animate={{ opacity: 1, rotate: 0, scale: 1 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, rotate: 25, scale: 0.5 }} transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 650, damping: 20 }} className="flex text-amber-300" title="Mensagem fixada">
-                <PushPin size={9} weight="fill" aria-hidden="true" />
+                <PushPin size={9} fill="currentColor" aria-hidden="true" />
               </motion.span>
             )}
             {message.favorited && (
               <motion.span key="favorite-footer" initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.75 }} transition={{ duration: reduceMotion ? 0 : 0.18 }} className="flex text-amber-300" title="Mensagem favorita">
-                <Star size={9} weight="fill" aria-hidden="true" />
+                <Star size={9} fill="currentColor" aria-hidden="true" />
               </motion.span>
             )}
           </AnimatePresence>

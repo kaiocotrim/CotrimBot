@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Select } from "@base-ui/react/select";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown } from "@/components/icons/animated-lucide";
 import styles from "./bot-select.module.css";
 
 type Choice = { value: string; label: string };

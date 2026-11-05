@@ -1,7 +1,7 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import { ChartNoAxesColumnIncreasing, LoaderCircle, Plus, Send, Trash2, X } from "lucide-react";
+import { ChartNoAxesColumnIncreasing, LoaderCircle, Plus, Send, Trash2, X } from "@/components/icons/animated-lucide";
 import { useRef, useState, type FormEvent } from "react";
 import type { Poll } from "@/types/chat";
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatedSvg } from "@/components/icons/animated-svg";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState, type RefObject } from "react";
 
@@ -116,7 +117,7 @@ export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, o
                       className="flex min-h-[76px] min-w-0 flex-col items-center justify-start gap-2 rounded-2xl text-[12px] leading-4 text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
                     >
                       <span className="flex h-11 w-[58px] items-center justify-center rounded-[22px] bg-[#292929]" style={{ color: option.kind === "image" ? "#58a6ff" : option.kind === "document" ? "#22b8e8" : option.kind === "poll" ? "#ffbd44" : option.color }}>
-                        <svg className="size-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={option.path} /></svg>
+                        <AnimatedSvg className="size-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={option.path} /></AnimatedSvg>
                       </span>
                       <span>{label}</span>
                     </motion.button>
@@ -132,7 +133,7 @@ export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, o
                   className="flex min-h-[76px] min-w-0 flex-col items-center justify-start gap-2 rounded-2xl text-[12px] leading-4 text-zinc-100 outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
                 >
                   <span className={`flex h-11 w-[58px] items-center justify-center rounded-[22px] ${privateEnabled ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/40" : "bg-[#292929] text-zinc-300"}`}>
-                    <svg className="size-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="3" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" /></svg>
+                    <AnimatedSvg className="size-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="3" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" /></AnimatedSvg>
                   </span>
                   <span>Mensagem<br />privada</span>
                 </motion.button>
@@ -143,7 +144,7 @@ export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, o
                   <span aria-hidden="true" className={`flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors ${signatureEnabled ? "bg-emerald-500" : "bg-zinc-600"}`}><span className={`size-4 rounded-full bg-white shadow transition-transform motion-reduce:transition-none ${signatureEnabled ? "translate-x-4" : "translate-x-0"}`} /></span>
                 </button>
                 {allowCloseWithBot && <button type="button" role="menuitem" disabled={closing} aria-busy={closing} onClick={onCloseWithBot} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[13px] text-red-300 outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:opacity-50">
-                  <svg className="size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="6" width="16" height="14" rx="4" /><path d="M12 2v4M8 11h.01M16 11h.01M9 16h6M2 11v4M22 11v4" /></svg>
+                  <AnimatedSvg className="size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="6" width="16" height="14" rx="4" /><path d="M12 2v4M8 11h.01M16 11h.01M9 16h6M2 11v4M22 11v4" /></AnimatedSvg>
                   {closing ? "Encerrando..." : "Encerrar chamado com Bot"}
                 </button>}
               </div>
@@ -185,7 +186,7 @@ export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, o
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => onSelect(option.kind)}
               className="pointer-events-auto absolute bottom-0 left-0 flex size-9 items-center justify-center rounded-full border border-white/15 bg-zinc-900/95 bg-gradient-to-br from-white/10 to-transparent text-zinc-100 shadow-[inset_0_1px_2px_rgba(255,255,255,0.12),0_6px_20px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-colors hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-400">
-              <svg className="size-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={option.path} /></svg>
+              <AnimatedSvg className="size-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={option.path} /></AnimatedSvg>
               <span className="sr-only">{option.label}</span>
             </motion.button>
           ))}
@@ -208,7 +209,7 @@ export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, o
             {closing ? (
               <svg className="size-5 shrink-0 animate-spin text-red-300 motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" opacity=".25" /><path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
             ) : (
-              <svg className="size-5 shrink-0 text-red-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="6" width="16" height="14" rx="4" /><path d="M12 2v4M8 11h.01M16 11h.01M9 16h6M2 11v4M22 11v4" /></svg>
+              <AnimatedSvg className="size-5 shrink-0 text-red-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="6" width="16" height="14" rx="4" /><path d="M12 2v4M8 11h.01M16 11h.01M9 16h6M2 11v4M22 11v4" /></AnimatedSvg>
             )}
             <span className="sr-only">{closing ? "Encerrando..." : "Encerrar chamado com Bot"}</span>
           </motion.button>}
@@ -226,11 +227,11 @@ export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, o
             onClick={onToggleSignature}
             className={`pointer-events-auto absolute bottom-0 left-0 flex size-9 items-center justify-center rounded-full border bg-zinc-900/95 bg-gradient-to-br from-white/10 to-transparent shadow-[inset_0_1px_2px_rgba(255,255,255,0.12),0_6px_20px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-400 ${signatureEnabled ? "border-emerald-400/40 text-emerald-300 hover:bg-emerald-950" : "border-white/15 text-zinc-400 hover:bg-zinc-800"}`}
           >
-            <svg className="size-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <AnimatedSvg className="size-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="m4 20 4.5-1 11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z" />
               <path d="m14.5 6.5 3 3" />
               {!signatureEnabled && <path d="M3 3 21 21" />}
-            </svg>
+            </AnimatedSvg>
             <span className="sr-only">{signatureEnabled ? "Assinatura ativada" : "Assinatura desativada"}</span>
           </motion.button>
         </motion.div>

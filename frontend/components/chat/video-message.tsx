@@ -2,6 +2,7 @@
 
 // Este componente usa estado, eventos de teclado e o DOM para abrir o
 // visualizador em tela cheia; por isso precisa ser executado no cliente.
+import { AnimatedSvg } from "@/components/icons/animated-svg";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -101,7 +102,7 @@ export function VideoMessage({ messageId, mediaUrl, content, showSignature, cont
           aria-label="Vídeo da mensagem"
         />
         {!gifPlayback && <span className="absolute top-1/2 left-1/2 flex size-[46px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[rgba(30,30,30,0.45)] text-white shadow-[0_3px_12px_rgba(0,0,0,0.18)] backdrop-blur-[14px] transition-transform duration-200 ease-out group-hover/video:scale-[1.04] group-active/video:scale-[0.98] motion-reduce:transition-none">
-          <svg className="ml-0.5 size-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10-6.5z" /></svg>
+          <AnimatedSvg className="ml-0.5 size-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10-6.5z" /></AnimatedSvg>
         </span>}
         {gifPlayback && <span className="absolute top-2 left-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-semibold text-white">GIF</span>}
       </button>
@@ -135,10 +136,10 @@ export function VideoMessage({ messageId, mediaUrl, content, showSignature, cont
                 </div>
                 <div className="ml-auto flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.035] p-1 shadow-lg backdrop-blur-xl">
                   <a href={activeItem.mediaUrl} download aria-label="Baixar mídia" className={controlClass}>
-                    <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 20h14" /></svg>
+                    <AnimatedSvg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 20h14" /></AnimatedSvg>
                   </a>
                   <button type="button" onClick={() => setViewerOpen(false)} aria-label="Fechar visualizador" className={controlClass}>
-                    <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m5 5 14 14M19 5 5 19" /></svg>
+                    <AnimatedSvg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m5 5 14 14M19 5 5 19" /></AnimatedSvg>
                   </button>
                 </div>
               </header>
@@ -155,8 +156,8 @@ export function VideoMessage({ messageId, mediaUrl, content, showSignature, cont
                 </motion.div>
                 {/* As setas aparecem apenas quando existe outra mídia para navegar. */}
                 {gallery.length > 1 && <>
-                  <button type="button" onClick={(event) => { event.stopPropagation(); setActiveIndex((activeIndex - 1 + gallery.length) % gallery.length); }} aria-label="Mídia anterior" className="absolute left-5 flex size-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white hover:bg-white/10"><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg></button>
-                  <button type="button" onClick={(event) => { event.stopPropagation(); setActiveIndex((activeIndex + 1) % gallery.length); }} aria-label="Próxima mídia" className="absolute right-5 flex size-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white hover:bg-white/10"><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></button>
+                  <button type="button" onClick={(event) => { event.stopPropagation(); setActiveIndex((activeIndex - 1 + gallery.length) % gallery.length); }} aria-label="Mídia anterior" className="absolute left-5 flex size-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white hover:bg-white/10"><AnimatedSvg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7" /></AnimatedSvg></button>
+                  <button type="button" onClick={(event) => { event.stopPropagation(); setActiveIndex((activeIndex + 1) % gallery.length); }} aria-label="Próxima mídia" className="absolute right-5 flex size-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white hover:bg-white/10"><AnimatedSvg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7" /></AnimatedSvg></button>
                 </>}
               </div>
               {/* Legenda da mídia atualmente selecionada. */}
@@ -164,7 +165,7 @@ export function VideoMessage({ messageId, mediaUrl, content, showSignature, cont
               {/* Faixa de miniaturas para navegação direta entre imagens e vídeos. */}
               {gallery.length > 1 && <div className="flex h-[calc(5rem+env(safe-area-inset-bottom))] shrink-0 items-center justify-center gap-2 overflow-x-auto border-t border-white/10 px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
                 {gallery.map((item, index) => <button key={item.id} type="button" onClick={() => setActiveIndex(index)} aria-label={`Abrir mídia ${index + 1}`} aria-current={index === activeIndex} className={`relative h-14 w-16 shrink-0 overflow-hidden rounded-md border-2 bg-black/30 p-0.5 ${index === activeIndex ? "border-emerald-400" : "border-transparent hover:border-white/30"}`}>
-                  {item.type === "VIDEO" ? <><video src={`${item.mediaUrl}#t=0.1`} preload="metadata" muted playsInline className="h-full w-full rounded-[3px] object-cover" /><span className="absolute inset-0 flex items-center justify-center bg-black/15"><span className="flex size-6 items-center justify-center rounded-full bg-black/65"><svg className="ml-px size-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10-6.5z" /></svg></span></span></> : <img src={item.mediaUrl} alt="" loading="lazy" className="h-full w-full rounded-[3px] object-cover" />}
+                  {item.type === "VIDEO" ? <><video src={`${item.mediaUrl}#t=0.1`} preload="metadata" muted playsInline className="h-full w-full rounded-[3px] object-cover" /><span className="absolute inset-0 flex items-center justify-center bg-black/15"><span className="flex size-6 items-center justify-center rounded-full bg-black/65"><AnimatedSvg className="ml-px size-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10-6.5z" /></AnimatedSvg></span></span></> : <img src={item.mediaUrl} alt="" loading="lazy" className="h-full w-full rounded-[3px] object-cover" />}
                 </button>)}
               </div>}
             </motion.div>

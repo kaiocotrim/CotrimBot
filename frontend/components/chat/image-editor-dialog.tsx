@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import { Dialog } from "@base-ui/react/dialog";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "@/components/icons/animated-lucide";
 import { EditorHeader, EditorToolPanel, EditorToolbar, type EditorTool } from "@/components/chat/image-editor-controls";
 import { DEFAULT_ADJUSTMENT, cropBetween, exportEditedImage, renderEditedImage, restoreImageFraming, type ImageAdjustment, type ImageCrop, type ImageEdit, type ImagePoint, type ImageShape } from "@/lib/image-editor";
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Eye, EyeOff, LoaderCircle } from "lucide-react";
+import { Eye, EyeOff, LoaderCircle } from "@/components/icons/animated-lucide";
 import styles from "./login-layout.module.css";
 
 interface LoginFormProps {

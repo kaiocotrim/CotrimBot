@@ -3,7 +3,7 @@
 import headerStyles from "./contact-info-header.module.css";
 
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
-import { Bot, Building2, Check, ChevronDown, ExternalLink, Link2, LoaderCircle, MessageCircle, Pencil, UserRound, X } from "lucide-react";
+import { Bot, Building2, Check, ChevronDown, ExternalLink, Link2, LoaderCircle, MessageCircle, Pencil, UserRound, X } from "@/components/icons/animated-lucide";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ContactPhoto } from "@/components/chat/contact-photo";

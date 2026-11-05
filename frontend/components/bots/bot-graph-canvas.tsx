@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { GitBranch, ImagePlus, ListTree, Maximize2, MessageSquare, Minus, Plus, SquareCheck, UserRound, Workflow, X, Unplug, Move, Play } from 'lucide-react';
+import { GitBranch, ImagePlus, ListTree, Maximize2, MessageSquare, Minus, Plus, SquareCheck, UserRound, Workflow, X, Unplug, Move, Play } from "@/components/icons/animated-lucide";
 import type { BotFlow, BotOption } from '@/lib/bot-api';
 import { graphNodes, menuGraphId, type GraphNode, type GraphPoint } from '@/lib/bot-graph';
 import { BotSelect } from "./bot-select";

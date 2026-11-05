@@ -3,8 +3,16 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
-import { Archive, Bell, Building2, CalendarDays, ContactRound, MessagesSquare, UserRound, UserRoundCheck, UsersRound } from "lucide-react";
+import { Building2, UserRound } from "@/components/icons/animated-lucide";
 import { useState } from "react";
+import { AnimatedIconButton } from "@/components/icons/animated-icon-button";
+import { ArchiveIcon } from "@/components/icons/lucide-animated/archive";
+import { BellIcon } from "@/components/icons/lucide-animated/bell";
+import { CalendarDaysIcon } from "@/components/icons/lucide-animated/calendar-days";
+import { IdCardIcon } from "@/components/icons/lucide-animated/id-card";
+import { MessageSquareIcon } from "@/components/icons/lucide-animated/message-square";
+import { UserRoundCheckIcon } from "@/components/icons/lucide-animated/user-round-check";
+import { UsersRoundIcon } from "@/components/icons/lucide-animated/users-round";
 import { AccountSettings } from "@/components/chat/account-settings";
 import { CalendarModal } from "@/components/chat/calendar-modal";
 import { MediaLibrary } from "@/components/chat/media-library";
@@ -20,12 +28,12 @@ type RailUser = {
 };
 
 const sections = [
-  { id: "notifications", label: "Notificações", icon: Bell },
-  { id: "conversations", label: "Conversas", icon: MessagesSquare },
-  { id: "contacts", label: "Contatos", icon: ContactRound },
-  { id: "groups", label: "Grupos", icon: UsersRound },
-  { id: "mine", label: "Minhas conversas", icon: UserRoundCheck },
-  { id: "archived", label: "Arquivadas", icon: Archive },
+  { id: "notifications", label: "Notificações", icon: BellIcon },
+  { id: "conversations", label: "Conversas", icon: MessageSquareIcon },
+  { id: "contacts", label: "Contatos", icon: IdCardIcon },
+  { id: "groups", label: "Grupos", icon: UsersRoundIcon },
+  { id: "mine", label: "Minhas conversas", icon: UserRoundCheckIcon },
+  { id: "archived", label: "Arquivadas", icon: ArchiveIcon },
 ] as const;
 
 function UnreadBadge({ count }: { count: number }) {
@@ -80,7 +88,8 @@ export function ChatNavigationRail({
       </div>
       <div className="flex min-h-0 flex-1 w-full -translate-y-[74px] flex-col items-center justify-center gap-1">
         {sections.filter(({ id }) => !unifiedConversations || (id !== "contacts" && id !== "groups" && id !== "mine")).map(({ id, label, icon: Icon }) => (
-          <motion.button
+          <AnimatedIconButton
+            icon={Icon}
             key={id}
             type="button"
             aria-label={id === "conversations" && unreadCount > 0
@@ -102,12 +111,12 @@ export function ChatNavigationRail({
                 transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 460, damping: 38 }}
               />
             )}
-            <Icon aria-hidden="true" className="relative size-5" strokeWidth={1.8} />
             {id === "conversations" && <UnreadBadge count={unreadCount} />}
             {id === "notifications" && <UnreadBadge count={notificationUnreadCount} />}
-          </motion.button>
+          </AnimatedIconButton>
         ))}
-        <button
+        <AnimatedIconButton
+          icon={CalendarDaysIcon}
           type="button"
           onClick={() => setCalendarOpen(true)}
           aria-haspopup="dialog"
@@ -115,9 +124,7 @@ export function ChatNavigationRail({
           aria-label="Calendário"
           title="Calendário"
           className="flex size-11 items-center justify-center rounded-xl text-zinc-600 transition-[background-color,color,transform] hover:text-zinc-100 active:scale-90 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/70"
-        >
-          <CalendarDays aria-hidden="true" className="size-5" strokeWidth={1.8} />
-        </button>
+        />
         {company && (
           <>
             <span aria-hidden="true" className="my-2 h-px w-7 shrink-0 bg-white/[0.1]" />

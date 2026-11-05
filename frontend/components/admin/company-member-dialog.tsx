@@ -2,7 +2,7 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import { motion, useReducedMotion } from "framer-motion";
-import { Camera, ShieldCheck, X } from "lucide-react";
+import { Camera, ShieldCheck, X } from "@/components/icons/animated-lucide";
 import { useRef, useState, type FormEvent } from "react";
 import { updateCompanyMemberAvatar, updateCompanyMemberProfile } from "@/lib/company-api";
 import { authClient, useSession } from "@/lib/auth-client";

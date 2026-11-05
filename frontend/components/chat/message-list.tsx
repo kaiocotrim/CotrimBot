@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatedSvg } from "@/components/icons/animated-svg";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Avatar } from "@/components/chat/avatar";
@@ -373,7 +374,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
                   className="absolute inset-0 z-20 cursor-pointer rounded-2xl focus-visible:outline-2 focus-visible:outline-white/70"
                 >
                   <span className={`absolute left-3 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded-[6px] border transition-[color,background-color,border-color,transform,box-shadow] duration-150 ${selected ? "scale-100 border-white bg-white text-zinc-950 shadow-[0_2px_10px_rgba(255,255,255,0.22)]" : "scale-95 border-white/60 bg-white/[0.04] text-transparent"}`}>
-                    <svg className="size-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8 3 3 7-7" /></svg>
+                    <AnimatedSvg className="size-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8 3 3 7-7" /></AnimatedSvg>
                   </span>
                 </button>
               )}
@@ -422,9 +423,9 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
         tabIndex={showScrollButton ? 0 : -1}
         className={`absolute right-1/2 bottom-[calc(var(--chat-composer-height,0px)+12px)] max-lg:bottom-3 z-20 flex size-9 translate-x-1/2 items-center justify-center rounded-full border border-white/15 bg-zinc-900/90 text-zinc-200 shadow-[0_6px_20px_rgba(0,0,0,0.35)] backdrop-blur-xl transition-[opacity,transform,background-color] duration-200 hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-white/60 motion-reduce:transition-none ${showScrollButton ? "scale-100 opacity-100" : "pointer-events-none scale-90 opacity-0"}`}
       >
-        <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <AnimatedSvg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M12 4v15M6.5 13.5 12 19l5.5-5.5" />
-        </svg>
+        </AnimatedSvg>
       </button>
     </div>
     </GroupMentionContext.Provider>

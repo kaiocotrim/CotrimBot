@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "framer-motion";
-import { Maximize2 } from "lucide-react";
+import { Maximize2 } from "@/components/icons/animated-lucide";
 import styles from "./bot-designer.module.css";
 
 export function BotMessageField({ label, value, onChange, maxLength = 8000, placeholder }: {

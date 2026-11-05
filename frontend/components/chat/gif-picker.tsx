@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Search, Settings2 } from "lucide-react";
+import { Loader2, Search, Settings2 } from "@/components/icons/animated-lucide";
 import { downloadGif, readGiphyKey, saveGiphyKey, searchGifs, type GiphyGif } from "@/lib/giphy";
 import styles from "./gif-picker.module.css";
 

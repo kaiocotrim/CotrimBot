@@ -2,7 +2,9 @@
 
 import { Popover } from "@base-ui/react/popover";
 import { motion, useReducedMotion } from "framer-motion";
-import { AtSign, Bell, MessageSquare, Trash2, UserRoundPlus } from "lucide-react";
+import { AtSign, MessageSquare, Trash2, UserRoundPlus } from "@/components/icons/animated-lucide";
+import { AnimatedIconButton } from "@/components/icons/animated-icon-button";
+import { BellIcon } from "@/components/icons/lucide-animated/bell";
 import type { AppNotification } from "@/lib/notification-api";
 
 type NotificationsPopoverProps = {
@@ -40,10 +42,10 @@ export function NotificationsPopover({
   return (
     <Popover.Root>
       <Popover.Trigger
+        render={<AnimatedIconButton icon={BellIcon} iconSize={18} iconStrokeWidth={2} iconClassName="opacity-30 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100" />}
         aria-label={unreadCount ? `Notificações, ${unreadCount} não lidas` : "Notificações"}
         className="group relative flex size-10 items-center justify-center rounded-full bg-zinc-950 lg:size-8 text-zinc-500 transition-[background-color,color,transform] hover:text-white focus-visible:text-white active:scale-95"
       >
-        <Bell aria-hidden="true" className="size-[18px] opacity-30 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100" />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 flex min-w-4 items-center justify-center rounded-full bg-zinc-600/80 px-1 text-[10px] font-semibold leading-4 text-zinc-200 opacity-60 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
             {unreadCount > 99 ? "99+" : unreadCount}

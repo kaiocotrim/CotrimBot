@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Check, ChevronLeft, ChevronRight, Search, Send, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Search, Send, X } from "@/components/icons/animated-lucide";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { CalendarDatePicker } from "@/components/chat/calendar-date-picker";

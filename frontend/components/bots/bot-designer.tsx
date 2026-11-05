@@ -5,7 +5,7 @@ import Image from "next/image";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowDown, ArrowLeft, ArrowUp, BatteryFull, Bot as BotIcon, ChevronDown, ChevronRight, CheckCheck, Copy, GitBranch, Info, ImagePlus, ListTree, LoaderCircle, MessageSquare, Play, Plus, RotateCcw, Save, Send, Settings2, Signal, Smile, SquareCheck, Trash2, UserRound, Wifi, Workflow, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, BatteryFull, Bot as BotIcon, ChevronDown, ChevronRight, CheckCheck, Copy, GitBranch, Info, ImagePlus, ListTree, LoaderCircle, MessageSquare, Play, Plus, RotateCcw, Save, Send, Settings2, Signal, Smile, SquareCheck, Trash2, UserRound, Wifi, Workflow, X } from "@/components/icons/animated-lucide";
 import { useSession } from "@/lib/auth-client";
 import { MessageText } from "@/components/chat/message-text";
 import { botImageUrl, botRequest, emptyFlow, type Bot, type BotFlow, type BotList, type BotMenu, type BotOption, type Simulation } from "@/lib/bot-api";
@@ -16,6 +16,7 @@ import { BotEditorPanel } from "./bot-editor-panel";
 import { BotSelect } from "./bot-select";
 import { BotMessageField } from "./bot-message-field";
 import { BotImageInput } from "./bot-image-input";
+import { BotConfigurationTransfer } from "./bot-configuration-transfer";
 import { MenuDetailsDialog } from "./menu-details-dialog";
 import { MenuNameDialog } from "./menu-name-dialog";
 import { MenuTree } from "./menu-tree";
@@ -26,7 +27,7 @@ import { BotGraphCanvas } from './bot-graph-canvas';
 import { connectBotOption } from '@/lib/bot-graph';
 import styles from "./bot-designer.module.css";
 
-type FlowSnapshot = { flow: BotFlow; menuId: string; selection: NodeSelection; showEditor: boolean };
+type FlowSnapshot = { flow: BotFlow; menuId: string; selection: NodeSelection; showEditor: boolean; name: string };
 
 const MotionLink = motion.create(Link);
 
@@ -156,12 +157,13 @@ export default function BotDesigner() {
       const source = redo ? redoHistory.current : undoHistory.current;
       const destination = redo ? undoHistory.current : redoHistory.current;
       let snapshot = source.pop();
-      while (snapshot && (snapshot.flow === flow || JSON.stringify(snapshot.flow) === JSON.stringify(flow))) snapshot = source.pop();
+      while (snapshot && snapshot.name === name && (snapshot.flow === flow || JSON.stringify(snapshot.flow) === JSON.stringify(flow))) snapshot = source.pop();
       if (!snapshot) return;
       event.preventDefault();
-      destination.push({ flow, menuId, selection, showEditor });
+      destination.push({ flow, menuId, selection, showEditor, name });
       historyGroup.current = null;
       setFlow(snapshot.flow);
+      setName(snapshot.name);
       setMenuId(snapshot.menuId);
       setSelection(snapshot.selection);
       setShowEditor(snapshot.showEditor);
@@ -176,7 +178,7 @@ export default function BotDesigner() {
     };
     document.addEventListener("keydown", handleHistory);
     return () => document.removeEventListener("keydown", handleHistory);
-  }, [flow, menuId, selection, showEditor, canvasMode, busy, uploadingImage, loading, isPending, session]);
+  }, [flow, menuId, selection, showEditor, name, canvasMode, busy, uploadingImage, loading, isPending, session]);
 
   function selectNode(next: NodeSelection) {
     setSelection(next);
@@ -187,7 +189,7 @@ export default function BotDesigner() {
     if (next === flow) return;
     const now = performance.now();
     if (!group || historyGroup.current?.key !== group || now - historyGroup.current.at > 750) {
-      undoHistory.current.push({ flow, menuId, selection, showEditor });
+      undoHistory.current.push({ flow, menuId, selection, showEditor, name });
       if (undoHistory.current.length > 50) undoHistory.current.shift();
     }
     historyGroup.current = group ? { key: group, at: now } : null;
@@ -357,6 +359,13 @@ export default function BotDesigner() {
               </motion.button>
             </motion.div>}
           </AnimatePresence>
+          <BotConfigurationTransfer name={name} flow={flow} members={list.members ?? []} busy={busy || uploadingImage || loading} dirty={dirty}
+            onProcessingChange={setUploadingImage} onNotice={setNotice} onImport={imported => {
+              change(imported.flow);
+              setName(imported.name); setMenuId(imported.flow.rootMenuId); setSelection({ kind: "message" });
+              setShowEditor(false); setShowTest(false); setPreviewMenuId(null); setTestStartMenuId(undefined);
+              setSimulationTimes([]); setInput(""); setTab("flow");
+            }} />
           <motion.button layout="position" {...controlMotion} className={styles.primary} disabled={busy || uploadingImage || loading || !name.trim()} onClick={() => void work(publish)}>{busy ? <LoaderCircle size={15} className="animate-spin" /> : <Send size={15} />} Publicar</motion.button>
         </motion.div>
         <div className={styles.tabs} role="tablist" aria-label="Central de Bots">

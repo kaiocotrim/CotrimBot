@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { BotDisclosure } from "./bot-disclosure";
-import { ChevronRight, ListTree, Pencil, Search } from "lucide-react";
+import { ChevronRight, ListTree, Pencil, Search } from "@/components/icons/animated-lucide";
 import type { BotFlow, BotMenu } from "@/lib/bot-api";
 import styles from "./bot-designer.module.css";
 

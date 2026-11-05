@@ -1,11 +1,17 @@
 "use client";
 
-import { ArrowLeft, CheckCheck, EllipsisVertical, Forward, Info, Phone, ScanLine, Search, Star, Trash2, UserRoundCheck, UserRoundPlus, X } from "lucide-react";
+import { AnimatedSvg } from "@/components/icons/animated-svg";
+import { ArrowLeft, CheckCheck, Forward, Phone, ScanLine, Search, Star, Trash2, UserRoundCheck, UserRoundPlus, X } from "@/components/icons/animated-lucide";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { parsePhoneNumberFromString } from "libphonenumber-js/min";
 import { useEffect, useRef, useState } from "react";
 import type { Contact, ContactPresence } from "@/types/chat";
 import { Avatar } from "@/components/chat/avatar";
+import { AnimatedIconButton } from "@/components/icons/animated-icon-button";
+import { EllipsisVerticalIcon } from "@/components/icons/lucide-animated/ellipsis-vertical";
+import { InfoIcon } from "@/components/icons/lucide-animated/info";
+import { UserRoundCheckIcon } from "@/components/icons/lucide-animated/user-round-check";
+import { UserRoundPlusIcon } from "@/components/icons/lucide-animated/user-round-plus";
 import styles from "./chat-header.module.css";
 
 type ChatHeaderProps = {
@@ -139,7 +145,7 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
       ) : searchOpen ? (
         <>
           <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3">
-            <svg className="size-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
+            <AnimatedSvg className="size-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></AnimatedSvg>
             <input ref={searchRef} type="search" value={searchQuery} onChange={(event) => onSearchQueryChange(event.target.value)} placeholder="Localizar mensagem..." className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-zinc-500 lg:text-sm" />
           </label>
           <span className="shrink-0 text-xs tabular-nums text-zinc-400">{resultCount ? currentResult + 1 : 0}/{resultCount}</span>
@@ -171,18 +177,20 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
             >
               <Phone className="size-5" fill="currentColor" strokeWidth={1.6} aria-hidden="true" />
             </a>}
-            {!contact.isGroup && <button
+            {!contact.isGroup && <AnimatedIconButton
+              icon={assignedToMe ? UserRoundCheckIcon : UserRoundPlusIcon}
+              iconStrokeWidth={2}
               type="button"
               onClick={() => void toggleAssignment()}
               disabled={assigning}
               aria-label={assignedToMe ? "Deixar de acompanhar conversa" : "Acompanhar conversa"}
               title={assignedToMe ? "Você acompanha esta conversa · clique para sair" : assignedUserIds.length ? "Acompanhar junto com os outros responsáveis" : "Assumir conversa para aparecer em Minhas"}
               className={`${styles.assignmentButton} ${actionClass} ${assignedToMe ? "text-white" : ""}`}
-            >
-              {assignedToMe ? <UserRoundCheck className="size-5" aria-hidden="true" /> : <UserRoundPlus className="size-5" aria-hidden="true" />}
-            </button>}
+            />}
             <div ref={menuRef} className="relative">
-              <button
+              <AnimatedIconButton
+                icon={EllipsisVerticalIcon}
+                iconStrokeWidth={2}
                 type="button"
                 onClick={() => setMenuOpen((open) => !open)}
                 aria-label="Mais opções"
@@ -190,9 +198,7 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
                 aria-expanded={menuOpen}
                 title="Mais opções"
                 className={`${styles.mobileAction} ${actionClass} ${menuOpen ? "text-white" : ""}`}
-              >
-                <EllipsisVertical className="size-5" strokeWidth={2} aria-hidden="true" />
-              </button>
+              />
               <AnimatePresence>
               {menuOpen && (
                 <motion.div
@@ -260,15 +266,15 @@ export function ChatHeader({ contact, currentUserId, onSetContactAssignment, isT
               )}
               </AnimatePresence>
             </div>
-            <button
+            <AnimatedIconButton
+              icon={InfoIcon}
+              iconStrokeWidth={2}
               type="button"
               onClick={onOpenContactInfo}
               aria-label="Informações do contato"
               title="Informações do contato"
               className={`${styles.mobileAction} ${actionClass}`}
-            >
-              <Info className="size-5" strokeWidth={2} aria-hidden="true" />
-            </button>
+            />
           </div>
           {assignmentError && <span role="alert" className="absolute top-14 right-2 z-30 max-w-[min(16rem,calc(100vw-1rem))] sm:right-4 rounded-lg border border-red-400/25 bg-zinc-950 px-3 py-2 text-xs text-red-300 shadow-xl">{assignmentError}</span>}
         </>

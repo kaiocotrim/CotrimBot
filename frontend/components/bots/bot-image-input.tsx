@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { ImagePlus, LoaderCircle, X } from "lucide-react";
+import { ImagePlus, LoaderCircle, X } from "@/components/icons/animated-lucide";
 import { botImageUrl, uploadBotImage } from "@/lib/bot-api";
 import styles from "./bot-designer.module.css";
 

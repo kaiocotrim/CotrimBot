@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { BookOpen, ChevronDown, LoaderCircle, Power, Save, Settings2 } from "lucide-react";
+import { BookOpen, ChevronDown, LoaderCircle, Power, Save, Settings2 } from "@/components/icons/animated-lucide";
 import type { BotFlow, BotMember } from "@/lib/bot-api";
 import { BotSelect } from "./bot-select";
 import styles from "./bot-settings.module.css";

@@ -311,7 +311,7 @@ async function mockApi(page: Page, messageCount = 1, compactExamples = false, co
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   const message = { id: 1, externalId: "test-1", content: `Mensagem longa ${longWord}`, private: false, contactId: 1, direction: "INCOMING", type: "TEXT", createdAt: new Date().toISOString(), readAt: null, reaction: null, senderName: null, senderPhone: null, senderProfilePictureUrl: null };
   const messages = Array.from({ length: messageCount }, (_, index) => ({ ...message, id: index + 1, externalId: `test-${index + 1}`, private: compactExamples && index === 1, content: compactExamples && index < 2 ? index === 0 ? "OSS" : "Nota privada" : `Mensagem ${index + 1}: ${message.content}` }));
-  const contact = { id: 1, name: "Contato de teste", phone: "5511999999999", isGroup: false, archived: false, unreadCount: 0, profilePictureUrl: null, messages: [message] };
+  const contact = { id: 1, name: "Contato de teste", phone: "5511999999999", isGroup: false, archived: false, unreadCount: 0, assignedUserIds: ["test-user"], profilePictureUrl: null, messages: [message] };
 
   // Toda API é simulada no navegador, como no teste de digitação.
   await page.route("**/socket.io/**", (route) => route.abort());
@@ -789,7 +789,7 @@ test("menu de conversas pode ser recolhido no desktop (1280px)", async ({ page }
   await page.goto("/");
 
   await expect(page.getByRole("button", { name: "Voltar para conversas" })).toBeHidden();
-  await expect(page.getByRole("heading", { name: "CotrimBot" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Conversas" })).toBeVisible();
   await page.getByRole("button", { name: "Contato de teste", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Mensagem", exact: true })).toBeVisible();
   await expect(page.locator("#chat-sidebar")).toBeVisible();
@@ -799,14 +799,14 @@ test("menu de conversas pode ser recolhido no desktop (1280px)", async ({ page }
   const expandedWidth = (await sidebar.boundingBox())!.width;
   const collapseButton = page.getByRole("button", { name: "Recolher menu de conversas" });
   await collapseButton.click();
-  await expect(page.getByRole("heading", { name: "CotrimBot" })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Conversas" })).toBeHidden();
   await expect(page.getByRole("button", { name: "Expandir menu de conversas" })).toBeFocused();
   await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);
   await expect.poll(async () => (await sidebar.boundingBox())!.width).toBeLessThan(expandedWidth);
 
   const expandButton = page.getByRole("button", { name: "Expandir menu de conversas" });
   await expandButton.click();
-  await expect(page.getByRole("heading", { name: "CotrimBot" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Conversas" })).toBeVisible();
   await expect(collapseButton).toBeFocused();
   await expect(page.getByRole("navigation", { name: "Navegação principal" })).toBeVisible();
   await expectNoHorizontalOverflow(page);

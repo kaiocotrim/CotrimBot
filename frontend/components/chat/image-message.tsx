@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatedSvg } from "@/components/icons/animated-svg";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -115,10 +116,10 @@ export function ImageMessage({ messageId, mediaUrl, content, showSignature, view
               </p>
             </div>
             <div className="ml-auto flex h-11 items-center rounded-full border border-white/10 bg-white/[0.035] px-1 text-zinc-100 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_6px_18px_rgba(0,0,0,0.18)] backdrop-blur-xl">
-              <button type="button" onClick={() => setZoom((value) => Math.max(0.5, value - 0.25))} aria-label="Diminuir zoom" className={viewerIconButtonClass}><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M7.5 10.5h6M15.5 15.5 21 21" /></svg></button>
-              <button type="button" onClick={() => setZoom((value) => Math.min(3, value + 0.25))} aria-label="Aumentar zoom" className={viewerIconButtonClass}><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M10.5 7.5v6M7.5 10.5h6M15.5 15.5 21 21" /></svg></button>
-              <a href={activeItem.mediaUrl} download aria-label="Baixar imagem" className={viewerIconButtonClass}><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 20h14" /></svg></a>
-              <button type="button" onClick={closeViewer} aria-label="Fechar visualizador" className={viewerIconButtonClass}><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m5 5 14 14M19 5 5 19" /></svg></button>
+              <button type="button" onClick={() => setZoom((value) => Math.max(0.5, value - 0.25))} aria-label="Diminuir zoom" className={viewerIconButtonClass}><AnimatedSvg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M7.5 10.5h6M15.5 15.5 21 21" /></AnimatedSvg></button>
+              <button type="button" onClick={() => setZoom((value) => Math.min(3, value + 0.25))} aria-label="Aumentar zoom" className={viewerIconButtonClass}><AnimatedSvg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M10.5 7.5v6M7.5 10.5h6M15.5 15.5 21 21" /></AnimatedSvg></button>
+              <a href={activeItem.mediaUrl} download aria-label="Baixar imagem" className={viewerIconButtonClass}><AnimatedSvg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 20h14" /></AnimatedSvg></a>
+              <button type="button" onClick={closeViewer} aria-label="Fechar visualizador" className={viewerIconButtonClass}><AnimatedSvg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m5 5 14 14M19 5 5 19" /></AnimatedSvg></button>
             </div>
           </header>
 
@@ -140,8 +141,8 @@ export function ImageMessage({ messageId, mediaUrl, content, showSignature, view
             </motion.div>
             {gallery.length > 1 && (
               <>
-                <button type="button" onClick={(event) => { event.stopPropagation(); selectImage((activeIndex - 1 + gallery.length) % gallery.length); }} aria-label="Imagem anterior" className={`${sideButtonClass} left-5`}><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg></button>
-                <button type="button" onClick={(event) => { event.stopPropagation(); selectImage((activeIndex + 1) % gallery.length); }} aria-label="Próxima imagem" className={`${sideButtonClass} right-5`}><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></button>
+                <button type="button" onClick={(event) => { event.stopPropagation(); selectImage((activeIndex - 1 + gallery.length) % gallery.length); }} aria-label="Imagem anterior" className={`${sideButtonClass} left-5`}><AnimatedSvg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7" /></AnimatedSvg></button>
+                <button type="button" onClick={(event) => { event.stopPropagation(); selectImage((activeIndex + 1) % gallery.length); }} aria-label="Próxima imagem" className={`${sideButtonClass} right-5`}><AnimatedSvg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7" /></AnimatedSvg></button>
               </>
             )}
           </div>
@@ -149,7 +150,7 @@ export function ImageMessage({ messageId, mediaUrl, content, showSignature, view
           {activeHasCaption && <p className="shrink-0 px-6 py-2 text-center text-xs text-zinc-300"><MessageText content={activeItem.content} showSignature={activeItem.showSignature} /></p>}
           {gallery.length > 1 && (
             <div className="flex h-[calc(5rem+env(safe-area-inset-bottom))] shrink-0 items-center justify-center gap-2 overflow-x-auto border-t border-white/10 px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
-              <a href={activeItem.mediaUrl} download aria-label="Baixar imagem atual" className={`${viewerButtonClass} shrink-0`}><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 20h14" /></svg></a>
+              <a href={activeItem.mediaUrl} download aria-label="Baixar imagem atual" className={`${viewerButtonClass} shrink-0`}><AnimatedSvg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 20h14" /></AnimatedSvg></a>
               {gallery.map((item, index) => (
                 <button key={item.id} type="button" onClick={() => selectImage(index)} aria-label={`Abrir imagem ${index + 1}`} aria-current={index === activeIndex} className={`h-14 w-16 shrink-0 overflow-hidden rounded-md border-2 bg-black/30 p-0.5 transition-colors ${index === activeIndex ? "border-emerald-400" : "border-transparent hover:border-white/30"}`}>
                   {/* URL autenticada e dinâmica do backend; não passa pelo otimizador do Next. */}
@@ -175,7 +176,7 @@ export function ImageMessage({ messageId, mediaUrl, content, showSignature, view
         />
         {viewOnce && (
           <span className="absolute top-2 left-2 flex items-center gap-1 rounded-full border border-white/15 bg-black/55 px-2 py-1 text-[10px] font-medium text-white/90 shadow-sm backdrop-blur-md">
-            <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.5" /><path d="m4 4 16 16" /></svg>
+            <AnimatedSvg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.5" /><path d="m4 4 16 16" /></AnimatedSvg>
             <span>Visualização única</span>
           </span>
         )}
