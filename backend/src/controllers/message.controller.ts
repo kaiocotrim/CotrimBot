@@ -23,6 +23,7 @@ import {
 } from "../services/transcription.service.js";
 
 import { getSatisfactionSurvey } from "../services/bot.service.js";
+import { readStoredMedia, uploadMediaObject } from "../services/media-storage.service.js";
 import { getSignedOutgoingText, SignatureMembershipError } from "../services/user-signature.service.js";
 import { notifyMention } from "../services/notification.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
@@ -444,6 +445,24 @@ export async function sendMediaToContact(
       },
       include: sentByUserInclude,
     });
+
+    // Guarda uma cópia do arquivo no S3; se falhar, getMessageMedia busca na Evolution.
+    try {
+      const storageKey = await uploadMediaObject(file.buffer, file.mimetype);
+      const record = {
+        storageKey,
+        data: null,
+        mimetype: file.mimetype,
+        fileName: file.originalname,
+      };
+      await prisma.messageMedia.upsert({
+        where: { messageId: message.id },
+        create: { messageId: message.id, ...record },
+        update: record,
+      });
+    } catch (cacheError) {
+      console.error("Não foi possível guardar a mídia enviada no S3:", cacheError);
+    }
 
     // Atualiza o frontend em tempo real.
     const io = getSocketServer();
@@ -889,11 +908,11 @@ export async function getMessageMedia(
       where: { messageId: message.id },
     });
 
-    if (cachedMedia) {
+    if (cachedMedia && (cachedMedia.storageKey || cachedMedia.data)) {
       return sendMediaResponse(
         req,
         res,
-        Buffer.from(cachedMedia.data),
+        await readStoredMedia(cachedMedia),
         cachedMedia.mimetype,
         cachedMedia.fileName,
       );
@@ -913,16 +932,18 @@ export async function getMessageMedia(
     );
 
     try {
+      const storageKey = await uploadMediaObject(buffer, media.mimetype);
       await prisma.messageMedia.create({
         data: {
           messageId: message.id,
-          data: buffer,
+          storageKey,
+          data: null,
           mimetype: media.mimetype,
           fileName: media.fileName ?? null,
         },
       });
     } catch (cacheError) {
-      console.error("Não foi possível guardar a mídia no cache:", cacheError);
+      console.error("Não foi possível guardar a mídia no S3:", cacheError);
     }
 
     return sendMediaResponse(req, res, buffer, media.mimetype, media.fileName);

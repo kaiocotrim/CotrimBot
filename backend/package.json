@@ -17,6 +17,7 @@
     "prisma:deploy": "prisma migrate deploy --config prisma.config.ts",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:seed:technicos-alfas": "tsx scripts/seed-technicos-alfas.ts",
+    "media:migrate-s3": "tsx scripts/migrate-media-to-s3.ts",
     "push:generate-vapid-keys": "tsx scripts/generate-vapid-keys.ts"
   },
   "devDependencies": {
@@ -31,6 +32,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1162.0",
     "@better-auth/api-key": "^1.7.14",
     "@prisma/adapter-mariadb": "^7.10.0",
     "@prisma/client": "^7.10.0",

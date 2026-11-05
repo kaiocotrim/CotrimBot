@@ -7,7 +7,7 @@ import { SAC_TEST_CATALOG } from '../src/services/bot-sac-test.js';
 
 function harness() {
   const flow = fixture();
-  const state = { sent: [] as string[], mediaSent: [] as any[], cachedMedia: [] as any[], outgoing: [] as any[], emitted: [] as unknown[], contactEvents: [] as unknown[], logs: new Map<number, Record<string, unknown>>(), session: null as any,
+  const state = { sent: [] as string[], mediaSent: [] as any[], storedMedia: [] as any[], cachedMedia: [] as any[], outgoing: [] as any[], emitted: [] as unknown[], contactEvents: [] as unknown[], logs: new Map<number, Record<string, unknown>>(), session: null as any,
     contact: { id: 1, phone: "5511999999999", name: "Cliente", isGroup: false, blocked: false, assignments: [{ userId: "inforbot-id" }] as unknown[] },
     members: [{ userId: "inforbot-id", organizationId: "company-a", displayName: "Inforbot", user: { name: "Bot de atendimento" } }] as { userId: string; organizationId: string; displayName: string | null; user: { name: string } }[],
     message: { id: 1, contactId: 1, direction: "INCOMING", type: "TEXT", content: "Oi" }, failSend: false, imageAvailable: true,
@@ -44,7 +44,7 @@ function harness() {
   };
   let queue = Promise.resolve();
   db.$transaction = (fn: any) => { const next = queue.then(() => fn(db)); queue = next.catch(() => {}); return next; };
-  const process = createBotProcessor(db as typeof prisma, async (_phone, text) => { state.sent.push(text); if (state.failSend) throw new Error("timeout"); return { key: { id: `sent-${state.sent.length}` } }; }, event => { state.emitted.push(event); }, async input => { state.mediaSent.push(input); if (state.failSend) throw new Error("timeout"); return { key: { id: `image-${state.mediaSent.length}` } }; }, event => { state.contactEvents.push(event); });
+  const process = createBotProcessor(db as typeof prisma, async (_phone, text) => { state.sent.push(text); if (state.failSend) throw new Error("timeout"); return { key: { id: `sent-${state.sent.length}` } }; }, event => { state.emitted.push(event); }, async input => { state.mediaSent.push(input); if (state.failSend) throw new Error("timeout"); return { key: { id: `image-${state.mediaSent.length}` } }; }, event => { state.contactEvents.push(event); }, async (data, mimetype) => { state.storedMedia.push({ size: data.byteLength, mimetype }); return `media/test-${state.storedMedia.length}`; });
   return { state, process, flow };
 }
 
@@ -284,6 +284,9 @@ test("image greetings and option photos use media, persist image bytes and keep 
   assert.equal(state.outgoing[0].type, "TEXT");
   assert.equal(state.outgoing[1].type, "IMAGE");
   assert.equal(state.cachedMedia[0].mimetype, "image/png");
+  assert.equal(state.cachedMedia[0].data, null);
+  assert.equal(state.cachedMedia[0].storageKey, "media/test-1");
+  assert.deepEqual(state.storedMedia[0], { size: 3, mimetype: "image/png" });
   assert.equal(state.logs.get(1)?.outcome, "SENT");
   state.message = { ...state.message, id: 2, content: "1" };
   await process(2, "test-instance");

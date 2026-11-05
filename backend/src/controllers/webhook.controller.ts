@@ -7,6 +7,7 @@ import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { notifyIncomingMessage, notifyReply } from "../services/notification.service.js";
 import { getGroupInfo, getMediaMessage } from "../services/evolution.service.js";
+import { uploadMediaObject } from "../services/media-storage.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
 import { extractSharedContacts } from "../utils/shared-contact.js";
 import { extractPoll, pollSummary } from "../utils/poll.js";
@@ -133,19 +134,17 @@ async function markMessageAsDeleted(externalId: string) {
 
 async function cacheMessageMedia(messageId: number, externalId: string) {
   const media = await getMediaMessage(externalId);
+  const storageKey = await uploadMediaObject(Buffer.from(media.base64, "base64"), media.mimetype);
+  const record = {
+    storageKey,
+    data: null,
+    mimetype: media.mimetype,
+    fileName: media.fileName ?? null,
+  };
   await prisma.messageMedia.upsert({
     where: { messageId },
-    create: {
-      messageId,
-      data: Buffer.from(media.base64, "base64"),
-      mimetype: media.mimetype,
-      fileName: media.fileName ?? null,
-    },
-    update: {
-      data: Buffer.from(media.base64, "base64"),
-      mimetype: media.mimetype,
-      fileName: media.fileName ?? null,
-    },
+    create: { messageId, ...record },
+    update: record,
   });
 }
 
