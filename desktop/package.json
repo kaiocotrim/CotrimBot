@@ -40,7 +40,7 @@
       "main.cjs",
       "policy.cjs",
       "config.json",
-      "assets/icon.png",      
+      "assets/icon.png"      
     ],
     "win": {
       "target": [
