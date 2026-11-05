@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { sendWhatsAppMessage, sendWhatsAppMedia } from "./evolution.service.js";
+import { uploadMediaObject } from "./media-storage.service.js";
 import { advanceBot, type BotFlow, type BotState } from "./bot-flow.js";
 import { Prisma, type Prisma as PrismaTypes } from "../../generated/prisma/client.js";
 import { contactDisplayName } from "../utils/contact-name.js";
@@ -12,7 +13,7 @@ export async function lockBotContact(tx: Prisma.TransactionClient, contactId: nu
 }
 
 // Contact row locks serialize bot replies and assignment changes across workers.
-export function createBotProcessor(database = prisma, send = sendWhatsAppMessage, emit: (payload: unknown) => void = payload => { getSocketServer().emit("new_message", payload); }, sendMedia = sendWhatsAppMedia, emitContact: (payload: unknown) => void = payload => { getSocketServer().emit("contact_updated", payload); }) {
+export function createBotProcessor(database = prisma, send = sendWhatsAppMessage, emit: (payload: unknown) => void = payload => { getSocketServer().emit("new_message", payload); }, sendMedia = sendWhatsAppMedia, emitContact: (payload: unknown) => void = payload => { getSocketServer().emit("contact_updated", payload); }, storeMedia: (data: Uint8Array, mimetype: string) => Promise<string> = uploadMediaObject) {
 return async function processBotMessage(messageId: number, instance: unknown) {
   const runtimeInstance = process.env.EVOLUTION_INSTANCE;
   if (!runtimeInstance || typeof instance !== "string" || instance.trim() !== runtimeInstance.trim()) return;
@@ -103,6 +104,8 @@ return async function processBotMessage(messageId: number, instance: unknown) {
         }));
       }
       if (image) {
+        // Grava a imagem no S3 antes do envio para que a mensagem enviada sempre tenha registro.
+        const storageKey = await storeMedia(image.data, image.mimetype);
         const response = await sendMedia({
           number: contact.phone,
           mediatype: "image",
@@ -117,7 +120,7 @@ return async function processBotMessage(messageId: number, instance: unknown) {
           create: { externalId, contactId: contact.id, direction: "OUTGOING", content: "[Imagem]", type: "IMAGE" },
           update: {},
         });
-        const media = { data: image.data, mimetype: image.mimetype, fileName: image.fileName };
+        const media = { storageKey, data: null, mimetype: image.mimetype, fileName: image.fileName };
         await tx.messageMedia.upsert({ where: { messageId: message.id }, create: { messageId: message.id, ...media }, update: media });
         messages.push(message);
       }

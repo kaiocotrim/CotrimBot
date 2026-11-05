@@ -227,10 +227,11 @@ model MessageReceipt {
 }
 
 model MessageMedia {
-  messageId Int     @id
-  data      Bytes   @db.LongBlob
-  mimetype  String  @db.VarChar(255)
-  fileName  String? @db.VarChar(512)
+  messageId  Int     @id
+  data       Bytes?  @db.LongBlob
+  storageKey String? @db.VarChar(512)
+  mimetype   String  @db.VarChar(255)
+  fileName   String? @db.VarChar(512)
   message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
 }
 
@@ -517,10 +518,11 @@ model InternalMessage {
 }
 
 model InternalMessageMedia {
-  messageId Int    @id
-  mimeType  String @db.VarChar(100)
-  fileName  String @db.VarChar(255)
-  data      Bytes  @db.LongBlob
+  messageId  Int     @id
+  mimeType   String  @db.VarChar(100)
+  fileName   String  @db.VarChar(255)
+  data       Bytes?  @db.LongBlob
+  storageKey String? @db.VarChar(512)
 
   message InternalMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 }

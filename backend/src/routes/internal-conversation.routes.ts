@@ -4,6 +4,7 @@ import type { InternalConversationType, InternalParticipantRole } from "../../ge
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { notifyInternalMention, notifyInternalReply, userRoom } from "../services/notification.service.js";
+import { readStoredMedia, uploadMediaObject } from "../services/media-storage.service.js";
 import { transcribeAudio } from "../services/transcription.service.js";
 import { getSignedOutgoingText } from "../services/user-signature.service.js";
 
@@ -434,10 +435,11 @@ const receiveMedia = async (request: Request, response: Response) => {
     return response.status(400).json({ error: "A mensagem respondida não pertence a esta conversa." });
   }
   const content = caption ? await getSignedOutgoingText(userId, organizationId, caption, undefined, includeSignature) : media.label;
+  const storageKey = await uploadMediaObject(file.buffer, media.mimeType);
   const message = await prisma.internalMessage.create({
     data: {
       organizationId, conversationId, senderId: userId, type: "FILE", content, replyToMessageId,
-      media: { create: { mimeType: media.mimeType, fileName: file.originalname.slice(0, 255), data: Uint8Array.from(file.buffer) } },
+      media: { create: { mimeType: media.mimeType, fileName: file.originalname.slice(0, 255), storageKey, data: null } },
     },
     include: messageInclude,
   });
@@ -469,7 +471,7 @@ internalConversationRouter.get("/organizations/:organizationId/internal-conversa
   });
   if (!message?.media) return response.status(404).json({ error: "Arquivo não encontrado." });
   const media = message.media;
-  const bytes = Buffer.from(media.data);
+  const bytes = await readStoredMedia(media);
   const inline = /^(image|video|audio)\//.test(media.mimeType) && request.query.download !== "1";
   response.setHeader("Content-Disposition", `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(media.fileName)}`);
   response.setHeader("Content-Type", message.media.mimeType);
@@ -506,7 +508,7 @@ internalConversationRouter.post("/organizations/:organizationId/internal-convers
   });
   if (!message?.media?.mimeType.startsWith("audio/")) return response.status(400).json({ error: "Essa mensagem não é um áudio." });
   const transcription = await transcribeAudio({
-    base64: Buffer.from(message.media.data).toString("base64"),
+    base64: (await readStoredMedia(message.media)).toString("base64"),
     mimetype: message.media.mimeType,
     fileName: message.media.fileName,
   });

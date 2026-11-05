@@ -3,6 +3,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 export type MediaLibraryTab = "media" | "documents" | "links";
 export type MediaLibraryItem = {
   id: number;
+  externalId: string;
   type: "IMAGE" | "VIDEO" | "DOCUMENT" | "TEXT";
   content: string;
   createdAt: string;
@@ -32,10 +33,12 @@ export async function getContactMediaSummary(contactId: number, signal?: AbortSi
   return response.json();
 }
 
-export function libraryMediaUrl(id: number) { return `${API_URL}/messages/${id}/media`; }
+export function messageMediaUrl(externalId: string) { return `${API_URL}/messages/${encodeURIComponent(externalId)}/media`; }
+
+export const libraryMediaUrl = messageMediaUrl;
 
 export async function downloadLibraryItem(item: MediaLibraryItem) {
-  const response = await fetch(libraryMediaUrl(item.id), { credentials: "include" });
+  const response = await fetch(libraryMediaUrl(item.externalId), { credentials: "include" });
   if (!response.ok) throw new Error("Não foi possível baixar o arquivo. Tente novamente.");
   const url = URL.createObjectURL(await response.blob());
   const anchor = document.createElement("a");

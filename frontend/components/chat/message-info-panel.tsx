@@ -9,6 +9,7 @@ import { MessageText } from "@/components/chat/message-text";
 import { getMessageInfo, type MessageInfo, type MessageRecipient } from "@/lib/message-info-api";
 import { socket } from "@/lib/socket";
 import type { Message } from "@/types/chat";
+import { messageMediaUrl } from "@/lib/media-library-api";
 
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 
@@ -34,7 +35,7 @@ export function MessageInfoPanel({ message, groupName, onClose }: { message: Mes
   const [error, setError] = useState(false);
   const [reload, setReload] = useState(0);
   const caption = !/^\[(Imagem|Vídeo|Áudio|Sticker|Documento)\]$/.test(message.content) && message.content;
-  const mediaUrl = `${process.env.NEXT_PUBLIC_API_URL ?? "/api"}/messages/${message.id}/media`;
+  const mediaUrl = messageMediaUrl(message.externalId);
 
   useEffect(() => {
     const controller = new AbortController();

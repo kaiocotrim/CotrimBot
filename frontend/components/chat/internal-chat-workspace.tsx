@@ -961,7 +961,7 @@ export function InternalChatWorkspace({ activeOrganizationId, currentUserId }: I
             allowCloseWithBot={false}
             internalMentionUsers={chat.selected.participants.map((participant) => ({ id: participant.user.id, name: participant.user.name, image: participant.user.image ?? null }))}
             replyingTo={composerReply(replyTo, userId)}
-            replyMediaUrl={(id) => internalMediaUrl(chat.organizationId!, chat.selectedId!, id)}
+            replyMediaUrl={(message) => internalMediaUrl(chat.organizationId!, chat.selectedId!, message.id)}
             onCancelReply={() => setReplyTo(null)}
             focusRequestKey={0}
           />

@@ -18,6 +18,7 @@ import { insertEmojiAtSelection } from "@/lib/emoji-text";
 import type { GifFile } from "@/lib/giphy";
 import { getContactAssignees, rewriteMessage, type ContactAssignee } from "@/lib/chat-api";
 import type { Message, Poll } from "@/types/chat";
+import { messageMediaUrl } from "@/lib/media-library-api";
 import styles from "./message-composer.module.css";
 
 
@@ -29,7 +30,7 @@ type MessageComposerProps = {
   dropZoneContainer: HTMLElement | null;
   mode?: "external" | "internal";
   internalMentionUsers?: ContactAssignee[];
-  replyMediaUrl?: (messageId: number) => string;
+  replyMediaUrl?: (message: { id: number; externalId?: string }) => string;
   text: string;
   sending: boolean;
   closing: boolean;
@@ -43,7 +44,7 @@ type MessageComposerProps = {
   onSendPoll?: (poll: Poll) => Promise<void>;
   allowCloseWithBot?: boolean;
   focusRequestKey: number | string;
-  replyingTo: Pick<Message, "id" | "type" | "content" | "direction" | "senderName" | "private"> | null;
+  replyingTo: (Pick<Message, "id" | "type" | "content" | "direction" | "senderName" | "private"> & { externalId?: string }) | null;
   onCancelReply: () => void;
 
   onSendMedia: (
@@ -60,7 +61,6 @@ type PendingAttachment = {
 type MentionMatch = { start: number; end: number; query: string };
 type ComposerIconName = "message" | "lock" | "plus" | "sticker" | "smile" | "mic" | "send" | "expand" | "collapse" | "sparkles";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 const LONG_PASTE_CHARACTER_LIMIT = 1200;
 const LONG_PASTE_LINE_LIMIT = 18;
 
@@ -850,7 +850,7 @@ export function MessageComposer({
                   </span>
                   <span className="flex min-w-0 items-center gap-2">
                     {replyingTo.type === "IMAGE" && (
-                      <Image unoptimized src={replyMediaUrl?.(replyingTo.id) ?? `${API_URL}/messages/${replyingTo.id}/media`} alt="" width={32} height={32} className="size-8 shrink-0 rounded-md object-cover" />
+                      <Image unoptimized src={replyMediaUrl?.(replyingTo) ?? messageMediaUrl(replyingTo.externalId ?? "")} alt="" width={32} height={32} className="size-8 shrink-0 rounded-md object-cover" />
                     )}
                     <span className="block truncate text-xs text-zinc-300">{replyPreview(replyingTo)}</span>
                   </span>
