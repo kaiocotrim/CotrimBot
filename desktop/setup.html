@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Servidor do CotrimBot</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #09090b; color: #fafafa; }
+    label { display: block; margin-bottom: 8px; }
+    input { width: 100%; box-sizing: border-box; padding: 8px; font-size: 14px; }
+    .error { color: #f87171; min-height: 1.2em; margin: 8px 0 0; }
+    .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+    button { padding: 8px 16px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <form id="form">
+    <label for="url">URL do servidor (HTTPS)</label>
+    <input id="url" type="text" autocomplete="off" autofocus required>
+    <p class="error" id="error"></p>
+    <div class="actions">
+      <button type="button" id="cancel">Sair</button>
+      <button type="submit">Conectar</button>
+    </div>
+  </form>
+  <script>
+    const input = document.getElementById("url");
+    const error = document.getElementById("error");
+    input.value = new URLSearchParams(location.search).get("server") ?? "";
+    document.getElementById("form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const result = await cotrimSetup.submit(input.value);
+      error.textContent = result.error ?? "";
+    });
+    document.getElementById("cancel").addEventListener("click", () => cotrimSetup.cancel());
+  </script>
+</body>
+</html>

@@ -39,6 +39,8 @@
     "files": [
       "main.cjs",
       "policy.cjs",
+      "setup.html",
+      "setup-preload.cjs",
       "config.json",
       "assets/icon.png"      
     ],

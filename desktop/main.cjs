@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog, session, shell } = require("electron");
+const { app, BrowserWindow, Menu, dialog, ipcMain, session, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("node:path");
 const fs = require("node:fs");
@@ -6,13 +6,70 @@ const config = require("./config.json");
 const { parseServerUrl, isServerUrl, isExternalUrl, canRequestPermission } = require("./policy.cjs");
 
 const APP_ID = "net.infordoc.cotrimbot";
-const installedServerFile = path.join(process.resourcesPath, "server-url.txt");
-const installedServer = app.isPackaged && fs.existsSync(installedServerFile)
-  ? fs.readFileSync(installedServerFile, "utf8").trim() : config.serverUrl;
-const serverUrl = parseServerUrl(!app.isPackaged && process.env.COTRIMBOT_DESKTOP_URL
-  ? process.env.COTRIMBOT_DESKTOP_URL : installedServer, !app.isPackaged);
+const SERVER_STORE = "server-url.json";
+let serverUrl = null;
 let mainWindow;
 let quitting = false;
+
+function readStoredServerUrl() {
+  try {
+    return parseServerUrl(JSON.parse(fs.readFileSync(path.join(app.getPath("userData"), SERVER_STORE), "utf8")).serverUrl);
+  } catch { return null; }
+}
+
+// Windows installer writes this file; the .deb has no installer step.
+function readInstalledServerUrl() {
+  try {
+    return parseServerUrl(fs.readFileSync(path.join(process.resourcesPath, "server-url.txt"), "utf8").trim());
+  } catch { return null; }
+}
+
+function saveServerUrl(url) {
+  fs.mkdirSync(app.getPath("userData"), { recursive: true });
+  fs.writeFileSync(path.join(app.getPath("userData"), SERVER_STORE), JSON.stringify({ serverUrl: url }));
+}
+
+function askServerUrl(initialUrl) {
+  return new Promise(resolve => {
+    let result = null;
+    const setup = new BrowserWindow({
+      title: "CotrimBot", width: 480, height: 260, resizable: false, minimizable: false, maximizable: false,
+      autoHideMenuBar: true, backgroundColor: "#09090b",
+      webPreferences: {
+        preload: path.join(__dirname, "setup-preload.cjs"), nodeIntegration: false, contextIsolation: true, sandbox: true,
+      },
+    });
+    ipcMain.handle("setup:submit", (_event, value) => {
+      try { result = parseServerUrl(String(value).trim()); } catch { return { error: "Informe uma URL HTTPS válida, sem credenciais." }; }
+      setImmediate(() => setup.close());
+      return { ok: true };
+    });
+    ipcMain.once("setup:cancel", () => setup.close());
+    setup.on("closed", () => {
+      ipcMain.removeHandler("setup:submit");
+      ipcMain.removeAllListeners("setup:cancel");
+      resolve(result);
+    });
+    void setup.loadFile(path.join(__dirname, "setup.html"), { query: { server: initialUrl } });
+  });
+}
+
+async function resolveServerUrl() {
+  if (!app.isPackaged) return parseServerUrl(process.env.COTRIMBOT_DESKTOP_URL || config.serverUrl, true);
+  const saved = readStoredServerUrl() ?? readInstalledServerUrl();
+  if (saved) return saved;
+  const chosen = await askServerUrl(config.serverUrl);
+  if (chosen) saveServerUrl(chosen);
+  return chosen;
+}
+
+async function changeServer() {
+  const chosen = await askServerUrl(serverUrl);
+  if (!chosen || chosen === serverUrl) return;
+  saveServerUrl(chosen);
+  app.relaunch();
+  app.quit();
+}
 
 app.setName("CotrimBot");
 app.setAppUserModelId(APP_ID);
@@ -140,11 +197,13 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on("second-instance", focusWindow);
   app.on("before-quit", () => { quitting = true; });
-  app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
-  app.on("activate", () => { if (!mainWindow) createWindow(); else focusWindow(); });
-  app.whenReady().then(() => {
+  app.on("window-all-closed", () => { if (process.platform !== "darwin" && serverUrl) app.quit(); });
+  app.on("activate", () => { if (!serverUrl) return; if (!mainWindow) createWindow(); else focusWindow(); });
+  app.whenReady().then(async () => {
+    serverUrl = await resolveServerUrl();
+    if (!serverUrl) { app.quit(); return; }
     Menu.setApplicationMenu(Menu.buildFromTemplate([
-      { label: "Aplicativo", submenu: [{ label: "Abrir no navegador", click: () => void openExternal(serverUrl) }, { type: "separator" }, { role: "quit", label: "Sair" }] },
+      { label: "Aplicativo", submenu: [{ label: "Abrir no navegador", click: () => void openExternal(serverUrl) }, ...(app.isPackaged ? [{ label: "Alterar servidor", click: () => void changeServer() }] : []), { type: "separator" }, { role: "quit", label: "Sair" }] },
       { label: "Editar", submenu: [{ role: "undo", label: "Desfazer" }, { role: "redo", label: "Refazer" }, { type: "separator" }, { role: "cut", label: "Recortar" }, { role: "copy", label: "Copiar" }, { role: "paste", label: "Colar" }, { role: "selectAll", label: "Selecionar tudo" }] },
       { label: "Exibir", submenu: [{ role: "reload", label: "Recarregar" }, { role: "resetZoom", label: "Zoom original" }, { role: "zoomIn", label: "Aumentar zoom" }, { role: "zoomOut", label: "Diminuir zoom" }, { role: "togglefullscreen", label: "Tela cheia" }, ...(!app.isPackaged ? [{ role: "toggleDevTools", label: "Ferramentas do desenvolvedor" }] : [])] },
     ]));

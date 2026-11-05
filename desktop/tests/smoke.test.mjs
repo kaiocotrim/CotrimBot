@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdir, mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { _electron, expect } from "@playwright/test";
@@ -55,6 +55,7 @@ test("desktop opens the server sandboxed, blocks unsafe popups, and keeps login 
 test("packaged executable opens the published CotrimBot login", { skip: !process.env.COTRIMBOT_SMOKE_EXECUTABLE, timeout: 90000 }, async () => {
   await mkdir(results, { recursive: true });
   const userData = await mkdtemp(path.join(results, "packaged-profile-"));
+  await writeFile(path.join(userData, "server-url.json"), JSON.stringify({ serverUrl: "https://cotrim.infordoc.net/" }));
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   const electron = await _electron.launch({ executablePath: process.env.COTRIMBOT_SMOKE_EXECUTABLE, args: [`--user-data-dir=${userData}`], env });

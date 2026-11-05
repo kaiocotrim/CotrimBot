@@ -94,6 +94,11 @@ não inclui `.env`, código do backend ou chaves do servidor.
 - Notificações e microfone exigem confirmação e só podem ser solicitados pelo
   servidor configurado. As permissões são mantidas durante a sessão.
 - O menu fica oculto e pode ser acessado com Alt; inclui copiar, colar, zoom e recarregar.
+- Na primeira execução do pacote `.deb` ou `.AppImage`, sem URL salva, o aplicativo pede a
+  URL HTTPS do servidor. Cancelar encerra o aplicativo. A escolha fica em `server-url.json` no
+  perfil do usuário (`~/.config/CotrimBot` no Linux).
+- O menu Aplicativo tem **Alterar servidor** no pacote instalado. A nova URL vale após reiniciar.
+  No Windows, a URL salva no aplicativo tem prioridade sobre a do instalador.
 - Fechar a janela encerra o aplicativo. Notificações são recebidas enquanto ele
   está aberto ou minimizado; não há processo em segundo plano depois de fechar.
 - Use o login por e-mail e senha. Login social em navegador externo ainda exige
@@ -120,8 +125,8 @@ Não renomeie o arquivo antes da instalação. Sufixos de download repetido como
 na página de conferência antes de instalar.
 
 O instalador salva a escolha em `resources/server-url.txt` e a registra por usuário
-para futuras reinstalações. O aplicativo valida a URL ao carregar. Uma instalação
-sem personalização mantém o padrão de `config.json`. Não se cria outra conexão
+para futuras reinstalações. O aplicativo valida a URL ao carregar. Se não houver
+URL salva, ele pede a URL ao abrir (ver Comportamento). Não se cria outra conexão
 WhatsApp nem se move o banco de dados para o computador do atendente.
 
 ### Disponibilizar o instalador no servidor web
