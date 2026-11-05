@@ -23,6 +23,7 @@ import {
 } from "../services/transcription.service.js";
 
 import { getSatisfactionSurvey } from "../services/bot.service.js";
+import { createCsatSurvey } from "../services/csat.service.js";
 import { readStoredMedia, uploadMediaObject } from "../services/media-storage.service.js";
 import { getSignedOutgoingText, SignatureMembershipError } from "../services/user-signature.service.js";
 import { notifyMention } from "../services/notification.service.js";
@@ -778,6 +779,11 @@ export async function closeConversationWithBot(req: Request, res: Response) {
           sentByUserId: req.user!.id,
         },
         include: sentByUserInclude,
+      });
+      await createCsatSurvey(transaction, {
+        contactId,
+        messageId: createdMessage.id,
+        sentByUserId: req.user!.id,
       });
 
       // Um chamado encerrado volta para a fila sem responsáveis atribuídos.
