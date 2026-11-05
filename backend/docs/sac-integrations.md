@@ -55,15 +55,18 @@ dos valores no corpo JSON. Não lê o token do ambiente nem envia chamadas exter
 
 ## Comportamento desta versão
 
-Esta entrega cadastra, valida, salva e apresenta as rotas. **Não conecta a API real
-do SAC.** O fluxo `SAC_TEST` continua consultando o catálogo de demonstração e
-salvando registros de teste no MySQL. Alterar ou publicar as configurações não muda
-esse comportamento. Assim, é possível preparar o contrato sem abrir chamados reais.
+O painel cadastra, valida, salva e apresenta as rotas como um contrato de referência.
+O runtime de `SAC_TEST` conecta o SDK do SAC quando `SAC_BASE_URL` e
+`SAC_API_TOKEN` estão configurados no servidor: consulta o tenant pelo CNPJ e os
+endereços pelo `IdTenant`. Consulte [Configuração do SDK](sac-sdk.md).
+Sem configuração SAC, o runtime mantém o catálogo de demonstração do MySQL.
+O simulador também usa consultas reais quando o SAC está configurado; caso
+contrário, usa dados fictícios. Nenhum chamado real é criado nesta etapa.
 
-Quando a API estiver disponível, será necessário implementar seu transporte,
-autenticação, tratamento de respostas e vínculo das operações às etapas da coleta,
-de acordo com a documentação. A referência da variável de token fica pronta para
-essa etapa; esta versão não utiliza seu valor.
+As consultas do runtime usam os endpoints definidos no SDK; alterar as rotas do
+painel não altera esses endpoints. A criação definitiva do chamado continua
+disponível na ação **Abrir chamado no SAC** (`SAC_TICKET`), documentada em
+[Abertura real pelo WhatsApp](sac-real-tickets.md).
 
 ## Persistência e SDK
 

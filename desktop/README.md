@@ -1,6 +1,6 @@
 # CotrimBot Desktop
 
-Aplicativo Electron que abre **https://cotrim.infordoc.net/** em uma janela
+Aplicativo Electron que abre o servidor informado pelo usuário em uma janela
 própria. O servidor, o banco de dados e a Evolution API continuam hospedados.
 É necessário acesso à internet. Atualizações publicadas no site aparecem
 também no aplicativo, sem recompilar o instalador.
@@ -44,7 +44,7 @@ npm run desktop:build
 O build gera:
 
 ```text
-desktop/dist/CotrimBot-Setup-1.0.0-x64.exe   # instalador Windows de 64 bits
+desktop/dist/CotrimBot-Setup-1.1.0-x64.exe   # instalador Windows de 64 bits
 desktop/dist/win-unpacked/CotrimBot.exe    # aplicativo sem instalador
 ```
 
@@ -79,7 +79,7 @@ $env:COTRIMBOT_SMOKE_EXECUTABLE = (Resolve-Path "desktop/dist/win-unpacked/Cotri
 npm run test:smoke --workspace=@cotrimbot/desktop
 ```
 
-Para trocar o servidor de produção, edite `desktop/config.json` e gere outro
+Para alterar somente o servidor padrão, edite `desktop/config.json` e gere outro
 instalador. Use HTTPS. O pacote inclui somente o cliente Electron e o ícone;
 não inclui `.env`, código do backend ou chaves do servidor.
 
@@ -100,3 +100,55 @@ não inclui `.env`, código do backend ou chaves do servidor.
   implementar um fluxo de retorno ao aplicativo; não está integrado nesta versão.
 - O aplicativo carrega a versão publicada. Alterações locais do frontend precisam
   ser publicadas no servidor para aparecer no executável de produção.
+
+## Download com servidor personalizado (1.1.0)
+
+No navegador de computador, **Baixar para Windows (.exe)** abre um formulário.
+O usuário informa a origem HTTPS do servidor, por exemplo
+`https://chat.cotrimdev.com.br`. Não são aceitos caminhos como `/login`, credenciais,
+query ou fragmentos. O limite de origem é 110 caracteres.
+No Electron e em celulares/tablets o botão não aparece; janelas abaixo de 900px
+igualmente o ocultam, sem reservar espaço extra para o botão.
+
+O formulário chama `HEAD /api/desktop/download?server=...` para verificar a
+validade/disponibilidade e depois inicia o GET que baixa o instalador. Essa rota
+é pública para permitir download antes do login e não acessa o endereço informado.
+O conteúdo é sempre o mesmo instalador local; a URL é transportada em hexadecimal
+no nome do arquivo, preservando os bytes e uma eventual assinatura do EXE.
+Não renomeie o arquivo antes da instalação. Sufixos de download repetido como
+` (1)` são aceitos. Se o nome for alterado, o instalador permite informar o servidor
+na página de conferência antes de instalar.
+
+O instalador salva a escolha em `resources/server-url.txt` e a registra por usuário
+para futuras reinstalações. O aplicativo valida a URL ao carregar. Uma instalação
+sem personalização mantém o padrão de `config.json`. Não se cria outra conexão
+WhatsApp nem se move o banco de dados para o computador do atendente.
+
+### Disponibilizar o instalador no servidor web
+
+1. Gere `desktop/dist/CotrimBot-Setup-1.1.0-x64.exe` no Windows.
+2. Transfira o arquivo para o servidor/container que executa o backend.
+3. Configure `COTRIMBOT_DESKTOP_INSTALLER_PATH` com o caminho absoluto do arquivo
+   naquele ambiente (por exemplo `/app/downloads/CotrimBot-Setup-1.1.0-x64.exe`).
+   Use volume persistente se necessário. `desktop/dist` é ignorado no Git e no Docker.
+4. Publique o frontend e o backend atualizados e reinicie o backend com a variável.
+5. Abra o site no navegador de computador, informe o servidor e baixe o instalador.
+
+Em desenvolvimento, a rota usa por padrão o arquivo gerado em `desktop/dist`.
+Sem o instalador disponível, responde 503 e o formulário informa a indisponibilidade.
+O link antigo do MediaFire não é usado: a versão antiga não lê a escolha do usuário.
+Os EXEs já instalados precisam ser atualizados para permitir servidor personalizado.
+A ocultação do botão também exige publicar o frontend atualizado.
+
+### Testes adicionais
+
+```powershell
+npm.cmd run test:desktop --workspace=@cotrimbot/backend
+npm.cmd run desktop:test
+npm.cmd exec --workspace=@cotrimbot/frontend -- playwright test --config=playwright.config.ts desktop-download.spec.ts
+```
+
+O teste NSIS compila um executável mínimo e confere a decodificação de três
+servidores, inclusive com porta e sufixo de download repetido, sem instalar o app
+nem criar atalhos/entradas de desinstalação. Ele é pulado quando não há Windows
+ou compilador NSIS no cache local do electron-builder.

@@ -200,6 +200,7 @@
   font-size: 13px;
   line-height: 20px;
   text-decoration: none;
+  cursor: pointer;
   transition: background .2s, border-color .2s, color .2s;
 }
 
@@ -207,9 +208,20 @@
 .downloadLink:focus-visible { outline: 2px solid #e4dcf4; outline-offset: 4px; }
 
 @media (max-width: 899px) {
-  .container { min-height: 640px; padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
-  .downloadLink { right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); }
+  .container { min-height: 640px; padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
+  .downloadLink { display: none; }
 }
+
+.downloadDialog { position: fixed; inset: 0; margin: auto; width: min(440px, calc(100vw - 32px)); padding: 32px; border: 1px solid #ffffff26; border-radius: 24px; color: #fafafa; background: #18181b; }
+.downloadDialog::backdrop { background: #000a; backdrop-filter: blur(6px); }
+.downloadDialog h2 { font-size: 22px; font-weight: 600; padding-right: 24px; }
+.downloadDialog p { color: #a1a1aa; margin-top: 12px; font-size: 14px; }
+.downloadDialog label { display: block; margin-top: 24px; font-size: 14px; }
+.downloadDialog input { display: block; width: 100%; margin-top: 8px; padding: 12px; border: 1px solid #52525b; border-radius: 12px; background: #09090b; color: white; }
+.downloadDialog form button { width: 100%; margin-top: 20px; padding: 12px; border-radius: 12px; background: #fafafa; color: #18181b; cursor: pointer; }
+.downloadDialog form button:disabled { opacity: .6; cursor: wait; }
+.downloadDialog p[role="alert"] { color: #fca5a5; }
+.downloadClose { position: absolute; top: 20px; right: 20px; padding: 4px; cursor: pointer; }
 
 .srOnly {
   position: absolute;

@@ -15,6 +15,7 @@ import { userRoom } from "./services/notification.service.js";
 import { processInBatches } from "./utils/batch.js";
 
 import { contactRouter } from "./routes/contact.routes.js";
+import { desktopRouter } from "./routes/desktop.routes.js";
 import { botRouter } from "./routes/bot.routes.js";
 import { notificationRouter } from "./routes/notification.routes.js";
 import { pushRouter } from "./routes/push.routes.js";
@@ -54,6 +55,7 @@ app.use(express.json({ limit: "250mb" }));
 // Registra as rotas da aplicação.
 app.use("/api", webhookRoutes);
 app.use("/api", invitationRouter);
+app.use("/api", desktopRouter);
 app.use("/api", requireAuth, organizationRouter);
 app.use("/api", requireAuth, evolutionRouter);
 app.use("/api", requireAuth, contactRouter);

@@ -1,13 +1,16 @@
+import { SAC_TEST_CATALOG } from '../services/bot-sac-test.js';
 import { Router } from "express";
 import type { Request } from "express";
 import type {} from "../middlewares/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
-import { advanceBot, validateFlow, type BotState } from "../services/bot-flow.js";
+import { advanceBot, validateFlow, type BotState, type BotReply } from "../services/bot-flow.js";
 import type { Prisma } from "../../generated/prisma/client.js";
 import multer from "multer";
 import { BOT_IMAGE_MAX_BYTES, botImageIds, botImageMime } from "../services/bot-image.js";
+import { findSacCompany, loadSacCompanyAddresses, loadSacMachines, sacConfigured } from '../services/bot-sac.service.js';
+import { validSacTestCnpj, validSacTestPhone, validSacTestEmail } from '../services/bot-sac-test-validation.js';
 
-export function createBotRouter(database = prisma) {
+export function createBotRouter(database = prisma, sac: { enabled: typeof sacConfigured; findCompany: typeof findSacCompany; loadAddresses: typeof loadSacCompanyAddresses; loadMachines?: typeof loadSacMachines } = { enabled: sacConfigured, findCompany: findSacCompany, loadAddresses: loadSacCompanyAddresses, loadMachines: loadSacMachines }) {
 const prisma = database;
 const botRouter = Router();
 const json = (value: unknown) => value as Prisma.InputJsonValue;
@@ -154,7 +157,7 @@ botRouter.post("/bots/:id/activation", async (req, res) => {
   } catch { res.status(409).json({ message: "Não foi possível ativar: instância vinculada a outra empresa ou ocupada. Tente novamente." }); }
 });
 
-botRouter.post("/bots/simulate", (req, res) => {
+botRouter.post("/bots/simulate", async (req, res) => {
   try {
     validateFlow(req.body?.flow);
     // Rebuild simulator state by replaying inputs; never trust client state pointers.
@@ -167,22 +170,62 @@ botRouter.post("/bots/simulate", (req, res) => {
     let state: BotState | null = null;
     const messages: { role: string; text: string; imageId?: string; menuId?: string; optionId?: string }[] = [];
     const steps: { menuId: string; optionId?: string; status: string }[] = [];
+    const liveSac = sac.enabled();
+    // Replay is read-only. Reuse lookups within this request, never client data.
+    const companies = new Map<string, Awaited<ReturnType<typeof findSacCompany>>>();
+    const addresses = new Map<string, Awaited<ReturnType<typeof loadSacCompanyAddresses>>>();
+    const machines = new Map<string, Awaited<ReturnType<typeof loadSacMachines>>>();
     for (const input of ["", ...inputs]) {
       if (state && state.status !== "BOT_ACTIVE") break;
       const selectedOption = state && !state.sacTest && input.trim() !== "0" ? testFlow.menus.find((menu: { id: string }) => menu.id === state!.menuId)?.options.find((option: { active: boolean; number: string }) => option.active && option.number === input.trim()) : undefined;
       if (state) messages.push({ role: "user", text: input });
-      const result = advanceBot(state ? req.body.flow : testFlow, state, input);
+      let catalog = SAC_TEST_CATALOG;
+      let lookupFailed = false;
+      if (liveSac && state?.sacTest) {
+        const ticket = state.sacTest;
+        ticket.source = 'sac';
+        catalog = ticket.catalog ?? [];
+        const cancelling = /^(0|cancelar)$/i.test(input.trim());
+        try {
+          if (!cancelling && ticket.step === 'cnpj' && validSacTestCnpj(input)) {
+            const cnpj = input.replace(/\D/g, '');
+            if (!companies.has(cnpj)) companies.set(cnpj, await sac.findCompany(cnpj));
+            catalog = structuredClone(companies.get(cnpj)!);
+          } else if (!cancelling && ticket.step === 'phone' && validSacTestPhone(input)) {
+            const company = catalog.find(item => item.id === ticket.data.companyId);
+            if (!company) throw new Error('Tenant ausente na sessão SAC.');
+            const key = `${company.id}:${company.cnpj}`;
+            if (!addresses.has(key)) addresses.set(key, await sac.loadAddresses(company));
+            catalog = structuredClone(addresses.get(key)!);
+          } else if (!cancelling && ticket.real && ticket.step === 'email' && validSacTestEmail(input)) {
+            const company = catalog.find(item => item.id === ticket.data.companyId);
+            if (!company) throw new Error('Tenant ausente na sessão SAC.');
+            if (!machines.has(company.id)) machines.set(company.id, await (sac.loadMachines ?? loadSacMachines)(company));
+            catalog = structuredClone(machines.get(company.id)!);
+          }
+          ticket.catalog = catalog;
+        } catch {
+          lookupFailed = true;
+        }
+      }
+      const result: BotReply = lookupFailed
+        ? { state: state!, text: '⚠️ Não foi possível consultar o SAC. Seus dados foram mantidos. Envie sua resposta novamente ou digite 0 para cancelar.' }
+        : advanceBot(state ? req.body.flow : testFlow, state, input, { catalog });
       // Reexecutar o histórico do simulador nunca grava nem envia mensagens reais.
-      if (result.sacTestSubmission) result.text = '✅ Simulação concluída! Nenhum registro foi salvo e nenhum chamado foi aberto no SAC.\n\n0 — ↩️ Menu principal';
+      if (result.submitSacTicket) {
+        const { sacTest: simulated, ...clean } = result.state;
+        result.state = { ...clean, menuId: testFlow.rootMenuId, stack: [] };
+        result.text = '✅ Fluxo de abertura concluído no simulador. No WhatsApp, esta confirmação envia o chamado ao SAC e retorna o protocolo. Nenhum chamado real foi aberto neste teste.\n\n0 — Menu principal';
+      }
       state = result.state;
       const step = { menuId: state.menuId, status: state.status, ...(selectedOption ? { optionId: selectedOption.id } : {}) };
       steps.push(step);
       if (result.text || result.imageId) messages.push({ role: "bot", text: result.text, menuId: state.menuId, ...(selectedOption ? { optionId: selectedOption.id } : {}), ...(result.imageId ? { imageId: result.imageId } : {}) });
     }
     const ticket = state?.sacTest;
-    const quickReplies = ticket ? ticket.cancelPending || ['confirmCnpj', 'review'].includes(ticket.step) ? ['1', '2', ...(ticket.cancelPending ? [] : ['0'])]
-      : ticket.step === 'edit' ? ['1', '2', '3', '4', '5', '6', '7', '8', '0']
-      : ['equipment', 'address'].includes(ticket.step) ? ['1', '0'] : ['0']
+    const quickReplies = ticket ? ['confirmCnpj', 'review'].includes(ticket.step) ? ['1', '2', '0']
+      : ticket.step === 'equipment' ? [...((ticket.catalog ?? SAC_TEST_CATALOG).find(company => company.id === ticket.data.companyId)?.equipment.slice((ticket.equipmentPage ?? 0) * 10, ((ticket.equipmentPage ?? 0) + 1) * 10).map((_, i) => String((ticket.equipmentPage ?? 0) * 10 + i + 1)) ?? []), ...((ticket.equipmentPage ?? 0) > 0 ? ['anterior'] : []), ...(((ticket.equipmentPage ?? 0) + 1) * 10 < ((ticket.catalog ?? SAC_TEST_CATALOG).find(company => company.id === ticket.data.companyId)?.equipment.length ?? 0) ? ['mais'] : []), '0']
+      : ticket.step === 'address' ? [...((ticket.catalog ?? SAC_TEST_CATALOG).find(company => company.id === ticket.data.companyId)?.addresses.filter(item => item.address.split(',').some(part => part.trim())).map((_, i) => String(i + 1)) ?? []), '0'] : ['0']
       : [...(req.body.flow.menus.find((menu: { id: string }) => menu.id === state?.menuId)?.options.filter((option: { active: boolean }) => option.active).map((option: { number: string }) => option.number) ?? []), '0'];
     res.json({ state, messages, steps, quickReplies });
   } catch (error) { res.status(400).json({ message: error instanceof Error ? error.message : "Simulação inválida." }); }

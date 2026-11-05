@@ -1,12 +1,16 @@
 const { app, BrowserWindow, Menu, dialog, session, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("node:path");
+const fs = require("node:fs");
 const config = require("./config.json");
 const { parseServerUrl, isServerUrl, isExternalUrl, canRequestPermission } = require("./policy.cjs");
 
 const APP_ID = "net.infordoc.cotrimbot";
+const installedServerFile = path.join(process.resourcesPath, "server-url.txt");
+const installedServer = app.isPackaged && fs.existsSync(installedServerFile)
+  ? fs.readFileSync(installedServerFile, "utf8").trim() : config.serverUrl;
 const serverUrl = parseServerUrl(!app.isPackaged && process.env.COTRIMBOT_DESKTOP_URL
-  ? process.env.COTRIMBOT_DESKTOP_URL : config.serverUrl, !app.isPackaged);
+  ? process.env.COTRIMBOT_DESKTOP_URL : installedServer, !app.isPackaged);
 let mainWindow;
 let quitting = false;
 
@@ -108,6 +112,7 @@ function createWindow() {
   });
   configureSession(desktopSession);
   const contents = mainWindow.webContents;
+  contents.setUserAgent(`${contents.getUserAgent()} CotrimBotDesktop/1.1`);
   contents.on("will-attach-webview", event => event.preventDefault());
   contents.on("will-navigate", (event, url) => {
     if (isServerUrl(url, serverUrl)) return;

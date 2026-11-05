@@ -2,11 +2,13 @@ import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { sendWhatsAppMessage, sendWhatsAppMedia } from "./evolution.service.js";
 import { uploadMediaObject } from "./media-storage.service.js";
-import { advanceBot, type BotFlow, type BotState } from "./bot-flow.js";
+import { advanceBot, type BotFlow, type BotState, type BotReply } from "./bot-flow.js";
 import { Prisma, type Prisma as PrismaTypes } from "../../generated/prisma/client.js";
 import { contactDisplayName } from "../utils/contact-name.js";
 import { isInforbotName } from "./bot.service.js";
-import { validSacTestSubmission } from './bot-sac-test.js';
+import { findSacCompany, loadSacCompanyAddresses, loadSacMachines, sacConfigured } from './bot-sac.service.js';
+import { validSacTestCnpj, validSacTestPhone, validSacTestEmail } from './bot-sac-test-validation.js';
+import { submitSacTicket } from './bot-sac-submission.js';
 
 export async function lockBotContact(tx: Prisma.TransactionClient, contactId: number) {
   await tx.$queryRaw`SELECT id FROM Contact WHERE id = ${contactId} FOR UPDATE`;
@@ -66,31 +68,60 @@ return async function processBotMessage(messageId: number, instance: unknown) {
       const expired = Boolean(state?.sacTest && previous?.updatedAt && Date.now() - previous.updatedAt.getTime() > ttl * 60000);
       if (expired) state = null;
       const flow = bot.published as unknown as BotFlow;
-      const selectedOption = flow.menus.find(menu => menu.id === state?.menuId)?.options.find(option => option.active && option.number === input.content.trim());
-      const needsCatalog = Boolean(state?.sacTest || selectedOption?.action === 'SAC_TEST');
-      const catalog = needsCatalog ? await tx.sacTestCompany.findMany({ include: { equipment: { orderBy: { id: 'asc' } }, addresses: { orderBy: { id: 'asc' } } }, orderBy: { id: 'asc' } }) : [];
-      const result = advanceBot(flow, state, input.content, { catalog, messageId: String(input.id), inputType: input.type });
+      const cancelling = input.type === 'TEXT' && /^(0|cancelar)$/i.test(input.content.trim());
+      const needsCatalog = !cancelling && Boolean(state?.sacTest && (
+        state.sacTest.step === 'address' || input.type === 'TEXT' && (['cnpj', 'phone'].includes(state.sacTest.step) || state.sacTest.real && state.sacTest.step === 'email')));
+      const liveSac = state?.sacTest?.source === 'sac' || Boolean(state?.sacTest && (state.sacTest.real || sacConfigured()));
+      if (liveSac && state?.sacTest) {
+        state = structuredClone(state);
+        state.sacTest!.source = 'sac';
+      }
+      let catalog: import('./bot-sac-test.js').SacTestCatalog = state?.sacTest?.catalog ?? [];
+      let catalogFailed = false;
+      if (needsCatalog) {
+        try {
+          if (liveSac && state?.sacTest) {
+            const ticket = state.sacTest;
+            if (ticket.step === 'cnpj' && validSacTestCnpj(input.content)) {
+              catalog = await findSacCompany(input.content);
+            } else if (ticket.step === 'phone' && validSacTestPhone(input.content)) {
+              const company = catalog.find(item => item.id === ticket.data.companyId);
+              if (!company) throw new Error('Tenant ausente na sessão SAC.');
+              catalog = await loadSacCompanyAddresses(company);
+            } else if (ticket.real && ticket.step === 'email' && validSacTestEmail(input.content)) {
+              const company = catalog.find(item => item.id === ticket.data.companyId);
+              if (!company) throw new Error('Tenant ausente na sessão SAC.');
+              catalog = await loadSacMachines(company);
+            }
+            ticket.catalog = catalog;
+          } else {
+            catalog = await tx.sacTestCompany.findMany({ include: { equipment: { orderBy: { id: 'asc' } }, addresses: { orderBy: { id: 'asc' } } }, orderBy: { id: 'asc' } });
+          }
+        } catch {
+          catalogFailed = true;
+          console.error('Falha na consulta do catálogo SAC do bot.');
+        }
+      }
+      const result: BotReply = catalogFailed
+        ? { state: state!, text: `⚠️ Não foi possível consultar ${liveSac ? 'o SAC' : 'a base de teste'}. Seus dados foram mantidos. Envie sua resposta novamente ou digite 0 para cancelar.` }
+        : advanceBot(flow, state, input.content, { catalog, messageId: String(input.id), inputType: input.type, testMode: (process.env.TICKET_FLOW_TEST_MODE ?? 'true').toLowerCase() === 'true' });
       if (expired) result.text = 'O preenchimento anterior expirou por inatividade. Inicie uma nova abertura pelo menu.\n\n' + result.text;
       const image = result.imageId ? await tx.botImage.findFirst({ where: { id: result.imageId, organizationId: bot.organizationId } }) : null;
       if (result.imageId && !image) throw new Error("Bot image not found");
       // Commit the unique claim independently BEFORE contacting Evolution. It survives
       // an ambiguous timeout/transaction rollback and prevents a later duplicate send.
       await database.botExecutionLog.create({ data: { messageId, botId: bot.id, outcome: "PROCESSING" } });
-      if (result.sacTestSubmission) {
-        const submission = result.sacTestSubmission;
-        if (!validSacTestSubmission(submission.data, catalog) || !/^\d+$/.test(submission.startMessageId)) throw new Error('Invalid test ticket submission');
-        // Um registro por início de fluxo, mesmo se houver repetição de confirmação.
-        try {
-          await tx.sacTestTicket.upsert({
-            where: { startMessageId: Number(submission.startMessageId) },
-            create: { organizationId: bot.organizationId, contactId: contact.id, botId: bot.id, startMessageId: Number(submission.startMessageId), confirmationMessageId: input.id, mode: 'TEST', data: submission.data },
-            update: {},
-          });
-        } catch {
-          // Não confirmar sucesso nem apagar a coleta quando a gravação falhar.
-          result.state = state!;
-          result.text = 'Não foi possível salvar o registro de teste. Seus dados foram mantidos.\n\n1 — Tentar salvar novamente\n2 — Corrigir informações\n0 — Solicitar cancelamento';
-        }
+      if (result.submitSacTicket && result.state.sacTest) {
+        const submission = await submitSacTicket(database, result.state.sacTest, { botId: bot.id, contactId: contact.id, organizationId: bot.organizationId });
+        const { sacTest: completed, ...clean } = result.state;
+        result.state = submission.status === 'SUCCEEDED'
+          ? { ...clean, menuId: flow.rootMenuId, stack: [], status: 'BOT_ACTIVE' }
+          : { ...result.state, status: 'WAITING_HUMAN' };
+        result.text = submission.status === 'SUCCEEDED'
+          ? `✅ *Chamado aberto no SAC!*\n\nProtocolo: *${submission.protocol}*\n\n0 — Menu principal`
+          : submission.status === 'REJECTED'
+            ? '⚠️ O SAC recusou a abertura do chamado. Vou encaminhar seu atendimento à equipe para verificar o cadastro e concluir a solicitação.'
+            : '⚠️ Não foi possível confirmar o protocolo da abertura. Para evitar um chamado duplicado, não repetirei o envio. Vou encaminhar seu atendimento à equipe para conferir no SAC.';
       }
       const messages = [];
       if (!image || result.text.trim()) {

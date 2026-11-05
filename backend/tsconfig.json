@@ -14,6 +14,7 @@
     "sourceMap": true,
     "declaration": false,
     "declarationMap": false,
+    "allowJs": true,
 
     // Verifica tipos, valores opcionais e acessos a posições que podem não existir.
     "strict": true,
@@ -31,6 +32,6 @@
     "noEmitOnError": true
   },
   // O cliente Prisma também precisa ser compilado para funcionar em produção.
-  "include": ["src/**/*.ts", "generated/**/*.ts"],
+  "include": ["src/**/*.ts", "src/lib/sac/**/*.js", "generated/**/*.ts"],
   "exclude": ["dist", "node_modules"]
 }

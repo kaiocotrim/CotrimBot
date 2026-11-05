@@ -133,7 +133,7 @@ export interface TicketCreateInput {
 export interface Machine {
     /** O backend seleciona a coluna duas vezes; o driver pode devolver um array. */
     Descricao: string | string[];
-    IdEstoque: number;
+    IdEstoque: number | string;
 }
 export interface Address {
     endereco: string;

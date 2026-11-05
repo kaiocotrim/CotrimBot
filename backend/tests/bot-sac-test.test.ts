@@ -1,77 +1,75 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { advanceBot, validateFlow, type BotState } from '../src/services/bot-flow.js';
+import { SAC_TEST_CATALOG } from '../src/services/bot-sac-test.js';
 import { fixture } from './bot-fixture.js';
-
-const inputs = ['1', '05540238000123', '1', 'Pessoa Teste', '27999999999', '1', 'teste@example.com', '1', 'Erro 123 no scanner'];
+const inputs = ['1', '05.540.238/0001-23', '1', 'José da Silva', '(27) 99999-9999', '1', 'teste@example.com'];
 function setup() {
-  const flow = fixture();
-  flow.menus[0]!.options[0]!.action = 'SAC_TEST';
-  flow.menus[0]!.options[0]!.response = '';
-  validateFlow(flow, true);
+  const flow = fixture(); flow.menus[0]!.options[0]!.action = 'SAC_TEST';
+  flow.menus[0]!.options[0]!.response = ''; validateFlow(flow, true);
   return { flow, start: advanceBot(flow, null, 'Oi').state };
 }
-
-test('coleta valida dados, aceita números na descrição, corrige campo e só submete após confirmar', () => {
-  const { flow, start } = setup();
-  let state = start;
-  for (const text of inputs) {
-    const snapshot = structuredClone(state);
-    const result = advanceBot(flow, state, text);
-    assert.equal(result.sacTestSubmission, undefined);
-    assert.deepEqual(state, snapshot, 'transição não modifica o estado anterior');
-    state = JSON.parse(JSON.stringify(result.state)); // Como uma sessão recuperada após reinício.
+test('six stages follow order, survive JSON reload and pause after email without submitting', () => {
+  const { flow, start } = setup(); let state = start;
+  const steps = ['cnpj', 'confirmCnpj', 'requester', 'phone', 'address', 'email', 'nextStep'];
+  for (const [index, text] of inputs.entries()) {
+    const snapshot = structuredClone(state); const result = advanceBot(flow, state, text);
+    assert.deepEqual(state, snapshot); assert.equal(result.state.sacTest?.step, steps[index]);
+    assert.equal('sacTestSubmission' in result, false);
+    state = JSON.parse(JSON.stringify(result.state));
   }
-  assert.equal(state.sacTest?.step, 'review');
-  state = advanceBot(flow, state, '2').state;
-  state = advanceBot(flow, state, '5').state;
-  assert.equal(state.sacTest?.step, 'email');
-  const invalid = advanceBot(flow, state, 'email-sem-arroba');
-  assert.equal(invalid.state.sacTest?.step, 'email');
-  assert.match(invalid.text, /E-mail inválido/);
-  state = advanceBot(flow, invalid.state, 'corrigido@example.com').state;
-  assert.equal(state.sacTest?.step, 'review');
-  const done = advanceBot(flow, state, '1');
-  assert.equal(done.sacTestSubmission?.data.email, 'corrigido@example.com');
-  assert.equal(done.state.sacTest, undefined);
-  assert.equal(done.state.status, 'BOT_ACTIVE');
-  assert.match(advanceBot(flow, done.state, '0').text, /Assistente Infordoc/);
-  assert.equal(advanceBot(flow, done.state, '1').state.sacTest?.step, 'cnpj');
+  assert.equal(state.sacTest?.data.requester, 'José da Silva');
+  assert.equal(state.sacTest?.data.phone, '27999999999');
+  assert.equal(state.sacTest?.data.addressId, 'sac-demo-address');
+  assert.ok(!state.sacTest?.data.addressLabel?.includes(', ,'));
+  for (const input of ['1', '2', 'problema']) assert.deepEqual(advanceBot(flow, state, input).state, state);
 });
-
-test('cancelamento em cada etapa pode continuar sem perder dados ou descartar sem prender a sessão', () => {
-  const { flow, start } = setup();
-  let state = start;
-  const states: BotState[] = [];
+test('cancel commands immediately clear collection at every stage', () => {
+  const { flow, start } = setup(); let state = start; const states: BotState[] = [];
   for (const text of inputs) { state = advanceBot(flow, state, text).state; states.push(state); }
-  states.push(advanceBot(flow, state, '2').state); // seleção de campo para correção
-  for (const snapshot of states) {
-    const cancel = advanceBot(flow, snapshot, 'cancelar');
-    assert.equal(cancel.state.sacTest?.cancelPending, true);
-    assert.equal(advanceBot(flow, cancel.state, '9').state.sacTest?.cancelPending, true);
-    const resume = advanceBot(flow, cancel.state, '2');
-    assert.deepEqual(resume.state.sacTest?.data, snapshot.sacTest?.data);
-    assert.equal(resume.state.sacTest?.step, snapshot.sacTest?.step);
-    const cancelled = advanceBot(flow, advanceBot(flow, resume.state, '0').state, '1');
-    assert.equal(cancelled.state.sacTest, undefined);
-    assert.equal(cancelled.sacTestSubmission, undefined);
-    assert.match(advanceBot(flow, cancelled.state, '0').text, /Assistente Infordoc/);
+  for (const snapshot of states) for (const command of ['0', 'cancelar', ' CANCELAR ']) {
+    const result = advanceBot(flow, snapshot, command);
+    assert.equal(result.state.sacTest, undefined); assert.match(result.text, /Atendimento cancelado/);
+    assert.match(advanceBot(flow, result.state, '0').text, /Assistente Infordoc/);
+    assert.equal(advanceBot(flow, result.state, '1').state.sacTest?.step, 'cnpj');
   }
 });
-
-test('respostas inválidas, mídia e nova tentativa de início não avançam nem apagam dados', () => {
-  const { flow, start } = setup();
-  let state = advanceBot(flow, start, '1').state;
-  for (const text of ['05540238000124', '11222333000181', '', 'abrir chamado']) {
-    const result = advanceBot(flow, state, text);
-    assert.equal(result.state.sacTest?.step, 'cnpj');
-  }
+test('invalid values and media stay at their stage; correction clears CNPJ', () => {
+  const { flow, start } = setup(); let state = advanceBot(flow, start, '1').state;
+  for (const text of ['05540238000124', '11222333000181', '00000000000000', '', 'abrir chamado']) assert.equal(advanceBot(flow, state, text).state.sacTest?.step, 'cnpj');
   state = advanceBot(flow, state, '05540238000123').state;
   assert.equal(advanceBot(flow, state, '8').state.sacTest?.step, 'confirmCnpj');
+  const correction = advanceBot(flow, state, '2'); assert.equal(correction.state.sacTest?.step, 'cnpj'); assert.deepEqual(correction.state.sacTest?.data, {});
   state = advanceBot(flow, state, '1').state;
+  for (const text of ['', '123', '!!!']) assert.equal(advanceBot(flow, state, text).state.sacTest?.step, 'requester');
   assert.equal(advanceBot(flow, state, 'arquivo.pdf', { inputType: 'DOCUMENT' }).state.sacTest?.step, 'requester');
   state = advanceBot(flow, state, 'Pessoa Teste').state;
-  assert.equal(advanceBot(flow, state, '123').state.sacTest?.step, 'phone');
-  state = advanceBot(flow, state, '27999999999').state;
+  for (const text of ['123', '20999999999', '2799999999', '27999999999abc']) assert.equal(advanceBot(flow, state, text).state.sacTest?.step, 'phone');
+  state = advanceBot(flow, state, '+55 (27) 99999-9999').state; assert.equal(state.sacTest?.data.phone, '27999999999');
   assert.equal(advanceBot(flow, state, '999').state.sacTest?.step, 'address');
+  state = advanceBot(flow, state, '1').state;
+  for (const text of ['', 'email', 'a@b', 'a@b..com']) assert.equal(advanceBot(flow, state, text).state.sacTest?.step, 'email');
+});
+test('dynamic addresses are formatted and absent addresses never invented', () => {
+  const { flow, start } = setup(); let state = start;
+  for (const input of inputs.slice(0, 4)) state = advanceBot(flow, state, input).state;
+  const catalog = structuredClone(SAC_TEST_CATALOG); catalog[0]!.addresses = [];
+  assert.equal(advanceBot(flow, state, inputs[4]!, { catalog }).state.sacTest?.step, 'phone');
+  catalog[0]!.addresses = [{ id: 'empty', address: ', , ' }, { id: 'a', address: 'Rua A, , Cidade, ' }, { id: 'b', address: 'Rua B,, Cidade' }];
+  const phone = advanceBot(flow, state, inputs[4]!, { catalog });
+  assert.ok(phone.text.includes('Rua A, Cidade')); assert.ok(phone.text.includes('Rua B, Cidade'));
+  const address = advanceBot(flow, phone.state, '2', { catalog });
+  assert.equal(address.state.sacTest?.data.addressId, 'b'); assert.equal(address.state.sacTest?.data.addressLabel, 'Rua B, Cidade');
+});
+test('disabled test mode cannot start collection', () => {
+  const { flow, start } = setup(); const result = advanceBot(flow, start, '1', { testMode: false });
+  assert.equal(result.state.sacTest, undefined); assert.match(result.text, /desativada/);
+});
+test('legacy post-email sessions stop at nextStep and preserve data', () => {
+  const { flow, start } = setup(); let state = start;
+  for (const text of inputs) state = advanceBot(flow, state, text).state;
+  for (const step of ['equipment', 'description', 'review', 'edit']) {
+    const legacy = JSON.parse(JSON.stringify(state)); legacy.sacTest.step = step;
+    const result = advanceBot(flow, legacy, '1'); assert.equal(result.state.sacTest?.step, 'nextStep'); assert.deepEqual(result.state.sacTest?.data, state.sacTest?.data);
+  }
 });

@@ -687,6 +687,19 @@ model BotExecutionLog {
   @@index([botId, createdAt])
 }
 
+// Durable claim independent of WhatsApp delivery and bot-session transactions.
+model BotSacSubmission {
+  startMessageId Int @id
+  botId          String @db.VarChar(191)
+  contactId      Int
+  organizationId String @db.VarChar(191)
+  status         String @db.VarChar(32)
+  protocol       String? @db.VarChar(191)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@index([organizationId, createdAt])
+}
+
 // Catálogo fictício e registros de teste; não representam dados consultados no SAC.
 model SacTestCompany {
   id        String @id @db.VarChar(191)

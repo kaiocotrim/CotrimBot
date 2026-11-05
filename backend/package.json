@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:desktop": "tsc -p tsconfig.desktop-tests.json && node --test .desktop-test-dist/tests/desktop-download.test.js",
     "test:contacts": "tsx --test tests/contact-registration.test.ts",
     "test:csat": "tsx --test tests/csat.test.ts",
     "test:gifs": "tsc -p tsconfig.gif-tests.json && node --test .gif-test-dist/tests/evolution-media.test.js tests/evolution-gif-patch.test.mjs",

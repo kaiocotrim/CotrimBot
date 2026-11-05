@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "outDir": "./.bot-test-dist" },
-  "include": ["tests/bot*.ts"],
+  "include": ["tests/bot*.ts", "src/lib/sac/**/*.js"],
   "exclude": ["dist", ".bot-test-dist", "node_modules"]
 }

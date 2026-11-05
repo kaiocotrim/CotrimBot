@@ -79,5 +79,6 @@ WhatsApp ainda precisa ser implementado.
 ## Fluxo de abertura de chamados em modo de teste
 
 A ação **Abrir chamado (teste)** está disponível no editor e no simulador do bot.
-Ela usa o cadastro de demonstração e salva confirmações no MySQL, sem integrar o SAC.
+Ela usa o cadastro de demonstração e mantém os dados da coleta em `BotSession`
+no MySQL. O fluxo para após o e-mail, sem criar chamados ou registros finais.
 Veja [como configurar, publicar, testar e consultar os registros](docs/sac-test.md).

@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "outDir": "./.desktop-test-dist" },
+  "include": ["tests/desktop-download.test.ts"],
+  "exclude": ["dist", ".desktop-test-dist", "node_modules"]
+}

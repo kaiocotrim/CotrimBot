@@ -31,6 +31,7 @@ generated/
 # Logs
 *.log
 backend/.bot-test-dist/
+backend/.desktop-test-dist/
 backend/.announcement-test-dist/
 backend/.gif-test-dist/
 backend/.sac-test-backups/
