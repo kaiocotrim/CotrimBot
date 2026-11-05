@@ -38,14 +38,14 @@ export function MediaThumbnail({ item, showContactName = true }: { item: MediaLi
     <span ref={ref} style={{ display: "block", width: "100%", height: "100%" }}>
       {!loaded && !failed && <span aria-hidden="true" className={styles.skeleton} style={{ position: "absolute", inset: 0 }} />}
       {failed ? <span className={styles.placeholder}><Images size={26} aria-label="Prévia indisponível" /></span> : visible && (item.type === "VIDEO"
-        ? <video src={libraryMediaUrl(item.id)} muted playsInline preload="metadata" onLoadedData={() => setLoaded(true)} onError={() => setFailed(true)} onLoadedMetadata={(event) => {
+        ? <video src={libraryMediaUrl(item.externalId)} muted playsInline preload="metadata" onLoadedData={() => setLoaded(true)} onError={() => setFailed(true)} onLoadedMetadata={(event) => {
           setLoaded(true);
           const seconds = event.currentTarget.duration;
           if (Number.isFinite(seconds)) setDuration(`${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`);
         }} />
         // A mídia vem do endpoint autenticado de mensagens.
         // eslint-disable-next-line @next/next/no-img-element
-        : <img src={libraryMediaUrl(item.id)} alt="" loading="lazy" onLoad={() => setLoaded(true)} onError={() => setFailed(true)} />)}
+        : <img src={libraryMediaUrl(item.externalId)} alt="" loading="lazy" onLoad={() => setLoaded(true)} onError={() => setFailed(true)} />)}
       {(showContactName || item.type === "VIDEO") && <span className={styles.tileInfo}>
         {item.type === "VIDEO" && <span className={styles.videoLabel}><Video size={14} aria-hidden="true" />{duration || "Vídeo"}</span>}
         {showContactName && <strong>{item.contactName}</strong>}
@@ -205,9 +205,9 @@ export function LibraryContent({ contactId, contactName, onBack }: { contactId?:
       <Dialog.Portal><Dialog.Backdrop forceRender className={styles.viewerBackdrop} /><Dialog.Popup className={styles.viewer}>
         <header className={styles.viewerHeader}><div className={styles.viewerHeading}><Dialog.Title className={styles.title}>{preview?.contactName}</Dialog.Title><Dialog.Description className={styles.subtitle}>{preview && timeFormat.format(new Date(preview.createdAt))}</Dialog.Description></div><button type="button" className={styles.iconButton} aria-label="Baixar mídia" onClick={() => { if (preview) void download(preview); }}><Download size={18} /></button><Dialog.Close aria-label="Fechar visualização" className={styles.iconButton}><X size={20} /></Dialog.Close></header>
         <div className={styles.viewerImage}>
-          {preview && (previewError === preview.id ? <p className={styles.error}>Não foi possível abrir esta mídia.</p> : preview.type === "VIDEO" ? <video key={preview.id} src={libraryMediaUrl(preview.id)} controls playsInline autoPlay onError={() => setPreviewError(preview.id)} />
+          {preview && (previewError === preview.id ? <p className={styles.error}>Não foi possível abrir esta mídia.</p> : preview.type === "VIDEO" ? <video key={preview.id} src={libraryMediaUrl(preview.externalId)} controls playsInline autoPlay onError={() => setPreviewError(preview.id)} />
             // eslint-disable-next-line @next/next/no-img-element
-            : <img key={preview.id} src={libraryMediaUrl(preview.id)} alt={`Imagem compartilhada em ${preview.contactName}`} onError={() => setPreviewError(preview.id)} />)}
+            : <img key={preview.id} src={libraryMediaUrl(preview.externalId)} alt={`Imagem compartilhada em ${preview.contactName}`} onError={() => setPreviewError(preview.id)} />)}
           {previewIndex > 0 && <button type="button" aria-label="Mídia anterior" className={`${styles.iconButton} ${styles.previous}`} onClick={() => setPreview(media[previewIndex - 1])}><ChevronLeft size={23} /></button>}
           {previewIndex >= 0 && previewIndex < media.length - 1 && <button type="button" aria-label="Próxima mídia" className={`${styles.iconButton} ${styles.next}`} onClick={() => setPreview(media[previewIndex + 1])}><ChevronRight size={23} /></button>}
         </div>

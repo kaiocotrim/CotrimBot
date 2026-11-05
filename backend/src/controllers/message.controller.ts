@@ -880,16 +880,21 @@ export async function getMessageMedia(
   req: Request,
   res: Response
 ) {
-  const messageId = Number(req.params.id);
+  const externalId = String(req.params.externalId);
 
-  // Procura a mensagem no banco do CotrimBot.
-  const message = await prisma.message.findUnique({
+  // Procura apenas mensagens visíveis para o usuário autenticado:
+  // não apagadas globalmente e não apagadas por ele mesmo.
+  // Mensagens inacessíveis respondem igual a inexistentes (404),
+  // para não revelar quais IDs existem.
+  const message = await prisma.message.findFirst({
     where: {
-      id: messageId,
+      externalId,
+      deletedAt: null,
+      deletions: { none: { userId: req.user!.id } },
     },
   });
 
-  // Não existe uma Message com esse ID.
+  // Não existe uma Message visível com esse ID.
   if (!message) {
     return res.status(404).json({
       message: "Mensagem não encontrada",

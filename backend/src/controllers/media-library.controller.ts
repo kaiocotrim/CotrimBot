@@ -60,7 +60,7 @@ export function createMediaLibraryHandler(database: Pick<typeof prisma, "message
       ...(!summary && cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       take: summary ? 4 : 49,
       select: {
-        id: true, type: true, content: true, createdAt: true, direction: true, senderName: true,
+        id: true, externalId: true, type: true, content: true, createdAt: true, direction: true, senderName: true,
         contact: { select: { id: true, name: true, phone: true, isGroup: true, isSaved: true } },
         cachedMedia: { select: { fileName: true, mimetype: true } },
         sentByUser: { select: { name: true } },
@@ -68,7 +68,7 @@ export function createMediaLibraryHandler(database: Pick<typeof prisma, "message
     }), summary ? database.message.count({ where: { ...visibleWhere, OR: [mediaCategory, { type: "DOCUMENT" }, linksCategory] } }) : Promise.resolve(null)]);
     const page = messages.slice(0, summary ? 4 : 48);
     const items = page.map((message) => ({
-      id: message.id, type: message.type, content: message.content, createdAt: message.createdAt,
+      id: message.id, externalId: message.externalId, type: message.type, content: message.content, createdAt: message.createdAt,
       contactId: message.contact.id, contactName: contactDisplayName(message.contact),
       senderName: message.direction === "OUTGOING" ? message.sentByUser?.name ?? "Você" : message.senderName ?? contactDisplayName(message.contact),
       fileName: message.cachedMedia?.fileName ?? (message.type === "DOCUMENT" ? message.content : null),

@@ -35,6 +35,7 @@ import { useMessageTranslations } from "@/hooks/use-message-translations";
 import { splitMessageSignatures } from "@/lib/message-signature";
 import { participantColor } from "@/lib/participant-color";
 import type { Contact, Message } from "@/types/chat";
+import { messageMediaUrl } from "@/lib/media-library-api";
 
 type MessageBubbleProps = {
   message: Message;
@@ -64,9 +65,6 @@ function isMessageGestureTarget(target: EventTarget | null) {
   return !target.closest("button") || Boolean(target.closest("[data-message-media-preview]"));
 }
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "/api";
 
 const messageTimeFormatter = new Intl.DateTimeFormat("pt-BR", {
   hour: "2-digit",
@@ -125,7 +123,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
   const isVideo = message.type === "VIDEO";
   const isSticker = message.type === "STICKER";
   const imageHasCaption = isImage && message.content !== "[Imagem]";
-  const mediaUrl = `${API_URL}/messages/${message.id}/media`;
+  const mediaUrl = messageMediaUrl(message.externalId);
   const quotedMediaMessage = message.quotedMessageId
     ? mediaMessages.find((media) => media.id === message.quotedMessageId)
     : undefined;
@@ -165,7 +163,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           createdAt={message.createdAt}
           gallery={mediaMessages.filter((media) => media.type === "IMAGE").map((image) => ({
             id: image.id,
-            mediaUrl: `${API_URL}/messages/${image.id}/media`,
+            mediaUrl: messageMediaUrl(image.externalId),
             content: image.content,
             showSignature: image.direction === "OUTGOING" && !image.private,
             createdAt: image.createdAt,
@@ -185,7 +183,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
             id: media.id,
             type: media.type as "IMAGE" | "VIDEO",
             gifPlayback: Boolean(media.gifPlayback),
-            mediaUrl: `${API_URL}/messages/${media.id}/media`,
+            mediaUrl: messageMediaUrl(media.externalId),
             content: media.content,
             showSignature: media.direction === "OUTGOING" && !media.private,
             createdAt: media.createdAt,
@@ -666,8 +664,8 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           className={`mb-2 block w-full border-l-4 px-2.5 py-2 text-left ${isPrivate ? "border-zinc-400 bg-zinc-200/70" : "border-white bg-black/15"} ${isImage || isVideo ? "rounded-xl" : "rounded-lg"} disabled:cursor-default`}
         >
           <span className="flex min-w-0 items-center gap-2">
-            {quotedMediaMessage?.type === "IMAGE" && message.quotedMessageId && (
-              <Image unoptimized src={`${API_URL}/messages/${message.quotedMessageId}/media`} alt="" width={36} height={36} className="size-9 shrink-0 rounded-md object-cover" />
+            {quotedMediaMessage?.type === "IMAGE" && message.quotedExternalId && (
+              <Image unoptimized src={messageMediaUrl(message.quotedExternalId)} alt="" width={36} height={36} className="size-9 shrink-0 rounded-md object-cover" />
             )}
             <span className="min-w-0">
               <span className={`block truncate text-[11px] font-semibold ${isPrivate ? "text-zinc-700" : "text-white"}`}>

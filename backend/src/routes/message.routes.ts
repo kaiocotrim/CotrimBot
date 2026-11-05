@@ -67,12 +67,12 @@ messageRouter.post("/contacts/:id/close-with-bot", closeConversationWithBot);
 messageRouter.patch("/contacts/:id/messages/read", markMessagesAsRead);
 
 /**
- * GET /messages/:id/media
+ * GET /messages/:externalId/media
  * Busca a mídia original na Evolution usando o externalId da mensagem salva.
  * Devolve os bytes e o Content-Type para o navegador exibir ou tocar o arquivo.
  * O controller rejeita mensagens de texto, pois não possuem arquivo de mídia.
  */
-messageRouter.get("/messages/:id/media", getMessageMedia);
+messageRouter.get("/messages/:externalId/media", getMessageMedia);
 messageRouter.get("/messages/:id/sender-avatar", getGroupSenderAvatar);
 messageRouter.get("/messages/:id/info", getMessageInfo);
 messageRouter.put("/messages/:id/reaction", reactToMessage);
