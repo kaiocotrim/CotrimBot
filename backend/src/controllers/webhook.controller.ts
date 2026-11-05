@@ -6,7 +6,7 @@ import { recordOutgoingMessageRead } from "../services/outgoing-message-read.ser
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { notifyIncomingMessage, notifyReply } from "../services/notification.service.js";
-import { getGroupInfo, getMediaMessage } from "../services/evolution.service.js";
+import { getGroupInfo, getMediaMessage, sendWhatsAppMessage } from "../services/evolution.service.js";
 import { uploadMediaObject } from "../services/media-storage.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
 import { extractSharedContacts } from "../utils/shared-contact.js";
@@ -20,6 +20,28 @@ import {
 } from "../utils/whatsapp-message.js";
 import { isPresenceEvent, parsePresenceUpdate, presenceDebug, presenceIdentifiers } from "../utils/whatsapp-presence.js";
 import { normalizeWhatsAppJid, whatsAppJidIdentifier } from "../utils/whatsapp-jid.js";
+import { parseCsatRating, recordCsatReply } from "../services/csat.service.js";
+import type { Contact } from "../../generated/prisma/client.js";
+
+const CSAT_THANKS_TEXT = "Obrigado pela sua avaliação! 💙";
+const CSAT_COMMENT_PROMPT = "Se quiser, envie um comentário sobre o atendimento nos próximos 10 minutos.";
+
+// Agradece a nota e, quando ela veio sem comentário, convida o cliente a comentar.
+async function replyToCsatRating(contact: Contact, text: string) {
+  const commentIncluded = Boolean(parseCsatRating(text)?.comment);
+  const content = commentIncluded ? CSAT_THANKS_TEXT : `${CSAT_THANKS_TEXT} ${CSAT_COMMENT_PROMPT}`;
+  const evolutionResponse = await sendWhatsAppMessage(contact.phone, content);
+  const externalId = evolutionResponse?.key?.id;
+  if (!externalId) throw new Error("A Evolution API não retornou o ID da mensagem de agradecimento");
+
+  const message = await prisma.message.create({
+    data: { externalId, content, direction: "OUTGOING", contactId: contact.id },
+  });
+  getSocketServer().emit("new_message", {
+    message,
+    contact: { ...contact, name: contactDisplayName(contact) },
+  });
+}
 
 // Impede que sincronizações da Evolution repovoem o banco com o histórico antigo.
 // Mantemos uma pequena tolerância para mensagens que estavam em trânsito no reinício.
@@ -639,9 +661,22 @@ export async function whatsappWebhook(req: Request, res: Response) {
     externalId: incomingMessage.externalId,
   });
 
+  // Resposta à pesquisa CSAT não aciona o menu do bot.
   // O runtime só processa conversas atribuídas ao membro Inforbot.
   if (!fromMe && !contact.isGroup) {
-    await processBotMessage(incomingMessage.id, req.body?.instance);
+    let csatReply: Awaited<ReturnType<typeof recordCsatReply>> | null = null;
+    try {
+      csatReply = await recordCsatReply(prisma, { contactId: contact.id, text: incomingMessage.content });
+      if (csatReply.handled && csatReply.rating !== undefined) {
+        await replyToCsatRating(contact, incomingMessage.content);
+      }
+    } catch (error) {
+      console.error("Não foi possível registrar a resposta da pesquisa CSAT:", error);
+    }
+
+    if (!csatReply?.handled) {
+      await processBotMessage(incomingMessage.id, req.body?.instance);
+    }
   }
 
   // Respondemos 200 para informar à Evolution

@@ -34,6 +34,7 @@ model Contact {
   notifications     Notification[]
   botSessions       BotSession[]
   sacTestTickets    SacTestTicket[]
+  csatSurveys       CsatSurvey[]
 
 }
 
@@ -208,6 +209,7 @@ model Message {
   cachedMedia             MessageMedia?
   deletions               MessageDeletion[]
   receipts                MessageReceipt[]
+  csatSurvey              CsatSurvey?
 
   @@index([contactId], map: "Message_contactId_fkey")
   @@index([sentByUserId])
@@ -303,6 +305,7 @@ model User {
   internalConversationParticipants InternalConversationParticipant[]
   internalMessages InternalMessage[]
   internalMessageReactions InternalMessageReaction[]
+  csatSurveys CsatSurvey[]
 }
 
 model Session {
@@ -723,4 +726,30 @@ model SacTestTicket {
   contact               Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
   @@index([organizationId, createdAt])
   @@index([contactId])
+}
+
+enum CsatSurveyStatus {
+  PENDING
+  ANSWERED
+  EXPIRED
+}
+
+model CsatSurvey {
+  id           Int             @id @default(autoincrement())
+  contactId    Int
+  messageId    Int?            @unique
+  status       CsatSurveyStatus @default(PENDING)
+  rating       Int?            @db.TinyInt
+  comment      String?         @db.Text
+  sentByUserId String?
+  sentAt       DateTime        @default(now())
+  answeredAt   DateTime?
+  commentUntil DateTime?
+  contact      Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  message      Message?        @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  sentByUser   User?           @relation(fields: [sentByUserId], references: [id], onDelete: SetNull)
+
+  @@index([contactId, sentAt])
+  @@index([sentAt])
+  @@index([sentByUserId])
 }
