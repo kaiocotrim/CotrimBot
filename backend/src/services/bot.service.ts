@@ -4,23 +4,16 @@ export function isInforbotName(name: string | null | undefined): boolean {
 
 const SATISFACTION_SURVEY = `Olá! 😊
 
-Queremos saber como foi sua experiência com o nosso atendimento.
+Como você avalia o atendimento que recebeu?
 
-De 0 a 10, qual nota você daria para o atendimento recebido?
+1 - Muito insatisfeito 😡
+2 - Insatisfeito 🙁
+3 - Neutro 😐
+4 - Satisfeito 🙂
+5 - Muito satisfeito 😍
 
-😡 0
-😠 1
-😠 2
-🙁 3
-😕 4
-😐 5
-🙂 6
-😊 7
-😄 8
-😁 9
-😍 10
-
-Responda apenas com o número da sua nota.
+Responda apenas com o número da sua nota (de 1 a 5).
+Se quiser, pode incluir um comentário após a nota, por exemplo: "4 atendimento rápido".
 
 Sua opinião é muito importante para nós. 💙`;
 
