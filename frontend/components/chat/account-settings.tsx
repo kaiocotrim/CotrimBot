@@ -4,7 +4,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Select } from "@base-ui/react/select";
 import { Tabs } from "@base-ui/react/tabs";
 import { AppleLogo, GoogleLogo } from "@phosphor-icons/react";
-import { BadgeCheck, Bell, Bot, Building2, Camera, Check, ChevronDown, ContactRound, Keyboard, KeyRound, Laptop, Link2, Megaphone, Palette, PhoneOff, Plus, QrCode, Search, Trash2, UserRound, Volume2, X } from "@/components/icons/animated-lucide";
+import { BadgeCheck, Bell, Bot, Building2, Camera, Check, ChevronDown, ContactRound, Keyboard, KeyRound, Laptop, Link2, Megaphone, Palette, PhoneOff, Plus, QrCode, Search, Star, Trash2, UserRound, Volume2, X } from "@/components/icons/animated-lucide";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -16,6 +16,7 @@ import { AnnouncementSettings } from "@/components/chat/announcement-settings";
 import { ThemeSettings } from "@/components/chat/theme-settings";
 import { KeyboardSettings } from "@/components/chat/keyboard-settings";
 import { SdkSettings } from "@/components/chat/sdk-settings";
+import CsatDashboard from "@/components/csat/csat-dashboard";
 import { authClient } from "@/lib/auth-client";
 import { prepareAvatar } from "@/lib/avatar-image";
 import { checkLocalTranscription, isLocalTranscriptionEnabled, setLocalTranscriptionEnabled } from "@/lib/local-transcription";
@@ -54,6 +55,7 @@ const sections = [
   { value: "calls", label: "Chamadas", icon: PhoneOff },
   { value: "business", label: "Empresa", icon: Building2 },
   { value: "announcements", label: "Notícias", icon: Megaphone },
+  { value: "csat", label: "CSAT", icon: Star },
   { value: "bots", label: "Central de Bots", icon: Bot },
   { value: "sdk", label: "API e SDK", icon: KeyRound },
   { value: "local", label: "Transcrição local", icon: Laptop },
@@ -207,7 +209,7 @@ function SettingsContent({ user }: { user: SettingsUser }) {
 
       <div className={styles.main}>
         <header className={styles.header}>
-          {section !== "client" && <h2 className={styles.title}>{availableSections.find((item) => item.value === section)?.label}</h2>}
+          {section !== "client" && section !== "csat" && <h2 className={styles.title}>{availableSections.find((item) => item.value === section)?.label}</h2>}
           <Dialog.Close aria-label="Fechar configurações" title="Fechar" className={styles.closeButton}>
             <X size={24} strokeWidth={1.8} aria-hidden="true" />
           </Dialog.Close>
@@ -324,6 +326,10 @@ function SettingsContent({ user }: { user: SettingsUser }) {
 
           <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="announcements" className={styles.panel}>
             <AnnouncementSettings />
+          </MotionPanel>
+
+          <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="csat" className={styles.panel}>
+            {section === "csat" && <CsatDashboard />}
           </MotionPanel>
 
           <MotionPanel initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : settingsSpring} value="pro" className={styles.panel}>
