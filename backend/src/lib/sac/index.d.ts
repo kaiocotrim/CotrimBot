@@ -126,7 +126,8 @@ export interface TicketCreateInput {
     Endereco: string;
     Email: string;
     IdContrato?: number;
-    Maquina?: string;
+    /** Identificador IdEstoque do equipamento selecionado. */
+    Maquina?: number;
     /** Padrão no backend: "SAC". */
     Origem?: string;
 }

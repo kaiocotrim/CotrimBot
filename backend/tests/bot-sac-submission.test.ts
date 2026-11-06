@@ -41,7 +41,7 @@ test('real flow collects equipment, department and description and submits only 
   assert.equal(advanceBot(flow, reply.state, '0', { catalog }).state.sacTest, undefined);
   assert.deepEqual(sacTicketPayload(reply.state.sacTest!), { IdTenant: 'tenant-a', IdEstoque: 123, Solicitante: 'Pessoa Teste',
     Motivo: 'Scanner não liga', Departamento: 'Administrativo', Telefone: '27999999999', Endereco: 'Rua SAC, 10',
-    Email: 'teste@example.com', Maquina: 'Scanner', Origem: 'WhatsApp' });
+    Email: 'teste@example.com', Maquina: 123, Origem: 'WhatsApp' });
 });
 
 test('large equipment catalogs are paginated and keep absolute selection numbers', () => {

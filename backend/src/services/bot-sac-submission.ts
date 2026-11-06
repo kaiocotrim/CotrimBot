@@ -11,7 +11,7 @@ export function sacTicketPayload(ticket: SacTestState): TicketCreateInput {
     || !data.department || !data.phone || !data.addressLabel || !data.email) throw new Error('Dados incompletos para abrir chamado.');
   return { IdTenant: data.companyId, IdEstoque: Number(equipment.id), Solicitante: data.requester,
     Motivo: data.description, Departamento: data.department, Telefone: data.phone, Endereco: data.addressLabel,
-    Email: data.email, Maquina: equipment.name, Origem: 'WhatsApp' };
+    Email: data.email, Maquina: Number(equipment.id), Origem: 'WhatsApp' };
 }
 
 export function sacProtocol(value: JsonValue): string | null {
