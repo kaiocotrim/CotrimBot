@@ -90,3 +90,22 @@ test('a failed protocol save preserves the original claim and prevents retries a
   assert.equal((await submitSacTicket(database, ticket, context, create)).status, 'UNCERTAIN');
   assert.equal(posts, 1);
 });
+
+test('SAC rejection logs the upstream reason without collected data or credentials', async (t) => {
+  const logs: unknown[][] = [];
+  t.mock.method(console, 'error', (...args: unknown[]) => logs.push(args));
+  const { database } = ledger();
+  const ticket = reviewed().reply.state.sacTest!;
+  const result = await submitSacTicket(database, ticket, context, async () => {
+    throw new SacApiError(400, { error: `Campo obrigatório ausente. Solicitante: ${ticket.data.requester}; Email: ${ticket.data.email}; Bearer secret-token` });
+  });
+  assert.equal(result.status, 'REJECTED');
+  assert.equal(logs.length, 1);
+  const detail = logs[0]![1] as { startMessageId: number; status: number; reason: string };
+  assert.equal(detail.startMessageId, 100);
+  assert.equal(detail.status, 400);
+  assert.match(detail.reason, /Campo obrigatório ausente/);
+  assert.equal(detail.reason.includes(ticket.data.requester!), false);
+  assert.equal(detail.reason.includes(ticket.data.email!), false);
+  assert.equal(detail.reason.includes('secret-token'), false);
+});
