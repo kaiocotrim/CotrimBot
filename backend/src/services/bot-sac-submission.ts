@@ -60,7 +60,7 @@ export async function submitSacTicket(database: Pick<typeof prisma, 'botSacSubmi
     let reason = error instanceof SacApiError ? error.message : 'Falha de conexão ou resposta inválida do SAC.';
     const secrets = [process.env.SAC_API_TOKEN, process.env.SAC_TOKEN,
       ...Object.entries(input).filter(([key]) => key !== 'Origem').map(([, value]) => String(value ?? ''))]
-      .filter(value => value && value.length >= 3).sort((a, b) => b.length - a.length);
+      .filter((value): value is string => typeof value === 'string' && value.length >= 3).sort((a, b) => b.length - a.length);
     for (const value of secrets) reason = reason.replaceAll(value, '[omitido]');
     reason = reason.replace(/Bearer\s+\S+/gi, 'Bearer [omitido]').slice(0, 1000);
     console.error('Falha ao abrir chamado no SAC.', {
