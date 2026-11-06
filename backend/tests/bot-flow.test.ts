@@ -3,6 +3,30 @@ import assert from "node:assert/strict";
 import { advanceBot, validateFlow } from "../src/services/bot-flow.js";
 import { authenticateBotWebhook } from "../src/services/bot-webhook-auth.js";
 import { fixture } from "./bot-fixture.js";
+import { existsSync, readFileSync } from "node:fs";
+
+test("InforBot greeting ends with the selection instruction and only submenus offer a return", () => {
+  const configuration = ["../../docs/bots/inforbot.cotrimbot.json", "../../../docs/bots/inforbot.cotrimbot.json"]
+    .map(path => new URL(path, import.meta.url)).find(path => existsSync(path));
+  assert.ok(configuration);
+  const { draft: flow } = JSON.parse(readFileSync(configuration, "utf8"));
+  validateFlow(flow);
+  const initial = advanceBot(flow, null, "Olá");
+  assert.equal(initial.text, [
+    "👋 Olá! Seja bem-vindo à *Infordoc*.",
+    "🤖 Sou o *InforBot*, seu assistente virtual, e estou aqui para facilitar seu atendimento.",
+    "*Como podemos ajudar você hoje?*",
+    "1 — 🛠️ *Suporte Técnico*\nProblemas com scanners, sistemas ou dificuldades técnicas.",
+    "2 — 💳 *Financeiro*\nInformações sobre boletos, pagamentos e faturamento.",
+    "Responda com o *número da opção desejada* para continuar.",
+  ].join("\n\n"));
+  for (const number of ["1", "2"]) {
+    const submenu = advanceBot(flow, initial.state, number);
+    assert.match(submenu.text, /0 — ↩️ Voltar ao menu principal\n\nDigite o número da opção desejada\.$/);
+    assert.equal(advanceBot(flow, submenu.state, "0").text, initial.text);
+  }
+  assert.doesNotMatch(advanceBot(flow, initial.state, "99").text, /0 —/);
+});
 
 test("published Infordoc flow navigates responses, submenus, previous menu, invalid and inactive options", () => {
   const flow = fixture(); validateFlow(flow, true);

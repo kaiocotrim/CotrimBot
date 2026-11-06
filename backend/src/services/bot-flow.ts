@@ -17,7 +17,15 @@ export function validateFlow(value: unknown, publish = false): asserts value is 
 
 export function renderMenu(flow: BotFlow, id: string): string {
   const menu = flow.menus.find(m => m.id === id)!;
-  return [menu.text, ...menu.options.filter(o => o.active).map(o => `${o.number} — ${o.label}${o.description?.trim() ? `\n${o.description.trim()}` : ""}`), `0 — ${flow.backLabel}`].filter(Boolean).join("\n\n");
+  // Keep a final selection instruction after the choices, where the client acts on it.
+  const instruction = menu.text.match(/(?:^|\n\s*\n)((?:Responda com o \*?número da opção desejada\*? para continuar\.|Digite o número da opção desejada\.))\s*$/u);
+  const text = instruction ? menu.text.slice(0, instruction.index).trimEnd() : menu.text;
+  return [
+    text,
+    ...menu.options.filter(o => o.active).map(o => `${o.number} — ${o.label}${o.description?.trim() ? `\n${o.description.trim()}` : ""}`),
+    ...(id !== flow.rootMenuId ? [`0 — ${flow.backLabel}`] : []),
+    instruction?.[1],
+  ].filter(Boolean).join("\n\n");
 }
 
 // Both the simulator and WhatsApp runtime call this pure transition function.

@@ -1,0 +1,136 @@
+{
+  "format": "cotrimbot.bot",
+  "version": 1,
+  "exportedAt": "2026-11-06T14:09:16.606Z",
+  "name": "InforBot",
+  "images": [],
+  "draft": {
+    "rootMenuId": "main",
+    "invalidMessage": "⚠️ *Não consegui identificar sua escolha.*\n\nPor favor, selecione uma das opções disponíveis no menu abaixo.",
+    "backLabel": "↩️ Voltar ao menu principal",
+    "menus": [
+      {
+        "id": "main",
+        "name": "Menu principal",
+        "text": "👋 Olá! Seja bem-vindo à *Infordoc*.\n\n🤖 Sou o *InforBot*, seu assistente virtual, e estou aqui para facilitar seu atendimento.\n\n*Como podemos ajudar você hoje?*\n\nResponda com o *número da opção desejada* para continuar.",
+        "options": [
+          {
+            "id": "main-support",
+            "number": "1",
+            "label": "🛠️ *Suporte Técnico*",
+            "description": "Problemas com scanners, sistemas ou dificuldades técnicas.",
+            "active": true,
+            "action": "SUBMENU",
+            "response": "",
+            "targetMenuId": "support"
+          },
+          {
+            "id": "main-finance",
+            "number": "2",
+            "label": "💳 *Financeiro*",
+            "description": "Informações sobre boletos, pagamentos e faturamento.",
+            "active": true,
+            "action": "SUBMENU",
+            "response": "",
+            "targetMenuId": "finance"
+          }
+        ]
+      },
+      {
+        "id": "support",
+        "name": "Suporte Técnico",
+        "text": "🛠️ *InforBot | Suporte Técnico*\n\nCerto! Vamos ajudar você a resolver seu problema.\n\n*Com qual serviço está precisando de ajuda?*\n\nDigite o número da opção desejada.",
+        "options": [
+          {
+            "id": "support-scanners",
+            "number": "1",
+            "label": "🖨️ Scanners e digitalização",
+            "active": true,
+            "action": "MESSAGE",
+            "response": "em breve...",
+            "targetMenuId": ""
+          },
+          {
+            "id": "support-systems",
+            "number": "2",
+            "label": "💻 Sistemas Infordoc",
+            "active": true,
+            "action": "MESSAGE",
+            "response": "em breve...",
+            "targetMenuId": ""
+          },
+          {
+            "id": "support-certificate",
+            "number": "3",
+            "label": "🔐 Certificado digital",
+            "active": true,
+            "action": "MESSAGE",
+            "response": "em breve...",
+            "targetMenuId": ""
+          },
+          {
+            "id": "support-ticket",
+            "number": "4",
+            "label": "🎫 Abrir um chamado",
+            "active": true,
+            "action": "MESSAGE",
+            "response": "em breve...",
+            "targetMenuId": ""
+          },
+          {
+            "id": "support-human",
+            "number": "5",
+            "label": "👨‍💻 Falar com o suporte",
+            "active": true,
+            "action": "MESSAGE",
+            "response": "em breve...",
+            "targetMenuId": ""
+          }
+        ]
+      },
+      {
+        "id": "finance",
+        "name": "Financeiro",
+        "text": "💳 *InforBot | Financeiro*\n\nVamos direcionar sua solicitação.\n\n*Sobre qual assunto você precisa de ajuda?*\n\nDigite o número da opção desejada.",
+        "options": [
+          {
+            "id": "finance-boleto",
+            "number": "1",
+            "label": "📄 Segunda via de boleto",
+            "active": true,
+            "action": "MESSAGE",
+            "response": "em breve...",
+            "targetMenuId": ""
+          },
+          {
+            "id": "finance-payments",
+            "number": "2",
+            "label": "💰 Pagamentos",
+            "active": true,
+            "action": "MESSAGE",
+            "response": "em breve...",
+            "targetMenuId": ""
+          },
+          {
+            "id": "finance-invoices",
+            "number": "3",
+            "label": "🧾 Notas fiscais e faturamento",
+            "active": true,
+            "action": "MESSAGE",
+            "response": "em breve...",
+            "targetMenuId": ""
+          },
+          {
+            "id": "finance-human",
+            "number": "4",
+            "label": "👤 Falar com o financeiro",
+            "active": true,
+            "action": "MESSAGE",
+            "response": "em breve...",
+            "targetMenuId": ""
+          }
+        ]
+      }
+    ]
+  }
+}
