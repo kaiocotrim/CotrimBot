@@ -76,7 +76,7 @@ export class Api {
     return { token, session };
   }
 
-  contacts() { return this.request<Contact[]>('/contacts'); }
+  contacts() { return this.request<Contact[]>('/contacts?includeFavoriteCounts=1'); }
   contact(id: number) { return this.request<Contact>(`/contacts/${id}`); }
   assignees() { return this.request<ContactAssignee[]>('/contacts/assignees'); }
   setAssignment(id: number, assignedUserIds: string[]) {
@@ -99,15 +99,41 @@ export class Api {
   messages(contactId: number, before?: number) {
     return this.request<MessagesPage>(`/contacts/${contactId}/messages?limit=40${before ? `&before=${before}` : ''}`);
   }
-  send(contactId: number, text: string, replyToMessageId?: number) {
+  async rewriteMessage(text: string) {
+    const result = await this.request<{ text: string }>('/ai/rewrite', {
+      method: 'POST', body: JSON.stringify({ text: text.trim() }),
+    }, 60000);
+    if (typeof result.text !== 'string' || !result.text.trim() || result.text.length > 10000) {
+      throw new Error('A IA não retornou um texto válido. Seu rascunho foi mantido.');
+    }
+    return result.text;
+  }
+  async translateMessage(text: string) {
+    const result = await this.request<{ text: string }>('/ai/translate', { method: 'POST', body: JSON.stringify({ text }) }, 60000);
+    if (typeof result?.text !== 'string' || !result.text.trim()) throw new Error('A IA não retornou uma tradução válida.');
+    return result.text;
+  }
+  reactToMessage(id: number, reaction: string) {
+    return this.request<Message>(`/messages/${id}/reaction`, { method: 'PUT', body: JSON.stringify({ reaction }) });
+  }
+  messageFlags(id: number, flags: { pinned?: boolean; pinDurationHours?: 24 | 168 | 720; favorited?: boolean }) {
+    return this.request<Message>(`/messages/${id}/flags`, { method: 'PATCH', body: JSON.stringify(flags) });
+  }
+  deleteMessage(id: number, scope: 'me' | 'everyone') {
+    return this.request<{ messageId: number; scope: 'me' | 'everyone'; deletedAt?: string }>(`/messages/${id}?scope=${scope}`, { method: 'DELETE' });
+  }
+  send(contactId: number, text: string, replyToMessageId?: number, options: { private?: boolean; includeSignature?: boolean } = {}) {
     return this.request<{ message: Message }>(`/contacts/${contactId}/send`, {
-      method: 'POST', body: JSON.stringify({ text, includeSignature: true, replyToMessageId }),
+      method: 'POST', body: JSON.stringify({ text, includeSignature: options.includeSignature ?? true, private: options.private ?? false, replyToMessageId }),
     });
   }
-  sendMedia(contactId: number, file: UploadAttachment, caption: string, replyToMessageId?: number) {
+  sendMedia(contactId: number, file: UploadAttachment, caption: string, replyToMessageId?: number, includeSignature = true) {
     return this.request<{ message: Message }>(`/contacts/${contactId}/send-media`, {
-      method: 'POST', body: attachmentForm(file, caption, replyToMessageId),
+      method: 'POST', body: attachmentForm(file, caption, replyToMessageId, new FormData(), includeSignature),
     }, 120000);
+  }
+  sendPoll(contactId: number, poll: { question: string; options: string[]; selectableCount: number }) {
+    return this.request<{ message: Message }>(`/contacts/${contactId}/send-poll`, { method: 'POST', body: JSON.stringify(poll) }, 120000);
   }
   markRead(contactId: number) {
     return this.fetch(`/contacts/${contactId}/messages/read`, { method: 'PATCH' });

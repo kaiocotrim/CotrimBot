@@ -22,7 +22,7 @@
         "expo-image-picker",
         {
           "photosPermission": "Permitir que o CotrimBot selecione fotos para enviar nas conversas.",
-          "cameraPermission": false,
+          "cameraPermission": "Permitir que o CotrimBot tire fotos para enviar nas conversas.",
           "microphonePermission": "Permitir que o CotrimBot grave áudios para enviar nas conversas."
         }
       ],

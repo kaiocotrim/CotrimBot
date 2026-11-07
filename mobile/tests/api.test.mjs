@@ -2,6 +2,87 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Api, ApiError, normalizeServer } from '../src/lib/api.ts';
 
+test('message context actions use authenticated routes and explicit deletion scopes', async () => {
+  const calls = [];
+  const api = new Api('https://example.com', 'token', async (url, init) => {
+    assert.equal(init.headers.Authorization, 'Bearer token');
+    calls.push({ path: url.replace('https://example.com/api', ''), method: init.method, body: init.body ? JSON.parse(init.body) : undefined });
+    return Response.json(url.endsWith('/ai/translate') ? { text: 'Olá' } : { id: 3 });
+  });
+  assert.equal(await api.translateMessage('Hello'), 'Olá');
+  await api.reactToMessage(3, '👍');
+  await api.messageFlags(3, { pinned: true, pinDurationHours: 168 });
+  await api.messageFlags(3, { favorited: true });
+  await api.deleteMessage(3, 'me');
+  assert.deepEqual(calls, [
+    { path: '/ai/translate', method: 'POST', body: { text: 'Hello' } },
+    { path: '/messages/3/reaction', method: 'PUT', body: { reaction: '👍' } },
+    { path: '/messages/3/flags', method: 'PATCH', body: { pinned: true, pinDurationHours: 168 } },
+    { path: '/messages/3/flags', method: 'PATCH', body: { favorited: true } },
+    { path: '/messages/3?scope=me', method: 'DELETE', body: undefined },
+  ]);
+});
+
+test('private notes and disabled signatures are explicit on text and media requests', async () => {
+  const calls = [];
+  const api = new Api('https://example.com', 'token', async (url, init) => {
+    calls.push({ url, body: init.body });
+    return Response.json({ message: { id: 1 } });
+  });
+  await api.send(7, 'Somente equipe', undefined, { private: true, includeSignature: false });
+  assert.deepEqual(JSON.parse(calls[0].body), { text: 'Somente equipe', private: true, includeSignature: false });
+  await api.sendMedia(7, { uri: 'file:///foto.jpg', name: 'foto.jpg', mimeType: 'image/jpeg' }, 'Legenda', undefined, false);
+  assert.equal(calls[1].body.get('includeSignature'), 'false');
+  const poll = { question: 'Quando?', options: ['Hoje', 'Amanhã'], selectableCount: 1 };
+  await api.sendPoll(7, poll);
+  assert.equal(calls[2].url, 'https://example.com/api/contacts/7/send-poll');
+  assert.deepEqual(JSON.parse(calls[2].body), poll);
+});
+
+test('AI rewrite uses the same authenticated endpoint as web and does not send the draft', async () => {
+  const calls = [];
+  const api = new Api('https://example.com', 'token', async (url, init) => {
+    calls.push(url);
+    assert.equal(url, 'https://example.com/api/ai/rewrite');
+    assert.equal(init.headers.Authorization, 'Bearer token');
+    assert.equal(init.method, 'POST');
+    assert.deepEqual(JSON.parse(init.body), { text: 'me manda o boleto' });
+    return Response.json({ text: 'Por favor, envie o boleto.' });
+  });
+  assert.equal(await api.rewriteMessage('  me manda o boleto  '), 'Por favor, envie o boleto.');
+  assert.equal(calls.length, 1);
+});
+
+test('AI rewrite rejects invalid responses and preserves server errors', async () => {
+  for (const text of ['', null, '   ', 'a'.repeat(10001)]) {
+    const api = new Api('https://example.com', 'token', async () => Response.json({ text }));
+    await assert.rejects(api.rewriteMessage('Original'), /rascunho foi mantido/);
+  }
+  const api = new Api('https://example.com', 'token', async () => Response.json({ error: 'IA não configurada' }, { status: 503 }));
+  await assert.rejects(api.rewriteMessage('Original'), /IA não configurada/);
+});
+
+test('history lookup used by previews only reads messages and sends no read receipt', async () => {
+  const calls = [];
+  const api = new Api('https://example.com', 'token', async (url, init) => {
+    calls.push({ url, method: init.method ?? 'GET' });
+    assert.equal(init.headers.Authorization, 'Bearer token');
+    return Response.json({ messages: [{ id: 10, content: 'Não lida', readAt: null }], hasMore: false, nextCursor: null });
+  });
+  const page = await api.messages(7);
+  assert.equal(page.messages[0].readAt, null);
+  assert.deepEqual(calls, [{ url: 'https://example.com/api/contacts/7/messages?limit=40', method: 'GET' }]);
+});
+
+test('conversation list requests favorite message counts for the filter', async () => {
+  const api = new Api('https://example.com', 'token', async (url, init) => {
+    assert.equal(url, 'https://example.com/api/contacts?includeFavoriteCounts=1');
+    assert.equal(init.headers.Authorization, 'Bearer token');
+    return Response.json([{ id: 1, favoriteMessageCount: 2 }]);
+  });
+  assert.equal((await api.contacts())[0].favoriteMessageCount, 2);
+});
+
 test('server normalization accepts an API suffix and rejects credentials and insecure production URLs', () => {
   assert.equal(normalizeServer(' https://chat.example.com/api/ '), 'https://chat.example.com');
   assert.equal(normalizeServer('http://192.168.1.20:3001', true), 'http://192.168.1.20:3001');
@@ -53,7 +134,7 @@ test('chat requests preserve backend pagination and send signature-enabled text'
   await api.markRead(12);
   assert.equal(calls[0].url, 'https://example.com/api/contacts/12/messages?limit=40&before=55');
   assert.equal(calls[1].url, 'https://example.com/api/contacts/12/send');
-  assert.deepEqual(JSON.parse(calls[1].init.body), { text: 'Olá!', includeSignature: true });
+  assert.deepEqual(JSON.parse(calls[1].init.body), { text: 'Olá!', includeSignature: true, private: false });
   assert.equal(calls[2].init.method, 'PATCH');
 });
 
