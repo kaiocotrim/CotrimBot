@@ -88,6 +88,7 @@ export async function deliverOrganizationWebhook(
       });
       responseStatus = response.status;
       await response.body?.cancel().catch(() => undefined);
+      console.log(`[webhooks] ${event} webhook=${webhook.id} tentativa=${attempts} HTTP ${response.status}`);
       if (response.ok) {
         status = "SUCCEEDED";
         error = null;
@@ -97,6 +98,7 @@ export async function deliverOrganizationWebhook(
     } catch (failure) {
       responseStatus = null;
       error = describeFailure(failure);
+      console.log(`[webhooks] ${event} webhook=${webhook.id} tentativa=${attempts} ${error}`);
     }
     if (index < retryDelays.length) await sleep(retryDelays[index]!);
   }
@@ -108,6 +110,7 @@ export async function deliverOrganizationWebhook(
   } catch {
     console.error("Falha ao registrar entrega de webhook.");
   }
+  console.log(`[webhooks] ${event} webhook=${webhook.id} entrega ${deliveryId} ${status} apos ${attempts} tentativa(s)`);
   return status;
 }
 
@@ -124,6 +127,7 @@ export async function dispatchOrganizationWebhookEvent(
     select: { id: true, url: true, secret: true, events: true },
   });
   const subscribed = webhooks.filter((webhook) => Array.isArray(webhook.events) && webhook.events.includes(event));
+  console.log(`[webhooks] evento ${event} org=${organizationId}: ${webhooks.length} ativo(s), ${subscribed.length} assinando`);
   await Promise.all(subscribed.map((webhook) => deliverOrganizationWebhook(database, webhook, event, organizationId, data, options)));
   return subscribed.length;
 }
@@ -135,8 +139,11 @@ export function emitOrganizationWebhookEvent(
   event: OrganizationWebhookEvent,
   data: Record<string, unknown>,
 ) {
-  if (!organizationId) return;
-  dispatchOrganizationWebhookEvent(database, organizationId, event, data).catch(() => {
-    console.error("Falha ao disparar webhooks da empresa.");
+  if (!organizationId) {
+    console.log(`[webhooks] evento ${event} ignorado: sem organizationId`);
+    return;
+  }
+  dispatchOrganizationWebhookEvent(database, organizationId, event, data).catch((failure) => {
+    console.error(`[webhooks] falha ao disparar ${event} org=${organizationId}:`, failure);
   });
 }

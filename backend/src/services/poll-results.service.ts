@@ -108,6 +108,7 @@ export function createPollResultsService(
       if (!updated.count) continue;
       emit({ messageId: message.id, poll });
       if (message.organizationId) notify(message.organizationId, { messageId: message.id, contactId: message.contactId, question: poll.question, votes: delta });
+      else console.log(`[webhooks] voto em enquete ${message.id} sem organizationId; poll.vote_changed nao emitido`);
       return poll;
     }
     throw new Error("Não foi possível atualizar os votos da enquete.");

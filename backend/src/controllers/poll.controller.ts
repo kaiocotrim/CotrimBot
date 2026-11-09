@@ -36,6 +36,7 @@ export function createSendPollHandler(
       });
       emit({ message, contact: { ...contact, name: contactDisplayName(contact) } });
       if (organizationId) notify(organizationId, { messageId: message.id, contactId, question: poll.question, options: poll.options, selectableCount: poll.selectableCount });
+      else console.log("[webhooks] enquete enviada sem empresa ativa; poll.created nao emitido");
       return res.status(201).json({ message });
     } catch (error) {
       console.error("Erro ao enviar enquete:", error);
