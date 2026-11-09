@@ -2,9 +2,9 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ChartNoAxesColumnIncreasing, Check, LoaderCircle, RefreshCw, UserRound, Users, X } from "@/components/icons/animated-lucide";
+import { ChartNoAxesColumnIncreasing, Check, LoaderCircle, LockKeyhole, RefreshCw, UserRound, Users, X } from "@/components/icons/animated-lucide";
 import { useEffect, useRef, useState } from "react";
-import { getPollResults, voteOnPoll } from "@/lib/chat-api";
+import { closePoll, getPollResults, voteOnPoll } from "@/lib/chat-api";
 import { socket } from "@/lib/socket";
 import type { Poll, PollResults, PollVote } from "@/types/chat";
 
@@ -55,6 +55,7 @@ export function PollMessage({ poll, messageId }: { poll: Poll; messageId?: numbe
   const [pending, setPending] = useState<number[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [resultsOpen, setResultsOpen] = useState(false);
   const busy = useRef(false);
   const revision = useRef(0);
@@ -63,6 +64,7 @@ export function PollMessage({ poll, messageId }: { poll: Poll; messageId?: numbe
   const activeVotes = votes.filter((vote) => vote.optionIndexes.length > 0);
   const ownVote = votes.find((vote) => result.ownVoterIds.includes(vote.voterId));
   const selected = pending ?? ownVote?.optionIndexes ?? [];
+  const closed = Boolean(current.closedAt);
 
   useEffect(() => {
     if (!messageId) return;
@@ -81,7 +83,7 @@ export function PollMessage({ poll, messageId }: { poll: Poll; messageId?: numbe
   }, [messageId]);
 
   async function castVote(index: number) {
-    if (!messageId || busy.current) return;
+    if (!messageId || busy.current || closed) return;
     const next = selected.includes(index) ? selected.filter((value) => value !== index)
       : current.selectableCount === 1 ? [index] : [...selected, index];
     if (next.length > current.selectableCount) return;
@@ -103,14 +105,23 @@ export function PollMessage({ poll, messageId }: { poll: Poll; messageId?: numbe
     finally { setRefreshing(false); }
   }
 
+  async function close() {
+    if (!messageId || closing || closed) return;
+    setClosing(true);
+    setError(null);
+    try { const data = await closePoll(messageId); revision.current += 1; setResult((previous) => ({ ...previous, poll: data.poll })); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Não foi possível encerrar a enquete."); }
+    finally { setClosing(false); }
+  }
+
   return <div className="w-64 max-w-full space-y-3 py-1">
     <div className="flex items-start gap-2"><ChartNoAxesColumnIncreasing aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-zinc-400" /><p className="min-w-0 break-words text-sm font-semibold text-zinc-100">{current.question}</p></div>
-    <p className="text-[11px] text-zinc-400">{current.selectableCount === 1 ? "Selecione uma opção" : "Selecione uma ou mais opções"}</p>
+    <p className="text-[11px] text-zinc-400">{closed ? "Enquete encerrada" : current.selectableCount === 1 ? "Selecione uma opção" : "Selecione uma ou mais opções"}</p>
     <div className="space-y-2" role="group" aria-label="Opções da enquete">{current.options.map((option, index) => {
       const people = activeVotes.filter((vote) => vote.optionIndexes.includes(index));
       const count = people.length;
       const checked = selected.includes(index);
-      return <motion.button key={index} type="button" disabled={!messageId || pending !== null} aria-pressed={checked} aria-label={`Votar em ${option}`} onClick={() => void castVote(index)} whileTap={reduceMotion ? undefined : { scale: 0.98 }} transition={spring} className={`relative flex min-h-11 w-full items-center gap-2.5 overflow-hidden rounded-lg border px-3 py-2.5 text-left transition-colors motion-reduce:transition-none enabled:hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:cursor-wait ${checked ? "border-emerald-400/40 bg-emerald-400/[0.06]" : "border-white/[0.08]"}`}>
+      return <motion.button key={index} type="button" disabled={!messageId || pending !== null || closed} aria-pressed={checked} aria-label={`Votar em ${option}`} onClick={() => void castVote(index)} whileTap={reduceMotion ? undefined : { scale: 0.98 }} transition={spring} className={`relative flex min-h-11 w-full items-center gap-2.5 overflow-hidden rounded-lg border px-3 py-2.5 text-left transition-colors motion-reduce:transition-none enabled:hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:cursor-wait ${checked ? "border-emerald-400/40 bg-emerald-400/[0.06]" : "border-white/[0.08]"}`}>
         <motion.span aria-hidden="true" initial={false} animate={{ width: `${activeVotes.length ? count / activeVotes.length * 100 : 0}%` }} transition={spring} className="absolute inset-y-0 left-0 bg-white/[0.04]" />
         <span aria-hidden="true" className={`relative flex size-4 shrink-0 items-center justify-center border transition-colors motion-reduce:transition-none ${current.selectableCount === 1 ? "rounded-full" : "rounded"} ${checked ? "border-emerald-400 bg-emerald-500 text-black" : "border-zinc-500"}`}>
           <AnimatePresence initial={false}>
@@ -129,6 +140,7 @@ export function PollMessage({ poll, messageId }: { poll: Poll; messageId?: numbe
     })}</div>
     <div className="flex items-center justify-between gap-2 text-[11px] text-zinc-400"><span aria-live="polite">{pending !== null ? <span className="flex items-center gap-1.5"><LoaderCircle className="size-3 animate-spin motion-reduce:animate-none" />Enviando voto…</span> : `${activeVotes.length} ${activeVotes.length === 1 ? "participante" : "participantes"}`}</span><button type="button" onClick={() => void refresh()} disabled={refreshing || pending !== null || !messageId} aria-label="Atualizar votos" className="rounded p-1.5 hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-white/50"><RefreshCw className={`size-3 ${refreshing ? "animate-spin motion-reduce:animate-none" : ""}`} /></button></div>
     {(error || result.syncError) && <p role="alert" className="text-[11px] text-red-300">{error ?? result.syncError}</p>}
+    {!closed && messageId && <button type="button" onClick={() => void close()} disabled={closing || pending !== null} className="flex min-h-9 w-full items-center justify-center gap-2 rounded-lg text-xs text-zinc-300 hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-white/50 disabled:opacity-50">{closing ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" /> : <LockKeyhole className="size-4" />}Encerrar enquete</button>}
     <Dialog.Root open={resultsOpen} onOpenChange={(open) => { setResultsOpen(open); if (open) void refresh(); }}>
       <Dialog.Trigger className="flex min-h-9 w-full items-center justify-center gap-2 rounded-lg text-xs text-zinc-300 hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-white/50"><Users className="size-4" />Ver votos</Dialog.Trigger>
       <Dialog.Portal><Dialog.Backdrop className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm" /><Dialog.Popup className="fixed top-1/2 left-1/2 z-[121] flex max-h-[calc(100dvh-32px)] w-[min(420px,calc(100vw-24px))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#111] text-zinc-100 shadow-2xl outline-none">

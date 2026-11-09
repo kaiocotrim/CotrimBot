@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import type { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { getProfilePicture, sendWhatsAppPoll } from "../services/evolution.service.js";
@@ -8,12 +9,14 @@ import { pollResults, storedPoll } from "../services/poll-results.service.js";
 import { getWhatsAppPollIdentity, getWhatsAppPollVotes, sendWhatsAppPollVote } from "../services/evolution-polls.service.js";
 import { whatsAppJidIdentifier } from "../utils/whatsapp-jid.js";
 import { emitOrganizationWebhookEvent } from "../services/organization-webhook.service.js";
+import { resolveRequestOrganizationId } from "../middlewares/auth.middleware.js";
 
 export function createSendPollHandler(
   database: Pick<typeof prisma, "contact" | "message"> = prisma,
   send = sendWhatsAppPoll,
   emit: (payload: unknown) => void = (payload) => { getSocketServer().emit("new_message", payload); },
   notify: (organizationId: string, payload: Record<string, unknown>) => void = (organizationId, payload) => emitOrganizationWebhookEvent(prisma, organizationId, "poll.created", payload),
+  resolveOrganizationId: (req: Request) => Promise<string | null> = (req) => resolveRequestOrganizationId(prisma, req),
 ) {
   return async function sendPoll(req: Request, res: Response) {
     const contactId = Number(req.params.id);
@@ -27,7 +30,7 @@ export function createSendPollHandler(
       const result = await send(contact.phone, poll);
       const externalId = result?.key?.id;
       if (typeof externalId !== "string" || !externalId) throw new Error("A Evolution não retornou o identificador da enquete");
-      const organizationId = req.activeOrganizationId ?? null;
+      const organizationId = await resolveOrganizationId(req);
       const data = { content: pollSummary(poll), type: "POLL" as const, poll, sentByUserId: req.user!.id, organizationId };
       const message = await database.message.upsert({
         where: { externalId }, update: data,
@@ -54,6 +57,8 @@ export function createPollInteractionHandlers(
   getIdentity = getWhatsAppPollIdentity,
   getVotes = getWhatsAppPollVotes,
   getPicture = getProfilePicture,
+  emit: (payload: unknown) => void = (payload) => { getSocketServer().emit("poll_updated", payload); },
+  notifyClosed: (organizationId: string, payload: Record<string, unknown>) => void = (organizationId, payload) => emitOrganizationWebhookEvent(prisma, organizationId, "poll.closed", payload),
 ) {
   const synchronization = new Map<number, { at: number; promise: Promise<void> }>();
   async function synchronizePoll(message: { id: number; externalId: string; contact: { phone: string } }, ownJid?: string) {
@@ -134,6 +139,7 @@ export function createPollInteractionHandlers(
     const message = await visiblePoll(id, req.user!.id);
     const poll = storedPoll(message?.poll);
     if (!message || !poll) return res.status(404).json({ message: "Enquete não encontrada" });
+    if (poll.closedAt) return res.status(409).json({ message: "Esta enquete foi encerrada." });
     if (new Set(indexes).size !== indexes.length || indexes.length > poll.selectableCount || indexes.some((index) => index < 0 || index >= poll.options.length)) {
       return res.status(400).json({ message: "Selecione opções válidas para esta enquete." });
     }
@@ -149,7 +155,27 @@ export function createPollInteractionHandlers(
     }
   }
 
-  return { getPollResults, getPollVoterAvatar, voteOnPoll };
+  async function closePoll(req: Request, res: Response) {
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: "Enquete inválida" });
+    const message = await visiblePoll(id, req.user!.id);
+    const poll = storedPoll(message?.poll);
+    if (!message || !poll) return res.status(404).json({ message: "Enquete não encontrada" });
+    if (poll.closedAt) return res.json({ poll });
+    const closed = { ...poll, closedAt: new Date().toISOString() };
+    // Só encerra se a enquete não tiver sido alterada (votos) desde a leitura.
+    const updated = await database.message.updateMany({
+      where: { id, deletedAt: null, poll: { equals: message.poll as Prisma.InputJsonValue } },
+      data: { poll: closed as Prisma.InputJsonValue },
+    });
+    if (!updated.count) return res.status(409).json({ message: "A enquete foi alterada. Tente novamente." });
+    emit({ messageId: id, poll: closed });
+    if (message.organizationId) notifyClosed(message.organizationId, { messageId: id, contactId: message.contactId, question: closed.question, closedAt: closed.closedAt });
+    else console.log(`[webhooks] enquete ${id} encerrada sem organizationId; poll.closed nao emitido`);
+    return res.json({ poll: closed });
+  }
+
+  return { getPollResults, getPollVoterAvatar, voteOnPoll, closePoll };
 }
 
-export const { getPollResults, getPollVoterAvatar, voteOnPoll } = createPollInteractionHandlers();
+export const { getPollResults, getPollVoterAvatar, voteOnPoll, closePoll } = createPollInteractionHandlers();

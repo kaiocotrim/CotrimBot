@@ -15,7 +15,7 @@ export function storedPoll(value: unknown): Poll | null {
     vote && typeof vote.voterId === "string" && typeof vote.updatedAt === "string"
     && Array.isArray(vote.optionIndexes) && vote.optionIndexes.every((index: unknown) => Number.isInteger(index) && Number(index) >= 0 && Number(index) < poll.options.length)
   )) : [];
-  return { ...poll, votes };
+  return { ...poll, votes, ...(typeof raw.closedAt === "string" ? { closedAt: raw.closedAt } : {}) };
 }
 
 function timestamp(value: unknown) {
@@ -97,7 +97,8 @@ export function createPollResultsService(
       if (!message || message.type !== "POLL" || message.deletedAt) return null;
       const current = storedPoll(message.poll);
       if (!current) return null;
-      const delta = changes(current);
+      // Votos com data posterior ao encerramento são descartados.
+      const delta = changes(current).filter((vote) => !current.closedAt || vote.updatedAt <= current.closedAt);
       if (!delta.length) return current;
       const poll = mergePollVotes(current, delta);
       if (JSON.stringify(current) === JSON.stringify(poll)) return poll;

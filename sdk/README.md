@@ -230,6 +230,7 @@ do backend para integrações realtime; esse transporte não faz parte deste SDK
 | `messages` | `mediaLibrary`, `list`, `favorites` | `GET /media-library`, `/contacts/:id/messages`, `/contacts/:id/messages/favorites` |
 | `messages` | `sendText`, `sendPoll`, `closeWithBot`, `sendMedia` | `POST /contacts/:id/send`, `/contacts/:id/send-poll`, `/contacts/:id/close-with-bot`, `/contacts/:id/send-media` |
 | `messages` | `poll`, `pollVoterAvatar`, `voteOnPoll` | `GET /messages/:id/poll`, `GET /messages/:id/poll/voter-avatar`, `PUT /messages/:id/poll/vote` |
+| `messages` | `closePoll` | `POST /messages/:id/poll/close` |
 | `messages` | `markRead`, `media`, `senderAvatar`, `info` | `PATCH /contacts/:id/messages/read`, `GET /messages/:id/media`, `/messages/:id/sender-avatar`, `/messages/:id/info` |
 | `messages` | `react`, `updateFlags`, `delete`, `transcribe` | `PUT /messages/:id/reaction`, `PATCH /messages/:id/flags`, `DELETE /messages/:id`, `POST /messages/:id/transcribe` |
 | `ai` | `translate`, `rewrite` | `POST /ai/translate`, `/ai/rewrite` |
@@ -325,6 +326,7 @@ WhatsApp não têm empresa associada e não geram `poll.*`.
 | `bot.activation_changed` | `botId`, `name`, `active` |
 | `poll.created` | `messageId`, `contactId`, `question`, `options`, `selectableCount` |
 | `poll.vote_changed` | `messageId`, `contactId`, `question`, `votes` (somente os votos alterados) |
+| `poll.closed` | `messageId`, `contactId`, `question`, `closedAt` |
 
 ## Build e testes
 

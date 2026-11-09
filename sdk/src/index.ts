@@ -122,7 +122,8 @@ export type OrganizationWebhookEvent =
   | "bot.published"
   | "bot.activation_changed"
   | "poll.created"
-  | "poll.vote_changed";
+  | "poll.vote_changed"
+  | "poll.closed";
 
 export interface OrganizationWebhookCatalogEntry {
   key: OrganizationWebhookEvent;
@@ -211,6 +212,12 @@ export interface OrganizationWebhookDataMap {
     contactId: number;
     question: string;
     votes: OrganizationWebhookPollVote[];
+  };
+  "poll.closed": {
+    messageId: number;
+    contactId: number;
+    question: string;
+    closedAt: string;
   };
 }
 
@@ -311,6 +318,7 @@ export class CotrimBotClient {
       poll: (messageId) => this.request(`/messages/${encode(messageId)}/poll`),
       pollVoterAvatar: (messageId, voterId) => this.request(withQuery(`/messages/${encode(messageId)}/poll/voter-avatar`, { voterId })),
       voteOnPoll: (messageId, optionIndexes) => this.json(`/messages/${encode(messageId)}/poll/vote`, "PUT", { optionIndexes }),
+      closePoll: (messageId) => this.json(`/messages/${encode(messageId)}/poll/close`, "POST", {}),
       closeWithBot: (contactId) => this.json(`/contacts/${encode(contactId)}/close-with-bot`, "POST", {}),
       markRead: (contactId) => this.json(`/contacts/${encode(contactId)}/messages/read`, "PATCH"),
       media: (messageId, query) => this.blob(withQuery(`/messages/${encode(messageId)}/media`, {
@@ -507,6 +515,7 @@ export class CotrimBotClient {
     poll(messageId: number): Promise<unknown>;
     pollVoterAvatar(messageId: number, voterId: string): Promise<unknown>;
     voteOnPoll(messageId: number, optionIndexes: number[]): Promise<unknown>;
+    closePoll(messageId: number): Promise<unknown>;
     closeWithBot(contactId: number): Promise<unknown>;
     markRead(contactId: number): Promise<unknown>;
     media(messageId: number, query?: { download?: boolean }): Promise<Blob>;

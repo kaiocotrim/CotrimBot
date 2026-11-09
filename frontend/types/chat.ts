@@ -32,7 +32,7 @@ export type Contact = {
 };
 
 export type PollVote = { voterId: string; voterName: string | null; voterProfilePictureUrl?: string | null; optionIndexes: number[]; updatedAt: string };
-export type Poll = { question: string; options: string[]; selectableCount: number; votes?: PollVote[] };
+export type Poll = { question: string; options: string[]; selectableCount: number; votes?: PollVote[]; closedAt?: string };
 export type PollResults = { poll: Poll; ownVoterIds: string[]; syncError?: string | null };
 
 export type Message = {

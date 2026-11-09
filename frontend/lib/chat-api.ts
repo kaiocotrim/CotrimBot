@@ -241,6 +241,11 @@ export async function voteOnPoll(messageId: number, optionIndexes: number[]): Pr
   return parseResponse<PollResults>(response, "Não foi possível enviar seu voto.");
 }
 
+export async function closePoll(messageId: number): Promise<{ poll: Poll }> {
+  const response = await fetch(`${API_URL}/messages/${messageId}/poll/close`, { method: "POST", credentials: "include" });
+  return parseResponse<{ poll: Poll }>(response, "Não foi possível encerrar a enquete.");
+}
+
 export async function rewriteMessage(text: string): Promise<string> {
   const response = await fetch(`${API_URL}/ai/rewrite`, {
     method: "POST",

@@ -55,6 +55,12 @@ export const ORGANIZATION_WEBHOOK_EVENTS = [
     label: "Voto em enquete registrado",
     description: "Um ou mais votos de uma enquete enviada pela empresa foram registrados ou alterados.",
   },
+  {
+    key: "poll.closed",
+    group: "Enquetes",
+    label: "Enquete encerrada",
+    description: "Uma enquete enviada pela empresa foi encerrada no CotrimBot.",
+  },
 ] as const;
 
 export type OrganizationWebhookEvent = (typeof ORGANIZATION_WEBHOOK_EVENTS)[number]["key"];

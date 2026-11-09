@@ -1,5 +1,5 @@
 export type PollVote = { voterId: string; voterName: string | null; optionIndexes: number[]; updatedAt: string; voterAliases?: string[] };
-export type Poll = { question: string; options: string[]; selectableCount: number; votes?: PollVote[] };
+export type Poll = { question: string; options: string[]; selectableCount: number; votes?: PollVote[]; closedAt?: string };
 
 export function normalizePoll(value: unknown): Poll | null {
   if (!value || typeof value !== "object") return null;
