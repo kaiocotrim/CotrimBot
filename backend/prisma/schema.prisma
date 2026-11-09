@@ -8,67 +8,67 @@ datasource db {
 }
 
 model Contact {
-  id                Int       @id @default(autoincrement())
+  id                Int                 @id @default(autoincrement())
   name              String
-  companyName       String?   @db.VarChar(191)
-  jobTitle          String?   @db.VarChar(191)
-  phone             String    @unique
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  isGroup           Boolean   @default(false)
-  isSaved           Boolean   @default(false)
-  archived          Boolean   @default(false)
-  pinned            Boolean   @default(false)
-  priority          ContactPriority @default(NONE)
-  profilePictureUrl String?   @db.Text
-  whatsappLid       String?   @unique
-  muted             Boolean   @default(false)
-  favorited         Boolean   @default(false)
-  blocked           Boolean   @default(false)
+  phone             String              @unique
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  isGroup           Boolean             @default(false)
+  archived          Boolean             @default(false)
+  profilePictureUrl String?             @db.Text
+  advancedPrivacy   Boolean             @default(false)
+  blocked           Boolean             @default(false)
+  chatTheme         String              @default("default") @db.VarChar(32)
   ephemeralSeconds  Int?
-  advancedPrivacy   Boolean   @default(false)
-  chatTheme         String    @default("default") @db.VarChar(32)
-  listName          String?   @db.VarChar(64)
+  favorited         Boolean             @default(false)
+  listName          String?             @db.VarChar(64)
+  muted             Boolean             @default(false)
+  whatsappLid       String?             @unique
+  priority          ContactPriority     @default(NONE)
+  isSaved           Boolean             @default(false)
+  companyName       String?
+  pinned            Boolean             @default(false)
+  jobTitle          String?
+  botSessions       BotSession[]
   assignments       ContactAssignment[]
+  csatSurveys       CsatSurvey[]
   messages          Message[]
   notifications     Notification[]
-  botSessions       BotSession[]
   sacTestTickets    SacTestTicket[]
-  csatSurveys       CsatSurvey[]
-
 }
 
 model Notification {
-  id        Int       @id @default(autoincrement())
-  userId    String
-  type      String    @db.VarChar(32)
-  title     String
-  body      String    @db.Text
-  contactId Int?
-  internalConversationId String? @db.VarChar(191)
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  contact   Contact?  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  id                     Int       @id @default(autoincrement())
+  userId                 String
+  type                   String    @db.VarChar(32)
+  title                  String
+  body                   String    @db.Text
+  contactId              Int?
+  readAt                 DateTime?
+  createdAt              DateTime  @default(now())
+  internalConversationId String?
+  contact                Contact?  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt])
   @@index([userId, createdAt])
   @@index([internalConversationId])
+  @@index([contactId], map: "Notification_contactId_fkey")
 }
 
 model CalendarEvent {
   id          String                @id @default(cuid())
   userId      String
-  title       String                @db.VarChar(191)
-  companyName String?               @db.VarChar(191)
+  title       String
+  companyName String?
   description String?               @db.Text
   startsAt    DateTime
   endsAt      DateTime
   category    CalendarEventCategory @default(OTHER)
-  isPublic    Boolean               @default(false)
-  completedAt DateTime?
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt
+  completedAt DateTime?
+  isPublic    Boolean               @default(false)
   user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, startsAt])
@@ -76,40 +76,39 @@ model CalendarEvent {
 }
 
 model ScheduledMessage {
-  id          String                 @id @default(cuid())
-  userId      String
-  phone       String                 @db.VarChar(64)
-  content     String                 @db.Text
-  scheduledAt DateTime
-  status      ScheduledMessageStatus @default(PENDING)
-  sentAt      DateTime?
-  error       String?                @db.Text
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
-  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  announcementId String?
+  id                    String                 @id @default(cuid())
+  userId                String
+  phone                 String                 @db.VarChar(64)
+  content               String                 @db.Text
+  scheduledAt           DateTime
+  status                ScheduledMessageStatus @default(PENDING)
+  sentAt                DateTime?
+  error                 String?                @db.Text
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
   announcementContactId Int?
-  recipientName String? @db.VarChar(191)
-  announcement Announcement? @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  announcementId        String?
+  recipientName         String?
+  announcement          Announcement?          @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([announcementId])
   @@index([status, scheduledAt])
   @@index([userId, scheduledAt])
 }
 
-// O comunicado e seus destinatários são gravados juntos antes de iniciar os envios.
 model Announcement {
-  id String @id @default(cuid())
-  userId String
+  id             String             @id @default(cuid())
+  userId         String
   organizationId String?
-  clientId String?
-  companyName String @db.VarChar(191)
-  content String @db.Text
-  requestKey String @db.VarChar(64)
-  createdAt DateTime @default(now())
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  messages ScheduledMessage[]
+  clientId       String?
+  companyName    String
+  content        String             @db.Text
+  requestKey     String             @db.VarChar(64)
+  createdAt      DateTime           @default(now())
+  client         Client?            @relation(fields: [clientId], references: [id])
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages       ScheduledMessage[]
 
   @@unique([userId, requestKey])
   @@index([userId, organizationId, createdAt])
@@ -117,39 +116,23 @@ model Announcement {
 }
 
 model Client {
-  id             String        @id @default(cuid())
+  id             String         @id @default(cuid())
   userId         String
-  organizationId String?
-  name           String        @db.VarChar(191)
-  image          String?       @db.Text
+  name           String
   links          Json
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  announcements Announcement[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  image          String?        @db.Text
+  organizationId String?
+  announcements  Announcement[]
+  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([organizationId])
   @@map("ClientProfile")
 }
 
-enum ScheduledMessageStatus {
-  PENDING
-  PROCESSING
-  SENT
-  FAILED
-}
-
-enum CalendarEventCategory {
-  MEETING
-  TRAINING
-  DEADLINE
-  APPOINTMENT
-  OTHER
-}
-
-// Assinaturas Web Push (PWA) de cada navegador/dispositivo do usuário.
 model PushSubscription {
   id        Int      @id @default(autoincrement())
   userId    String
@@ -174,67 +157,69 @@ model ContactAssignment {
 }
 
 model Message {
-  id                      Int              @id @default(autoincrement())
-  content                 String           @db.Text
-  sharedContacts          Json?
-  poll                    Json?
+  id                      Int               @id @default(autoincrement())
+  content                 String            @db.Text
   direction               MessageDirection
   contactId               Int
-  createdAt               DateTime         @default(now())
-  externalId              String           @unique
+  createdAt               DateTime          @default(now())
+  externalId              String            @unique
   readAt                  DateTime?
-  type                    MessageType      @default(TEXT)
-  reaction                String?          @db.VarChar(16)
+  type                    MessageType       @default(TEXT)
+  reaction                String?           @db.VarChar(16)
   senderName              String?
-  senderPhone             String?          @db.VarChar(64)
-  senderProfilePictureUrl String?          @db.Text
-  sentByUserId            String?
-  private                 Boolean          @default(false)
-  pinned                  Boolean          @default(false)
-  pinnedUntil             DateTime?
-  favorited               Boolean          @default(false)
-  deletedAt               DateTime?
-  editedAt                DateTime?
-  viewOnce                Boolean          @default(false)
-  isVoiceMessage          Boolean?
-  gifPlayback             Boolean          @default(false)
+  senderPhone             String?           @db.VarChar(64)
+  senderProfilePictureUrl String?           @db.Text
+  favorited               Boolean           @default(false)
+  pinned                  Boolean           @default(false)
+  private                 Boolean           @default(false)
+  quotedContent           String?           @db.Text
   quotedExternalId        String?
   quotedMessageId         Int?
-  quotedContent           String?          @db.Text
   quotedSenderName        String?
-  contact                 Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  sentByUser              User?            @relation(fields: [sentByUserId], references: [id], onDelete: SetNull)
-  quotedMessage           Message?         @relation("MessageToMessage", fields: [quotedMessageId], references: [id])
-  quotedByMessages        Message[]        @relation("MessageToMessage")
-  cachedMedia             MessageMedia?
-  deletions               MessageDeletion[]
-  receipts                MessageReceipt[]
+  deletedAt               DateTime?
+  viewOnce                Boolean           @default(false)
+  sentByUserId            String?
+  pinnedUntil             DateTime?
+  sharedContacts          Json?
+  poll                    Json?
+  organizationId          String?
+  isVoiceMessage          Boolean?
+  gifPlayback             Boolean           @default(false)
+  editedAt                DateTime?
   csatSurvey              CsatSurvey?
+  contact                 Contact           @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  quotedMessage           Message?          @relation("MessageToMessage", fields: [quotedMessageId], references: [id])
+  quotedByMessages        Message[]         @relation("MessageToMessage")
+  sentByUser              User?             @relation(fields: [sentByUserId], references: [id])
+  deletions               MessageDeletion[]
+  cachedMedia             MessageMedia?
+  receipts                MessageReceipt[]
 
   @@index([contactId], map: "Message_contactId_fkey")
   @@index([sentByUserId])
   @@index([quotedExternalId])
   @@index([quotedMessageId])
+  @@index([organizationId])
 }
 
 model MessageReceipt {
   messageId   Int
-  recipientId String   @db.VarChar(100)
+  recipientId String    @db.VarChar(100)
   deliveredAt DateTime?
   readAt      DateTime?
   playedAt    DateTime?
-  message     Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  message     Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@id([messageId, recipientId])
 }
 
 model MessageMedia {
   messageId  Int     @id
-  data       Bytes?  @db.LongBlob
-  storageKey String? @db.VarChar(512)
+  data       Bytes?
   mimetype   String  @db.VarChar(255)
   fileName   String? @db.VarChar(512)
-  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  storageKey String? @db.VarChar(512)
+  message    Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
 }
 
 model MessageDeletion {
@@ -248,83 +233,52 @@ model MessageDeletion {
   @@index([userId])
 }
 
-enum MessageDirection {
-  INCOMING
-  OUTGOING
-}
-
-enum MessageType {
-  TEXT
-  SYSTEM
-  IMAGE
-  STICKER
-  VIDEO
-  AUDIO
-  DOCUMENT
-  CONTACT
-  POLL
-}
-
-enum ContactPriority {
-  LOW
-  MEDIUM
-  HIGH
-  NONE
-}
-
-// Tabelas exigidas pelo Better Auth (https://www.better-auth.com/docs/adapters/prisma).
 model User {
-  id            String    @id @default(cuid())
-  name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  image         String?   @db.Text
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  // Campos do plugin admin (gerenciamento de usuários).
-  role       String?   @default("user")
-  banned     Boolean?  @default(false)
-  banReason  String?
-  banExpires DateTime?
-
-  sessions    Session[]
-  accounts    Account[]
-  members     Member[]
-  invitations Invitation[]
-  messageDeletions MessageDeletion[]
-  sentMessages     Message[]
-  contactAssignments ContactAssignment[]
-  notifications      Notification[]
-  calendarEvents     CalendarEvent[]
-  scheduledMessages  ScheduledMessage[]
-  announcements Announcement[]
-  clients            Client[]
-  pushSubscriptions  PushSubscription[]
-  organizationMessages OrganizationMessage[]
+  id                               String                            @id @default(cuid())
+  name                             String
+  email                            String                            @unique
+  emailVerified                    Boolean                           @default(false)
+  image                            String?                           @db.Text
+  createdAt                        DateTime                          @default(now())
+  updatedAt                        DateTime                          @updatedAt
+  banExpires                       DateTime?
+  banReason                        String?
+  banned                           Boolean?                          @default(false)
+  role                             String?                           @default("user")
+  accounts                         Account[]
+  announcements                    Announcement[]
+  calendarEvents                   CalendarEvent[]
+  clients                          Client[]
+  contactAssignments               ContactAssignment[]
+  csatSurveys                      CsatSurvey[]
   internalConversationParticipants InternalConversationParticipant[]
-  internalMessages InternalMessage[]
-  internalMessageReactions InternalMessageReaction[]
-  csatSurveys CsatSurvey[]
+  internalMessages                 InternalMessage[]
+  internalMessageReactions         InternalMessageReaction[]
+  invitations                      Invitation[]
+  members                          Member[]
+  sentMessages                     Message[]
+  messageDeletions                 MessageDeletion[]
+  notifications                    Notification[]
+  organizationMessages             OrganizationMessage[]
+  pushSubscriptions                PushSubscription[]
+  scheduledMessages                ScheduledMessage[]
+  sessions                         Session[]
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  expiresAt DateTime
-  token     String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ipAddress String?
-  userAgent String?  @db.Text
-
-  // Preenchido pelo plugin admin enquanto um admin está impersonando este usuário.
-  impersonatedBy String?
-
-  // Preenchido pelo plugin organization.
+  id                   String   @id @default(cuid())
+  expiresAt            DateTime
+  token                String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  ipAddress            String?
+  userAgent            String?  @db.Text
+  userId               String
+  impersonatedBy       String?
   activeOrganizationId String?
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId], map: "Session_userId_fkey")
 }
 
 model Apikey {
@@ -368,9 +322,10 @@ model Account {
   password              String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId], map: "Account_userId_fkey")
 }
 
 model Verification {
@@ -382,90 +337,72 @@ model Verification {
   updatedAt  DateTime? @updatedAt
 }
 
-// Tabelas do plugin organization (https://better-auth.com/docs/plugins/organization).
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  logo      String?  @db.Text
-  metadata  String?  @db.Text
-  createdAt DateTime @default(now())
-
-  members     Member[]
-  invitations Invitation[]
-  groups      OrganizationGroup[]
-  internalMessages OrganizationMessage[]
+  id                    String                 @id @default(cuid())
+  name                  String
+  slug                  String                 @unique
+  logo                  String?                @db.Text
+  metadata              String?                @db.Text
+  createdAt             DateTime               @default(now())
+  bots                  Bot[]
+  botImages             BotImage[]
+  botInstances          BotInstance[]
+  clients               Client[]
   internalConversations InternalConversation[]
-  clients     Client[]
-  bots        Bot[]
-  sacTestTickets SacTestTicket[]
-  botInstances BotInstance[]
-    botImages    BotImage[]
+  invitations           Invitation[]
+  members               Member[]
+  groups                OrganizationGroup[]
+  internalMessages      OrganizationMessage[]
+  organizationWebhooks  OrganizationWebhook[]
+  sacTestTickets        SacTestTicket[]
 }
 
 model OrganizationMessage {
-  id             Int      @id @default(autoincrement())
+  id             Int          @id @default(autoincrement())
   organizationId String
   senderId       String
-  content        String   @db.Text
-  createdAt      DateTime @default(now())
+  content        String       @db.Text
+  createdAt      DateTime     @default(now())
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  sender         User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, id])
   @@index([senderId])
 }
 
 model Member {
-  id             String   @id @default(cuid())
-  organizationId String
-  userId         String
-  role           String   @default("member")
-  jobTitle       String?
-  displayName    String?
-  signature      String?  @db.VarChar(255)
-  signatureEnabled Boolean @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  groupMemberships OrganizationGroupMember[]
+  id                               String                            @id @default(cuid())
+  organizationId                   String
+  userId                           String
+  role                             String                            @default("member")
+  createdAt                        DateTime                          @default(now())
+  jobTitle                         String?
+  displayName                      String?
+  signature                        String?                           @db.VarChar(255)
+  signatureEnabled                 Boolean                           @default(false)
+  updatedAt                        DateTime                          @updatedAt
   internalConversationParticipants InternalConversationParticipant[]
+  organization                     Organization                      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user                             User                              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupMemberships                 OrganizationGroupMember[]
 
+  @@unique([organizationId, userId])
   @@index([organizationId])
   @@index([userId])
-  @@unique([organizationId, userId])
-}
-
-enum InternalConversationType {
-  DIRECT
-  GROUP
-}
-
-enum InternalParticipantRole {
-  MEMBER
-  ADMIN
-}
-
-enum InternalMessageType {
-  TEXT
-  FILE
 }
 
 model InternalConversation {
-  id             String                   @id @default(cuid())
+  id             String                            @id @default(cuid())
   organizationId String
   type           InternalConversationType
-  name           String?                  @db.VarChar(100)
-  avatarUrl      String?                  @db.Text
-  directKey      String?                  @db.VarChar(255)
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
-
-  organization Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  participants InternalConversationParticipant[]
-  messages     InternalMessage[]
+  name           String?                           @db.VarChar(100)
+  avatarUrl      String?                           @db.Text
+  directKey      String?                           @db.VarChar(255)
+  createdAt      DateTime                          @default(now())
+  updatedAt      DateTime                          @updatedAt
+  organization   Organization                      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  participants   InternalConversationParticipant[]
+  messages       InternalMessage[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, directKey])
@@ -481,91 +418,87 @@ model InternalConversationParticipant {
   lastReadAt     DateTime?
   pinned         Boolean                 @default(false)
   archived       Boolean                 @default(false)
-
-  conversation InternalConversation @relation(fields: [organizationId, conversationId], references: [organizationId, id], onDelete: Cascade)
-  member       Member               @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
-  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation   InternalConversation    @relation(fields: [organizationId, conversationId], references: [organizationId, id], onDelete: Cascade)
+  member         Member                  @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([conversationId, userId])
   @@index([organizationId, userId])
   @@index([userId, lastReadAt])
+  @@index([organizationId, conversationId], map: "InternalConversationParticipant_organizationId_conversation_fkey")
 }
 
 model InternalMessage {
-  id                   Int                @id @default(autoincrement())
-  organizationId       String
-  conversationId       String
-  senderId             String
-  content              String             @db.Text
-  type                 InternalMessageType @default(TEXT)
-  private              Boolean            @default(false)
-  clientId             String?            @db.VarChar(80)
-  replyToMessageId     Int?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-  deletedAt            DateTime?
-  pinned               Boolean            @default(false)
-  pinnedUntil          DateTime?
-  favorited            Boolean            @default(false)
-
-  conversation InternalConversation @relation(fields: [organizationId, conversationId], references: [organizationId, id], onDelete: Cascade)
-  sender       User                @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  replyTo      InternalMessage?    @relation("InternalMessageReply", fields: [replyToMessageId], references: [id], onDelete: SetNull)
-  replies      InternalMessage[]    @relation("InternalMessageReply")
-  reactions    InternalMessageReaction[]
-  media        InternalMessageMedia?
+  id               Int                       @id @default(autoincrement())
+  organizationId   String
+  conversationId   String
+  senderId         String
+  content          String                    @db.Text
+  type             InternalMessageType       @default(TEXT)
+  clientId         String?                   @db.VarChar(80)
+  replyToMessageId Int?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  deletedAt        DateTime?
+  private          Boolean                   @default(false)
+  pinned           Boolean                   @default(false)
+  pinnedUntil      DateTime?
+  favorited        Boolean                   @default(false)
+  conversation     InternalConversation      @relation(fields: [organizationId, conversationId], references: [organizationId, id], onDelete: Cascade)
+  replyTo          InternalMessage?          @relation("InternalMessageReply", fields: [replyToMessageId], references: [id])
+  replies          InternalMessage[]         @relation("InternalMessageReply")
+  sender           User                      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  media            InternalMessageMedia?
+  reactions        InternalMessageReaction[]
 
   @@unique([conversationId, clientId])
   @@index([organizationId, conversationId, id])
   @@index([senderId])
+  @@index([replyToMessageId], map: "InternalMessage_replyToMessageId_fkey")
 }
 
 model InternalMessageMedia {
-  messageId  Int     @id
-  mimeType   String  @db.VarChar(100)
-  fileName   String  @db.VarChar(255)
-  data       Bytes?  @db.LongBlob
-  storageKey String? @db.VarChar(512)
-
-  message InternalMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId  Int             @id
+  mimeType   String          @db.VarChar(100)
+  fileName   String          @db.VarChar(255)
+  data       Bytes?
+  storageKey String?         @db.VarChar(512)
+  message    InternalMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 }
 
 model InternalMessageReaction {
   messageId Int
   userId    String
-  emoji     String   @db.VarChar(32)
-  createdAt DateTime @default(now())
-
-  message InternalMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String          @db.VarChar(32)
+  createdAt DateTime        @default(now())
+  message   InternalMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([messageId, userId])
   @@index([userId])
 }
 
 model OrganizationGroup {
-  id             String   @id @default(cuid())
+  id             String                    @id @default(cuid())
   organizationId String
-  name           String   @db.VarChar(100)
-  description    String?  @db.VarChar(500)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  members      OrganizationGroupMember[]
-  permissions  GroupPermission[]
+  name           String                    @db.VarChar(100)
+  description    String?                   @db.VarChar(500)
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  permissions    GroupPermission[]
+  organization   Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members        OrganizationGroupMember[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
 }
 
 model OrganizationGroupMember {
-  groupId  String
-  memberId String
-  createdAt DateTime @default(now())
-
-  group  OrganizationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  member Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  groupId   String
+  memberId  String
+  createdAt DateTime          @default(now())
+  group     OrganizationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  member    Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@id([groupId, memberId])
   @@index([memberId])
@@ -574,29 +507,252 @@ model OrganizationGroupMember {
 model GroupPermission {
   groupId    String
   permission GroupPermissionKey
-
-  group OrganizationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  group      OrganizationGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@id([groupId, permission])
 }
 
 model Invitation {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   email          String
+  role           String?
+  status         String       @default("pending")
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+  inviterId      String
   name           String?
   jobTitle       String?
-  role           String?
-  status         String   @default("pending")
-  expiresAt      DateTime
-  createdAt      DateTime @default(now())
-  inviterId      String
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  inviter      User         @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+  inviter        User         @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([email])
+  @@index([inviterId], map: "Invitation_inviterId_fkey")
+}
+
+model OrganizationWebhook {
+  id             String                        @id @default(cuid())
+  organizationId String
+  name           String                        @db.VarChar(100)
+  url            String                        @db.VarChar(2048)
+  secret         String                        @db.VarChar(128)
+  events         Json
+  active         Boolean                       @default(true)
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+  organization   Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deliveries     OrganizationWebhookDelivery[]
+
+  @@index([organizationId])
+}
+
+model OrganizationWebhookDelivery {
+  id             String              @id @default(cuid())
+  webhookId      String
+  event          String              @db.VarChar(64)
+  status         String              @db.VarChar(16)
+  attempts       Int                 @default(0)
+  responseStatus Int?
+  error          String?             @db.VarChar(255)
+  createdAt      DateTime            @default(now())
+  webhook        OrganizationWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, createdAt])
+}
+
+model BotImage {
+  id             String       @id @default(cuid())
+  organizationId String
+  data           Bytes
+  mimetype       String       @db.VarChar(100)
+  fileName       String       @db.VarChar(255)
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model Bot {
+  id                String       @id @default(cuid())
+  organizationId    String
+  name              String       @db.VarChar(100)
+  draft             Json
+  published         Json?
+  revision          Int          @default(0)
+  publishedRevision Int          @default(0)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sessions          BotSession[]
+
+  @@unique([organizationId, id])
+}
+
+model BotInstance {
+  instance       String       @id
+  organizationId String
+  activeBotId    String?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId], map: "BotInstance_organizationId_fkey")
+}
+
+model BotSession {
+  id        String           @id @default(cuid())
+  instance  String
+  contactId Int
+  botId     String
+  revision  Int
+  state     Json
+  status    BotSessionStatus @default(BOT_ACTIVE)
+  updatedAt DateTime         @updatedAt
+  bot       Bot              @relation(fields: [botId], references: [id], onDelete: Cascade)
+  contact   Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([instance, contactId])
+  @@index([botId], map: "BotSession_botId_fkey")
+  @@index([contactId], map: "BotSession_contactId_fkey")
+}
+
+model BotExecutionLog {
+  id        String   @id @default(cuid())
+  messageId Int      @unique
+  botId     String
+  outcome   String   @db.VarChar(32)
+  createdAt DateTime @default(now())
+
+  @@index([botId, createdAt])
+}
+
+model BotSacSubmission {
+  startMessageId Int      @id
+  botId          String
+  contactId      Int
+  organizationId String
+  status         String   @db.VarChar(32)
+  protocol       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId, createdAt])
+}
+
+model SacTestCompany {
+  id        String             @id
+  cnpj      String             @unique @db.VarChar(14)
+  addresses SacTestAddress[]
+  equipment SacTestEquipment[]
+}
+
+model SacTestEquipment {
+  id        String         @id
+  companyId String
+  name      String
+  serial    String
+  company   SacTestCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+model SacTestAddress {
+  id        String         @id
+  companyId String
+  address   String         @db.Text
+  company   SacTestCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+model SacTestTicket {
+  id                    String       @id @default(cuid())
+  organizationId        String
+  contactId             Int
+  botId                 String
+  startMessageId        Int          @unique
+  confirmationMessageId Int          @unique
+  mode                  String       @default("TEST") @db.VarChar(16)
+  data                  Json
+  createdAt             DateTime     @default(now())
+  contact               Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([contactId])
+}
+
+model CsatSurvey {
+  id           Int              @id @default(autoincrement())
+  contactId    Int
+  messageId    Int?             @unique
+  status       CsatSurveyStatus @default(PENDING)
+  rating       Int?             @db.TinyInt
+  comment      String?          @db.Text
+  sentByUserId String?
+  sentAt       DateTime         @default(now())
+  answeredAt   DateTime?
+  commentUntil DateTime?
+  contact      Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  message      Message?         @relation(fields: [messageId], references: [id])
+  sentByUser   User?            @relation(fields: [sentByUserId], references: [id])
+
+  @@index([contactId, sentAt])
+  @@index([sentAt])
+  @@index([sentByUserId])
+}
+
+enum ScheduledMessageStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+enum CalendarEventCategory {
+  MEETING
+  TRAINING
+  DEADLINE
+  APPOINTMENT
+  OTHER
+}
+
+enum MessageDirection {
+  INCOMING
+  OUTGOING
+}
+
+enum MessageType {
+  TEXT
+  SYSTEM
+  IMAGE
+  STICKER
+  VIDEO
+  AUDIO
+  DOCUMENT
+  CONTACT
+  POLL
+}
+
+enum ContactPriority {
+  LOW
+  MEDIUM
+  HIGH
+  NONE
+}
+
+enum InternalConversationType {
+  DIRECT
+  GROUP
+}
+
+enum InternalParticipantRole {
+  MEMBER
+  ADMIN
+}
+
+enum InternalMessageType {
+  TEXT
+  FILE
 }
 
 enum GroupPermissionKey {
@@ -622,55 +778,6 @@ enum GroupPermissionKey {
   SETTINGS_COMPANY_MANAGE
 }
 
-// Immutable published snapshots keep drafts out of live conversations.
-model BotImage {
-  id             String @id @default(cuid())
-  organizationId String
-  data           Bytes @db.LongBlob
-  mimetype       String @db.VarChar(100)
-  fileName       String @db.VarChar(255)
-  createdAt      DateTime @default(now())
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  @@index([organizationId])
-}
-
-model Bot {
-  id             String @id @default(cuid())
-  organizationId String
-  name           String @db.VarChar(100)
-  draft          Json
-  published      Json?
-  revision       Int @default(0)
-  publishedRevision Int @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  sessions       BotSession[]
-  @@unique([organizationId, id])
-}
-
-// One organization owns the server's single Evolution instance.
-model BotInstance {
-  instance       String @id @db.VarChar(191)
-  organizationId String
-  activeBotId    String?
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-}
-
-model BotSession {
-  id             String @id @default(cuid())
-  instance       String @db.VarChar(191)
-  contactId      Int
-  botId          String
-  revision       Int
-  state          Json
-  status         BotSessionStatus @default(BOT_ACTIVE)
-  updatedAt      DateTime @updatedAt
-  bot            Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
-  contact        Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  @@unique([instance, contactId])
-}
-
 enum BotSessionStatus {
   BOT_ACTIVE
   WAITING_HUMAN
@@ -678,91 +785,8 @@ enum BotSessionStatus {
   CLOSED
 }
 
-model BotExecutionLog {
-  id             String @id @default(cuid())
-  messageId      Int @unique
-  botId          String
-  outcome        String @db.VarChar(32)
-  createdAt      DateTime @default(now())
-  @@index([botId, createdAt])
-}
-
-// Durable claim independent of WhatsApp delivery and bot-session transactions.
-model BotSacSubmission {
-  startMessageId Int @id
-  botId          String @db.VarChar(191)
-  contactId      Int
-  organizationId String @db.VarChar(191)
-  status         String @db.VarChar(32)
-  protocol       String? @db.VarChar(191)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  @@index([organizationId, createdAt])
-}
-
-// Catálogo fictício e registros de teste; não representam dados consultados no SAC.
-model SacTestCompany {
-  id        String @id @db.VarChar(191)
-  cnpj      String @unique @db.VarChar(14)
-  equipment SacTestEquipment[]
-  addresses SacTestAddress[]
-}
-
-model SacTestEquipment {
-  id        String @id @db.VarChar(191)
-  companyId String @db.VarChar(191)
-  name      String @db.VarChar(191)
-  serial    String @db.VarChar(191)
-  company   SacTestCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  @@index([companyId])
-}
-
-model SacTestAddress {
-  id        String @id @db.VarChar(191)
-  companyId String @db.VarChar(191)
-  address   String @db.Text
-  company   SacTestCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  @@index([companyId])
-}
-
-model SacTestTicket {
-  id                    String @id @default(cuid())
-  organizationId        String
-  contactId             Int
-  botId                 String
-  startMessageId        Int @unique
-  confirmationMessageId Int @unique
-  mode                  String @default("TEST") @db.VarChar(16)
-  data                  Json
-  createdAt             DateTime @default(now())
-  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  contact               Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  @@index([organizationId, createdAt])
-  @@index([contactId])
-}
-
 enum CsatSurveyStatus {
   PENDING
   ANSWERED
   EXPIRED
-}
-
-model CsatSurvey {
-  id           Int             @id @default(autoincrement())
-  contactId    Int
-  messageId    Int?            @unique
-  status       CsatSurveyStatus @default(PENDING)
-  rating       Int?            @db.TinyInt
-  comment      String?         @db.Text
-  sentByUserId String?
-  sentAt       DateTime        @default(now())
-  answeredAt   DateTime?
-  commentUntil DateTime?
-  contact      Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  message      Message?        @relation(fields: [messageId], references: [id], onDelete: SetNull)
-  sentByUser   User?           @relation(fields: [sentByUserId], references: [id], onDelete: SetNull)
-
-  @@index([contactId, sentAt])
-  @@index([sentAt])
-  @@index([sentByUserId])
 }

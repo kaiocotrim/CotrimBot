@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { normalizePoll, type Poll, type PollVote } from "../utils/poll.js";
 import { normalizeWhatsAppJid } from "../utils/whatsapp-jid.js";
+import { emitOrganizationWebhookEvent } from "./organization-webhook.service.js";
 
 type RecordValue = Record<string, any>;
 export function storedPoll(value: unknown): Poll | null {
@@ -87,6 +88,7 @@ export function mergePollVotes(poll: Poll, changes: PollVote[]): Poll {
 export function createPollResultsService(
   database: Pick<typeof prisma, "message"> = prisma,
   emit: (payload: { messageId: number; poll: Poll }) => void = (payload) => { getSocketServer().emit("poll_updated", payload); },
+  notify: (organizationId: string, payload: Record<string, unknown>) => void = (organizationId, payload) => emitOrganizationWebhookEvent(prisma, organizationId, "poll.vote_changed", payload),
 ) {
   async function apply(externalId: string, changes: (poll: Poll) => PollVote[]) {
     // Compare-and-swap preserves simultaneous votes from different people.
@@ -105,6 +107,7 @@ export function createPollResultsService(
       });
       if (!updated.count) continue;
       emit({ messageId: message.id, poll });
+      if (message.organizationId) notify(message.organizationId, { messageId: message.id, contactId: message.contactId, question: poll.question, votes: delta });
       return poll;
     }
     throw new Error("Não foi possível atualizar os votos da enquete.");

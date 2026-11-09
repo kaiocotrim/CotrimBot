@@ -52,6 +52,7 @@ export default function CompanyPage() {
           currentUserName={session.user.name}
           currentUserEmail={session.user.email}
           canCreateCompany={session.user.role === "admin"}
+          activeOrganizationId={session.session.activeOrganizationId}
         />
       </motion.div>
     </main>

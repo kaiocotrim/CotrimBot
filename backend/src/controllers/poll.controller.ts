@@ -7,11 +7,13 @@ import { normalizePoll, pollSummary } from "../utils/poll.js";
 import { pollResults, storedPoll } from "../services/poll-results.service.js";
 import { getWhatsAppPollIdentity, getWhatsAppPollVotes, sendWhatsAppPollVote } from "../services/evolution-polls.service.js";
 import { whatsAppJidIdentifier } from "../utils/whatsapp-jid.js";
+import { emitOrganizationWebhookEvent } from "../services/organization-webhook.service.js";
 
 export function createSendPollHandler(
   database: Pick<typeof prisma, "contact" | "message"> = prisma,
   send = sendWhatsAppPoll,
   emit: (payload: unknown) => void = (payload) => { getSocketServer().emit("new_message", payload); },
+  notify: (organizationId: string, payload: Record<string, unknown>) => void = (organizationId, payload) => emitOrganizationWebhookEvent(prisma, organizationId, "poll.created", payload),
 ) {
   return async function sendPoll(req: Request, res: Response) {
     const contactId = Number(req.params.id);
@@ -25,13 +27,15 @@ export function createSendPollHandler(
       const result = await send(contact.phone, poll);
       const externalId = result?.key?.id;
       if (typeof externalId !== "string" || !externalId) throw new Error("A Evolution não retornou o identificador da enquete");
-      const data = { content: pollSummary(poll), type: "POLL" as const, poll, sentByUserId: req.user!.id };
+      const organizationId = req.activeOrganizationId ?? null;
+      const data = { content: pollSummary(poll), type: "POLL" as const, poll, sentByUserId: req.user!.id, organizationId };
       const message = await database.message.upsert({
         where: { externalId }, update: data,
         create: { ...data, externalId, direction: "OUTGOING", contactId },
         include: { sentByUser: { select: { id: true, name: true, image: true } } },
       });
       emit({ message, contact: { ...contact, name: contactDisplayName(contact) } });
+      if (organizationId) notify(organizationId, { messageId: message.id, contactId, question: poll.question, options: poll.options, selectableCount: poll.selectableCount });
       return res.status(201).json({ message });
     } catch (error) {
       console.error("Erro ao enviar enquete:", error);

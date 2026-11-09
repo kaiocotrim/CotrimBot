@@ -252,11 +252,79 @@ do backend para integrações realtime; esse transporte não faz parte deste SDK
 | `calendarEvents` | `list`, `create`, `setCompleted`, `delete` | `GET|POST /calendar-events`, `PATCH /calendar-events/:id/completed`, `DELETE /calendar-events/:id` |
 | `scheduledMessages` | `list`, `create`, `delete` | `GET|POST /scheduled-messages`, `DELETE /scheduled-messages/:id` |
 | `clients` | `list`, `create`, `update`, `delete` | `GET|POST /clients`, `PUT|DELETE /clients/:id` |
+| `webhooks` | `events`, `list`, `create`, `update`, `rotateSecret`, `delete`, `deliveries` | `GET /organization-webhooks/events`, `GET|POST /organization-webhooks`, `PATCH|DELETE /organization-webhooks/:id`, `POST /organization-webhooks/:id/rotate-secret`, `GET /organization-webhooks/:id/deliveries` |
 
 As rotas da Evolution que gerenciam conexão/QR Code e as rotas de bots exigem
 perfil administrativo conforme as regras do backend. As rotas de organização,
 mensagens internas e clientes também verificam associação/permissões da empresa.
 O webhook `POST /webhook/whatsapp` é interno à Evolution e não é incluído no SDK.
+
+## Webhooks da empresa
+
+Os métodos de `client.webhooks` exigem administrador da empresa. Os métodos
+recebem o `organizationId` explícito e o enviam no cabeçalho `X-Organization-Id`.
+
+```ts
+const { events } = await client.webhooks.events();
+const { webhook, secret } = await client.webhooks.create(organizationId, {
+  name: "ERP",
+  url: "https://erp.exemplo.com/cotrimbot",
+  events: ["client.created", "poll.vote_changed"],
+});
+// `secret` aparece somente aqui e em rotateSecret.
+await client.webhooks.update(organizationId, webhook.id, { active: false });
+const secretNovo = await client.webhooks.rotateSecret(organizationId, webhook.id);
+```
+
+Cada entrega é um `POST` JSON com o envelope abaixo. O tipo `OrganizationWebhookPayload`
+descreve o envelope e `OrganizationWebhookDataMap` descreve `data` por evento.
+
+```json
+{
+  "id": "2f1c...",
+  "event": "client.created",
+  "organizationId": "org_123",
+  "createdAt": "2026-11-09T12:00:00.000Z",
+  "data": { "clientId": "cl_1", "name": "Maria" }
+}
+```
+
+Cabeçalhos: `X-CotrimBot-Event`, `X-CotrimBot-Delivery` (use para idempotência),
+`X-CotrimBot-Timestamp` e `X-CotrimBot-Signature` (`sha256=<hex>`).
+
+A assinatura é HMAC-SHA256 do texto `<timestamp>.<body bruto>` com o segredo do
+webhook. Valide-a com o corpo original, sem reserializar o JSON, e recuse
+timestamps antigos.
+
+```ts
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+export function verifyCotrimBotWebhook(secret: string, headers: Record<string, string>, rawBody: string): boolean {
+  const timestamp = headers["x-cotrimbot-timestamp"];
+  const signature = headers["x-cotrimbot-signature"];
+  if (!timestamp || !signature) return false;
+  if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
+  const expected = `sha256=${createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest("hex")}`;
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signature);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+```
+
+O CotrimBot tenta a entrega até 3 vezes (intervalos de 2s e 8s). Só uma resposta
+2xx conta como sucesso; redirecionamentos não são seguidos. Enquetes recebidas do
+WhatsApp não têm empresa associada e não geram `poll.*`.
+
+| Evento | `data` |
+| --- | --- |
+| `internal_conversation.created` | `conversationId`, `type`, `name`, `participantIds` |
+| `internal_message.created` | `conversationId`, `message` (`id`, `senderId`, `type`, `content`, `replyToMessageId`, `createdAt`). Mensagens privadas não disparam evento. |
+| `client.created` / `client.updated` | `clientId`, `name` |
+| `client.deleted` | `clientId` |
+| `bot.published` | `botId`, `name`, `publishedRevision` |
+| `bot.activation_changed` | `botId`, `name`, `active` |
+| `poll.created` | `messageId`, `contactId`, `question`, `options`, `selectableCount` |
+| `poll.vote_changed` | `messageId`, `contactId`, `question`, `votes` (somente os votos alterados) |
 
 ## Build e testes
 

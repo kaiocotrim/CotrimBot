@@ -29,9 +29,12 @@ export default function AdminPage() {
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-semibold tracking-tight">Empresa</h1>
-          <Link href="/" className="text-sm text-zinc-400 transition-colors hover:text-zinc-100">Voltar para o chat</Link>
+          <div className="flex items-center gap-6">
+            <Link href="/admin/webhooks" className="text-sm text-zinc-400 transition-colors hover:text-zinc-100">Webhooks</Link>
+            <Link href="/" className="text-sm text-zinc-400 transition-colors hover:text-zinc-100">Voltar para o chat</Link>
+          </div>
         </div>
-        <TeamManagement currentUserId={session.user.id} currentUserName={session.user.name} currentUserEmail={session.user.email} canCreateCompany />
+        <TeamManagement currentUserId={session.user.id} currentUserName={session.user.name} currentUserEmail={session.user.email} canCreateCompany activeOrganizationId={session.session.activeOrganizationId} />
       </div>
     </main>
   );
