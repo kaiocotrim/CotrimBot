@@ -20,7 +20,8 @@ test('consulta SAC salva técnico habilitado e destino Não atribuído nas confi
       return route.fulfill({ json: current });
     }
     if (path.endsWith('/bots')) return route.fulfill({ json: { bots: [current], activeBotId: null, instanceAvailable: true,
-      members: [{ userId: 'inforbot', name: 'InforBot' }, { userId: 'tech-a', name: 'Técnico A' }] } });
+      members: [{ userId: 'inforbot', name: 'InforBot' }, { userId: 'tech-a', name: 'Técnico A' }, { userId: 'tech-b', name: 'Técnico B' },
+        { userId: 'kaio', name: 'Kaio Cotrim' }, { userId: 'felype', name: 'Felype Souza' }, { userId: 'bruno', name: 'Bruno Campaner' }, { userId: 'thiago', name: 'Thiago Praxedes' }] } });
     return route.fulfill({ json: {} });
   });
   await page.goto('/dashboard/bots/');
@@ -28,12 +29,30 @@ test('consulta SAC salva técnico habilitado e destino Não atribuído nas confi
   await expect(page.getByRole('combobox', { name: 'Destino de apoio da consulta', exact: true })).toHaveAttribute('data-value', '');
   await page.getByRole('button', { name: 'Adicionar técnico', exact: true }).click();
   await page.getByLabel('Nome do técnico no SAC', { exact: true }).fill('Tecnico SAC');
+  await page.getByRole('combobox', { name: 'Membro que receberá o atendimento — técnico 1', exact: true }).click();
+  await page.getByRole('option', { name: 'Técnico A', exact: true }).click();
   await page.getByRole('checkbox', { name: 'Receber transferências', exact: true }).check();
   await page.getByRole('button', { name: /^Salvar rascunho/ }).last().click();
   await expect.poll(() => current.draft.sacLookup?.technicians).toEqual([{ name: 'Tecnico SAC', userId: 'tech-a', available: true }]);
   expect(current.draft.sacLookup?.fallbackUserId).toBe('');
   expect(current.published.sacLookup?.technicians).toEqual([]);
   await page.getByRole('group', { name: 'Consulta de chamados no SAC', exact: true }).screenshot({ path: testInfo.outputPath('consulta-sac-configuracao.png') });
+  await page.getByRole('tab', { name: 'Fluxo', exact: true }).click();
+  await page.getByRole('button', { name: 'Editar opção 1: Consultar chamado', exact: true }).click();
+  const destination = page.getByRole('combobox', { name: 'Membro que receberá o atendimento — técnico 1', exact: true });
+  await expect(destination).toHaveAttribute('data-value', 'tech-a');
+  await destination.click();
+  await page.getByRole('option', { name: 'Técnico B', exact: true }).click();
+  await page.getByRole('button', { name: /^Salvar rascunho/ }).first().click();
+  await expect.poll(() => current.draft.sacLookup?.technicians[0].userId).toBe('tech-b');
+  await page.getByRole('group', { name: 'Consulta de chamados no SAC', exact: true }).screenshot({ path: testInfo.outputPath('consulta-sac-editor.png') });
+  await page.getByRole('button', { name: 'Preencher Kaio, Felype, Bruno e Thiago', exact: true }).click();
+  await page.getByRole('button', { name: /^Salvar rascunho/ }).first().click();
+  await expect.poll(() => current.draft.sacLookup?.technicians.slice(1)).toEqual([
+    { name: 'Kaio', userId: 'kaio', available: true }, { name: 'Felype', userId: 'felype', available: true },
+    { name: 'Bruno', userId: 'bruno', available: true }, { name: 'Thiago', userId: 'thiago', available: true },
+  ]);
+  await expect(page.getByRole('button', { name: 'Preencher Kaio, Felype, Bruno e Thiago', exact: true })).toBeDisabled();
   expect(errors).toEqual([]);
 });
 

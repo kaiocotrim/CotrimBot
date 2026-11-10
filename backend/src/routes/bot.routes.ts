@@ -9,7 +9,7 @@ import multer from "multer";
 import { BOT_IMAGE_MAX_BYTES, botImageIds, botImageMime } from "../services/bot-image.js";
 import { findSacCompany, loadSacCompanyAddresses, loadSacMachines, sacConfigured } from '../services/bot-sac.service.js';
 import { validSacTestCnpj, validSacTestPhone, validSacTestEmail } from '../services/bot-sac-test-validation.js';
-import { advanceSacLookup, findSacTicket } from '../services/bot-sac-lookup.js';
+import { advanceSacLookup, findSacTicket, resolveSacTechnicianTarget } from '../services/bot-sac-lookup.js';
 import { emitOrganizationWebhookEvent } from '../services/organization-webhook.service.js';
 
 export function createBotRouter(database = prisma, sac: { enabled: typeof sacConfigured; findCompany: typeof findSacCompany; loadAddresses: typeof loadSacCompanyAddresses; loadMachines?: typeof loadSacMachines; findTicket?: typeof findSacTicket } = { enabled: sacConfigured, findCompany: findSacCompany, loadAddresses: loadSacCompanyAddresses, loadMachines: loadSacMachines, findTicket: findSacTicket }) {
@@ -217,7 +217,18 @@ botRouter.post("/bots/simulate", async (req, res) => {
           lookupFailed = true;
         }
       }
-      const result: BotReply = state?.sacLookup ? await advanceSacLookup(req.body.flow, state, input, { findTicket: sac.findTicket ?? findSacTicket }) : lookupFailed
+      const result: BotReply = state?.sacLookup ? await advanceSacLookup(req.body.flow, state, input, {
+        findTicket: sac.findTicket ?? findSacTicket,
+        resolveTarget: async (_userId, technician) => {
+          if (!req.user?.id) return undefined;
+          const organizationId = await resolveOrganization(req);
+          if (!organizationId || !await prisma.member.findUnique({ where: { organizationId_userId: { organizationId, userId: req.user.id } }, select: { id: true } })) return undefined;
+          const members = await prisma.member.findMany({ where: { organizationId }, select: { userId: true, displayName: true, user: { select: { name: true, banned: true } } } });
+          const userId = resolveSacTechnicianTarget(req.body.flow, technician, members);
+          const member = members.find(m => m.userId === userId);
+          return member ? { userId: member.userId, name: member.displayName?.trim() || member.user.name } : undefined;
+        },
+      }) : lookupFailed
         ? { state: state!, text: '⚠️ Não foi possível consultar o SAC. Seus dados foram mantidos. Envie sua resposta novamente ou digite 0 para cancelar.' }
         : advanceBot(state ? req.body.flow : testFlow, state, input, { catalog });
       // Reexecutar o histórico do simulador nunca grava nem envia mensagens reais.

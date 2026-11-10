@@ -9,7 +9,7 @@ import { isInforbotName } from "./bot.service.js";
 import { findSacCompany, loadSacCompanyAddresses, loadSacMachines, sacConfigured } from './bot-sac.service.js';
 import { validSacTestCnpj, validSacTestPhone, validSacTestEmail } from './bot-sac-test-validation.js';
 import { submitSacTicket } from './bot-sac-submission.js';
-import { advanceSacLookup } from './bot-sac-lookup.js';
+import { advanceSacLookup, resolveSacTechnicianTarget } from './bot-sac-lookup.js';
 
 export async function lockBotContact(tx: Prisma.TransactionClient, contactId: number) {
   await tx.$queryRaw`SELECT id FROM Contact WHERE id = ${contactId} FOR UPDATE`;
@@ -105,13 +105,12 @@ return async function processBotMessage(messageId: number, instance: unknown) {
       }
       const result: BotReply = state?.sacLookup ? await advanceSacLookup(flow, state, input.content, {
         phone: contact.phone, inputType: input.type,
-        resolveTarget: async userId => {
-          const candidates = [...new Set([userId, flow.sacLookup?.fallbackUserId].filter((id): id is string => !!id && id !== inforbotMember.userId))];
-          for (const id of candidates) {
-            const member = await tx.member.findFirst({ where: { organizationId: bot!.organizationId, userId: id, user: { OR: [{ banned: false }, { banned: null }] } }, select: { userId: true } });
-            if (member) return member.userId;
-          }
-          return undefined;
+        resolveTarget: async (_userId, technician) => {
+          const members = await tx.member.findMany({ where: { organizationId: bot!.organizationId },
+            select: { userId: true, displayName: true, user: { select: { name: true, banned: true } } } });
+          const userId = resolveSacTechnicianTarget(flow, technician, members, inforbotMember.userId);
+          const member = members.find(m => m.userId === userId);
+          return member ? { userId: member.userId, name: member.displayName?.trim() || member.user.name } : undefined;
         },
       }) : catalogFailed
         ? { state: state!, text: `⚠️ Não foi possível consultar ${liveSac ? 'o SAC' : 'a base de teste'}. Seus dados foram mantidos. Envie sua resposta novamente ou digite 0 para cancelar.` }

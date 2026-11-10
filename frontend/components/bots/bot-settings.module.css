@@ -8,10 +8,10 @@
 .formHeading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
 .formHeading h2, .guide h2 { font-size: 13px; font-weight: 500; }
 .status { color: #a1a1aa; font-size: 10px; }
-.form label { display: block; font-size: 12px; color: #b4b4bc; }
+.form label, .lookup label { display: block; font-size: 12px; color: #b4b4bc; }
 .hint { margin: 6px 0 12px; font-size: 11px; line-height: 1.6; color: #a1a1aa; }
-.form input, .form textarea { display: block; width: 100%; min-width: 0; border: 1px solid #ffffff14; border-radius: 10px; padding: 12px 13px; background: #141416; color: #b4b4bc; font: inherit; font-size: 12px; line-height: 1.7; outline: none; transition: border-color .18s, box-shadow .18s; }
-.form input:focus, .form textarea:focus { border-color: #a1a1aa; box-shadow: 0 0 0 3px #ffffff06; }
+.form input, .form textarea, .lookup input { display: block; width: 100%; min-width: 0; border: 1px solid #ffffff14; border-radius: 10px; padding: 12px 13px; background: #141416; color: #b4b4bc; font: inherit; font-size: 12px; line-height: 1.7; outline: none; transition: border-color .18s, box-shadow .18s; }
+.form input:focus, .form textarea:focus, .lookup input:focus { border-color: #a1a1aa; box-shadow: 0 0 0 3px #ffffff06; }
 .form textarea { resize: vertical; min-height: 98px; }
 .divider { height: 1px; background: #ffffff0c; margin: 26px 0; }
 .lookup { min-width: 0; border: 0; padding: 0; margin: 0; }
@@ -20,8 +20,8 @@
 .technician { display: grid; gap: 12px; min-width: 0; margin: 16px 0; padding: 16px; border: 1px solid #ffffff14; border-radius: 12px; }
 .technician legend { padding: 0 6px; font-size: 11px; color: #a1a1aa; }
 .technician label > input:not([type="checkbox"]) { margin-top: 8px; }
-.form .availabilityChoice { display: flex; gap: 10px; align-items: center; }
-.form .availabilityChoice input { display: inline-block; width: 16px; height: 16px; padding: 0; flex: none; accent-color: #2dd4bf; }
+.form .availabilityChoice, .lookup .availabilityChoice { display: flex; gap: 10px; align-items: center; }
+.form .availabilityChoice input, .lookup .availabilityChoice input { display: inline-block; width: 16px; height: 16px; padding: 0; flex: none; accent-color: #2dd4bf; }
 .technician > button { justify-self: start; }
 .counter { display: block; margin: 7px 0 22px; text-align: right; color: #85858f; font-size: 10px; font-variant-numeric: tabular-nums; }
 .footer { margin-top: 28px; padding-top: 20px; border-top: 1px solid #ffffff0c; }

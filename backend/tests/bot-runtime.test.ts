@@ -29,7 +29,7 @@ function harness() {
     message: { findUnique: async () => state.message, upsert: async ({ create }: any) => { state.outgoing.push(create); return { id: 100, ...create }; },
       create: async ({ data }: any) => { state.outgoing.push(data); return { id: 101, ...data }; } },
     messageMedia: { upsert: async ({ create }: any) => { state.cachedMedia.push(create); } },
-    member: { findMany: async () => state.members,
+    member: { findMany: async ({ where }: any) => state.members.filter(m => !where.organizationId || m.organizationId === where.organizationId),
       findFirst: async ({ where }: any) => state.members.find(m => m.userId === where.userId && m.organizationId === where.organizationId) ?? null },
     bot: { findFirst: async ({ where }: any) => (where.OR ? where.OR.some((filter: any) => filter.organizationId === "company-a" && filter.published.equals === flow.assignedUserId) : where.organizationId === "company-a") ? { id: "bot-a", organizationId: "company-a", published: flow, publishedRevision: state.publishedRevision } : null },
     sacTestCompany: { findMany: async () => { if (state.failCatalog) throw new Error("catalog unavailable"); return structuredClone(SAC_TEST_CATALOG); } },
@@ -83,29 +83,35 @@ test('SAC lookup assigns an eligible technician or clears assignments for the un
   let requests = 0;
   globalThis.fetch = async (url, options) => {
     assert.ok(!options?.method || options.method === 'GET'); requests++;
-    return new Response(JSON.stringify(String(url).includes('check-tenant')
-      ? [{ valido: true, IdTenant: 'tenant-a' }]
+    return new Response(JSON.stringify(String(url).endsWith('/tenants')
+      ? [{ IdTenant: 'tenant-a' }]
       : [{ IdChamado: 19335, Tecnico: 'Tecnico A', FoneContato: '11999999999', StatusChamado: 'Aberto', NrSerie: 'SERIE-TESTE' }]));
   };
   try {
-    for (const mode of ['available', 'unavailable', 'foreign'] as const) {
+    for (const mode of ['available', 'unavailable', 'foreign', 'unmapped'] as const) {
       const { state, process, flow } = harness();
       flow.menus[0]!.options[0]!.action = 'SAC_LOOKUP';
+      state.contact.phone = '5511888888888';
       flow.sacLookup = { fallbackUserId: '', technicians: [{ name: 'Tecnico A', userId: 'tech-a', available: mode !== 'unavailable' }] };
+      if (mode === 'unmapped') flow.sacLookup.technicians = [];
       state.members.push({ userId: 'tech-a', organizationId: mode === 'foreign' ? 'other-org' : 'company-a', displayName: 'Tecnico A', user: { name: 'Tecnico A' } });
-      for (const [index, content] of ['Oi', '1', '19335', '05540238000123'].entries()) {
+      for (const [index, content] of ['Oi', '1', '19335'].entries()) {
         state.message = { ...state.message, id: index + 1, content }; await process(index + 1, 'test-instance');
       }
       assert.equal(state.session.state.sacLookup.step, 'transfer');
+      assert.match(state.sent.at(-1)!, /Status: Aberto/);
+      assert.match(state.sent.at(-1)!, /Tecnico A/);
+      assert.doesNotMatch(state.sent.at(-1)!, /CNPJ|SERIE-TESTE/);
       assert.equal(state.contactEvents.length, 0);
-      state.message = { ...state.message, id: 5, content: '1' };
-      await process(5, 'test-instance');
+      state.message = { ...state.message, id: 4, content: '1' };
+      await process(4, 'test-instance');
       assert.equal(state.session.status, 'WAITING_HUMAN');
       assert.deepEqual(state.contact.assignments.map((a: any) => a.userId), mode === 'available' ? ['tech-a'] : []);
+      if (mode === 'available') assert.match(state.sent.at(-1)!, /encaminhada para \*Tecnico A\*/);
       const notes = state.outgoing.filter(m => m.private);
       assert.equal(notes.length, 1); assert.match(notes[0].content, /19335/);
       assert.ok(state.sent.every(text => !text.includes('Consulta SAC:')));
-      const count = requests; await process(5, 'test-instance');
+      const count = requests; await process(4, 'test-instance');
       assert.equal(requests, count); assert.equal(state.outgoing.filter(m => m.private).length, 1);
     }
   } finally {

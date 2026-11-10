@@ -6,13 +6,43 @@ import type { prisma } from '../src/lib/prisma.js';
 import { fixture } from './bot-fixture.js';
 import type { Ticket } from '../src/lib/sac/index.js';
 
+test('simulator resolves the member configured for Bruno in the authenticated organization without assigning a real conversation', async () => {
+  let memberReads = 0;
+  const database: any = { member: {
+    findUnique: async ({ where }: any) => where.organizationId_userId.organizationId === 'company-a' && where.organizationId_userId.userId === 'admin' ? { id: 'admin-member' } : null,
+    findMany: async ({ where }: any) => {
+      assert.equal(where.organizationId, 'company-a'); memberReads++;
+      return [{ userId: 'bruno', displayName: 'Bruno', user: { name: 'Bruno Odorissi Campaner', banned: false } }];
+    },
+  } };
+  const app = express(); app.use(express.json());
+  app.use((req, _res, next) => { req.user = { id: 'admin' } as any; req.activeOrganizationId = 'company-a'; next(); });
+  app.use(createBotRouter(database, { enabled: () => true, findCompany: async () => [], loadAddresses: async () => [],
+    findTicket: async () => ({ IdChamado: 19344, Tecnico: 'BRUNO ODORISSI CAMPANER', StatusChamado: 'ABERTO' } as Ticket) }));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  const address = server.address(); assert.ok(address && typeof address !== 'string');
+  try {
+    const flow = fixture(); flow.menus[0]!.options[0]!.action = 'SAC_LOOKUP';
+    flow.sacLookup = { fallbackUserId: '', technicians: [{ name: 'Bruno', userId: 'bruno', available: true }] };
+    const response = await fetch(`http://127.0.0.1:${address.port}/bots/simulate`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ flow, inputs: ['1', '19344', '1'] }),
+    });
+    assert.equal(response.status, 200);
+    const result = await response.json() as any;
+    assert.match(result.messages.at(-1).text, /encaminhada para \*Bruno\*/);
+    assert.doesNotMatch(result.messages.at(-1).text, /fila de suporte/);
+    assert.equal(result.state.status, 'WAITING_HUMAN'); assert.equal(memberReads, 1);
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
+});
+
 test('lookup simulator replays consent without database writes, assignments or private ticket disclosure', async () => {
   let reads = 0;
   const app = express(); app.use(express.json());
   app.use(createBotRouter({} as typeof prisma, {
     enabled: () => true, findCompany: async () => [], loadAddresses: async () => [],
-    findTicket: async (cnpj, protocol) => {
-      assert.equal(cnpj, '05540238000123'); assert.equal(protocol, '19335'); reads++;
+    findTicket: async protocol => {
+      assert.equal(protocol, '19335'); reads++;
       return { IdChamado: 19335, Tecnico: 'Tecnico A', NrSerie: 'PRIVATE-SERIAL', FoneContato: '11999999999' } as Ticket;
     },
   }));
@@ -24,7 +54,7 @@ test('lookup simulator replays consent without database writes, assignments or p
     flow.sacLookup = { fallbackUserId: '', technicians: [] };
     const response = await fetch(`http://127.0.0.1:${address.port}/bots/simulate`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ flow, inputs: ['1', '19335', '05540238000123', '1'] }),
+      body: JSON.stringify({ flow, inputs: ['1', '19335', '1'] }),
     });
     assert.equal(response.status, 200);
     const result = await response.json() as any;

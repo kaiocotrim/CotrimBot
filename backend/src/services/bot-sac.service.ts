@@ -42,14 +42,14 @@ export type SacInvoicesResult =
   | { status: 'found'; tenant: TenantCheck & { IdTenant: string }; invoices: Invoice[] };
 
 /** Lazy configuration allows bots without SAC integration to keep running. */
-export function createSacClient(env: NodeJS.ProcessEnv = process.env): SacClient {
+export function createSacClient(env: NodeJS.ProcessEnv = process.env, signal?: AbortSignal): SacClient {
   const baseUrl = env.SAC_BASE_URL?.trim();
   const token = env.SAC_API_TOKEN?.trim() || env.SAC_TOKEN?.trim();
   if (!baseUrl || !token) throw new Error('Configure SAC_BASE_URL e SAC_API_TOKEN no servidor.');
   return new SacClient({
     baseUrl,
     token,
-    fetch: (url, options) => fetch(url, { ...options, signal: AbortSignal.timeout(10000) }),
+    fetch: (url, options) => fetch(url, { ...options, signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(10000)]) : AbortSignal.timeout(10000) }),
   });
 }
 
