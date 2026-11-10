@@ -17,6 +17,11 @@ export type Message = {
   sentByUserId?: string | null;
   sentByUser?: { id: string; name: string; image: string | null } | null;
   readAt?: string | null;
+  reaction?: string | null;
+  pinned?: boolean;
+  pinnedUntil?: string | null;
+  favorited?: boolean;
+  poll?: { question: string; options: string[]; selectableCount: number } | null;
   quotedMessageId?: number | null;
   quotedContent?: string | null;
   quotedSenderName?: string | null;
@@ -34,6 +39,7 @@ export type Contact = {
   jobTitle?: string | null;
   priority?: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH';
   unreadCount: number;
+  favoriteMessageCount?: number;
   profilePictureUrl?: string | null;
   messages?: Message[];
 };

@@ -5,7 +5,7 @@ import { useAccount } from '../lib/session';
 import { messageImageSource } from '../lib/images';
 import { colors, IconButton } from './ui';
 
-export function MessageImage({ id, sticker = false, thumbnailSize }: { id: number; sticker?: boolean; thumbnailSize?: number }) {
+export function MessageImage({ id, sticker = false, thumbnailSize, onLongPress }: { id: number; sticker?: boolean; thumbnailSize?: number; onLongPress?: (anchor: { x: number; y: number }) => void }) {
   const { account } = useAccount();
   const { width, height } = useWindowDimensions();
   const [ratio, setRatio] = useState(sticker ? 1 : 4 / 3);
@@ -18,7 +18,7 @@ export function MessageImage({ id, sticker = false, thumbnailSize }: { id: numbe
   const imageWidth = thumbnailSize ?? Math.max(120, Math.min(width * .82 - 46, sticker ? 180 : 340));
   const imageHeight = thumbnailSize ?? Math.min(imageWidth / ratio, 360);
   return <>
-    <Pressable accessibilityRole="button" accessibilityLabel={failed ? 'Tentar carregar imagem novamente' : sticker ? 'Abrir figurinha' : 'Abrir imagem'} onPress={() => {
+    <Pressable delayLongPress={400} onLongPress={onLongPress ? event => onLongPress({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }) : undefined} accessibilityRole="button" accessibilityLabel={failed ? 'Tentar carregar imagem novamente' : sticker ? 'Abrir figurinha' : 'Abrir imagem'} onPress={() => {
       if (failed) { setFailed(false); setLoading(true); setAttempt(value => value + 1); }
       else if (!loading) setExpanded(true);
     }} style={[styles.preview, { width: imageWidth, height: imageHeight }, sticker && { backgroundColor: 'transparent' }]}>

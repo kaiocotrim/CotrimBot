@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Alert, Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import type { Message, UploadAttachment } from '../lib/types';
@@ -7,34 +7,43 @@ import { messagePreview } from '../lib/message-composer';
 import { colors, Icon, IconButton } from './ui';
 import { AudioControl } from './message-audio';
 
-export function AttachmentPickerButton({ disabled, onPick, onError, onPicking }: {
-  disabled: boolean; onPick: (file: UploadAttachment) => void; onError: (message: string) => void; onPicking: (busy: boolean) => void;
-}) {
+export type AttachmentKind = 'image' | 'video' | 'audio' | 'document' | 'camera';
+
+type PickerProps = { disabled: boolean; onPick: (file: UploadAttachment) => void; onError: (message: string) => void; onPicking: (busy: boolean) => void };
+
+export function useAttachmentPicker({ disabled, onPick, onError, onPicking }: PickerProps) {
   const [picking, setPicking] = useState(false);
   const lock = useRef(false);
-  async function pick(kind: 'image' | 'document') {
+  async function pick(kind: AttachmentKind) {
     if (lock.current || disabled) return;
     lock.current = true; setPicking(true); onPicking(true);
     try {
-      if (kind === 'image') {
-        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: false, quality: .85, preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible });
+      if (kind === 'image' || kind === 'video' || kind === 'camera') {
+        if (kind === 'camera') {
+          const permission = await ImagePicker.requestCameraPermissionsAsync();
+          if (!permission.granted) { onError('Permita o acesso à câmera nos ajustes do aparelho para tirar uma foto.'); return; }
+        }
+        const result = kind === 'camera'
+          ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: .85 })
+          : await ImagePicker.launchImageLibraryAsync({ mediaTypes: kind === 'video' ? ['videos'] : ['images'], allowsMultipleSelection: false, quality: .85, preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible });
         if (result.canceled || !result.assets?.[0]) return;
         const image = result.assets[0];
-        onPick({ uri: image.uri, name: image.fileName || `foto-${Date.now()}.jpg`, mimeType: image.mimeType || 'image/jpeg', size: image.fileSize });
+        onPick({ uri: image.uri, name: image.fileName || `${kind === 'video' ? 'video' : 'foto'}-${Date.now()}.${kind === 'video' ? 'mp4' : 'jpg'}`, mimeType: image.mimeType || (kind === 'video' ? 'video/mp4' : 'image/jpeg'), size: image.fileSize });
       } else {
-        const result = await DocumentPicker.getDocumentAsync({ type: '*/*', multiple: false, copyToCacheDirectory: true });
+        const result = await DocumentPicker.getDocumentAsync({ type: kind === 'audio' ? 'audio/*' : '*/*', multiple: false, copyToCacheDirectory: true });
         if (result.canceled || !result.assets?.[0]) return;
         const document = result.assets[0];
         onPick({ uri: document.uri, name: document.name, mimeType: document.mimeType || 'application/octet-stream', size: document.size });
       }
-    } catch { onError('Não foi possível selecionar o arquivo. Tente novamente.'); }
+    } catch { onError(kind === 'camera' ? 'Não foi possível abrir a câmera. Tente novamente.' : 'Não foi possível selecionar o arquivo. Tente novamente.'); }
     finally { lock.current = false; setPicking(false); onPicking(false); }
   }
-  return <IconButton name="plus" label="Anexar foto ou documento" disabled={disabled || picking} busy={picking} onPress={() => Alert.alert('Anexar', 'Selecione o que deseja enviar.', [
-    { text: 'Foto da galeria', onPress: () => void pick('image') },
-    { text: 'Documento', onPress: () => void pick('document') },
-    { text: 'Cancelar', style: 'cancel' },
-  ])} />;
+  return { pick, picking };
+}
+
+export function AttachmentPickerButton(props: PickerProps & { cameraOnly?: boolean }) {
+  const { pick, picking } = useAttachmentPicker(props);
+  return <IconButton name="camera" label="Tirar foto" iconSize={22} plain disabled={props.disabled || picking} busy={picking} onPress={() => void pick('camera')} />;
 }
 
 export function ComposerPreview({ reply, replyName, attachment, disabled, onCancelReply, onRemoveAttachment }: {

@@ -9,7 +9,7 @@ import { editWhatsAppMessage } from "../services/evolution.service.js";
 import { upload } from "../middlewares/upload.js";
 import { getMediaLibrary } from "../controllers/media-library.controller.js";
 import { getMessageInfo } from "../controllers/message-info.controller.js";
-import { getPollResults, getPollVoterAvatar, sendPoll, voteOnPoll } from "../controllers/poll.controller.js";
+import { closePoll, getPollResults, getPollVoterAvatar, sendPoll, voteOnPoll } from "../controllers/poll.controller.js";
 
 // Cada controller recebe req e res, executa a operação e responde ao frontend.
 // A extensão .js nos imports é necessária para os módulos ESM/NodeNext do projeto.
@@ -53,6 +53,7 @@ messageRouter.post("/contacts/:id/send-poll", sendPoll);
 messageRouter.get("/messages/:id/poll", getPollResults);
 messageRouter.get("/messages/:id/poll/voter-avatar", getPollVoterAvatar);
 messageRouter.put("/messages/:id/poll/vote", voteOnPoll);
+messageRouter.post("/messages/:id/poll/close", closePoll);
 
 /**
  * POST /contacts/:id/close-with-bot

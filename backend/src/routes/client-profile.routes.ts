@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import type { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../lib/prisma.js";
 import { ClientAccessError, getClientAccess, type ClientAccess } from "../services/client-access.service.js";
+import { emitOrganizationWebhookEvent } from "../services/organization-webhook.service.js";
 
 function normalizeLinks(value: unknown) {
   if (!Array.isArray(value) || value.length > 20) return null;
@@ -56,7 +57,7 @@ function presentClient(client: Prisma.ClientGetPayload<{ select: typeof clientSe
   };
 }
 
-type ClientDatabase = Pick<typeof prisma, "client" | "member">;
+type ClientDatabase = Pick<typeof prisma, "client" | "member" | "organizationWebhook" | "organizationWebhookDelivery">;
 
 export function createClientRouter(database: ClientDatabase = prisma) {
   const router = Router();
@@ -115,6 +116,7 @@ export function createClientRouter(database: ClientDatabase = prisma) {
       data: { userId: request.user!.id, organizationId: access.organizationId, name, image, links },
       select: clientSelect,
     });
+    emitOrganizationWebhookEvent(database, access.organizationId, "client.created", { clientId: client.id, name: client.name });
     return response.status(201).json({ client: presentClient(client) });
   });
 
@@ -146,6 +148,7 @@ export function createClientRouter(database: ClientDatabase = prisma) {
       data: { name, image, links },
       select: clientSelect,
     });
+    emitOrganizationWebhookEvent(database, access.organizationId, "client.updated", { clientId: client.id, name: client.name });
     return response.json({ client: presentClient(client) });
   });
 
@@ -156,6 +159,7 @@ export function createClientRouter(database: ClientDatabase = prisma) {
       where: { ...access.where, id: request.params.id },
     });
     if (!deleted.count) return response.status(404).json({ error: "Cliente não encontrado." });
+    emitOrganizationWebhookEvent(database, access.organizationId, "client.deleted", { clientId: request.params.id });
     return response.status(204).send();
   });
 

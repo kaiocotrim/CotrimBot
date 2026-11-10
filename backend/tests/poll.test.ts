@@ -30,7 +30,7 @@ test("poll sending persists native metadata, emits once, and rejects invalid inp
     sent.push({ number, input });
     if (fail) throw new Error("Falha simulada");
     return { key: { id: "poll-external" } };
-  }, (payload) => { emitted.push(payload); });
+  }, (payload) => { emitted.push(payload); }, undefined, async () => null);
   async function run(id: string, body: unknown) {
     const response = { code: 200, body: {} as any, status(value: number) { this.code = value; return this; }, json(value: unknown) { this.body = value; return this; } };
     await handler({ params: { id }, body, user: { id: "me" } } as unknown as Request, response as unknown as Response);

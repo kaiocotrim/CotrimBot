@@ -32,6 +32,7 @@ import { scheduledMessageRouter } from "./routes/scheduled-message.routes.js";
 import { clientRouter } from "./routes/client-profile.routes.js";
 import { announcementRouter } from "./routes/announcement.routes.js";
 import { csatRouter } from "./routes/csat.routes.js";
+import { organizationWebhookRouter } from "./routes/organization-webhook.routes.js";
 import { startScheduledMessageWorker } from "./services/scheduled-message.service.js";
 import { createContactTypingPresence } from "./services/contact-typing.service.js";
 
@@ -71,6 +72,7 @@ app.use("/api", requireAuth, scheduledMessageRouter);
 app.use("/api", requireAuth, clientRouter);
 app.use("/api", requireAuth, announcementRouter);
 app.use("/api", requireAuth, csatRouter);
+app.use("/api", requireAuth, organizationWebhookRouter);
 
 // Compatibilidade com instalações da Evolution que ainda usam a URL antiga.
 app.use(webhookRoutes);

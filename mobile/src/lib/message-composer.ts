@@ -7,11 +7,11 @@ export function messagePreview(message: Pick<Message, 'content' | 'type' | 'dele
   return ({ IMAGE: 'Imagem', STICKER: 'Figurinha', DOCUMENT: 'Documento', VIDEO: 'Vídeo', AUDIO: 'Áudio' } as Record<string, string>)[message.type] || 'Mensagem';
 }
 
-export function attachmentForm(file: UploadAttachment, caption: string, replyToMessageId?: number, form = new FormData()) {
+export function attachmentForm(file: UploadAttachment, caption: string, replyToMessageId?: number, form = new FormData(), includeSignature = true) {
   // React Native's FormData reads the local file from this descriptor.
   form.append('file', { uri: file.uri, name: file.name, type: file.mimeType } as unknown as Blob);
   if (caption.trim()) form.append('caption', caption.trim());
   if (replyToMessageId !== undefined) form.append('replyToMessageId', String(replyToMessageId));
-  form.append('includeSignature', 'true');
+  form.append('includeSignature', String(includeSignature));
   return form;
 }

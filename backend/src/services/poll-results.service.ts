@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { getSocketServer } from "../lib/socket.js";
 import { normalizePoll, type Poll, type PollVote } from "../utils/poll.js";
 import { normalizeWhatsAppJid } from "../utils/whatsapp-jid.js";
+import { emitOrganizationWebhookEvent } from "./organization-webhook.service.js";
 
 type RecordValue = Record<string, any>;
 export function storedPoll(value: unknown): Poll | null {
@@ -14,7 +15,7 @@ export function storedPoll(value: unknown): Poll | null {
     vote && typeof vote.voterId === "string" && typeof vote.updatedAt === "string"
     && Array.isArray(vote.optionIndexes) && vote.optionIndexes.every((index: unknown) => Number.isInteger(index) && Number(index) >= 0 && Number(index) < poll.options.length)
   )) : [];
-  return { ...poll, votes };
+  return { ...poll, votes, ...(typeof raw.closedAt === "string" ? { closedAt: raw.closedAt } : {}) };
 }
 
 function timestamp(value: unknown) {
@@ -87,6 +88,7 @@ export function mergePollVotes(poll: Poll, changes: PollVote[]): Poll {
 export function createPollResultsService(
   database: Pick<typeof prisma, "message"> = prisma,
   emit: (payload: { messageId: number; poll: Poll }) => void = (payload) => { getSocketServer().emit("poll_updated", payload); },
+  notify: (organizationId: string, payload: Record<string, unknown>) => void = (organizationId, payload) => emitOrganizationWebhookEvent(prisma, organizationId, "poll.vote_changed", payload),
 ) {
   async function apply(externalId: string, changes: (poll: Poll) => PollVote[]) {
     // Compare-and-swap preserves simultaneous votes from different people.
@@ -95,7 +97,8 @@ export function createPollResultsService(
       if (!message || message.type !== "POLL" || message.deletedAt) return null;
       const current = storedPoll(message.poll);
       if (!current) return null;
-      const delta = changes(current);
+      // Votos com data posterior ao encerramento são descartados.
+      const delta = changes(current).filter((vote) => !current.closedAt || vote.updatedAt <= current.closedAt);
       if (!delta.length) return current;
       const poll = mergePollVotes(current, delta);
       if (JSON.stringify(current) === JSON.stringify(poll)) return poll;
@@ -105,6 +108,8 @@ export function createPollResultsService(
       });
       if (!updated.count) continue;
       emit({ messageId: message.id, poll });
+      if (message.organizationId) notify(message.organizationId, { messageId: message.id, contactId: message.contactId, question: poll.question, votes: delta });
+      else console.log(`[webhooks] voto em enquete ${message.id} sem organizationId; poll.vote_changed nao emitido`);
       return poll;
     }
     throw new Error("Não foi possível atualizar os votos da enquete.");

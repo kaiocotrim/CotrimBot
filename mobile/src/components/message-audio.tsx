@@ -7,12 +7,12 @@ import { useAccount } from '../lib/session';
 import { messageImageSource } from '../lib/images';
 import { colors, IconButton } from './ui';
 
-export function MessageAudio({ id }: { id: number }) {
+export function MessageAudio({ id, onLongPress }: { id: number; onLongPress?: (anchor: { x: number; y: number }) => void }) {
   const { account } = useAccount();
-  return account ? <AudioControl source={messageImageSource(account.api, id)} /> : null;
+  return account ? <AudioControl source={messageImageSource(account.api, id)} onLongPress={onLongPress} /> : null;
 }
 
-export function AudioControl({ source }: { source: AudioSource }) {
+export function AudioControl({ source, onLongPress }: { source: AudioSource; onLongPress?: (anchor: { x: number; y: number }) => void }) {
   const id = useId();
   const player = useAudioPlayer(null, { updateInterval: 250 });
   const status = useAudioPlayerStatus(player);
@@ -52,15 +52,15 @@ export function AudioControl({ source }: { source: AudioSource }) {
 
   return <View style={styles.root}>
     <View style={styles.controls}>
-      <IconButton name={status.playing ? 'pause' : 'play'} label={status.playing ? 'Pausar áudio' : status.error ? 'Tentar reproduzir áudio novamente' : 'Reproduzir áudio'} busy={starting || status.isBuffering} onPress={() => void toggle()} />
+      <IconButton name={status.playing ? 'pause' : 'play'} label={status.playing ? 'Pausar áudio' : status.error ? 'Tentar reproduzir áudio novamente' : 'Reproduzir áudio'} busy={starting || status.isBuffering} onLongPress={onLongPress} onPress={() => void toggle()} />
       <View style={styles.timeline}>
-        <Pressable accessibilityRole="adjustable" accessibilityLabel="Posição do áudio" accessibilityValue={{ min: 0, max: 100, now: Math.round(percent) }} accessibilityActions={[{ name: 'increment', label: 'Avançar dez segundos' }, { name: 'decrement', label: 'Voltar dez segundos' }]} onAccessibilityAction={event => void seek(status.currentTime + (event.nativeEvent.actionName === 'increment' ? 10 : -10))}
+        <Pressable delayLongPress={400} onLongPress={onLongPress ? event => onLongPress({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }) : undefined} accessibilityRole="adjustable" accessibilityLabel="Posição do áudio" accessibilityValue={{ min: 0, max: 100, now: Math.round(percent) }} accessibilityActions={[{ name: 'increment', label: 'Avançar dez segundos' }, { name: 'decrement', label: 'Voltar dez segundos' }]} onAccessibilityAction={event => void seek(status.currentTime + (event.nativeEvent.actionName === 'increment' ? 10 : -10))}
           disabled={!status.isLoaded || status.duration <= 0} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)} onPress={event => void seek(event.nativeEvent.locationX / trackWidth * status.duration)} style={styles.trackTouch}>
           <View style={styles.track}><View style={[styles.progress, { width: `${percent}%` }]} /></View>
         </Pressable>
         <Text style={styles.time}>{audioTime(status.currentTime)} / {audioTime(status.duration)}</Text>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Velocidade ${rate} vezes`} style={styles.speed} onPress={() => { const next = rate === 1 ? 1.5 : rate === 1.5 ? 2 : 1; try { player.setPlaybackRate(next); setRate(next); } catch { setError('Não foi possível alterar a velocidade.'); } }}><Text style={styles.speedText}>{rate}×</Text></Pressable>
+      <Pressable delayLongPress={400} onLongPress={onLongPress ? event => onLongPress({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }) : undefined} accessibilityRole="button" accessibilityLabel={`Velocidade ${rate} vezes`} style={styles.speed} onPress={() => { const next = rate === 1 ? 1.5 : rate === 1.5 ? 2 : 1; try { player.setPlaybackRate(next); setRate(next); } catch { setError('Não foi possível alterar a velocidade.'); } }}><Text style={styles.speedText}>{rate}×</Text></Pressable>
     </View>
     {!!(error || status.error) && <Text accessibilityRole="alert" style={styles.error}>{error || 'Não foi possível reproduzir este formato de áudio. Toque em reproduzir para tentar novamente.'}</Text>}
   </View>;

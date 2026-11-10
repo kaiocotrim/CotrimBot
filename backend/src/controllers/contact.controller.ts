@@ -50,6 +50,19 @@ export async function getContacts(req: Request, res: Response) {
     },
   });
 
+  const includeFavoriteCounts = req.query.includeFavoriteCounts === "1";
+  const favorites = includeFavoriteCounts && contacts.length ? await prisma.message.groupBy({
+    by: ["contactId"],
+    where: {
+      contactId: { in: contacts.map(contact => contact.id) },
+      favorited: true,
+      deletedAt: null,
+      ...(userId ? { deletions: { none: { userId } } } : {}),
+    },
+    _count: { _all: true },
+  }) : [];
+  const favoriteCounts = new Map(favorites.map(item => [item.contactId, item._count._all]));
+
   // Adiciona a contagem de mensagens não lidas e ordena os contatos pela data da última mensagem
   const result = contacts
     .map(({ _count, assignments, ...contact }) => ({
@@ -57,6 +70,7 @@ export async function getContacts(req: Request, res: Response) {
       name: contactDisplayName(contact),
       assignedUserIds: assignments.map((assignment) => assignment.userId),
       unreadCount: _count.messages,
+      ...(includeFavoriteCounts ? { favoriteMessageCount: favoriteCounts.get(contact.id) ?? 0 } : {}),
     }))
     .sort((a, b) => {
       const dateA = a.messages[0]?.createdAt

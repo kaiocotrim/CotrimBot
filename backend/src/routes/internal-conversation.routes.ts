@@ -7,6 +7,7 @@ import { notifyInternalMention, notifyInternalReply, userRoom } from "../service
 import { readStoredMedia, uploadMediaObject } from "../services/media-storage.service.js";
 import { transcribeAudio } from "../services/transcription.service.js";
 import { getSignedOutgoingText } from "../services/user-signature.service.js";
+import { emitOrganizationWebhookEvent } from "../services/organization-webhook.service.js";
 
 export const internalConversationRouter = Router();
 
@@ -297,6 +298,7 @@ internalConversationRouter.post("/organizations/:organizationId/internal-convers
   if (members.length !== ids.length) return response.status(400).json({ error: "Todos os participantes devem pertencer à empresa." });
 
   const directKey = type === "DIRECT" ? [...ids].sort().join(":") : null;
+  let isNewConversation = false;
   const conversation = await prisma.$transaction(async (tx) => {
     if (directKey) {
       const existing = await tx.internalConversation.findUnique({
@@ -313,6 +315,7 @@ internalConversationRouter.post("/organizations/:organizationId/internal-convers
         directKey,
       },
     });
+    isNewConversation = true;
     await tx.internalConversationParticipant.createMany({
       data: ids.map((participantId) => ({
         conversationId: created.id,
@@ -327,6 +330,7 @@ internalConversationRouter.post("/organizations/:organizationId/internal-convers
     });
   });
   emitToParticipants(conversation, "internal:conversation:updated", { organizationId, conversationId: conversation.id });
+  if (isNewConversation) emitOrganizationWebhookEvent(prisma, organizationId, "internal_conversation.created", { conversationId: conversation.id, type: conversation.type, name: conversation.name, participantIds: ids });
   return response.status(201).json({ conversation: publicConversation(conversation) });
 });
 
@@ -394,6 +398,7 @@ internalConversationRouter.post("/organizations/:organizationId/internal-convers
   });
   await prisma.internalConversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
   emitToParticipants(conversation, "internal:message:new", { organizationId, conversationId, message });
+  if (!isPrivate) emitOrganizationWebhookEvent(prisma, organizationId, "internal_message.created", { conversationId, message: { id: message.id, senderId: userId, type: message.type, content: message.content, replyToMessageId: message.replyToMessageId, createdAt: message.createdAt } });
   if (mentions.length) notifyInternalMention(
     conversationId,
     conversation.type === "DIRECT" ? message.sender.name : conversation.name || "Grupo interno",
@@ -445,6 +450,7 @@ const receiveMedia = async (request: Request, response: Response) => {
   });
   await prisma.internalConversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
   emitToParticipants(conversation, "internal:message:new", { organizationId, conversationId, message });
+  emitOrganizationWebhookEvent(prisma, organizationId, "internal_message.created", { conversationId, message: { id: message.id, senderId: userId, type: message.type, content: message.content, replyToMessageId: message.replyToMessageId, createdAt: message.createdAt } });
   if (repliedMessage) notifyInternalReply(
     conversationId,
     conversation.type === "DIRECT" ? message.sender.name : conversation.name || "Grupo interno",

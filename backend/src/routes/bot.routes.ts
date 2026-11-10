@@ -10,6 +10,7 @@ import { BOT_IMAGE_MAX_BYTES, botImageIds, botImageMime } from "../services/bot-
 import { findSacCompany, loadSacCompanyAddresses, loadSacMachines, sacConfigured } from '../services/bot-sac.service.js';
 import { validSacTestCnpj, validSacTestPhone, validSacTestEmail } from '../services/bot-sac-test-validation.js';
 import { advanceSacLookup, findSacTicket } from '../services/bot-sac-lookup.js';
+import { emitOrganizationWebhookEvent } from '../services/organization-webhook.service.js';
 
 export function createBotRouter(database = prisma, sac: { enabled: typeof sacConfigured; findCompany: typeof findSacCompany; loadAddresses: typeof loadSacCompanyAddresses; loadMachines?: typeof loadSacMachines; findTicket?: typeof findSacTicket } = { enabled: sacConfigured, findCompany: findSacCompany, loadAddresses: loadSacCompanyAddresses, loadMachines: loadSacMachines, findTicket: findSacTicket }) {
 const prisma = database;
@@ -137,7 +138,9 @@ botRouter.post("/bots/:id/publish", async (req, res) => {
     await validateImages(bot.draft, organizationId);
     const result = await prisma.bot.updateMany({ where: { id: bot.id, revision: req.body.revision }, data: { published: json(bot.draft), revision: { increment: 1 }, publishedRevision: { increment: 1 } } });
     if (!result.count) return res.status(409).json({ message: "Rascunho alterado. Recarregue antes de publicar." });
-    res.json(await prisma.bot.findUnique({ where: { id: bot.id } }));
+    const published = await prisma.bot.findUnique({ where: { id: bot.id } });
+    emitOrganizationWebhookEvent(prisma, organizationId, "bot.published", { botId: bot.id, name: bot.name, publishedRevision: published?.publishedRevision ?? null });
+    res.json(published);
   } catch (error) { res.status(400).json({ message: errorMessage(error) }); }
 });
 
@@ -158,6 +161,7 @@ botRouter.post("/bots/:id/activation", async (req, res) => {
       if (binding.organizationId !== organizationId) throw new Error("Esta instância já pertence a outra empresa.");
       await tx.botInstance.updateMany({ where: { instance, organizationId, ...(req.body.active ? {} : { activeBotId: bot.id }) }, data: { activeBotId: req.body.active ? bot.id : null } });
     });
+    emitOrganizationWebhookEvent(prisma, organizationId, "bot.activation_changed", { botId: bot.id, name: bot.name, active: req.body.active });
     res.json({ success: true });
   } catch { res.status(409).json({ message: "Não foi possível ativar: instância vinculada a outra empresa ou ocupada. Tente novamente." }); }
 });

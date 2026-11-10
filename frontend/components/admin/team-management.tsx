@@ -102,11 +102,12 @@ async function prepareCompanyLogo(file: File): Promise<string> {
   throw new Error("Não foi possível reduzir a imagem. Escolha outro arquivo.");
 }
 
-export function TeamManagement({ currentUserId, currentUserName, currentUserEmail, canCreateCompany = false }: {
+export function TeamManagement({ currentUserId, currentUserName, currentUserEmail, canCreateCompany = false, activeOrganizationId }: {
   currentUserId: string;
   currentUserName?: string;
   currentUserEmail?: string;
   canCreateCompany?: boolean;
+  activeOrganizationId?: string | null;
 }) {
   const [organization, setOrganization] = useState<OrganizationSummary | null>(null);
   const [members, setMembers] = useState<OrganizationMember[]>([]);
@@ -149,7 +150,8 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
     try {
       const { data, error: organizationError } = await authClient.organization.list();
       if (organizationError) throw new Error("organization");
-      const nextOrganization = (data?.[0] as OrganizationSummary | undefined) ?? null;
+      const organizations = (data ?? []) as OrganizationSummary[];
+      const nextOrganization = organizations.find((item) => item.id === activeOrganizationId) ?? organizations[0] ?? null;
       setOrganization(nextOrganization);
       if (!nextOrganization) {
         setMembers([]);
@@ -169,7 +171,7 @@ export function TeamManagement({ currentUserId, currentUserName, currentUserEmai
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, []);
+  }, [activeOrganizationId]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => void loadOrganization(), 0);

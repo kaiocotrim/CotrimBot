@@ -841,7 +841,7 @@ export async function markMessagesAsRead(
 ) {
   const contactId = Number(req.params.id);
 
-  await prisma.message.updateMany({
+  const updated = await prisma.message.updateMany({
     where: {
       contactId,
       direction: "INCOMING",
@@ -852,6 +852,8 @@ export async function markMessagesAsRead(
       readAt: new Date(),
     },
   });
+
+  if (updated.count > 0) getSocketServer().emit("conversation_read", { contactId });
 
   return res.status(200).json({
     message: "Mensagens marcadas como lidas",

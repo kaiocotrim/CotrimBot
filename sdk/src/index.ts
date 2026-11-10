@@ -113,6 +113,123 @@ export interface FileUpload {
   caption?: string;
 }
 
+export type OrganizationWebhookEvent =
+  | "internal_conversation.created"
+  | "internal_message.created"
+  | "client.created"
+  | "client.updated"
+  | "client.deleted"
+  | "bot.published"
+  | "bot.activation_changed"
+  | "poll.created"
+  | "poll.vote_changed"
+  | "poll.closed";
+
+export interface OrganizationWebhookCatalogEntry {
+  key: OrganizationWebhookEvent;
+  group: string;
+  label: string;
+  description: string;
+}
+
+export interface OrganizationWebhook {
+  id: string;
+  name: string;
+  url: string;
+  events: OrganizationWebhookEvent[];
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrganizationWebhookCreateResult {
+  webhook: OrganizationWebhook;
+  // Exibido somente na criacao e na rotacao do segredo.
+  secret: string;
+}
+
+export interface OrganizationWebhookDelivery {
+  id: string;
+  event: OrganizationWebhookEvent;
+  status: "SUCCEEDED" | "FAILED";
+  attempts: number;
+  responseStatus: number | null;
+  error: string | null;
+  createdAt: string;
+}
+
+export interface OrganizationWebhookInput {
+  name: string;
+  url: string;
+  events: OrganizationWebhookEvent[];
+  active?: boolean;
+}
+
+export type OrganizationWebhookUpdateInput = Partial<OrganizationWebhookInput>;
+
+export interface OrganizationWebhookPollVote {
+  voterId: string;
+  voterName: string | null;
+  optionIndexes: number[];
+  updatedAt: string;
+  voterAliases?: string[];
+}
+
+// Formato de data de cada evento, conforme enviado em `data`.
+export interface OrganizationWebhookDataMap {
+  "internal_conversation.created": {
+    conversationId: string;
+    type: "DIRECT" | "GROUP";
+    name: string | null;
+    participantIds: string[];
+  };
+  "internal_message.created": {
+    conversationId: string;
+    message: {
+      id: number;
+      senderId: string;
+      type: "TEXT" | "FILE";
+      content: string;
+      replyToMessageId: number | null;
+      createdAt: string;
+    };
+  };
+  "client.created": { clientId: string; name: string };
+  "client.updated": { clientId: string; name: string };
+  "client.deleted": { clientId: string };
+  "bot.published": { botId: string; name: string; publishedRevision: number | null };
+  "bot.activation_changed": { botId: string; name: string; active: boolean };
+  "poll.created": {
+    messageId: number;
+    contactId: number;
+    question: string;
+    options: string[];
+    selectableCount: number;
+  };
+  // Somente os votos alterados nesta atualizacao.
+  "poll.vote_changed": {
+    messageId: number;
+    contactId: number;
+    question: string;
+    votes: OrganizationWebhookPollVote[];
+  };
+  "poll.closed": {
+    messageId: number;
+    contactId: number;
+    question: string;
+    closedAt: string;
+  };
+}
+
+// Corpo HTTP enviado por POST ao endpoint do webhook (JSON).
+export interface OrganizationWebhookPayload<E extends OrganizationWebhookEvent = OrganizationWebhookEvent> {
+  id: string;
+  event: E;
+  organizationId: string;
+  createdAt: string;
+  data: OrganizationWebhookDataMap[E];
+}
+
 function encode(value: string | number): string {
   return encodeURIComponent(String(value));
 }
@@ -201,6 +318,7 @@ export class CotrimBotClient {
       poll: (messageId) => this.request(`/messages/${encode(messageId)}/poll`),
       pollVoterAvatar: (messageId, voterId) => this.request(withQuery(`/messages/${encode(messageId)}/poll/voter-avatar`, { voterId })),
       voteOnPoll: (messageId, optionIndexes) => this.json(`/messages/${encode(messageId)}/poll/vote`, "PUT", { optionIndexes }),
+      closePoll: (messageId) => this.json(`/messages/${encode(messageId)}/poll/close`, "POST", {}),
       closeWithBot: (contactId) => this.json(`/contacts/${encode(contactId)}/close-with-bot`, "POST", {}),
       markRead: (contactId) => this.json(`/contacts/${encode(contactId)}/messages/read`, "PATCH"),
       media: (messageId, query) => this.blob(withQuery(`/messages/${encode(messageId)}/media`, {
@@ -350,6 +468,16 @@ export class CotrimBotClient {
       delete: (id) => this.json(`/clients/${encode(id)}`, "DELETE"),
     };
 
+    this.webhooks = {
+      events: () => this.request("/organization-webhooks/events"),
+      list: (organizationId) => this.webhookJson(organizationId, "", "GET"),
+      create: (organizationId, input) => this.webhookJson(organizationId, "", "POST", input),
+      update: (organizationId, id, input) => this.webhookJson(organizationId, `/${encode(id)}`, "PATCH", input),
+      rotateSecret: (organizationId, id) => this.webhookJson(organizationId, `/${encode(id)}/rotate-secret`, "POST"),
+      delete: (organizationId, id) => this.webhookJson(organizationId, `/${encode(id)}`, "DELETE"),
+      deliveries: (organizationId, id) => this.webhookJson(organizationId, `/${encode(id)}/deliveries`, "GET"),
+    };
+
   }
 
   readonly auth: {
@@ -387,6 +515,7 @@ export class CotrimBotClient {
     poll(messageId: number): Promise<unknown>;
     pollVoterAvatar(messageId: number, voterId: string): Promise<unknown>;
     voteOnPoll(messageId: number, optionIndexes: number[]): Promise<unknown>;
+    closePoll(messageId: number): Promise<unknown>;
     closeWithBot(contactId: number): Promise<unknown>;
     markRead(contactId: number): Promise<unknown>;
     media(messageId: number, query?: { download?: boolean }): Promise<Blob>;
@@ -489,6 +618,15 @@ export class CotrimBotClient {
     update(id: string, input: ClientProfileInput): Promise<{ client: ClientProfile }>;
     delete(id: string): Promise<void>;
   };
+  readonly webhooks: {
+    events(): Promise<{ events: OrganizationWebhookCatalogEntry[] }>;
+    list(organizationId: string): Promise<{ webhooks: OrganizationWebhook[] }>;
+    create(organizationId: string, input: OrganizationWebhookInput): Promise<OrganizationWebhookCreateResult>;
+    update(organizationId: string, id: string, input: OrganizationWebhookUpdateInput): Promise<{ webhook: OrganizationWebhook }>;
+    rotateSecret(organizationId: string, id: string): Promise<OrganizationWebhookCreateResult>;
+    delete(organizationId: string, id: string): Promise<void>;
+    deliveries(organizationId: string, id: string): Promise<{ deliveries: OrganizationWebhookDelivery[] }>;
+  };
 
   request<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
     return this.perform<T>(path, init, "json");
@@ -513,6 +651,16 @@ export class CotrimBotClient {
       headers,
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     }, "json", { skipAutoAuth });
+  }
+
+  private webhookJson<T = unknown>(organizationId: string, suffix: string, method: string, body?: unknown): Promise<T> {
+    const headers = new Headers({ "X-Organization-Id": organizationId });
+    if (body !== undefined) headers.set("Content-Type", "application/json");
+    return this.perform<T>(`/organization-webhooks${suffix}`, {
+      method,
+      headers,
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    }, "json");
   }
 
   private upload<T = unknown>(path: string, body: FormData): Promise<T> {
