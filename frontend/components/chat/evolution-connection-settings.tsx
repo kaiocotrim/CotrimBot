@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, LogOut, RefreshCw, Smartphone } from "@/components/icons/animated-lucide";
+import { CheckCircle2, LogOut, RefreshCw, Smartphone } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 

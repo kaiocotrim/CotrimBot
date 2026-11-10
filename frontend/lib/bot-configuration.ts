@@ -25,6 +25,8 @@ function copyFlow(flow: BotFlow): BotFlow {
   return {
     rootMenuId: flow.rootMenuId, invalidMessage: flow.invalidMessage, backLabel: flow.backLabel,
     ...(flow.assignedUserId !== undefined ? { assignedUserId: flow.assignedUserId } : {}),
+    ...(flow.sacLookup ? { sacLookup: { ...(flow.sacLookup.fallbackUserId !== undefined ? { fallbackUserId: flow.sacLookup.fallbackUserId } : {}),
+      technicians: flow.sacLookup.technicians.map(technician => ({ name: technician.name, userId: technician.userId, available: technician.available })) } } : {}),
     menus: flow.menus.map(menu => ({
       id: menu.id, name: menu.name, text: menu.text,
       ...(menu.imageId ? { imageId: menu.imageId } : {}),
@@ -132,6 +134,10 @@ export async function importBotConfiguration(configuration: BotConfiguration, me
     for (const option of menu.options) if (option.imageId) option.imageId = uploaded.get(option.imageId)!;
   }
   if (flow.assignedUserId && !members.some(member => member.userId === flow.assignedUserId)) flow.assignedUserId = "";
+  if (flow.sacLookup) {
+    if (flow.sacLookup.fallbackUserId && !members.some(member => member.userId === flow.sacLookup!.fallbackUserId)) flow.sacLookup.fallbackUserId = '';
+    flow.sacLookup.technicians = flow.sacLookup.technicians.filter(technician => members.some(member => member.userId === technician.userId));
+  }
   validateFlow(flow);
   return flow;
 }

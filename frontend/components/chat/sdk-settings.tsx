@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { Copy, Eye, EyeOff, KeyRound, Loader2, Play, Trash2 } from "@/components/icons/animated-lucide";
+import { Copy, Eye, EyeOff, KeyRound, Loader2, Play, Trash2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import shared from "./account-settings.module.css";
 import styles from "./sdk-settings.module.css";

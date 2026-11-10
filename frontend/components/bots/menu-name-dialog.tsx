@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { ListTree, X } from "@/components/icons/animated-lucide";
+import { ListTree, X } from "lucide-react";
 import styles from "./bot-designer.module.css";
 
 export function MenuNameDialog({ initialName, creating, onClose, onConfirm }: {

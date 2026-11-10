@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: ["typing.spec.ts", "responsive.spec.ts", "clients.spec.ts", "bots.spec.ts", "announcements.spec.ts", "sdk-settings.spec.ts", "desktop-download.spec.ts", "animated-icons.spec.ts", "bot-configuration.spec.ts"],
+  testMatch: ["typing.spec.ts", "responsive.spec.ts", "clients.spec.ts", "bots.spec.ts", "announcements.spec.ts", "sdk-settings.spec.ts", "desktop-download.spec.ts", "bot-configuration.spec.ts"],
   workers: 1,
   timeout: 30_000,
   reporter: [["line"], ["html", { open: "never" }]],

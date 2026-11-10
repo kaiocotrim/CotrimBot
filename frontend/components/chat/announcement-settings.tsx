@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Combobox } from "@base-ui/react/combobox";
 import { AnimatePresence, MotionConfig, motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronDown, Loader2, Megaphone, RefreshCw, Search, Send, Users } from "@/components/icons/animated-lucide";
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronDown, Loader2, Megaphone, RefreshCw, Search, Send, Users } from "lucide-react";
 import styles from "./announcement-settings.module.css";
 
 const MotionCompanyPopup = motion.create(Combobox.Popup);

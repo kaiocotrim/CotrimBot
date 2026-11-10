@@ -1,9 +1,8 @@
-"use client";
+﻿"use client";
 
-import { AnimatedSvg } from "@/components/icons/animated-svg";
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from "framer-motion";
 import Image from "next/image";
-import { Pencil, MessageCircle, LockKeyhole, Plus, Sticker, Smile, Mic, Send, Maximize2, Minimize2, Sparkles } from "@/components/icons/animated-lucide";
+import { Pencil } from "lucide-react";
 import { ImageEditorDialog, canEditImage } from "@/components/chat/image-editor-dialog";
 import { useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type Ref } from "react";
 import { createPortal } from "react-dom";
@@ -105,15 +104,22 @@ function replyPreview(message: Pick<Message, "type" | "content" | "direction" | 
   </>;
 }
 
-// Os controles usam os mesmos ícones animados das demais telas.
-const composerIcons = {
-  message: MessageCircle, lock: LockKeyhole, plus: Plus, sticker: Sticker,
-  smile: Smile, mic: Mic, send: Send, expand: Maximize2, collapse: Minimize2, sparkles: Sparkles,
-} as const;
-
+// Os controles compartilham tamanho e espessura de traço.
 function ComposerIcon({ name }: { name: ComposerIconName }) {
-  const Icon = composerIcons[name];
-  return <Icon className="size-5" strokeWidth={1.8} aria-hidden="true" />;
+  return (
+    <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {name === "message" && <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z" />}
+      {name === "lock" && <><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></>}
+      {name === "plus" && <path d="M12 5v14M5 12h14" />}
+      {name === "sticker" && <><path d="M9 3h6a6 6 0 0 1 6 6v5l-7 7H9a6 6 0 0 1-6-6V9a6 6 0 0 1 6-6ZM14 21v-4a3 3 0 0 1 3-3h4" /><path d="M8 9h.01M15 9h.01M8 13a4 4 0 0 0 5 2" /></>}
+      {name === "smile" && <><circle cx="12" cy="12" r="9" /><path d="M8 14a4.5 4.5 0 0 0 8 0M8.5 8.5h.01M15.5 8.5h.01" /></>}
+      {name === "mic" && <><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8" /></>}
+      {name === "send" && <><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></>}
+      {name === "expand" && <path d="M8 3H3v5m13 13h5v-5M3 3l6 6m12 12-6-6" />}
+      {name === "collapse" && <path d="M3 8h5V3m13 13h-5v5M8 8 3 3m13 13 5 5" />}
+      {name === "sparkles" && <><path d="m12 3 1.35 3.65L17 8l-3.65 1.35L12 13l-1.35-3.65L7 8l3.65-1.35L12 3Z" /><path d="m18.5 13 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z" /><path d="m5 14 .65 1.35L7 16l-1.35.65L5 18l-.65-1.35L3 16l1.35-.65L5 14Z" /></>}
+    </svg>
+  );
 }
 
 // Oculta a barra lateral, mantendo a rolagem por mouse, toque e teclado.
@@ -856,7 +862,7 @@ export function MessageComposer({
                   title="Cancelar resposta"
                   className="flex size-7 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white/50"
                 >
-                  <AnimatedSvg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></AnimatedSvg>
+                  <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
                 </button>
               </motion.div>
             )}
@@ -910,7 +916,7 @@ export function MessageComposer({
                       ) : (
                         <div className="flex size-full min-h-0 flex-col items-center justify-center gap-2 px-3 pt-3 text-center">
                           <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/[0.065] text-zinc-100">
-                            <AnimatedSvg className="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" /><path d="M14 2v6h6M8 13h8M8 17h6" /></AnimatedSvg>
+                            <svg className="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" /><path d="M14 2v6h6M8 13h8M8 17h6" /></svg>
                           </span>
                           <span className="w-full min-w-0">
                             <span className="block truncate text-[11px] font-medium text-zinc-200">{attachment.file.name}</span>
@@ -925,7 +931,7 @@ export function MessageComposer({
                         title="Remover arquivo"
                         className="absolute top-2 right-2 z-10 flex size-7 items-center justify-center rounded-full border border-white/15 bg-zinc-950/80 text-zinc-300 shadow-lg backdrop-blur-xl transition-colors hover:bg-red-500/25 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
                       >
-                        <AnimatedSvg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></AnimatedSvg>
+                        <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
                       </button>
                     </motion.div>
                     ))}
@@ -1008,7 +1014,7 @@ export function MessageComposer({
                   className={`absolute top-2.5 right-2.5 left-2.5 z-10 flex h-[66px] items-center gap-3 rounded-[18px] border px-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_5px_18px_rgba(0,0,0,0.2)] ${isPrivateMode ? "border-zinc-200 bg-zinc-100" : "border-white/15 bg-zinc-900/95"}`}
                 >
                   <span className={`flex size-7 shrink-0 items-center justify-center rounded-full border-2 ${isPrivateMode ? "border-zinc-400 text-zinc-600" : "border-zinc-300 text-zinc-300"}`} aria-hidden="true">
-                    <AnimatedSvg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3h6l4 4v14H8z" /><path d="M14 3v5h4" /></AnimatedSvg>
+                    <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3h6l4 4v14H8z" /><path d="M14 3v5h4" /></svg>
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className={`block truncate text-sm font-medium ${isPrivateMode ? "text-zinc-900" : "text-zinc-100"}`}>{longTextPreview(text)}</span>
@@ -1419,10 +1425,10 @@ export function MessageComposer({
                 <span aria-hidden="true" className="absolute top-0 left-[12%] h-40 w-2/3 rounded-full bg-white/[0.055] blur-3xl" />
                 <span aria-hidden="true" className="absolute right-[8%] bottom-[4%] size-64 rounded-full bg-emerald-400/[0.07] blur-3xl" />
                 <span className="relative mb-6 flex size-20 items-center justify-center rounded-[26px] border border-white/20 bg-gradient-to-br from-white/[0.2] via-white/[0.07] to-transparent text-emerald-50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),inset_0_-1px_1px_rgba(0,0,0,0.16),0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-2xl">
-                  <AnimatedSvg className="size-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg className="size-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" />
                     <path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
-                  </AnimatedSvg>
+                  </svg>
                 </span>
                 <span className="relative text-[clamp(1.5rem,3vw,2.25rem)] font-semibold tracking-[-0.035em] text-white">Arraste os arquivos aqui</span>
                 <span className="relative mt-2 max-w-md text-sm text-zinc-300 sm:text-base">Solte para preparar os anexos antes de enviar</span>

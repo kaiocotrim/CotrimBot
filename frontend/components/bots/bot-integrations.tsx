@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Save, Eye, PlugZap, BookOpen, ArrowRight, Braces, Check, Copy, LoaderCircle, FlaskConical } from "@/components/icons/animated-lucide";
+import { Save, Eye, PlugZap, BookOpen, ArrowRight, Braces, Check, Copy, LoaderCircle, FlaskConical } from 'lucide-react';
 import { defaultSacIntegrations, previewBotRoute, validateBotIntegrations, type BotIntegrations, type BotIntegrationRoute } from '../../../backend/src/services/bot-integrations';
 import { BotSelect } from './bot-select';
 import styles from './bot-integrations.module.css';

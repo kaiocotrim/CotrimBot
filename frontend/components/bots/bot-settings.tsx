@@ -2,10 +2,11 @@
 
 import { useId, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { BookOpen, ChevronDown, LoaderCircle, Power, Save, Settings2 } from "@/components/icons/animated-lucide";
+import { BookOpen, ChevronDown, LoaderCircle, Power, Save, Settings2 } from "lucide-react";
 import type { BotFlow, BotMember } from "@/lib/bot-api";
 import { BotSelect } from "./bot-select";
 import styles from "./bot-settings.module.css";
+import { BotSacLookupSettings } from './bot-sac-lookup-settings';
 
 const guide = [
   { title: "O que cada campo faz?", text: "O nome identifica seu bot na Central. A resposta para opção inválida orienta quem envia uma escolha não reconhecida. O texto do comando 0 é o rótulo de retorno exibido junto às opções do menu." },
@@ -49,6 +50,8 @@ export function BotSettingsPanel({ name, flow, members, dirty, busy, canActivate
           ...members.map(member => ({ value: member.userId, label: member.name })),
         ]} onChange={assignedUserId => onChange({ ...flow, assignedUserId })} />
         <p className={styles.hint}>Salve e publique para aplicar a atribuição.</p>
+        <div className={styles.divider} />
+        <BotSacLookupSettings flow={flow} members={members} onChange={onChange} />
         <div className={styles.divider} />
         <label htmlFor={`${id}-invalid`}>Resposta para opção inválida</label>
         <p className={styles.hint} id={`${id}-invalid-help`}>Oriente o cliente quando a escolha não existir no menu.</p>

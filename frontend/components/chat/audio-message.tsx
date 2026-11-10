@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatedSvg } from "@/components/icons/animated-svg";
 import { useRef, useState, type ChangeEvent } from "react";
 
 import { transcribeMessage } from "@/lib/chat-api";
@@ -144,13 +143,13 @@ export function AudioMessage({ mediaUrl, messageId, onTranscribe, variant = "voi
             `}
           >
             {isPlaying ? (
-              <AnimatedSvg viewBox="0 0 24 24" fill="currentColor" className="size-4" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="size-4" aria-hidden="true">
                 <path d="M7 5.75A1.25 1.25 0 0 1 8.25 4.5h1A1.25 1.25 0 0 1 10.5 5.75v12.5a1.25 1.25 0 0 1-1.25 1.25h-1A1.25 1.25 0 0 1 7 18.25V5.75Zm6.5 0a1.25 1.25 0 0 1 1.25-1.25h1A1.25 1.25 0 0 1 17 5.75v12.5a1.25 1.25 0 0 1-1.25 1.25h-1a1.25 1.25 0 0 1-1.25-1.25V5.75Z" />
-              </AnimatedSvg>
+              </svg>
             ) : (
-              <AnimatedSvg viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 size-4" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 size-4" aria-hidden="true">
                 <path d="M8.5 5.8a1 1 0 0 1 1.53-.85l9.1 6.2a1 1 0 0 1 0 1.7l-9.1 6.2a1 1 0 0 1-1.53-.85V5.8Z" />
-              </AnimatedSvg>
+              </svg>
             )}
           </button>
 
@@ -205,9 +204,9 @@ export function AudioMessage({ mediaUrl, messageId, onTranscribe, variant = "voi
           </div>
           {isFile && (
             <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.04] text-zinc-400" aria-hidden="true">
-              <AnimatedSvg className="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 14v-3a8 8 0 0 1 16 0v3M6 13H4a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1ZM18 13h2a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1Z" />
-              </AnimatedSvg>
+              </svg>
             </div>
           )}
         </div>
@@ -240,13 +239,13 @@ export function AudioMessage({ mediaUrl, messageId, onTranscribe, variant = "voi
                 </>
               ) : (
                 <>
-                  <AnimatedSvg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="size-4" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="size-4" aria-hidden="true">
                     <path d="M12 3v18" />
                     <path d="M8 8v8" />
                     <path d="M4 10v4" />
                     <path d="M16 6v12" />
                     <path d="M20 9v6" />
-                  </AnimatedSvg>
+                  </svg>
                   Transcrever áudio
                 </>
               )}
@@ -266,7 +265,7 @@ export function AudioMessage({ mediaUrl, messageId, onTranscribe, variant = "voi
               "
             >
               Transcrição
-              <AnimatedSvg
+              <svg
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -278,7 +277,7 @@ export function AudioMessage({ mediaUrl, messageId, onTranscribe, variant = "voi
                 aria-hidden="true"
               >
                 <path d="m6 9 6 6 6-6" />
-              </AnimatedSvg>
+              </svg>
             </button>
           )}
 

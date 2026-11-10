@@ -1,7 +1,7 @@
 "use client";
 
 import { Popover } from "@base-ui/react/popover";
-import { CalendarDays, ChevronLeft, ChevronRight } from "@/components/icons/animated-lucide";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 const weekdays = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];

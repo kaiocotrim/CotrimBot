@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, AtSign, Bell, CheckCheck, MessageSquare, Search, Trash2, UserRoundPlus } from "@/components/icons/animated-lucide";
+import { ArrowLeft, AtSign, Bell, CheckCheck, MessageSquare, Search, Trash2, UserRoundPlus } from "lucide-react";
 import type { AppNotification } from "@/lib/notification-api";
 
 type NotificationFilter = "all" | "unread" | "mentions";

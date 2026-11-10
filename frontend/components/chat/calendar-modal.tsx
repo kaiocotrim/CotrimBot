@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { CalendarPlus2, Check, ChevronLeft, ChevronRight, MessageSquareText, Plus, Trash2, X } from "@/components/icons/animated-lucide";
+import { CalendarPlus2, Check, ChevronLeft, ChevronRight, MessageSquareText, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CalendarEventForm, type CalendarEvent, type CalendarEventCategory } from "@/components/chat/calendar-event-form";

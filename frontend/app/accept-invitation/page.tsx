@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { Check, LoaderCircle, Mail } from "@/components/icons/animated-lucide";
+import { Check, LoaderCircle, Mail } from "lucide-react";
 import { authClient, useSession } from "@/lib/auth-client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";

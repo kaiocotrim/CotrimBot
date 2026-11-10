@@ -2,7 +2,7 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import { useRef, useState } from "react";
-import { ArrowUp, Download, LoaderCircle, X } from "@/components/icons/animated-lucide";
+import { ArrowUp, Download, LoaderCircle, X } from "lucide-react";
 import type { BotFlow, BotMember } from "@/lib/bot-api";
 import { BOT_CONFIGURATION_MAX_BYTES, botConfigurationFilename, exportBotConfiguration, importBotConfiguration, parseBotConfiguration, type BotConfiguration } from "@/lib/bot-configuration";
 import buttons from "./bot-designer.module.css";

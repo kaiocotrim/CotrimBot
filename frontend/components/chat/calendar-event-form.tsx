@@ -1,7 +1,7 @@
 "use client";
 
 import { Select } from "@base-ui/react/select";
-import { Check, ChevronDown } from "@/components/icons/animated-lucide";
+import { Check, ChevronDown } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { CalendarDatePicker } from "@/components/chat/calendar-date-picker";
 import { CalendarTimePicker } from "@/components/chat/calendar-time-picker";

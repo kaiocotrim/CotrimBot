@@ -2,15 +2,15 @@
 
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { GitBranch, ImagePlus, ListTree, Maximize2, MessageSquare, Minus, Plus, SquareCheck, UserRound, Workflow, X, Unplug, Move, Play } from "@/components/icons/animated-lucide";
+import { GitBranch, ImagePlus, ListTree, Maximize2, MessageSquare, Minus, Plus, SquareCheck, UserRound, Workflow, X, Unplug, Move, Play } from 'lucide-react';
 import type { BotFlow, BotOption } from '@/lib/bot-api';
 import { graphNodes, menuGraphId, type GraphNode, type GraphPoint } from '@/lib/bot-graph';
 import { BotSelect } from "./bot-select";
 import styles from './bot-designer.module.css';
 
-const colors = { menu: '#22d3ee', MESSAGE: '#60a5fa', SUBMENU: '#a78bfa', HUMAN: '#fbbf24', CLOSE: '#fb7185', IMAGE: '#60a5fa', SAC_TICKET: '#2dd4bf', SAC_TEST: '#2dd4bf' };
-const names = { MESSAGE: 'Mensagem', SUBMENU: 'Ir para menu', HUMAN: 'Atendimento humano', CLOSE: 'Encerrar', IMAGE: 'Enviar imagem', SAC_TICKET: 'Abrir chamado no SAC', SAC_TEST: 'Coleta de chamado' };
-const icons = { MESSAGE: MessageSquare, SUBMENU: GitBranch, HUMAN: UserRound, CLOSE: SquareCheck, IMAGE: ImagePlus, SAC_TICKET: Workflow, SAC_TEST: Workflow };
+const colors = { menu: '#22d3ee', MESSAGE: '#60a5fa', SUBMENU: '#a78bfa', HUMAN: '#fbbf24', CLOSE: '#fb7185', IMAGE: '#60a5fa', SAC_TICKET: '#2dd4bf', SAC_TEST: '#2dd4bf', SAC_LOOKUP: '#2dd4bf' };
+const names = { MESSAGE: 'Mensagem', SUBMENU: 'Ir para menu', HUMAN: 'Atendimento humano', CLOSE: 'Encerrar', IMAGE: 'Enviar imagem', SAC_TICKET: 'Abrir chamado no SAC', SAC_TEST: 'Coleta de chamado', SAC_LOOKUP: 'Consultar chamado' };
+const icons = { MESSAGE: MessageSquare, SUBMENU: GitBranch, HUMAN: UserRound, CLOSE: SquareCheck, IMAGE: ImagePlus, SAC_TICKET: Workflow, SAC_TEST: Workflow, SAC_LOOKUP: Workflow };
 const W = 160, H = 112;
 const curve = (a: GraphPoint, b: GraphPoint) => `M ${a.x} ${a.y} C ${a.x + Math.max(70, Math.abs(b.x - a.x) / 2)} ${a.y}, ${b.x - Math.max(70, Math.abs(b.x - a.x) / 2)} ${b.y}, ${b.x} ${b.y}`;
 
@@ -88,7 +88,7 @@ export function BotGraphCanvas({ flow, dirty, disabled, selectedMenuId, selected
       <BotSelect compact label="Modo de visualização" value="overview" options={[{ value: "menu", label: "Padrão" }, { value: "overview", label: "Modo 2 · n8n" }]} onChange={value => { if (value === "menu") onMenuView(); }} />
       {!expanded ? <button ref={expandButton} className={styles.toolButton} onClick={() => setExpanded(true)}><Maximize2 size={13} /> Tela cheia</button> : <><button className={styles.toolButton} onClick={() => setEditor(!editor)}>{editor ? 'Ocultar edição' : 'Editar nó'}</button><button className={styles.toolButton} aria-label="Fechar visão geral" onClick={() => { setExpanded(false); setEditor(false); }}><X size={14} /></button></>}
     </div></div>
-    <div ref={viewport} tabIndex={-1} data-graph-viewport className={`${styles.canvasViewport} ${styles.graphViewport}`} onDragOver={event => { if (event.dataTransfer.types.includes('application/cotrimbot-action')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }} onDrop={event => { event.preventDefault(); const action = event.dataTransfer.getData('application/cotrimbot-action'); if (!['MESSAGE', 'SUBMENU', 'HUMAN', 'IMAGE', 'CLOSE', 'SAC_TEST', 'SAC_TICKET'].includes(action)) return; const point = world(event.clientX, event.clientY); onAdd(action as BotOption['action'], { x: Math.max(20, Math.min(10000, point.x)), y: Math.max(20, Math.min(10000, point.y)) }); }} onPointerMove={move} onPointerUp={release} onPointerCancel={() => { drag.current = null; setConnection(null); }} onKeyDown={event => { if (event.key === 'Escape') { if (connection) event.preventDefault(); event.stopPropagation(); setConnection(null); setEdge(null); } }} onPointerDown={event => {
+    <div ref={viewport} tabIndex={-1} data-graph-viewport className={`${styles.canvasViewport} ${styles.graphViewport}`} onDragOver={event => { if (event.dataTransfer.types.includes('application/cotrimbot-action')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }} onDrop={event => { event.preventDefault(); const action = event.dataTransfer.getData('application/cotrimbot-action'); if (!['MESSAGE', 'SUBMENU', 'HUMAN', 'IMAGE', 'CLOSE', 'SAC_TEST', 'SAC_TICKET', 'SAC_LOOKUP'].includes(action)) return; const point = world(event.clientX, event.clientY); onAdd(action as BotOption['action'], { x: Math.max(20, Math.min(10000, point.x)), y: Math.max(20, Math.min(10000, point.y)) }); }} onPointerMove={move} onPointerUp={release} onPointerCancel={() => { drag.current = null; setConnection(null); }} onKeyDown={event => { if (event.key === 'Escape') { if (connection) event.preventDefault(); event.stopPropagation(); setConnection(null); setEdge(null); } }} onPointerDown={event => {
       if (event.button !== 0 || (event.target as HTMLElement).closest('[data-graph-node],button,path')) return;
       setEdge(null); setConnection(null); drag.current = { kind: 'pan', client: { x: event.clientX, y: event.clientY }, origin: offset }; event.currentTarget.setPointerCapture(event.pointerId);
     }}>

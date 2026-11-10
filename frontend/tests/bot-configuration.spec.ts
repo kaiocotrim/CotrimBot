@@ -32,6 +32,17 @@ test("arquivo preserva fluxo e integrações e remove metadados externos", () =>
   expect(result.draft.integrations?.tokenEnv).toBe("SAC_API_TOKEN");
 });
 
+test('arquivo preserva consulta SAC e fila sem atribuição, sem importar campos extras de técnicos', () => {
+  const original = configuration();
+  original.draft.sacLookup = { fallbackUserId: '', technicians: [{ name: 'Tecnico SAC', userId: 'tech-local', available: true }] };
+  original.draft.menus[1].options.push({ id: 'lookup', number: '2', label: 'Consultar chamado', action: 'SAC_LOOKUP', active: true, response: '', targetMenuId: '' });
+  const imported = JSON.parse(JSON.stringify(original));
+  imported.draft.sacLookup.technicians[0].secret = 'must-not-transfer';
+  const parsed = parseBotConfiguration(JSON.stringify(imported));
+  expect(parsed).toEqual(original);
+  expect(parsed.draft.sacLookup?.fallbackUserId).toBe('');
+});
+
 test("importação rejeita versão incompatível, vínculos quebrados e imagens ausentes ou adulteradas", () => {
   const original = configuration();
   expect(() => parseBotConfiguration("{" )).toThrow("JSON válido");

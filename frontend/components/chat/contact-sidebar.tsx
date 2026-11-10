@@ -1,14 +1,8 @@
 "use client";
 
-import { AnimatedSvg } from "@/components/icons/animated-svg";
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from "react";
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from "framer-motion";
-import { Archive, ArchiveRestore, ArrowLeft, Building2, Camera, ChevronDown, Copy, MessageCircle, Mic, Pin, PinOff, Phone, Search, Sticker, UserRound, UserRoundPlus, Video, X } from "@/components/icons/animated-lucide";
-import { AnimatedIconButton } from "@/components/icons/animated-icon-button";
-import { BellIcon } from "@/components/icons/lucide-animated/bell";
-import { PanelLeftCloseIcon } from "@/components/icons/lucide-animated/panel-left-close";
-import { PanelLeftOpenIcon } from "@/components/icons/lucide-animated/panel-left-open";
-import { PlusIcon } from "@/components/icons/lucide-animated/plus";
+import { Archive, ArchiveRestore, ArrowLeft, Bell, Building2, Camera, ChevronDown, Copy, MessageCircle, Mic, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Phone, Search, Sticker, UserRound, UserRoundPlus, Video, X } from "lucide-react";
 import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/min";
 import Image from "next/image";
 import { Avatar } from "@/components/chat/avatar";
@@ -1093,8 +1087,7 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
       >
         {collapsed && (
           <div className="flex justify-center pt-4">
-            <AnimatedIconButton
-              icon={PanelLeftOpenIcon}
+            <button
               ref={collapsedButtonRef}
               type="button"
               onClick={toggleCollapsed}
@@ -1102,7 +1095,9 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
               aria-expanded={false}
               title="Expandir menu (Ctrl+B)"
               className="flex size-10 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-white/50"
-            />
+            >
+              <PanelLeftOpen aria-hidden="true" className="size-5" strokeWidth={1.8} />
+            </button>
           </div>
         )}
         <header ref={headerRef} hidden={collapsed} className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-2 sm:px-5 lg:px-4 lg:pt-4">
@@ -1113,33 +1108,32 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
             </h1>
             <div className="flex shrink-0 items-center gap-1.5">
               <span className="hidden lg:contents">{headerActions}</span>
-              <AnimatedIconButton
-                icon={BellIcon}
+              <motion.button
                 type="button"
                 aria-label={notificationUnreadCount > 0 ? `Notificações, ${notificationUnreadCount} não lidas` : "Notificações"}
                 onClick={() => navigateFromRail("notifications")}
                 whileTap={reduceMotion ? undefined : { scale: 0.9 }}
                 className="relative flex size-11 items-center justify-center rounded-full bg-white/[0.06] text-zinc-200 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/50 lg:hidden"
               >
+                <Bell aria-hidden="true" className="size-5" strokeWidth={1.8} />
                 {notificationUnreadCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 flex min-w-4 items-center justify-center rounded-full bg-zinc-200 px-1 text-[10px] font-semibold leading-4 text-zinc-950">
                     {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
                   </span>
                 )}
-              </AnimatedIconButton>
-              <AnimatedIconButton
-                icon={PlusIcon}
-                iconSize={18}
-                iconStrokeWidth={2.2}
+              </motion.button>
+              <motion.button
                 type="button"
                 aria-label="Nova conversa"
                 onClick={openSavedContacts}
                 whileTap={reduceMotion ? undefined : { scale: 0.9 }}
                 className="flex size-11 items-center justify-center rounded-full bg-zinc-200 text-zinc-950 transition-colors hover:text-white lg:size-8 lg:bg-zinc-950 lg:text-zinc-400 lg:hover:text-white"
-              />
-              <AnimatedIconButton
-                icon={PanelLeftCloseIcon}
-                iconSize={18}
+              >
+                <svg className="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </motion.button>
+              <button
                 ref={expandedButtonRef}
                 type="button"
                 onClick={toggleCollapsed}
@@ -1147,14 +1141,16 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
                 aria-expanded={true}
                 title="Recolher menu (Ctrl+B)"
                 className="hidden size-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-white/50 lg:flex"
-              />
+              >
+                <PanelLeftClose aria-hidden="true" className="size-[18px]" strokeWidth={1.8} />
+              </button>
             </div>
           </div>
 
           <label className="mt-3 flex h-11 items-center gap-2 rounded-full lg:h-9 border border-white/10 bg-gradient-to-b from-white/[0.075] via-white/[0.035] to-white/[0.015] px-3 text-zinc-500 shadow-[inset_0_1px_1px_rgba(255,255,255,0.16),inset_0_-1px_1px_rgba(0,0,0,0.2),0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow,color] focus-within:border-white/20 focus-within:bg-zinc-900/65 focus-within:text-zinc-300 focus-within:ring-2 focus-within:ring-white/[0.05]">
-            <AnimatedSvg className="size-[15px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+            <svg className="size-[15px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
               <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
-            </AnimatedSvg>
+            </svg>
             <input
               type="search"
               value={query}
@@ -1206,14 +1202,14 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
             aria-pressed={showArchived}
             className={`mt-1.5 flex h-11 w-full items-center lg:h-8 gap-2.5 rounded-[10px] px-2 text-left text-sm lg:text-[13px] transition-colors hover:bg-white/[0.04] hover:text-zinc-200 ${showArchived ? "bg-white/[0.06] text-zinc-100" : "text-zinc-400"}`}
           >
-            <AnimatedSvg className="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg className="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M4 7h16v13H4zM3 4h18v3H3z" /><path d="M10 12h4" />
-            </AnimatedSvg>
+            </svg>
             <span className="flex-1">Arquivadas</span>
             <span className="text-[11px] tabular-nums text-zinc-500">{archivedCount}</span>
-            <AnimatedSvg className={`size-3.5 text-zinc-600 transition-transform ${showArchived ? "rotate-90" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg className={`size-3.5 text-zinc-600 transition-transform ${showArchived ? "rotate-90" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="m9 6 6 6-6 6" />
-            </AnimatedSvg>
+            </svg>
           </button>}
         </header>
 
@@ -1450,9 +1446,9 @@ export function ContactSidebar({ newContactFormRef, userId, contacts, drafts = {
             {!loading && !error && visibleContacts.length === 0 && (
               <p title={emptyMessage} className={`py-10 text-center text-[13px] text-zinc-500 ${collapsed ? "flex justify-center" : "px-4"}`}>
                 {collapsed && (
-                  <AnimatedSvg aria-hidden="true" className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <svg aria-hidden="true" className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z" />
-                  </AnimatedSvg>
+                  </svg>
                 )}
                 <span className={collapsed ? "sr-only" : undefined}>{emptyMessage}</span>
               </p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft } from "@/components/icons/animated-lucide";
+import { ArrowLeft } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";

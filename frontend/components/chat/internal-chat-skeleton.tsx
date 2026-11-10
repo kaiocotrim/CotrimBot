@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
-import { ArrowLeft, MessagesSquare, Search } from "@/components/icons/animated-lucide";
+import { ArrowLeft, MessagesSquare, Search } from "lucide-react";
 import type { ReactNode } from "react";
 
 function Skeleton({ className }: { className: string }) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { Popover } from "@base-ui/react/popover";
-import { Clock3 } from "@/components/icons/animated-lucide";
+import { Clock3 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 const itemHeight = 40;

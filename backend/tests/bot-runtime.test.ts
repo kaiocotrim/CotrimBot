@@ -21,11 +21,16 @@ function harness() {
     tickets: new Map<number, any>(), submissions: new Map<number, any>(), failTicketSave: false, publishedRevision: 1 };
   const db: any = {
     $queryRaw: async () => [],
-    contactAssignment: { deleteMany: async ({ where }: any) => { state.contact.assignments = state.contact.assignments.filter((assignment: any) => assignment.userId !== where.userId); return { count: 1 }; } },
+    contactAssignment: {
+      deleteMany: async ({ where }: any) => { state.contact.assignments = where.userId ? state.contact.assignments.filter((assignment: any) => assignment.userId !== where.userId) : []; return { count: 1 }; },
+      create: async ({ data }: any) => { state.contact.assignments.push(data); return data; },
+    },
     contact: { findUniqueOrThrow: async ({ where }: any) => where.id === 1 ? state.contact : state.contacts.get(where.id) },
-    message: { findUnique: async () => state.message, upsert: async ({ create }: any) => { state.outgoing.push(create); return { id: 100, ...create }; } },
+    message: { findUnique: async () => state.message, upsert: async ({ create }: any) => { state.outgoing.push(create); return { id: 100, ...create }; },
+      create: async ({ data }: any) => { state.outgoing.push(data); return { id: 101, ...data }; } },
     messageMedia: { upsert: async ({ create }: any) => { state.cachedMedia.push(create); } },
-    member: { findMany: async () => state.members },
+    member: { findMany: async () => state.members,
+      findFirst: async ({ where }: any) => state.members.find(m => m.userId === where.userId && m.organizationId === where.organizationId) ?? null },
     bot: { findFirst: async ({ where }: any) => (where.OR ? where.OR.some((filter: any) => filter.organizationId === "company-a" && filter.published.equals === flow.assignedUserId) : where.organizationId === "company-a") ? { id: "bot-a", organizationId: "company-a", published: flow, publishedRevision: state.publishedRevision } : null },
     sacTestCompany: { findMany: async () => { if (state.failCatalog) throw new Error("catalog unavailable"); return structuredClone(SAC_TEST_CATALOG); } },
     botSacSubmission: {
@@ -70,6 +75,45 @@ function harness() {
 }
 
 process.env.EVOLUTION_INSTANCE = "test-instance";
+
+test('SAC lookup assigns an eligible technician or clears assignments for the unassigned queue, with one private note', async () => {
+  const originalFetch = globalThis.fetch;
+  const savedUrl = process.env.SAC_BASE_URL; const savedToken = process.env.SAC_API_TOKEN;
+  process.env.SAC_BASE_URL = 'https://sac.example.com'; process.env.SAC_API_TOKEN = 'test-token';
+  let requests = 0;
+  globalThis.fetch = async (url, options) => {
+    assert.ok(!options?.method || options.method === 'GET'); requests++;
+    return new Response(JSON.stringify(String(url).includes('check-tenant')
+      ? [{ valido: true, IdTenant: 'tenant-a' }]
+      : [{ IdChamado: 19335, Tecnico: 'Tecnico A', FoneContato: '11999999999', StatusChamado: 'Aberto', NrSerie: 'SERIE-TESTE' }]));
+  };
+  try {
+    for (const mode of ['available', 'unavailable', 'foreign'] as const) {
+      const { state, process, flow } = harness();
+      flow.menus[0]!.options[0]!.action = 'SAC_LOOKUP';
+      flow.sacLookup = { fallbackUserId: '', technicians: [{ name: 'Tecnico A', userId: 'tech-a', available: mode !== 'unavailable' }] };
+      state.members.push({ userId: 'tech-a', organizationId: mode === 'foreign' ? 'other-org' : 'company-a', displayName: 'Tecnico A', user: { name: 'Tecnico A' } });
+      for (const [index, content] of ['Oi', '1', '19335', '05540238000123'].entries()) {
+        state.message = { ...state.message, id: index + 1, content }; await process(index + 1, 'test-instance');
+      }
+      assert.equal(state.session.state.sacLookup.step, 'transfer');
+      assert.equal(state.contactEvents.length, 0);
+      state.message = { ...state.message, id: 5, content: '1' };
+      await process(5, 'test-instance');
+      assert.equal(state.session.status, 'WAITING_HUMAN');
+      assert.deepEqual(state.contact.assignments.map((a: any) => a.userId), mode === 'available' ? ['tech-a'] : []);
+      const notes = state.outgoing.filter(m => m.private);
+      assert.equal(notes.length, 1); assert.match(notes[0].content, /19335/);
+      assert.ok(state.sent.every(text => !text.includes('Consulta SAC:')));
+      const count = requests; await process(5, 'test-instance');
+      assert.equal(requests, count); assert.equal(state.outgoing.filter(m => m.private).length, 1);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (savedUrl === undefined) delete process.env.SAC_BASE_URL; else process.env.SAC_BASE_URL = savedUrl;
+    if (savedToken === undefined) delete process.env.SAC_API_TOKEN; else process.env.SAC_API_TOKEN = savedToken;
+  }
+});
 
 test('SAC SDK GET resolves CNPJ in the real runtime, preserves progress on failure and skips GET on cancellation', async () => {
   const previousEnv = { SAC_BASE_URL: process.env.SAC_BASE_URL, SAC_API_TOKEN: process.env.SAC_API_TOKEN };

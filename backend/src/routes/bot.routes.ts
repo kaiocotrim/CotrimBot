@@ -9,8 +9,9 @@ import multer from "multer";
 import { BOT_IMAGE_MAX_BYTES, botImageIds, botImageMime } from "../services/bot-image.js";
 import { findSacCompany, loadSacCompanyAddresses, loadSacMachines, sacConfigured } from '../services/bot-sac.service.js';
 import { validSacTestCnpj, validSacTestPhone, validSacTestEmail } from '../services/bot-sac-test-validation.js';
+import { advanceSacLookup, findSacTicket } from '../services/bot-sac-lookup.js';
 
-export function createBotRouter(database = prisma, sac: { enabled: typeof sacConfigured; findCompany: typeof findSacCompany; loadAddresses: typeof loadSacCompanyAddresses; loadMachines?: typeof loadSacMachines } = { enabled: sacConfigured, findCompany: findSacCompany, loadAddresses: loadSacCompanyAddresses, loadMachines: loadSacMachines }) {
+export function createBotRouter(database = prisma, sac: { enabled: typeof sacConfigured; findCompany: typeof findSacCompany; loadAddresses: typeof loadSacCompanyAddresses; loadMachines?: typeof loadSacMachines; findTicket?: typeof findSacTicket } = { enabled: sacConfigured, findCompany: findSacCompany, loadAddresses: loadSacCompanyAddresses, loadMachines: loadSacMachines, findTicket: findSacTicket }) {
 const prisma = database;
 const botRouter = Router();
 const json = (value: unknown) => value as Prisma.InputJsonValue;
@@ -22,9 +23,13 @@ async function validateImages(flow: Parameters<typeof botImageIds>[0], organizat
   const images = await prisma.botImage.findMany({ where: { id: { in: ids }, organizationId }, select: { id: true } });
   if (images.length !== ids.length) throw new Error("Uma imagem não foi encontrada nesta empresa. Envie a foto novamente.");
 }
-async function validateAssignedMember(flow: { assignedUserId?: string }, organizationId: string) {
+async function validateAssignedMember(flow: { assignedUserId?: string; sacLookup?: import('../services/bot-sac-lookup.js').SacLookupRouting }, organizationId: string) {
   if (flow.assignedUserId && !await prisma.member.findUnique({ where: { organizationId_userId: { organizationId, userId: flow.assignedUserId } }, select: { id: true } })) {
     throw new Error("O membro selecionado não pertence a esta empresa.");
+  }
+  const ids = [...new Set([flow.sacLookup?.fallbackUserId, ...(flow.sacLookup?.technicians.map(t => t.userId) ?? [])].filter((id): id is string => !!id))];
+  for (const userId of ids) {
+    if (!await prisma.member.findUnique({ where: { organizationId_userId: { organizationId, userId } }, select: { id: true } })) throw new Error('O destino da consulta SAC não pertence a esta empresa.');
   }
 }
 async function resolveBotOrganization(request: Request, botId: string) {
@@ -177,7 +182,7 @@ botRouter.post("/bots/simulate", async (req, res) => {
     const machines = new Map<string, Awaited<ReturnType<typeof loadSacMachines>>>();
     for (const input of ["", ...inputs]) {
       if (state && state.status !== "BOT_ACTIVE") break;
-      const selectedOption = state && !state.sacTest && input.trim() !== "0" ? testFlow.menus.find((menu: { id: string }) => menu.id === state!.menuId)?.options.find((option: { active: boolean; number: string }) => option.active && option.number === input.trim()) : undefined;
+      const selectedOption = state && !state.sacTest && !state.sacLookup && input.trim() !== "0" ? testFlow.menus.find((menu: { id: string }) => menu.id === state!.menuId)?.options.find((option: { active: boolean; number: string }) => option.active && option.number === input.trim()) : undefined;
       if (state) messages.push({ role: "user", text: input });
       let catalog = SAC_TEST_CATALOG;
       let lookupFailed = false;
@@ -208,7 +213,7 @@ botRouter.post("/bots/simulate", async (req, res) => {
           lookupFailed = true;
         }
       }
-      const result: BotReply = lookupFailed
+      const result: BotReply = state?.sacLookup ? await advanceSacLookup(req.body.flow, state, input, { findTicket: sac.findTicket ?? findSacTicket }) : lookupFailed
         ? { state: state!, text: '⚠️ Não foi possível consultar o SAC. Seus dados foram mantidos. Envie sua resposta novamente ou digite 0 para cancelar.' }
         : advanceBot(state ? req.body.flow : testFlow, state, input, { catalog });
       // Reexecutar o histórico do simulador nunca grava nem envia mensagens reais.
@@ -223,7 +228,7 @@ botRouter.post("/bots/simulate", async (req, res) => {
       if (result.text || result.imageId) messages.push({ role: "bot", text: result.text, menuId: state.menuId, ...(selectedOption ? { optionId: selectedOption.id } : {}), ...(result.imageId ? { imageId: result.imageId } : {}) });
     }
     const ticket = state?.sacTest;
-    const quickReplies = ticket ? ['confirmCnpj', 'review'].includes(ticket.step) ? ['1', '2', '0']
+    const quickReplies = state?.sacLookup ? ['transfer', 'notFound'].includes(state.sacLookup.step) ? ['1', '2', '0'] : ['0'] : ticket ? ['confirmCnpj', 'review'].includes(ticket.step) ? ['1', '2', '0']
       : ticket.step === 'equipment' ? [...((ticket.catalog ?? SAC_TEST_CATALOG).find(company => company.id === ticket.data.companyId)?.equipment.slice((ticket.equipmentPage ?? 0) * 10, ((ticket.equipmentPage ?? 0) + 1) * 10).map((_, i) => String((ticket.equipmentPage ?? 0) * 10 + i + 1)) ?? []), ...((ticket.equipmentPage ?? 0) > 0 ? ['anterior'] : []), ...(((ticket.equipmentPage ?? 0) + 1) * 10 < ((ticket.catalog ?? SAC_TEST_CATALOG).find(company => company.id === ticket.data.companyId)?.equipment.length ?? 0) ? ['mais'] : []), '0']
       : ticket.step === 'address' ? [...((ticket.catalog ?? SAC_TEST_CATALOG).find(company => company.id === ticket.data.companyId)?.addresses.filter(item => item.address.split(',').some(part => part.trim())).map((_, i) => String(i + 1)) ?? []), '0'] : ['0']
       : [...(req.body.flow.menus.find((menu: { id: string }) => menu.id === state?.menuId)?.options.filter((option: { active: boolean }) => option.active).map((option: { number: string }) => option.number) ?? []), '0'];

@@ -1,4 +1,3 @@
-import { AnimatedSvg } from "@/components/icons/animated-svg";
 import { MessageText } from "@/components/chat/message-text";
 import { splitMessageSignatures } from "@/lib/message-signature";
 
@@ -21,10 +20,10 @@ export function DocumentMessage({ mediaUrl, content, showSignature, fileName: ex
   return (
     <div className="flex min-w-[min(280px,62vw)] max-w-[min(420px,72vw)] items-center gap-3 rounded-xl bg-black/20 p-3">
       <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/10 text-white/85">
-        <AnimatedSvg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
           <path d="M14 2v6h6M8 13h8M8 17h6" />
-        </AnimatedSvg>
+        </svg>
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold" title={explicitFileName ? fileName : signedDocument ? "Documento" : fileName}>
@@ -48,9 +47,9 @@ export function DocumentMessage({ mediaUrl, content, showSignature, fileName: ex
         title="Baixar arquivo"
         className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/[0.08] text-white/85 shadow-sm transition-[background-color,color,transform] hover:scale-105 hover:bg-white/[0.14] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 active:scale-95 motion-reduce:transition-none"
       >
-        <AnimatedSvg className="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg className="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M12 3v12m-4-4 4 4 4-4M5 20h14" />
-        </AnimatedSvg>
+        </svg>
       </a>
     </div>
   );

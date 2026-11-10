@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { CheckCheck, File, X } from "@/components/icons/animated-lucide";
+import { CheckCheck, File, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Avatar } from "@/components/chat/avatar";

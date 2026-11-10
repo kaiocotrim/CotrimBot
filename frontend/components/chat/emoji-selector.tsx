@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatedSvg } from "@/components/icons/animated-svg";
 import dynamic from "next/dynamic";
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
@@ -210,11 +209,11 @@ export function EmojiSelector({ id, open, isPrivateMode, triggerRef, onClose, on
           <div className="flex items-center justify-center px-4 pb-3 pt-2">
             <div className={`flex h-9 overflow-hidden rounded-full border ${isPrivateMode ? "border-zinc-200 bg-zinc-100" : "border-white/10 bg-black/15"}`} aria-label="Tipos de conteúdo">
               <button type="button" onClick={() => setTab("emoji")} aria-pressed={activeTab === "emoji"} className={`flex w-16 items-center justify-center ${activeTab === "emoji" ? isPrivateMode ? "bg-zinc-200 text-zinc-700" : "bg-white/5 text-emerald-400" : "text-zinc-500"}`} aria-label="Emojis">
-                <AnimatedSvg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 3 4 3 4-3 4-3M8.5 8.5h.01M15.5 8.5h.01" /></AnimatedSvg>
+                <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 3 4 3 4-3 4-3M8.5 8.5h.01M15.5 8.5h.01" /></svg>
               </button>
               <button type="button" onClick={() => setTab("gif")} disabled={isPrivateMode} aria-label="GIFs" aria-pressed={activeTab === "gif"} title={isPrivateMode ? "GIFs estão disponíveis nas mensagens públicas" : "Pesquisar GIFs"} className={`w-16 border-l text-xs font-semibold ${isPrivateMode ? "border-zinc-200 text-zinc-400" : activeTab === "gif" ? "border-white/10 bg-white/5 text-emerald-400" : "border-white/10 text-zinc-500"}`}>GIF</button>
               <button type="button" disabled title="Figurinhas em breve" aria-label="Figurinhas em breve" className={`flex w-16 items-center justify-center border-l ${isPrivateMode ? "border-zinc-200 text-zinc-400" : "border-white/10 text-zinc-600"}`}>
-                <AnimatedSvg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 21H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8l-6 6Z" /><path d="M15 21v-4a2 2 0 0 1 2-2h4" /></AnimatedSvg>
+                <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 21H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8l-6 6Z" /><path d="M15 21v-4a2 2 0 0 1 2-2h4" /></svg>
               </button>
             </div>
           </div>

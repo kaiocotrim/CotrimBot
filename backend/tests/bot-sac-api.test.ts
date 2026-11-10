@@ -4,6 +4,35 @@ import express from 'express';
 import { createBotRouter } from '../src/routes/bot.routes.js';
 import type { prisma } from '../src/lib/prisma.js';
 import { fixture } from './bot-fixture.js';
+import type { Ticket } from '../src/lib/sac/index.js';
+
+test('lookup simulator replays consent without database writes, assignments or private ticket disclosure', async () => {
+  let reads = 0;
+  const app = express(); app.use(express.json());
+  app.use(createBotRouter({} as typeof prisma, {
+    enabled: () => true, findCompany: async () => [], loadAddresses: async () => [],
+    findTicket: async (cnpj, protocol) => {
+      assert.equal(cnpj, '05540238000123'); assert.equal(protocol, '19335'); reads++;
+      return { IdChamado: 19335, Tecnico: 'Tecnico A', NrSerie: 'PRIVATE-SERIAL', FoneContato: '11999999999' } as Ticket;
+    },
+  }));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  const address = server.address(); assert.ok(address && typeof address !== 'string');
+  try {
+    const flow = fixture(); flow.menus[0]!.options[0]!.action = 'SAC_LOOKUP';
+    flow.sacLookup = { fallbackUserId: '', technicians: [] };
+    const response = await fetch(`http://127.0.0.1:${address.port}/bots/simulate`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ flow, inputs: ['1', '19335', '05540238000123', '1'] }),
+    });
+    assert.equal(response.status, 200);
+    const result = await response.json() as any;
+    assert.equal(reads, 2); assert.equal(result.state.status, 'WAITING_HUMAN');
+    assert.equal(result.state.sacLookup, undefined); assert.doesNotMatch(JSON.stringify(result), /PRIVATE-SERIAL/);
+    assert.match(result.messages.at(-1).text, /fila de suporte/);
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
+});
 
 test('simulador executa chamado sem gravar; listagem exige administrador e isola empresa', async () => {
   let reads = 0;

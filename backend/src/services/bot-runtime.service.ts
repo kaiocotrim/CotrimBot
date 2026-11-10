@@ -9,6 +9,7 @@ import { isInforbotName } from "./bot.service.js";
 import { findSacCompany, loadSacCompanyAddresses, loadSacMachines, sacConfigured } from './bot-sac.service.js';
 import { validSacTestCnpj, validSacTestPhone, validSacTestEmail } from './bot-sac-test-validation.js';
 import { submitSacTicket } from './bot-sac-submission.js';
+import { advanceSacLookup } from './bot-sac-lookup.js';
 
 export async function lockBotContact(tx: Prisma.TransactionClient, contactId: number) {
   await tx.$queryRaw`SELECT id FROM Contact WHERE id = ${contactId} FOR UPDATE`;
@@ -58,14 +59,14 @@ return async function processBotMessage(messageId: number, instance: unknown) {
       const previous = savedSession && ((savedSession.botId && savedSession.botId !== bot.id) || (assignment && assignment.assignedAt > savedSession.updatedAt)) ? null : savedSession;
       if (previous && ["WAITING_HUMAN", "HUMAN_ACTIVE", "CLOSED"].includes(previous.status)) return;
       // Any incoming message can start service; menu choices require text.
-      if (previous && input.type !== "TEXT" && !(previous.state as unknown as BotState)?.sacTest) return;
-      let state = previous?.botId === bot.id && (previous.revision === bot.publishedRevision || (previous.state as unknown as BotState)?.sacTest)
+      if (previous && input.type !== "TEXT" && !(previous.state as unknown as BotState)?.sacTest && !(previous.state as unknown as BotState)?.sacLookup) return;
+      let state = previous?.botId === bot.id && (previous.revision === bot.publishedRevision || (previous.state as unknown as BotState)?.sacTest || (previous.state as unknown as BotState)?.sacLookup)
         ? previous.state as unknown as BotState
         : null;
       // Coletas válidas sobrevivem à publicação de revisões; expiram por inatividade.
       const configuredTtl = Number(process.env.SAC_TEST_SESSION_TTL_MINUTES ?? 1440);
       const ttl = Number.isFinite(configuredTtl) && configuredTtl > 0 ? configuredTtl : 1440;
-      const expired = Boolean(state?.sacTest && previous?.updatedAt && Date.now() - previous.updatedAt.getTime() > ttl * 60000);
+      const expired = Boolean((state?.sacTest || state?.sacLookup) && previous?.updatedAt && Date.now() - previous.updatedAt.getTime() > ttl * 60000);
       if (expired) state = null;
       const flow = bot.published as unknown as BotFlow;
       const cancelling = input.type === 'TEXT' && /^(0|cancelar)$/i.test(input.content.trim());
@@ -102,7 +103,17 @@ return async function processBotMessage(messageId: number, instance: unknown) {
           console.error('Falha na consulta do catálogo SAC do bot.');
         }
       }
-      const result: BotReply = catalogFailed
+      const result: BotReply = state?.sacLookup ? await advanceSacLookup(flow, state, input.content, {
+        phone: contact.phone, inputType: input.type,
+        resolveTarget: async userId => {
+          const candidates = [...new Set([userId, flow.sacLookup?.fallbackUserId].filter((id): id is string => !!id && id !== inforbotMember.userId))];
+          for (const id of candidates) {
+            const member = await tx.member.findFirst({ where: { organizationId: bot!.organizationId, userId: id, user: { OR: [{ banned: false }, { banned: null }] } }, select: { userId: true } });
+            if (member) return member.userId;
+          }
+          return undefined;
+        },
+      }) : catalogFailed
         ? { state: state!, text: `⚠️ Não foi possível consultar ${liveSac ? 'o SAC' : 'a base de teste'}. Seus dados foram mantidos. Envie sua resposta novamente ou digite 0 para cancelar.` }
         : advanceBot(flow, state, input.content, { catalog, messageId: String(input.id), inputType: input.type, testMode: (process.env.TICKET_FLOW_TEST_MODE ?? 'true').toLowerCase() === 'true' });
       if (expired) result.text = 'O preenchimento anterior expirou por inatividade. Inicie uma nova abertura pelo menu.\n\n' + result.text;
@@ -156,11 +167,18 @@ return async function processBotMessage(messageId: number, instance: unknown) {
         messages.push(message);
       }
       // Release the bot's assignment so a human can pick the conversation up.
-      const assignments = result.state.status === "WAITING_HUMAN"
+      let assignments = result.state.status === "WAITING_HUMAN"
         ? contact.assignments.filter(assignment => assignment.userId !== inforbotMember.userId)
         : contact.assignments;
       if (result.state.status === "WAITING_HUMAN") {
         await tx.contactAssignment.deleteMany({ where: { contactId: contact.id, userId: inforbotMember.userId } });
+      }
+      if (result.handoff) {
+        // A lookup handoff has one explicit destination, or the unassigned queue.
+        await tx.contactAssignment.deleteMany({ where: { contactId: contact.id } });
+        assignments = result.handoff.userId ? [await tx.contactAssignment.create({ data: { contactId: contact.id, userId: result.handoff.userId } })] : [];
+        messages.push(await tx.message.create({ data: { externalId: `private:bot-lookup:${input.id}`, contactId: contact.id,
+          direction: 'OUTGOING', type: 'TEXT', private: true, content: result.handoff.note } }));
       }
       await tx.botSession.upsert({ where: { instance_contactId: { instance: runtimeInstance, contactId: contact.id } },
         create: { instance: runtimeInstance, contactId: contact.id, botId: bot.id, revision: bot.publishedRevision, state: result.state as unknown as PrismaTypes.InputJsonValue, status: result.state.status },

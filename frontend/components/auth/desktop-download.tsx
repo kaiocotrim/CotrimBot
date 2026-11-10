@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download } from "@/components/icons/animated-lucide";
+import { Download } from "lucide-react";
 import styles from "./login-layout.module.css";
 
 const DOWNLOAD_URL = "https://download1478.mediafire.com/0yxpdfo7iowgUi4BRIe8WVQGyuSbt9jo6Pu4QXjBSCoxxU_94fFdYlNybflcVAfXLirA0alCAITlTo5G8OU5iylPrb5n4A57Uzfih-OMctadVxG4SfPBBxohMYXfA5PsDcm9GEdrOSag3Obhuo_XZ1cNcD29Rlk-OVctKZwdbeHPBPw/00xqgjw0cxjhsc1/CotrimBot-Setup-1.1.0-x64.exe";

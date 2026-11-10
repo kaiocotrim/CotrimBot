@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Images, LoaderCircle } from "@/components/icons/animated-lucide";
+import { ChevronRight, Images, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { LibraryContent, MediaThumbnail } from "@/components/chat/media-library";
 import { getContactMediaSummary, type ContactMediaSummary } from "@/lib/media-library-api";

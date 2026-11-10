@@ -3,7 +3,7 @@
 import { Dialog } from "@base-ui/react/dialog";
 import Image from "next/image";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "framer-motion";
-import { ArrowRight, ChevronRight, ListTree, MessageSquare, X } from "@/components/icons/animated-lucide";
+import { ArrowRight, ChevronRight, ListTree, MessageSquare, X } from "lucide-react";
 import { MessageText } from "@/components/chat/message-text";
 import { botImageUrl, type BotFlow, type BotMenu } from "@/lib/bot-api";
 import styles from "./bot-designer.module.css";
@@ -66,7 +66,7 @@ function MenuDetailsContent({ menu, flow, path, onClose, onEdit, onNavigate }: M
               <h3>Opções deste menu</h3>
               {menu.options.length ? <ul className={styles.menuDialogOptions}>{menu.options.map(option => {
                 const target = option.action === "SUBMENU" ? flow.menus.find(item => item.id === option.targetMenuId) : undefined;
-                const action = option.action === "SAC_TICKET" ? "Abre o chamado no SAC após a confirmação do cliente e retorna o protocolo" : option.action === "SAC_TEST" ? "Coleta dados e salva um chamado de teste no CotrimBot, sem abrir chamado no SAC" : option.action === "SUBMENU" ? target ? `Abre o menu ${target.name}` : "Menu de destino não definido" : option.action === "CLOSE" ? "Encerra o atendimento" : option.action === "HUMAN" ? "Transfere para um atendente" : option.action === "IMAGE" || option.imageId ? "Envia uma imagem e a resposta cadastrada" : "Envia a resposta cadastrada";
+                const action = option.action === "SAC_LOOKUP" ? "Consulta o chamado e oferece encaminhamento para atendimento" : option.action === "SAC_TICKET" ? "Abre o chamado no SAC após a confirmação do cliente e retorna o protocolo" : option.action === "SAC_TEST" ? "Coleta dados e salva um chamado de teste no CotrimBot, sem abrir chamado no SAC" : option.action === "SUBMENU" ? target ? `Abre o menu ${target.name}` : "Menu de destino não definido" : option.action === "CLOSE" ? "Encerra o atendimento" : option.action === "HUMAN" ? "Transfere para um atendente" : option.action === "IMAGE" || option.imageId ? "Envia uma imagem e a resposta cadastrada" : "Envia a resposta cadastrada";
                 return <li key={option.id}>
                   <span className={styles.menuDialogNumber}>{option.number}</span>
                   <div><strong>{option.label || "Opção sem nome"}</strong>{option.description && <p>{option.description}</p>}<p>{action}</p>{!option.active && <span className={styles.menuDialogInactive}>Inativa · não aparece para o cliente</span>}</div>

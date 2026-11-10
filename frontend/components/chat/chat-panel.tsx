@@ -1,9 +1,8 @@
 "use client";
 
-import { AnimatedSvg } from "@/components/icons/animated-svg";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Pin, Search, Send, Star, Trash2, X } from "@/components/icons/animated-lucide";
+import { Pin, Search, Send, Star, Trash2, X } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Avatar } from "@/components/chat/avatar";
 import { ChatHeader, SidebarMenuButton } from "@/components/chat/chat-header";
@@ -578,7 +577,7 @@ export function ChatPanel({
                         return (
                           <button key={target.id} type="button" onClick={() => toggleForwardTarget(target.id)} aria-pressed={selected} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-white/50 ${selected ? "bg-white/[0.09]" : "hover:bg-white/[0.05]"}`}>
                             <span className={`flex size-5 shrink-0 items-center justify-center rounded-[5px] border transition-colors ${selected ? "border-white bg-white text-zinc-950" : "border-zinc-600 bg-transparent text-transparent"}`}>
-                              <AnimatedSvg className="size-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8 3 3 7-7" /></AnimatedSvg>
+                              <svg className="size-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8 3 3 7-7" /></svg>
                             </span>
                             <Avatar contact={target} className="size-11" />
                             <span className="min-w-0 flex-1">

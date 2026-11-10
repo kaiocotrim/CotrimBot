@@ -1,12 +1,13 @@
 import { advanceSacTest, startSacTest, SAC_TEST_CATALOG, type SacTestCatalog, type SacTestState } from './bot-sac-test.js';
 import { validateBotIntegrations, type BotIntegrations } from './bot-integrations.js';
 import { validateBotFlowStructure } from './bot-flow-validation.js';
+import { startSacLookup, type SacLookupRouting, type SacLookupState } from './bot-sac-lookup.js';
 
-export type BotOption = { id: string; number: string; label: string; description?: string; active: boolean; action: "MESSAGE" | "SUBMENU" | "HUMAN" | "IMAGE" | "CLOSE" | "SAC_TEST" | "SAC_TICKET"; response: string; targetMenuId: string; imageId?: string };
+export type BotOption = { id: string; number: string; label: string; description?: string; active: boolean; action: "MESSAGE" | "SUBMENU" | "HUMAN" | "IMAGE" | "CLOSE" | "SAC_TEST" | "SAC_TICKET" | "SAC_LOOKUP"; response: string; targetMenuId: string; imageId?: string };
 export type BotMenu = { id: string; name: string; text: string; options: BotOption[]; imageId?: string };
-export type BotFlow = { rootMenuId: string; invalidMessage: string; backLabel: string; assignedUserId?: string; menus: BotMenu[]; integrations?: BotIntegrations; layout?: Record<string, { x: number; y: number }> };
-export type BotState = { menuId: string; stack: string[]; status: "BOT_ACTIVE" | "WAITING_HUMAN" | "HUMAN_ACTIVE" | "CLOSED"; sacTest?: SacTestState };
-export type BotReply = { state: BotState; text: string; imageId?: string; submitSacTicket?: boolean };
+export type BotFlow = { rootMenuId: string; invalidMessage: string; backLabel: string; assignedUserId?: string; sacLookup?: SacLookupRouting; menus: BotMenu[]; integrations?: BotIntegrations; layout?: Record<string, { x: number; y: number }> };
+export type BotState = { menuId: string; stack: string[]; status: "BOT_ACTIVE" | "WAITING_HUMAN" | "HUMAN_ACTIVE" | "CLOSED"; sacTest?: SacTestState; sacLookup?: SacLookupState };
+export type BotReply = { state: BotState; text: string; imageId?: string; submitSacTicket?: boolean; handoff?: { userId?: string; note: string } };
 
 export { isProvisionalReply } from './bot-flow-validation.js';
 
@@ -36,6 +37,7 @@ function menuReply(flow: BotFlow, state: BotState): BotReply {
 
 export function advanceBot(flow: BotFlow, state: BotState | null, input: string, context: { catalog?: SacTestCatalog; messageId?: string; inputType?: string; testMode?: boolean } = {}): BotReply {
   if (state && state.status !== "BOT_ACTIVE") return { state, text: "" };
+  if (state?.sacLookup) throw new Error('A consulta SAC precisa ser processada pelo serviço de consulta.');
   if (state?.sacTest) {
     const result = advanceSacTest(state, input, context.catalog ?? SAC_TEST_CATALOG, context.inputType);
     // Depois da conclusão/cancelamento, o comando 0 retorna ao menu principal.
@@ -55,6 +57,7 @@ export function advanceBot(flow: BotFlow, state: BotState | null, input: string,
   if (option.action === 'SAC_TEST' && context.testMode === false) return { state, text: 'Abertura de chamados de teste desativada. Retorne ao menu principal com 0.' };
   if (option.action === 'SAC_TEST') return startSacTest(state, context.messageId ?? 'simulation', context.catalog ?? SAC_TEST_CATALOG);
   if (option.action === 'SAC_TICKET') return startSacTest(state, context.messageId ?? 'simulation', context.catalog ?? SAC_TEST_CATALOG, true);
+  if (option.action === 'SAC_LOOKUP') return startSacLookup(state);
   if (option.action === "SUBMENU") {
     // Navigation advances once per client reply, so returning to a menu is safe.
     // Reuse its existing history instead of accumulating loops in the back stack.

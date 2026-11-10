@@ -1,4 +1,4 @@
-import { CheckCheck } from "@/components/icons/animated-lucide";
+import { CheckCheck } from "lucide-react";
 import { isInternalMessageRead } from "@/lib/internal-message-read";
 import type { InternalConversation, InternalMessage } from "@/lib/internal-chat-api";
 

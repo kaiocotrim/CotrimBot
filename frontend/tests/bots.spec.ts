@@ -3,6 +3,40 @@ import type { BotFlow } from "../lib/bot-api";
 import { advanceBot, validateFlow } from "../../backend/src/services/bot-flow";
 import { connectBotOption, graphNodes } from '../lib/bot-graph';
 
+test('consulta SAC salva técnico habilitado e destino Não atribuído nas configurações', async ({ page }, testInfo) => {
+  const flow: BotFlow = { rootMenuId: 'root', invalidMessage: 'Escolha uma opção.', backLabel: 'Voltar', assignedUserId: 'inforbot',
+    sacLookup: { fallbackUserId: '', technicians: [] }, menus: [{ id: 'root', name: 'Principal', text: 'Olá!', options: [
+      { id: 'lookup', number: '1', label: 'Consultar chamado', action: 'SAC_LOOKUP', active: true, response: '', targetMenuId: '' },
+    ] }] };
+  let current = { id: 'lookup-bot', name: 'InforBot', draft: flow, published: structuredClone(flow), revision: 1 };
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.route('**/api/**', async route => {
+    const req = route.request(), path = new URL(req.url()).pathname;
+    if (path.endsWith('/auth/get-session')) return route.fulfill({ json: { user: { id: 'admin', name: 'Admin', email: 'admin@example.invalid' }, session: { id: 's', userId: 'admin', expiresAt: '2099-01-01T00:00:00Z' } } });
+    if (path.endsWith('/bots/lookup-bot') && req.method() === 'PUT') {
+      validateFlow(req.postDataJSON().draft, true);
+      current = { ...current, ...req.postDataJSON(), revision: current.revision + 1 };
+      return route.fulfill({ json: current });
+    }
+    if (path.endsWith('/bots')) return route.fulfill({ json: { bots: [current], activeBotId: null, instanceAvailable: true,
+      members: [{ userId: 'inforbot', name: 'InforBot' }, { userId: 'tech-a', name: 'Técnico A' }] } });
+    return route.fulfill({ json: {} });
+  });
+  await page.goto('/dashboard/bots/');
+  await page.getByRole('tab', { name: 'Configurações', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Destino de apoio da consulta', exact: true })).toHaveAttribute('data-value', '');
+  await page.getByRole('button', { name: 'Adicionar técnico', exact: true }).click();
+  await page.getByLabel('Nome do técnico no SAC', { exact: true }).fill('Tecnico SAC');
+  await page.getByRole('checkbox', { name: 'Receber transferências', exact: true }).check();
+  await page.getByRole('button', { name: /^Salvar rascunho/ }).last().click();
+  await expect.poll(() => current.draft.sacLookup?.technicians).toEqual([{ name: 'Tecnico SAC', userId: 'tech-a', available: true }]);
+  expect(current.draft.sacLookup?.fallbackUserId).toBe('');
+  expect(current.published.sacLookup?.technicians).toEqual([]);
+  await page.getByRole('group', { name: 'Consulta de chamados no SAC', exact: true }).screenshot({ path: testInfo.outputPath('consulta-sac-configuracao.png') });
+  expect(errors).toEqual([]);
+});
+
 async function selectChoice(trigger: Locator, value: string) {
   await trigger.click();
   await trigger.page().getByRole("option").and(trigger.page().locator(`[data-value="${value}"]`)).click();
