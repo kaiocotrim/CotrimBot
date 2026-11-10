@@ -1,4 +1,5 @@
 import type { BotFlow, BotReply, BotState } from './bot-flow.js';
+import { advanceBot } from './bot-flow.js';
 import type { Ticket } from '../lib/sac/index.js';
 import { createSacClient } from './bot-sac.service.js';
 
@@ -7,13 +8,13 @@ export type SacLookupRouting = {
   technicians: { name: string; userId: string; available: boolean }[];
 };
 export type SacLookupState = {
-  step: 'protocol' | 'cnpj' | 'transfer' | 'notFound'; protocol?: string; cnpj?: string;
+  step: 'protocol' | 'cnpj' | 'transfer' | 'notFound' | 'completed'; protocol?: string; cnpj?: string;
 };
 export type SacRoutingMember = { userId: string; displayName?: string | null; user: { name: string; banned?: boolean | null } };
 const normalizeTechnician = (value: string) => value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').toLowerCase();
-const footer = '\n\n0 — Cancelar consulta';
+const footer = '\n\n↩️ *0 — Voltar ao menu principal*';
 export function startSacLookup(state: BotState): BotReply {
-  return { state: { ...state, sacLookup: { step: 'protocol' } }, text: '🔎 *Consultar chamado*\n\nInforme o número do chamado.' + footer };
+  return { state: { ...state, sacLookup: { step: 'protocol' } }, text: '🔎 *InforBot | Consultar Chamado*\n\nVamos verificar o andamento da sua solicitação!\n\n🎫 Por favor, informe o *número do chamado* que deseja consultar.\n\nAssim, poderemos localizar sua solicitação e apresentar as informações disponíveis.' + footer };
 }
 
 /** Search only tenants accessible to the integration. Never use an unfiltered ticket list. */
@@ -100,11 +101,12 @@ export async function advanceSacLookup(flow: BotFlow, state: BotState, input: st
   if (/^(0|cancelar)$/i.test(text)) {
     delete next.sacLookup;
     next.menuId = flow.rootMenuId; next.stack = [];
-    return { state: next, text: 'Consulta cancelada.\n\n0 — Menu principal' };
+    return advanceBot(flow, next, '0');
   }
   // A conversation opened before the protocol-only flow may still be waiting
   // for a CNPJ. Restart that step instead of interpreting a CNPJ as a protocol.
   if (lookup.step === 'cnpj') return startSacLookup(next);
+  if (lookup.step === 'completed') return text === '1' ? startSacLookup(next) : reply('1 — 🔎 Consultar outro chamado');
   if (lookup.step === 'protocol') {
     if (!/^[1-9]\d{0,14}$/.test(text) || !Number.isSafeInteger(Number(text))) return reply('Informe somente um número de chamado válido.');
     lookup.protocol = text;
@@ -129,23 +131,32 @@ export async function advanceSacLookup(flow: BotFlow, state: BotState, input: st
     lookup.step = 'notFound';
     return reply('Não localizei esse chamado na consulta disponível do SAC. Confira o número. Chamados antigos podem precisar de consulta pela equipe.\n\n1 — Pedir ajuda ao suporte\n2 — Consultar outro chamado');
   }
+  const rawName = ticket.Tecnico?.trim() || '';
+  const name = rawName === rawName.toLocaleUpperCase('pt-BR')
+    ? rawName.toLocaleLowerCase('pt-BR').replace(/(^|\s)\p{L}/gu, letter => letter.toLocaleUpperCase('pt-BR')) : rawName;
+  // Also check on transfer confirmation: the technician may have completed the
+  // ticket after the customer read its original status.
+  if (normalizeTechnician(ticket.StatusChamado ?? '') === 'atendido') {
+    lookup.step = 'completed';
+    return { state: next, text: `🎫 *InforBot | Detalhes do Chamado*\n\n📋 *Chamado nº ${ticket.IdChamado}*\n\n✅ *Status:* Atendido\n👨‍💻 *Responsável:* ${name || 'Não informado'}\n\n✅ Este chamado já foi atendido e consta como finalizado em nosso sistema.\n\n*Deseja consultar outro chamado?*\n\n1 — 🔎 Consultar outro chamado\n0 — ↩️ Voltar ao menu principal\n\n*Digite o número da opção desejada.*` };
+  }
   if (lookup.step === 'protocol') {
     lookup.step = 'transfer';
-    const summary = `📋 *Chamado ${ticket.IdChamado}*\n\nStatus: ${ticket.StatusChamado || 'Não informado'}\n${ticket.Tecnico?.trim() ? `Esse chamado está sendo atendido por *${ticket.Tecnico.trim()}*.` : 'Esse chamado ainda não possui responsável atribuído.'}`;
-    return reply(summary + '\n\n1 — Solicitar atendimento\n2 — Consultar outro chamado');
+    const rawStatus = ticket.StatusChamado?.trim() || 'Não informado';
+    const status = normalizeTechnician(rawStatus) === 'aberto' ? '🟢 Aberto' : rawStatus;
+    const summary = `🎫 *InforBot | Detalhes do Chamado*\n\n📋 *Chamado nº ${ticket.IdChamado}*\n\n📌 *Status:* ${status}\n👨‍💻 *Responsável:* ${name || 'Ainda não atribuído'}\n\n${name ? '✅ Seu chamado está registrado em nosso sistema e possui um técnico responsável pelo atendimento.' : '✅ Seu chamado está registrado em nosso sistema e aguarda a atribuição de um técnico responsável.'}\n\n*Como deseja continuar?*\n\n1 — 💬 Solicitar atendimento com o responsável\n2 — 🔎 Consultar outro chamado\n0 — ↩️ Voltar ao menu principal\n\n*Digite o número da opção desejada.*`;
+    return { state: next, text: summary };
   }
   // Re-read the ticket on confirmation: its technician may have changed meanwhile.
   let target = sacTechnicianTarget(flow, ticket.Tecnico);
-  let targetName = ticket.Tecnico?.trim() || 'o responsável pelo chamado';
   if (context.resolveTarget) {
     const resolved = await context.resolveTarget(target, ticket.Tecnico);
     target = typeof resolved === 'object' ? resolved.userId : resolved;
-    if (typeof resolved === 'object') targetName = resolved.name;
   }
   delete next.sacLookup;
   next.status = 'WAITING_HUMAN';
   return { state: next, text: target && target !== flow.sacLookup?.fallbackUserId
-    ? `Sua conversa foi encaminhada para *${targetName}*. Aguarde o atendimento.`
+    ? '✅ *InforBot | Atendimento Solicitado*\n\n👨‍💻 Sua conversa foi encaminhada com sucesso ao *técnico responsável pelo chamado*.\n\n💬 Aguarde um momento. O responsável dará continuidade ao atendimento assim que estiver disponível.'
     : target ? 'Sua conversa foi encaminhada para o suporte.' : 'Sua conversa foi encaminhada para a fila de suporte. Aguarde o atendimento da equipe.',
     handoff: { ...(target ? { userId: target } : {}), note: `Consulta SAC: chamado ${lookup.protocol}. Técnico no SAC: ${ticket.Tecnico || 'Não atribuído'}. ${samePhone(context.phone, ticket.FoneContato) ? 'Telefone coincide com o registrado no chamado.' : 'Contato por outro número: confirmar autorização antes de compartilhar detalhes adicionais.'}` } };
 }

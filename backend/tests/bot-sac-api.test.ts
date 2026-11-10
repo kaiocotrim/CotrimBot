@@ -30,7 +30,7 @@ test('simulator resolves the member configured for Bruno in the authenticated or
     });
     assert.equal(response.status, 200);
     const result = await response.json() as any;
-    assert.match(result.messages.at(-1).text, /encaminhada para \*Bruno\*/);
+    assert.match(result.messages.at(-1).text, /técnico responsável pelo chamado/);
     assert.doesNotMatch(result.messages.at(-1).text, /fila de suporte/);
     assert.equal(result.state.status, 'WAITING_HUMAN'); assert.equal(memberReads, 1);
   } finally { await new Promise<void>(resolve => server.close(() => resolve())); }

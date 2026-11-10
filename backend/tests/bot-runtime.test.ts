@@ -99,7 +99,7 @@ test('SAC lookup assigns an eligible technician or clears assignments for the un
         state.message = { ...state.message, id: index + 1, content }; await process(index + 1, 'test-instance');
       }
       assert.equal(state.session.state.sacLookup.step, 'transfer');
-      assert.match(state.sent.at(-1)!, /Status: Aberto/);
+      assert.match(state.sent.at(-1)!, /Status:\*.*Aberto/);
       assert.match(state.sent.at(-1)!, /Tecnico A/);
       assert.doesNotMatch(state.sent.at(-1)!, /CNPJ|SERIE-TESTE/);
       assert.equal(state.contactEvents.length, 0);
@@ -107,7 +107,7 @@ test('SAC lookup assigns an eligible technician or clears assignments for the un
       await process(4, 'test-instance');
       assert.equal(state.session.status, 'WAITING_HUMAN');
       assert.deepEqual(state.contact.assignments.map((a: any) => a.userId), mode === 'available' ? ['tech-a'] : []);
-      if (mode === 'available') assert.match(state.sent.at(-1)!, /encaminhada para \*Tecnico A\*/);
+      if (mode === 'available') assert.match(state.sent.at(-1)!, /técnico responsável pelo chamado/);
       const notes = state.outgoing.filter(m => m.private);
       assert.equal(notes.length, 1); assert.match(notes[0].content, /19335/);
       assert.ok(state.sent.every(text => !text.includes('Consulta SAC:')));

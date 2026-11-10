@@ -5,6 +5,12 @@ o status e o nome do responsável retornados pelo SAC, seguidos de **1 — Solic
 atendimento**, **2 — Consultar outro chamado** e **0 — Cancelar consulta**.
 O comportamento é o mesmo para o telefone original e para outro número.
 
+Para status **Atendido**, o bot informa que o chamado já foi atendido e está
+finalizado, com somente **1 — Consultar outro chamado** e **0 — Voltar ao menu
+principal**. Não oferece nem executa encaminhamento. Essa condição é conferida
+novamente na confirmação, para evitar transferir um chamado finalizado depois da
+consulta inicial. O status **Em atendimento** continua permitindo encaminhamento.
+
 Como o SDK não oferece uma busca direta documentada por protocolo, o serviço
 consulta `tenants.list()` para identificar as empresas acessíveis ao token.
 Primeiro procura na visão agregada da Infordoc, quando disponível. Se não achar,
@@ -45,7 +51,10 @@ uma escolha presumida.
 `Receber transferências` permite desabilitar um vínculo. A regra não depende de
 a tela estar aberta ou de presença no WhatsApp. O simulador usa o mesmo vínculo
 e valida o membro na organização do usuário autenticado, sem atribuir conversas
-reais. A mensagem de confirmação identifica o técnico configurado como destino.
+reais. A mensagem **InforBot | Atendimento Solicitado** confirma o encaminhamento
+ao técnico responsável, quando esse destino está habilitado. A tecla 0 retorna
+diretamente ao menu principal. O status e o nome do responsável nos detalhes são
+preenchidos com os dados do chamado, sem fixar o protocolo do exemplo.
 
 O destino é novamente validado na organização do bot. Membro removido, banido,
 de outra organização ou o próprio bot não recebe a transferência. Sem destino

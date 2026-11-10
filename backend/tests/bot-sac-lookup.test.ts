@@ -23,8 +23,8 @@ async function entered(phone = '5511999999999') {
 test('protocol alone returns status and responsible person and waits for consent', async () => {
   const { f, result } = await entered(); validateFlow(f, true);
   assert.equal(result.state.sacLookup?.step, 'transfer');
-  assert.match(result.text, /Status: Aberto/); assert.match(result.text, /atendido por \*Jose Tecnico\*/);
-  assert.match(result.text, /1 — Solicitar atendimento/); assert.doesNotMatch(result.text, /CNPJ|SERIE-PRIVADA|Scanner|MOTIVO-PRIVADO/);
+  assert.match(result.text, /Status:\*.*Aberto/); assert.match(result.text, /Responsável:\* Jose Tecnico/);
+  assert.match(result.text, /Solicitar atendimento com o responsável/); assert.doesNotMatch(result.text, /CNPJ|SERIE-PRIVADA|Scanner|MOTIVO-PRIVADO/);
   assert.equal(result.handoff, undefined); assert.equal(result.state.status, 'BOT_ACTIVE');
 });
 test('another number gets the same status and responsible person and its own conversation is handed off', async () => {
@@ -35,6 +35,35 @@ test('another number gets the same status and responsible person and its own con
   assert.equal(confirmed.handoff?.userId, 'tech-a');
   assert.match(confirmed.handoff!.note, /confirmar autorização/);
   assert.equal(confirmed.state.status, 'WAITING_HUMAN');
+});
+
+test('attended ticket shows the requested final message, restarts on 1 and never requests a handoff', async () => {
+  const f = flow();
+  const state = advanceBot(f, advanceBot(f, null, '').state, '1').state;
+  let calls = 0;
+  const find = async () => { calls++; return { ...ticket, IdChamado: 19343, StatusChamado: ' ATENDIDO ', Tecnico: 'KAIO ALAN BARBOSA COTRIM' }; };
+  const result = await advanceSacLookup(f, state, '19343', { findTicket: find });
+  assert.equal(result.state.sacLookup?.step, 'completed');
+  assert.match(result.text, /Chamado nº 19343/); assert.match(result.text, /✅ \*Status:\* Atendido/);
+  assert.match(result.text, /Kaio Alan Barbosa Cotrim/); assert.match(result.text, /já foi atendido e consta como finalizado/);
+  assert.match(result.text, /1 — 🔎 Consultar outro chamado/); assert.doesNotMatch(result.text, /Solicitar atendimento|2 —/);
+  assert.equal(result.handoff, undefined); assert.equal(result.state.status, 'BOT_ACTIVE');
+  const invalid = await advanceSacLookup(f, result.state, '2', { findTicket: find });
+  assert.equal(invalid.state.sacLookup?.step, 'completed'); assert.equal(calls, 1);
+  const restarted = await advanceSacLookup(f, result.state, '1', { findTicket: find });
+  assert.equal(restarted.state.sacLookup?.step, 'protocol'); assert.equal(restarted.handoff, undefined); assert.equal(calls, 1);
+  const main = await advanceSacLookup(f, result.state, '0', { findTicket: find });
+  assert.equal(main.state.sacLookup, undefined); assert.equal(main.state.menuId, f.rootMenuId); assert.equal(calls, 1);
+});
+test('a ticket completed before transfer confirmation cannot be transferred; em atendimento stays open', async () => {
+  const { f, result } = await entered();
+  const completed = await advanceSacLookup(f, result.state, '1', { findTicket: async () => ({ ...ticket, StatusChamado: 'Atendido' }),
+    resolveTarget: async () => { throw new Error('must not resolve a transfer'); } });
+  assert.equal(completed.state.sacLookup?.step, 'completed'); assert.equal(completed.handoff, undefined);
+  assert.equal(completed.state.status, 'BOT_ACTIVE');
+  const state = advanceBot(f, advanceBot(f, null, '').state, '1').state;
+  const active = await advanceSacLookup(f, state, '19335', { findTicket: async () => ({ ...ticket, StatusChamado: 'EM ATENDIMENTO' }) });
+  assert.equal(active.state.sacLookup?.step, 'transfer'); assert.match(active.text, /Solicitar atendimento/);
 });
 test('confirmation refreshes responsible technician; missing/unavailable technician uses unassigned queue', async () => {
   for (const technician of [null, 'Outro técnico']) {
