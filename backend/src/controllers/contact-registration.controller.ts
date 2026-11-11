@@ -1,10 +1,11 @@
 import type { Request, Response } from "express";
-import type { prisma } from "../lib/prisma.js";
 import type { ContactPhoneInspection } from "../services/contact-phone.service.js";
 import { activeBotFlow, assignmentTarget } from "../services/bot-assignment.service.js";
+import { resolveRequestOrganizationId } from "../middlewares/auth.middleware.js";
+import { prisma } from "../lib/prisma.js";
 
 type Dependencies = {
-  database: Pick<typeof prisma, "contact" | "contactAssignment" | "botInstance" | "bot">;
+  database: Pick<typeof prisma, "contact" | "contactAssignment" | "botInstance" | "bot"> & Partial<Pick<typeof prisma, "member">>;
   inspect: (phone: string) => Promise<ContactPhoneInspection>;
   emit: (event: string, data: unknown) => void;
 };
@@ -43,7 +44,10 @@ export function createContactRegistrationHandler({ database, inspect, emit }: De
     const data = { name, companyName: companyName || null, jobTitle: jobTitle || null, isSaved: true };
     try {
       let contact;
-      const flow = await activeBotFlow(database, req.activeOrganizationId);
+      const organizationId = database.member
+        ? await resolveRequestOrganizationId(prisma, req)
+        : req.activeOrganizationId;
+      const flow = await activeBotFlow(database, organizationId);
       const assignedUserId = assignmentTarget(flow, "onContactCreateUserId");
       if (checked.contact) {
         // The extra predicate also protects against another user saving it in the meantime.
