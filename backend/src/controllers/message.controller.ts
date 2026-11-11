@@ -29,6 +29,7 @@ import { getSignedOutgoingText, SignatureMembershipError } from "../services/use
 import { notifyMention } from "../services/notification.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
 import { activeBotFlow, assignmentTarget } from "../services/bot-assignment.service.js";
+import { resolveRequestOrganizationId } from "../middlewares/auth.middleware.js";
 
 const sentByUserInclude = {
   sentByUser: { select: { id: true, name: true, image: true } },
@@ -752,11 +753,12 @@ export async function closeConversationWithBot(req: Request, res: Response) {
   }
 
   try {
-    const flow = await activeBotFlow(prisma, req.activeOrganizationId);
+    const organizationId = await resolveRequestOrganizationId(prisma, req);
+    const flow = await activeBotFlow(prisma, organizationId, contactId);
     const assignedUserId = assignmentTarget(flow, "onCloseUserId");
-    const actorMember = req.activeOrganizationId
+    const actorMember = organizationId
       ? await prisma.member.findFirst({
-          where: { organizationId: req.activeOrganizationId, userId: req.user!.id },
+          where: { organizationId, userId: req.user!.id },
           select: { displayName: true },
         })
       : null;
