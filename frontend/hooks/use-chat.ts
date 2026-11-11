@@ -1114,10 +1114,10 @@ export function useChat() {
       );
 
       setContacts((current) => current.map((item) =>
-        item.id === contact.id ? { ...item, assignedUserIds: [] } : item
+        item.id === contact.id ? { ...item, assignedUserIds: contact.assignedUserIds } : item
       ));
       setSelectedContact((current) =>
-        current?.id === contact.id ? { ...current, assignedUserIds: [] } : current
+        current?.id === contact.id ? { ...current, assignedUserIds: contact.assignedUserIds } : current
       );
 
     } catch (error) {
