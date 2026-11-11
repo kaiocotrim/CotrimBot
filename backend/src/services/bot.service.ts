@@ -1,5 +1,34 @@
+import type { Prisma } from "../../generated/prisma/client.js";
+
 export function isInforbotName(name: string | null | undefined): boolean {
   return name?.trim().toLocaleLowerCase("pt-BR") === "inforbot";
+}
+
+type BotUserDatabase = Pick<Prisma.TransactionClient, "member" | "user">;
+
+export async function findInforbotUserId(
+  database: BotUserDatabase,
+  organizationId?: string | null,
+): Promise<string | undefined> {
+  if (organizationId) {
+    const member = await database.member.findFirst({
+      where: {
+        organizationId,
+        OR: [
+          { displayName: "Inforbot" },
+          { user: { name: "Inforbot" } },
+        ],
+      },
+      select: { userId: true },
+    });
+    return member?.userId;
+  }
+
+  const user = await database.user.findFirst({
+    where: { name: "Inforbot" },
+    select: { id: true },
+  });
+  return user?.id;
 }
 
 const SATISFACTION_SURVEY = `Olá! 😊
