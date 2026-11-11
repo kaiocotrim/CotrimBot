@@ -24,12 +24,13 @@ async function validateImages(flow: Parameters<typeof botImageIds>[0], organizat
   const images = await prisma.botImage.findMany({ where: { id: { in: ids }, organizationId }, select: { id: true } });
   if (images.length !== ids.length) throw new Error("Uma imagem não foi encontrada nesta empresa. Envie a foto novamente.");
 }
-async function validateAssignedMember(flow: { assignedUserId?: string; assignment?: { onContactCreateUserId?: string; onTicketOpenUserId?: string; onCloseUserId?: string }; sacLookup?: import('../services/bot-sac-lookup.js').SacLookupRouting }, organizationId: string) {
+async function validateAssignedMember(flow: { assignedUserId?: string; assignment?: { onContactCreateUserId?: string; onIncomingContactUserId?: string; onTicketOpenUserId?: string; onCloseUserId?: string }; sacLookup?: import('../services/bot-sac-lookup.js').SacLookupRouting }, organizationId: string) {
   if (flow.assignedUserId && !await prisma.member.findUnique({ where: { organizationId_userId: { organizationId, userId: flow.assignedUserId } }, select: { id: true } })) {
     throw new Error("O membro selecionado não pertence a esta empresa.");
   }
   const ids = [...new Set([
     flow.assignment?.onContactCreateUserId,
+    flow.assignment?.onIncomingContactUserId,
     flow.assignment?.onTicketOpenUserId,
     flow.assignment?.onCloseUserId,
     flow.sacLookup?.fallbackUserId,

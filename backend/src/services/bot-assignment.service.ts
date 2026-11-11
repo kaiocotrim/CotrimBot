@@ -32,7 +32,7 @@ export async function activeBotFlow(
   return bot?.published as BotFlow | null ?? null;
 }
 
-export function assignmentTarget(flow: BotFlow | null, key: "onContactCreateUserId" | "onCloseUserId"): string | undefined {
+export function assignmentTarget(flow: BotFlow | null, key: "onContactCreateUserId" | "onIncomingContactUserId" | "onCloseUserId"): string | undefined {
   const hasSpecificTarget = flow?.assignment && Object.prototype.hasOwnProperty.call(flow.assignment, key);
   const value = hasSpecificTarget ? flow.assignment?.[key] : flow?.assignedUserId;
   return typeof value === "string" && value.trim() ? value : undefined;

@@ -21,6 +21,7 @@ import {
 import { isPresenceEvent, parsePresenceUpdate, presenceDebug, presenceIdentifiers } from "../utils/whatsapp-presence.js";
 import { normalizeWhatsAppJid, whatsAppJidIdentifier } from "../utils/whatsapp-jid.js";
 import { parseCsatRating, recordCsatReply } from "../services/csat.service.js";
+import { activeBotFlow, assignmentTarget } from "../services/bot-assignment.service.js";
 import type { Contact } from "../../generated/prisma/client.js";
 
 const CSAT_THANKS_TEXT = "Obrigado pela sua avaliação! 💙";
@@ -573,6 +574,32 @@ export async function whatsappWebhook(req: Request, res: Response) {
     },
   });
 
+  if ((!existingContact || !existingContact.isSaved) && !isGroup && typeof req.body?.instance === "string") {
+    const binding = await prisma.botInstance.findUnique({
+      where: { instance: req.body.instance.trim() },
+      select: { organizationId: true },
+    });
+    const flow = await activeBotFlow(prisma, binding?.organizationId, contact.id);
+    const assignedUserId = assignmentTarget(flow, "onIncomingContactUserId");
+    if (assignedUserId) {
+      await prisma.contactAssignment.upsert({
+        where: { contactId_userId: { contactId: contact.id, userId: assignedUserId } },
+        create: { contactId: contact.id, userId: assignedUserId },
+        update: {},
+      });
+    }
+  }
+
+  const contactAssignments = await prisma.contactAssignment.findMany({
+    where: { contactId: contact.id },
+    select: { userId: true },
+  });
+  const contactForEvents = {
+    ...contact,
+    name: contactDisplayName(contact),
+    assignedUserIds: contactAssignments.map(assignment => assignment.userId),
+  };
+
   await backfillGroupSenderName(contact.id);
 
   const quotedMessage = replyContextInfo && quotedExternalId
@@ -638,7 +665,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
   // Dispara um evento para os navegadores conectados.
   io.emit("new_message", {
     message: incomingMessage,
-    contact: { ...contact, name: contactDisplayName(contact) },
+    contact: contactForEvents,
   });
   const repliedUserId = !fromMe && quotedMessage?.direction === "OUTGOING"
     ? quotedMessage.sentByUserId

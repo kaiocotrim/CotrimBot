@@ -28,6 +28,19 @@ return async function processBotMessage(messageId: number, instance: unknown) {
       await lockBotContact(tx, input.contactId);
       const contact = await tx.contact.findUniqueOrThrow({ where: { id: input.contactId }, include: { assignments: true } });
       if (contact.isGroup || contact.blocked) return;
+      if ("csatSurvey" in tx) {
+        const activeSurvey = await tx.csatSurvey.findFirst({
+          where: {
+            contactId: contact.id,
+            OR: [
+              { status: "PENDING" },
+              { status: "ANSWERED", commentUntil: { gt: new Date() } },
+            ],
+          },
+          select: { id: true },
+        });
+        if (activeSurvey) return;
+      }
       const assignedMembers = contact.assignments.length
         ? await tx.member.findMany({
             where: { userId: { in: contact.assignments.map(assignment => assignment.userId) } },

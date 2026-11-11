@@ -17,6 +17,9 @@ export function BotAssignmentSettings({ flow, members, onChange }: Props) {
     <BotSelect label="Ao criar contato" value={assignment.onContactCreateUserId ?? ""} options={options}
       onChange={value => update("onContactCreateUserId", value)} />
     <p className={styles.hint}>Usado quando um contato é salvo na agenda.</p>
+    <BotSelect label="Ao receber mensagem de contato novo" value={assignment.onIncomingContactUserId ?? ""} options={options}
+      onChange={value => update("onIncomingContactUserId", value)} />
+    <p className={styles.hint}>Usado quando um número ainda não salvo envia a primeira mensagem.</p>
     <BotSelect label="Ao abrir chamado" value={assignment.onTicketOpenUserId ?? ""} options={options}
       onChange={value => update("onTicketOpenUserId", value)} />
     <p className={styles.hint}>O padrão é deixar o chamado na fila sem responsável.</p>
