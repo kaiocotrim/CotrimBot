@@ -125,7 +125,7 @@ return async function processBotMessage(messageId: number, instance: unknown) {
         const submission = await submitSacTicket(database, result.state.sacTest, { botId: bot.id, contactId: contact.id, organizationId: bot.organizationId });
         const { sacTest: completed, ...clean } = result.state;
         result.state = submission.status === 'SUCCEEDED'
-          ? { ...clean, menuId: flow.rootMenuId, stack: [], status: 'BOT_ACTIVE' }
+          ? { ...clean, menuId: flow.rootMenuId, stack: [], status: flow.sacTicketHandoff === "BOT" ? 'BOT_ACTIVE' : 'WAITING_HUMAN' }
           : { ...result.state, status: 'WAITING_HUMAN' };
         result.text = submission.status === 'SUCCEEDED'
           ? `✅ *Chamado aberto no SAC!*\n\nProtocolo: *${submission.protocol}*\n\n0 — Menu principal`

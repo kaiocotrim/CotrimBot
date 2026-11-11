@@ -5,7 +5,7 @@ import { startSacLookup, type SacLookupRouting, type SacLookupState } from './bo
 
 export type BotOption = { id: string; number: string; label: string; description?: string; active: boolean; action: "MESSAGE" | "SUBMENU" | "HUMAN" | "IMAGE" | "CLOSE" | "SAC_TEST" | "SAC_TICKET" | "SAC_LOOKUP"; response: string; targetMenuId: string; imageId?: string };
 export type BotMenu = { id: string; name: string; text: string; options: BotOption[]; imageId?: string };
-export type BotFlow = { rootMenuId: string; invalidMessage: string; backLabel: string; assignedUserId?: string; sacLookup?: SacLookupRouting; menus: BotMenu[]; integrations?: BotIntegrations; layout?: Record<string, { x: number; y: number }> };
+export type BotFlow = { rootMenuId: string; invalidMessage: string; backLabel: string; assignedUserId?: string; sacTicketHandoff?: "UNASSIGNED" | "BOT"; sacLookup?: SacLookupRouting; menus: BotMenu[]; integrations?: BotIntegrations; layout?: Record<string, { x: number; y: number }> };
 export type BotState = { menuId: string; stack: string[]; status: "BOT_ACTIVE" | "WAITING_HUMAN" | "HUMAN_ACTIVE" | "CLOSED"; sacTest?: SacTestState; sacLookup?: SacLookupState };
 export type BotReply = { state: BotState; text: string; imageId?: string; submitSacTicket?: boolean; handoff?: { userId?: string; note: string } };
 

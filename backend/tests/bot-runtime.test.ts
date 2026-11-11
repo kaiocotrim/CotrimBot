@@ -465,6 +465,8 @@ test('real WhatsApp flow posts once after confirmation and recovers its protocol
     assert.equal(state.session.state.sacTest.step, 'review');
     state.failSend = false; state.message.id = 13; await restart()(13, 'test-instance');
     assert.equal(posts, 1); assert.equal(state.session.state.sacTest, undefined);
+    assert.equal(state.session.state.status, 'WAITING_HUMAN');
+    assert.deepEqual(state.contact.assignments, []);
     assert.match(state.sent.at(-1)!, /12345/);
     await process(13, 'test-instance'); assert.equal(posts, 1);
   } finally {
