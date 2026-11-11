@@ -28,6 +28,7 @@ import { readStoredMedia, uploadMediaObject } from "../services/media-storage.se
 import { getSignedOutgoingText, SignatureMembershipError } from "../services/user-signature.service.js";
 import { notifyMention } from "../services/notification.service.js";
 import { contactDisplayName } from "../utils/contact-name.js";
+import { activeBotFlow, assignmentTarget } from "../services/bot-assignment.service.js";
 
 const sentByUserInclude = {
   sentByUser: { select: { id: true, name: true, image: true } },
@@ -751,6 +752,8 @@ export async function closeConversationWithBot(req: Request, res: Response) {
   }
 
   try {
+    const flow = await activeBotFlow(prisma, req.activeOrganizationId);
+    const assignedUserId = assignmentTarget(flow, "onCloseUserId");
     const actorMember = req.activeOrganizationId
       ? await prisma.member.findFirst({
           where: { organizationId: req.activeOrganizationId, userId: req.user!.id },
@@ -786,8 +789,11 @@ export async function closeConversationWithBot(req: Request, res: Response) {
         sentByUserId: req.user!.id,
       });
 
-      // Um chamado encerrado volta para a fila sem responsáveis atribuídos.
+      // O destino do encerramento é definido nas configurações do bot.
       await transaction.contactAssignment.deleteMany({ where: { contactId } });
+      if (assignedUserId) {
+        await transaction.contactAssignment.create({ data: { contactId, userId: assignedUserId } });
+      }
 
       const eventMessage = await transaction.message.create({
         data: {
@@ -813,7 +819,7 @@ export async function closeConversationWithBot(req: Request, res: Response) {
     const updatedContact = {
       ...contact,
       name: contactDisplayName(contact),
-      assignedUserIds: [],
+      assignedUserIds: assignedUserId ? [assignedUserId] : [],
     };
 
     io.emit("new_message", {

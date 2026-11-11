@@ -7,6 +7,7 @@ import type { BotFlow, BotMember } from "@/lib/bot-api";
 import { BotSelect } from "./bot-select";
 import styles from "./bot-settings.module.css";
 import { BotSacLookupSettings } from './bot-sac-lookup-settings';
+import { BotAssignmentSettings } from "./bot-assignment-settings";
 
 const guide = [
   { title: "O que cada campo faz?", text: "O nome identifica seu bot na Central. A resposta para opção inválida orienta quem envia uma escolha não reconhecida. O texto do comando 0 é o rótulo de retorno exibido junto às opções do menu." },
@@ -50,6 +51,8 @@ export function BotSettingsPanel({ name, flow, members, dirty, busy, canActivate
           ...members.map(member => ({ value: member.userId, label: member.name })),
         ]} onChange={assignedUserId => onChange({ ...flow, assignedUserId })} />
         <p className={styles.hint}>Salve e publique para aplicar a atribuição.</p>
+        <div className={styles.divider} />
+        <BotAssignmentSettings flow={flow} members={members} onChange={onChange} />
         <div className={styles.divider} />
         <BotSacLookupSettings flow={flow} members={members} onChange={onChange} />
         <div className={styles.divider} />

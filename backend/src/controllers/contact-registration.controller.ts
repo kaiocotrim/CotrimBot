@@ -1,9 +1,10 @@
 import type { Request, Response } from "express";
 import type { prisma } from "../lib/prisma.js";
 import type { ContactPhoneInspection } from "../services/contact-phone.service.js";
+import { activeBotFlow, assignmentTarget } from "../services/bot-assignment.service.js";
 
 type Dependencies = {
-  database: Pick<typeof prisma, "contact">;
+  database: Pick<typeof prisma, "contact" | "contactAssignment" | "botInstance" | "bot">;
   inspect: (phone: string) => Promise<ContactPhoneInspection>;
   emit: (event: string, data: unknown) => void;
 };
@@ -42,6 +43,8 @@ export function createContactRegistrationHandler({ database, inspect, emit }: De
     const data = { name, companyName: companyName || null, jobTitle: jobTitle || null, isSaved: true };
     try {
       let contact;
+      const flow = await activeBotFlow(database, req.activeOrganizationId);
+      const assignedUserId = assignmentTarget(flow, "onContactCreateUserId");
       if (checked.contact) {
         // The extra predicate also protects against another user saving it in the meantime.
         contact = await database.contact.update({
@@ -51,6 +54,23 @@ export function createContactRegistrationHandler({ database, inspect, emit }: De
       } else {
         contact = await database.contact.create({
           data: { ...data, phone: checked.phone },
+          include: { assignments: { select: { userId: true } } },
+        });
+      }
+      if (assignedUserId) {
+        await database.contactAssignment.upsert({
+          where: { contactId_userId: { contactId: contact.id, userId: assignedUserId } },
+          create: { contactId: contact.id, userId: assignedUserId },
+          update: {},
+        });
+        contact = await database.contact.findUniqueOrThrow({
+          where: { id: contact.id },
+          include: { assignments: { select: { userId: true } } },
+        });
+      } else if (flow?.assignment?.onContactCreateUserId === "") {
+        await database.contactAssignment.deleteMany({ where: { contactId: contact.id } });
+        contact = await database.contact.findUniqueOrThrow({
+          where: { id: contact.id },
           include: { assignments: { select: { userId: true } } },
         });
       }

@@ -9,6 +9,7 @@ export function validateBotFlowStructure(value: unknown, publish = false): asser
   if (!value || typeof value !== "object") fail("Fluxo inválido.");
   const f = value as BotFlow;
   if (f.assignedUserId !== undefined && (typeof f.assignedUserId !== "string" || f.assignedUserId.length > 191)) fail("Membro atribuído inválido.");
+  if (f.assignment !== undefined && (!f.assignment || Object.values(f.assignment).some(value => typeof value !== "string" || value.length > 191))) fail("Configuração de atribuição inválida.");
   if (f.sacTicketHandoff !== undefined && !["UNASSIGNED", "BOT"].includes(f.sacTicketHandoff)) fail("Destino após abertura do chamado inválido.");
   if (f.sacLookup !== undefined) {
     const routing = f.sacLookup;
