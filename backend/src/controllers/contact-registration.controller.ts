@@ -1,10 +1,9 @@
 import type { Request, Response } from "express";
 import type { prisma } from "../lib/prisma.js";
 import type { ContactPhoneInspection } from "../services/contact-phone.service.js";
-import { findInforbotUserId } from "../services/bot.service.js";
 
 type Dependencies = {
-  database: Pick<typeof prisma, "contact"> & Partial<Pick<typeof prisma, "contactAssignment" | "member" | "user">>;
+  database: Pick<typeof prisma, "contact">;
   inspect: (phone: string) => Promise<ContactPhoneInspection>;
   emit: (event: string, data: unknown) => void;
 };
@@ -43,9 +42,6 @@ export function createContactRegistrationHandler({ database, inspect, emit }: De
     const data = { name, companyName: companyName || null, jobTitle: jobTitle || null, isSaved: true };
     try {
       let contact;
-      const botUserId = database.member && database.user
-        ? await findInforbotUserId(database as Pick<typeof prisma, "member" | "user">, req.activeOrganizationId)
-        : undefined;
       if (checked.contact) {
         // The extra predicate also protects against another user saving it in the meantime.
         contact = await database.contact.update({
@@ -55,17 +51,6 @@ export function createContactRegistrationHandler({ database, inspect, emit }: De
       } else {
         contact = await database.contact.create({
           data: { ...data, phone: checked.phone },
-          include: { assignments: { select: { userId: true } } },
-        });
-      }
-      if (botUserId && database.contactAssignment) {
-        await database.contactAssignment.upsert({
-          where: { contactId_userId: { contactId: contact.id, userId: botUserId } },
-          create: { contactId: contact.id, userId: botUserId },
-          update: {},
-        });
-        contact = await database.contact.findUniqueOrThrow({
-          where: { id: contact.id },
           include: { assignments: { select: { userId: true } } },
         });
       }

@@ -22,7 +22,7 @@ import {
   transcribeAudio
 } from "../services/transcription.service.js";
 
-import { findInforbotUserId, getSatisfactionSurvey } from "../services/bot.service.js";
+import { getSatisfactionSurvey } from "../services/bot.service.js";
 import { createCsatSurvey } from "../services/csat.service.js";
 import { readStoredMedia, uploadMediaObject } from "../services/media-storage.service.js";
 import { getSignedOutgoingText, SignatureMembershipError } from "../services/user-signature.service.js";
@@ -751,11 +751,6 @@ export async function closeConversationWithBot(req: Request, res: Response) {
   }
 
   try {
-    const botUserId = await findInforbotUserId(prisma, req.activeOrganizationId);
-    if (!botUserId) {
-      console.error("Não foi possível encerrar o chamado: usuário Inforbot não encontrado.");
-      return res.status(409).json({ message: "Usuário do Bot não configurado" });
-    }
     const actorMember = req.activeOrganizationId
       ? await prisma.member.findFirst({
           where: { organizationId: req.activeOrganizationId, userId: req.user!.id },
@@ -791,9 +786,8 @@ export async function closeConversationWithBot(req: Request, res: Response) {
         sentByUserId: req.user!.id,
       });
 
-      // Um chamado encerrado pelo humano retorna ao atendimento automático.
+      // Um chamado encerrado volta para a fila sem responsáveis atribuídos.
       await transaction.contactAssignment.deleteMany({ where: { contactId } });
-      await transaction.contactAssignment.create({ data: { contactId, userId: botUserId } });
 
       const eventMessage = await transaction.message.create({
         data: {
@@ -819,7 +813,7 @@ export async function closeConversationWithBot(req: Request, res: Response) {
     const updatedContact = {
       ...contact,
       name: contactDisplayName(contact),
-      assignedUserIds: [botUserId],
+      assignedUserIds: [],
     };
 
     io.emit("new_message", {

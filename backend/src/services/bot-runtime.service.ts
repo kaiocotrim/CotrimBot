@@ -167,10 +167,10 @@ return async function processBotMessage(messageId: number, instance: unknown) {
       }
       // Release the bot's assignment so a human can pick the conversation up.
       let assignments = result.state.status === "WAITING_HUMAN"
-        ? []
+        ? contact.assignments.filter(assignment => assignment.userId !== inforbotMember.userId)
         : contact.assignments;
       if (result.state.status === "WAITING_HUMAN") {
-        await tx.contactAssignment.deleteMany({ where: { contactId: contact.id } });
+        await tx.contactAssignment.deleteMany({ where: { contactId: contact.id, userId: inforbotMember.userId } });
       }
       if (result.handoff) {
         // A lookup handoff has one explicit destination, or the unassigned queue.
