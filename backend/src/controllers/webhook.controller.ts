@@ -574,11 +574,17 @@ export async function whatsappWebhook(req: Request, res: Response) {
     },
   });
 
-  if ((!existingContact || !existingContact.isSaved) && !isGroup && typeof req.body?.instance === "string") {
-    const binding = await prisma.botInstance.findUnique({
-      where: { instance: req.body.instance.trim() },
-      select: { organizationId: true },
-    });
+  if ((!existingContact || !existingContact.isSaved) && !isGroup) {
+    const webhookInstance = typeof body.instance === "string" ? body.instance.trim() : "";
+    const binding = webhookInstance
+      ? await prisma.botInstance.findUnique({
+        where: { instance: webhookInstance },
+        select: { organizationId: true },
+      })
+      : await prisma.botInstance.findFirst({
+        where: { activeBotId: { not: null } },
+        select: { organizationId: true },
+      });
     const flow = await activeBotFlow(prisma, binding?.organizationId, contact.id);
     const assignedUserId = assignmentTarget(flow, "onIncomingContactUserId");
     if (assignedUserId) {
@@ -586,6 +592,11 @@ export async function whatsappWebhook(req: Request, res: Response) {
         where: { contactId_userId: { contactId: contact.id, userId: assignedUserId } },
         create: { contactId: contact.id, userId: assignedUserId },
         update: {},
+      });
+      getSocketServer().emit("contact_updated", {
+        ...contact,
+        name: contactDisplayName(contact),
+        assignedUserIds: [assignedUserId],
       });
     }
   }
