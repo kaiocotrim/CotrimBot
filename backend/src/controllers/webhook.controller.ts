@@ -576,15 +576,13 @@ export async function whatsappWebhook(req: Request, res: Response) {
 
   if ((!existingContact || !existingContact.isSaved) && !isGroup) {
     const webhookInstance = typeof body.instance === "string" ? body.instance.trim() : "";
-    const binding = webhookInstance
+    const instance = webhookInstance || process.env.EVOLUTION_INSTANCE?.trim() || "";
+    const binding = instance
       ? await prisma.botInstance.findUnique({
-        where: { instance: webhookInstance },
+        where: { instance },
         select: { organizationId: true },
       })
-      : await prisma.botInstance.findFirst({
-        where: { activeBotId: { not: null } },
-        select: { organizationId: true },
-      });
+      : null;
     const flow = await activeBotFlow(prisma, binding?.organizationId, contact.id);
     const assignedUserId = assignmentTarget(flow, "onIncomingContactUserId");
     if (assignedUserId) {
