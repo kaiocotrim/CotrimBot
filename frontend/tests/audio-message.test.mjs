@@ -50,6 +50,13 @@ test("audio files use the compact player while voice messages retain transcripti
     await expect(voice.getByRole("button", { name: "Transcrever áudio" })).toBeVisible();
     await file.getByRole("button", { name: "Reproduzir áudio" }).click();
     await expect(file.getByRole("button", { name: "Pausar áudio" })).toBeVisible();
+    await voice.getByRole("button", { name: "Reproduzir áudio" }).click();
+    await expect(voice.getByRole("button", { name: "Pausar áudio" })).toBeVisible();
+    await expect(file.getByRole("button", { name: "Reproduzir áudio" })).toBeVisible();
+    assert.equal(await file.locator("audio").evaluate(audio => audio.paused), true);
+    await file.getByRole("button", { name: "Reproduzir áudio" }).click();
+    await expect(voice.getByRole("button", { name: "Reproduzir áudio" })).toBeVisible();
+    assert.equal(await voice.locator("audio").evaluate(audio => audio.paused), true);
     await file.getByRole("button", { name: "Pausar áudio" }).click();
     await file.getByRole("slider").focus();
     await page.keyboard.press("Home");

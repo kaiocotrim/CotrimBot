@@ -108,12 +108,19 @@ export function AudioMessage({ mediaUrl, messageId, onTranscribe, variant = "voi
       {/* Áudio real, sem controles nativos */}
       <audio
         ref={audioRef}
+        data-message-audio
         src={mediaUrl}
         preload="metadata"
         onLoadedMetadata={(e) => syncDuration(e.currentTarget)}
         onDurationChange={(e) => syncDuration(e.currentTarget)}
         onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-        onPlay={() => setIsPlaying(true)}
+        onPlay={(event) => {
+          const currentAudio = event.currentTarget;
+          currentAudio.ownerDocument.querySelectorAll<HTMLAudioElement>("audio[data-message-audio]").forEach((audio) => {
+            if (audio !== currentAudio) audio.pause();
+          });
+          setIsPlaying(!currentAudio.paused);
+        }}
         onPause={() => setIsPlaying(false)}
         onEnded={() => {
           setIsPlaying(false);
