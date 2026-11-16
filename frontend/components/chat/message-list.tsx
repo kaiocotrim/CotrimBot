@@ -239,7 +239,7 @@ export function MessageList({ currentUser, contact, contacts, messages, hasOlder
 
   return (
     <GroupMentionContext.Provider value={mentionTargets}>
-    <div className="relative flex min-h-0 flex-1">
+    <div className="relative z-0 flex min-h-0 flex-1">
       <div
         ref={scrollRef}
         data-swipe-back-area
