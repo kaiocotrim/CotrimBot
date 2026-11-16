@@ -887,9 +887,8 @@ export function useChat() {
       senderName: null,
       senderPhone: null,
       senderProfilePictureUrl: null,
-      // A interface assume sucesso imediatamente; a API confirma em segundo
-      // plano e somente uma falha altera o estado visível da mensagem.
-      deliveryStatus: "sent",
+      // O encaminhamento só é confirmado depois da resposta da API.
+      deliveryStatus: "sending",
       clientId: `forwarding:${optimisticId}`,
     };
 

@@ -117,3 +117,30 @@ test("tenta Base64 puro quando a Evolution rejeita a Data URL", { concurrency: f
     }
   }
 });
+
+
+test("encaminha bytes de áudio pela rota WhatsApp e propaga rejeições", { concurrency: false }, async () => {
+  process.env.EVOLUTION_API_URL = "https://evolution.example";
+  process.env.EVOLUTION_API_KEY = "test-key";
+  process.env.EVOLUTION_INSTANCE = "test-instance";
+  let reject = false;
+  globalThis.fetch = async (input, init) => {
+    assert.equal(String(input), "https://evolution.example/message/sendWhatsAppAudio/test-instance");
+    const body = JSON.parse(String(init?.body));
+    assert.equal(body.number, "5511999999999");
+    assert.ok(["data:audio/ogg;base64,AQID", "AQID"].includes(body.audio));
+    assert.equal(body.media, undefined);
+    return reject ? new Response("audio rejected", { status: 500 }) : Response.json({ key: { id: "audio-message" } });
+  };
+  const input = { number: "5511999999999", mediatype: "audio" as const, mimetype: "audio/ogg", media: "AQID", fileName: "audio.ogg" };
+  try {
+    assert.equal((await sendWhatsAppMedia(input)).key.id, "audio-message");
+    reject = true;
+    await assert.rejects(sendWhatsAppMedia(input), /audio rejected/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of Object.entries({ EVOLUTION_API_URL: originalEnvironment.url, EVOLUTION_API_KEY: originalEnvironment.key, EVOLUTION_INSTANCE: originalEnvironment.instance })) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+});

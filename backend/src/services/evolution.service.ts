@@ -447,7 +447,7 @@ export async function sendWhatsAppMedia({
 
   for (const [index, mediaPayload] of mediaPayloads.entries()) {
     const response = await fetch(
-      `${apiUrl}/message/${gifPlayback ? "sendGif" : "sendMedia"}/${instance}`,
+      `${apiUrl}/message/${mediatype === "audio" ? "sendWhatsAppAudio" : gifPlayback ? "sendGif" : "sendMedia"}/${instance}`,
       {
         method: "POST",
         signal: AbortSignal.timeout(15000),
@@ -459,11 +459,15 @@ export async function sendWhatsAppMedia({
 
         body: JSON.stringify({
           number,
-          mediatype,
-          mimetype,
-          media: mediaPayload,
-          fileName,
-          caption,
+          ...(mediatype === "audio" ? {
+            audio: mediaPayload,
+          } : {
+            mediatype,
+            mimetype,
+            media: mediaPayload,
+            fileName,
+            caption,
+          }),
           ...(gifPlayback ? { gifPlayback: true } : {}),
           ...(quoted ? {
             quoted: {
