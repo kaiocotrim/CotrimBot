@@ -1,6 +1,7 @@
 "use client";
 
 import { socket } from "@/lib/socket";
+import { messageMediaUrl } from "@/lib/media-library-api";
 import { useContactAvatars } from "@/hooks/use-contact-avatars";
 import { useEffect, useRef, useState } from "react";
 
@@ -870,7 +871,7 @@ export function useChat() {
   // é reconciliada com o registro definitivo retornado pelo backend.
   function forwardMessage(sourceMessage: Message, target: Contact) {
     const content = sourceMessage.content.trim();
-    if (!content) return;
+    if (!content && sourceMessage.type !== "AUDIO") return;
 
     const optimisticId = nextOptimisticIdRef.current--;
     const optimisticMessage: Message = {
@@ -878,7 +879,7 @@ export function useChat() {
       externalId: `forwarding:${optimisticId}`,
       content,
       direction: "OUTGOING",
-      type: "TEXT",
+      type: sourceMessage.type === "AUDIO" ? "AUDIO" : "TEXT",
       contactId: target.id,
       createdAt: new Date().toISOString(),
       readAt: null,
@@ -910,7 +911,23 @@ export function useChat() {
       return [updatedTarget, ...current.filter((contact) => contact.id !== target.id)];
     });
 
-    void postMessage(target.id, content, optimisticMessage.clientId)
+    const sendForwardedMessage = async () => {
+      if (sourceMessage.type !== "AUDIO") {
+        return postMessage(target.id, content, optimisticMessage.clientId);
+      }
+
+      const response = await fetch(messageMediaUrl(sourceMessage.externalId), { credentials: "include" });
+      if (!response.ok) throw new Error("Não foi possível carregar o áudio para encaminhar.");
+      const audio = await response.blob();
+      if (!audio.size || !audio.type.startsWith("audio/")) {
+        throw new Error("O arquivo recebido não é um áudio válido.");
+      }
+      const extension = audio.type.split(";")[0].split("/")[1];
+      const file = new File([audio], `audio-${sourceMessage.id}.${extension}`, { type: audio.type });
+      return sendMediaRequest(target.id, file, undefined, undefined, false);
+    };
+
+    void sendForwardedMessage()
       .then(({ message }) => {
         const sentMessage = { ...message, clientId: optimisticMessage.clientId, deliveryStatus: "sent" as const };
         const replaceOptimistic = (items: Message[]) => {
