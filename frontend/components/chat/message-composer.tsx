@@ -1,4 +1,6 @@
-﻿"use client";
+"use client";
+
+import { AudioMessage } from "@/components/chat/audio-message";
 
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from "framer-motion";
 import Image from "next/image";
@@ -192,7 +194,7 @@ export function MessageComposer({
   const [isRecording, setIsRecording] =
     useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const [audioLevels, setAudioLevels] = useState([0.2, 0.2, 0.2, 0.2, 0.2]);
+  const [audioLevels, setAudioLevels] = useState<number[]>(Array(48).fill(0));
 
   const mediaRecorderRef =
     useRef<MediaRecorder | null>(null);
@@ -353,7 +355,7 @@ export function MessageComposer({
   const stagePendingFiles = useCallback((files: File[]) => {
     if (!files.length) return;
     const attachments = files.map((file) => {
-      const previewUrl = file.type.startsWith("image/") || (file as GifFile).gifPlayback ? URL.createObjectURL(file) : null;
+      const previewUrl = file.type.startsWith("image/") || file.type.startsWith("audio/") || (file as GifFile).gifPlayback ? URL.createObjectURL(file) : null;
       if (previewUrl) pendingPreviewUrlsRef.current.add(previewUrl);
       return { id: nextAttachmentIdRef.current++, file, previewUrl };
     });
@@ -646,7 +648,7 @@ export function MessageComposer({
     audioContextRef.current = null;
     analyserRef.current = null;
     recordingStartedAtRef.current = null;
-    setAudioLevels([0.2, 0.2, 0.2, 0.2, 0.2]);
+    setAudioLevels(Array(48).fill(0));
 
     setIsRecording(false);
 
@@ -658,17 +660,16 @@ export function MessageComposer({
   useEffect(() => {
     if (!isRecording) return;
     let frame = 0;
-    const data = new Uint8Array(analyserRef.current?.frequencyBinCount ?? 0);
-    const update = () => {
+    const data = new Uint8Array(analyserRef.current?.fftSize ?? 128);
+    let lastSample = 0;
+    const update = (now: number) => {
       const analyser = analyserRef.current;
-      if (analyser && data.length) {
-        analyser.getByteFrequencyData(data);
-        const bands = [0, 2, 5, 9, 14].map((start, index) => {
-          const end = Math.min(data.length, start + (index === 0 ? 3 : 4));
-          const average = data.slice(start, end).reduce((sum, value) => sum + value, 0) / Math.max(1, end - start);
-          return Math.max(0.12, Math.min(1, average / 150));
-        });
-        setAudioLevels(bands);
+      if (analyser && now - lastSample >= 60) {
+        analyser.getByteTimeDomainData(data);
+        const rms = Math.sqrt(data.reduce((sum, value) => sum + ((value - 128) / 128) ** 2, 0) / data.length);
+        const level = Math.min(1, Math.max(0, (rms - 0.008) * 9));
+        setAudioLevels(previous => [...previous.slice(1), level]);
+        lastSample = now;
       }
       if (recordingStartedAtRef.current) setRecordingSeconds(Math.floor((Date.now() - recordingStartedAtRef.current) / 1000));
       frame = requestAnimationFrame(update);
@@ -892,7 +893,7 @@ export function MessageComposer({
                         ease: [0.22, 1, 0.36, 1],
                         layout: { duration: reduceMotion ? 0 : 0.3, ease: [0.22, 1, 0.36, 1] },
                       }}
-                      className={`relative min-h-0 overflow-hidden rounded-[18px] border border-white/10 bg-black/20 ${pendingAttachments.length === 1 ? "h-[clamp(190px,32vh,280px)]" : "h-full"}`}
+                      className={`relative min-h-0 overflow-hidden rounded-[18px] border border-white/10 bg-black/20 ${attachment.file.type.startsWith("audio/") ? "min-h-[96px]" : pendingAttachments.length === 1 ? "h-[clamp(190px,32vh,280px)]" : "h-full"}`}
                     >
                       <motion.span
                         aria-hidden="true"
@@ -901,7 +902,12 @@ export function MessageComposer({
                         transition={{ duration: 0.85, times: [0, 0.3, 1], ease: "easeOut", delay: Math.min(index * 0.045, 0.18) }}
                         className="pointer-events-none absolute inset-0 z-10 rounded-[18px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.42),0_0_22px_rgba(255,255,255,0.1)]"
                       />
-                      {(attachment.file as GifFile).gifPlayback && attachment.previewUrl ? (
+                      {attachment.file.type.startsWith("audio/") && attachment.previewUrl ? (
+                        <div className="flex h-full flex-col justify-center gap-2 px-4 py-4 pr-12">
+                          <span className="text-[11px] font-medium text-zinc-400">Prévia do áudio</span>
+                          <AudioMessage mediaUrl={attachment.previewUrl} messageId={attachment.id} variant="file" />
+                        </div>
+                      ) : (attachment.file as GifFile).gifPlayback && attachment.previewUrl ? (
                         <video src={attachment.previewUrl} autoPlay loop muted playsInline aria-label={`Prévia de ${attachment.file.name}`} className="size-full object-contain p-2" />
                       ) : attachment.previewUrl ? (
                         <>
@@ -1042,10 +1048,27 @@ export function MessageComposer({
               animate={textLayout}
               transition={transition}
               onAnimationComplete={syncTextScroll}
-              className={`pointer-events-none absolute overflow-hidden p-0 text-base leading-6 font-normal whitespace-pre-wrap lg:text-[13.5px] [overflow-wrap:anywhere] ${isPrivateMode ? "text-zinc-900" : "text-white"} ${isLongTextCollapsed ? "invisible" : ""}`}
+              className={`pointer-events-none absolute overflow-hidden p-0 text-base leading-6 font-normal whitespace-pre-wrap lg:text-[13.5px] [overflow-wrap:anywhere] ${isPrivateMode ? "text-zinc-900" : "text-white"} ${isLongTextCollapsed || isRecording ? "invisible" : ""}`}
             >
               <EmojiText content={text ? `${text}\u200b` : ""} preserveMetrics />
             </motion.div>
+            <AnimatePresence>
+              {isRecording && <motion.div
+                key="recording-input"
+                initial={reduceMotion ? false : { opacity: 0, y: 10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: reduceMotion ? 0 : 6 }}
+                transition={{ duration: reduceMotion ? 0 : 0.22 }}
+                className="absolute inset-y-1 left-3 right-12 z-10 flex items-center gap-2 rounded-2xl px-2 text-zinc-400"
+                role="status" aria-label="Gravação em andamento"
+              >
+                <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-red-500" />
+                <span className="text-xs tabular-nums">{formatRecordingTime(recordingSeconds)}</span>
+                <div aria-hidden="true" className="ml-auto flex h-6 w-[min(45%,200px)] min-w-0 items-center justify-end gap-[2px] overflow-hidden">
+                  {audioLevels.map((level, index) => <span key={index} className="w-[2px] shrink-0 rounded-full bg-zinc-300 transition-[height,opacity] duration-75 motion-reduce:transition-none" style={{ height: `${2 + level * 20}px`, opacity: 0.25 + (index / audioLevels.length) * 0.65 }} />)}
+                </div>
+              </motion.div>}
+            </AnimatePresence>
             <motion.textarea
               ref={textareaRef}
               id={textareaId}
@@ -1152,15 +1175,15 @@ export function MessageComposer({
                   event.currentTarget.form?.requestSubmit();
                 }
               }}
-              placeholder={isPrivateMode ? "Digite uma mensagem privada..." : "Digite uma mensagem..."}
-              className={`absolute ${isPrivateMode ? "caret-zinc-900 placeholder:[-webkit-text-fill-color:#71717a]" : "caret-white placeholder:[-webkit-text-fill-color:#a1a1aa]"} ${textClassName} ${isLongTextCollapsed ? "pointer-events-none invisible" : ""}`}
+              placeholder={isRecording ? "" : isPrivateMode ? "Digite uma mensagem privada..." : "Digite uma mensagem..."}
+              className={`absolute ${isPrivateMode ? "caret-zinc-900 placeholder:[-webkit-text-fill-color:#71717a]" : "caret-white placeholder:[-webkit-text-fill-color:#a1a1aa]"} ${textClassName} ${isLongTextCollapsed || isRecording ? "pointer-events-none invisible" : ""}`}
               style={{ color: "transparent", WebkitTextFillColor: "transparent", overflowY: isStacked && measurements.stacked > textHeight ? "auto" : "hidden" }}
             />
 
             <motion.span
               initial={false}
               animate={{
-                opacity: isPrivateMode || !showControls ? 1 : 0,
+                opacity: !isRecording && (isPrivateMode || !showControls) ? 1 : 0,
                 scale: isPrivateMode || !showControls ? 1 : 0.9,
                 left: isMobile ? 12 : isPrivateMode && showControls ? isFocused ? 84 : 46 : 13,
               }}
@@ -1188,7 +1211,7 @@ export function MessageComposer({
                 setAttachmentsOpen((current) => !current);
               }}
               className={`${isMobile ? styles.mobileCircle : "size-8"} absolute border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isPrivateMode ? privateButtonClassName : "border-white/10 bg-white/[0.035]"}`}
-              style={{ pointerEvents: showControls ? "auto" : "none", transformOrigin: "center" }}
+              style={{ visibility: isRecording ? "hidden" : undefined, pointerEvents: showControls ? "auto" : "none", transformOrigin: "center" }}
             >
               <ComposerIcon name="plus" />
             </motion.button>
@@ -1216,7 +1239,7 @@ export function MessageComposer({
                 setEmojisOpen((current) => !current);
               }}
               className={`${isMobile ? styles.mobileEmoji : "border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)]"} absolute size-8 ${buttonClassName} ${isPrivateMode ? privateButtonClassName : isMobile ? "" : "border-white/10 bg-white/[0.035]"}`}
-              style={{ pointerEvents: showEmojis ? "auto" : "none" }}
+              style={{ visibility: isRecording ? "hidden" : undefined, pointerEvents: showEmojis ? "auto" : "none" }}
             >
               <ComposerIcon name={isMobile ? "smile" : "sticker"} />
             </motion.button>
@@ -1267,10 +1290,10 @@ export function MessageComposer({
                 opacity: showMicrophone ? 1 : 0,
                 width: isMobile ? 44 : 32,
                 height: isMobile ? 44 : 32,
-                borderRadius: 999,
+                borderRadius: isRecording ? 24 : 999,
 
                 scale: isRecording
-                  ? [1, 1.08, 1]
+                  ? 1
                   : showMicrophone
                     ? 1
                     : 0.9,
@@ -1278,15 +1301,7 @@ export function MessageComposer({
                 bottom: isMobile ? 0 : controlBottom,
                 right: isMobile ? -mobileRightInset : isStacked ? 52 : 8,
               }}
-              transition={
-                isRecording
-                  ? {
-                    duration: 1.2,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }
-                  : transition
-              }
+              transition={isRecording ? { duration: 0 } : transition}
               aria-label={
                 isRecording
                   ? "Parar gravação"
@@ -1307,8 +1322,8 @@ export function MessageComposer({
                   void startRecording();
                 }
               }}
-              className={`${isMobile ? styles.mobileCircle : ""} absolute border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${buttonClassName} ${isRecording
-                  ? isPrivateMode ? "border-red-600/30 bg-red-500/10 !text-red-700 hover:bg-red-500/15 hover:!text-red-800 focus-visible:!outline-red-600/60" : "border-red-400/40 bg-red-500/20 text-red-300"
+              className={`${isMobile ? styles.mobileCircle : ""} absolute border shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${isRecording ? "z-20 flex items-center justify-center !p-0" : ""} ${buttonClassName} ${isRecording
+                  ? isPrivateMode ? "border-red-600/30 bg-red-500/10 !text-red-700 hover:bg-red-500/15 hover:!text-red-800 focus-visible:!outline-red-600/60" : "border-white/15 bg-zinc-700 text-zinc-200"
                   : isPrivateMode
                     ? privateButtonClassName
                     : "border-white/10 bg-white/[0.035]"
@@ -1320,20 +1335,7 @@ export function MessageComposer({
                 display: isMobile && !showMicrophone ? "none" : undefined,
               }}
             >
-              {isRecording ? (
-                <span className={`flex h-4 items-center gap-[2px] ${isPrivateMode ? "text-red-700" : "text-red-300"}`} aria-label={`Gravando ${formatRecordingTime(recordingSeconds)}`}>
-                  {audioLevels.map((level, index) => (
-                    <span
-                      key={index}
-                      className="w-[2px] rounded-full bg-current transition-[height] duration-75"
-                      style={{ height: `${Math.max(4, Math.round(level * 16))}px` }}
-                    />
-                  ))}
-                  <span className={`pointer-events-none absolute right-full mr-2 min-w-[31px] text-[10px] font-medium tabular-nums ${isPrivateMode ? "text-red-700" : "text-red-200"}`}>{formatRecordingTime(recordingSeconds)}</span>
-                </span>
-              ) : (
-                <ComposerIcon name="mic" />
-              )}
+              {isRecording ? <span aria-hidden="true" className="block size-3 shrink-0 rounded-[2px] bg-zinc-100" /> : <ComposerIcon name="mic" />}
             </motion.button>
             <motion.button
               type="button"
