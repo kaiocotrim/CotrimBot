@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { AppState, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus, type AudioSource } from 'expo-audio';
 import { audioFocus, audioTime } from '../lib/audio-focus';
@@ -49,15 +49,25 @@ export function AudioControl({ source, onLongPress }: { source: AudioSource; onL
   }
   async function seek(seconds: number) { try { await player.seekTo(Math.max(0, Math.min(status.duration, seconds))); } catch { setError('Não foi possível avançar o áudio.'); } }
   const percent = status.duration > 0 ? Math.min(100, status.currentTime / status.duration * 100) : 0;
+  const seekAt = useCallback((x: number) => {
+    if (trackWidth <= 0 || status.duration <= 0) return;
+    void seek(Math.max(0, Math.min(1, x / trackWidth)) * status.duration);
+  }, [status.duration, trackWidth]);
+  const seekResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => status.isLoaded && status.duration > 0,
+    onMoveShouldSetPanResponder: () => status.isLoaded && status.duration > 0,
+    onPanResponderGrant: event => seekAt(event.nativeEvent.locationX),
+    onPanResponderMove: event => seekAt(event.nativeEvent.locationX),
+  }), [seekAt, status.duration, status.isLoaded]);
 
   return <View style={styles.root}>
     <View style={styles.controls}>
       <IconButton name={status.playing ? 'pause' : 'play'} label={status.playing ? 'Pausar áudio' : status.error ? 'Tentar reproduzir áudio novamente' : 'Reproduzir áudio'} busy={starting || status.isBuffering} onLongPress={onLongPress} onPress={() => void toggle()} />
       <View style={styles.timeline}>
-        <Pressable delayLongPress={400} onLongPress={onLongPress ? event => onLongPress({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }) : undefined} accessibilityRole="adjustable" accessibilityLabel="Posição do áudio" accessibilityValue={{ min: 0, max: 100, now: Math.round(percent) }} accessibilityActions={[{ name: 'increment', label: 'Avançar dez segundos' }, { name: 'decrement', label: 'Voltar dez segundos' }]} onAccessibilityAction={event => void seek(status.currentTime + (event.nativeEvent.actionName === 'increment' ? 10 : -10))}
-          disabled={!status.isLoaded || status.duration <= 0} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)} onPress={event => void seek(event.nativeEvent.locationX / trackWidth * status.duration)} style={styles.trackTouch}>
+        <View {...seekResponder.panHandlers} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)} accessibilityRole="adjustable" accessibilityLabel="Posição do áudio" accessibilityValue={{ min: 0, max: 100, now: Math.round(percent) }} accessibilityActions={[{ name: 'increment', label: 'Avançar dez segundos' }, { name: 'decrement', label: 'Voltar dez segundos' }]}
+          onAccessibilityAction={event => void seek(status.currentTime + (event.nativeEvent.actionName === 'increment' ? 10 : -10))} style={styles.trackTouch}>
           <View style={styles.track}><View style={[styles.progress, { width: `${percent}%` }]} /></View>
-        </Pressable>
+        </View>
         <Text style={styles.time}>{audioTime(status.currentTime)} / {audioTime(status.duration)}</Text>
       </View>
       <Pressable delayLongPress={400} onLongPress={onLongPress ? event => onLongPress({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }) : undefined} accessibilityRole="button" accessibilityLabel={`Velocidade ${rate} vezes`} style={styles.speed} onPress={() => { const next = rate === 1 ? 1.5 : rate === 1.5 ? 2 : 1; try { player.setPlaybackRate(next); setRate(next); } catch { setError('Não foi possível alterar a velocidade.'); } }}><Text style={styles.speedText}>{rate}×</Text></Pressable>
