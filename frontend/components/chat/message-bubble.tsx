@@ -28,7 +28,7 @@ import { SharedContactMessage } from "@/components/chat/shared-contact-message";
 import { PollMessage } from "@/components/chat/poll-message";
 import { TextMessage } from "@/components/chat/text-message";
 import { VideoMessage } from "@/components/chat/video-message";
-import { Info, Languages, Pencil } from "lucide-react";
+import { Eye, EyeOff, FileX2, ImageOff, MicOff, VideoOff, Info, Languages, Pencil } from "lucide-react";
 import { EditMessageDialog } from "@/components/chat/edit-message-dialog";
 import { MessageTranslation } from "@/components/chat/message-translation";
 import { useMessageTranslations } from "@/hooks/use-message-translations";
@@ -82,6 +82,7 @@ const messageDateFormatter = new Intl.DateTimeFormat("pt-BR", {
 // Mantém o estilo do balão e delega o conteúdo ao componente de cada tipo.
 export function MessageBubble({ message, quotedMessage, contact, mediaMessages, onReact, onUpdateFlags, onDelete, onEdit, onRequestForward, onReply, onNavigateToMessage, savedContacts, onSaveSharedContact, onMessageSharedContact }: MessageBubbleProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [showDeletedContent, setShowDeletedContent] = useState(false);
   const [editExpired, setEditExpired] = useState(() => Date.now() - new Date(message.createdAt).getTime() >= 15 * 60_000);
   useEffect(() => {
     const remaining = new Date(message.createdAt).getTime() + 15 * 60_000 - Date.now();
@@ -161,7 +162,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           viewOnce={Boolean(message.viewOnce)}
           contact={contact}
           createdAt={message.createdAt}
-          gallery={mediaMessages.filter((media) => media.type === "IMAGE").map((image) => ({
+          gallery={(message.deletedAt ? [] : mediaMessages).filter((media) => media.type === "IMAGE").map((image) => ({
             id: image.id,
             mediaUrl: messageMediaUrl(image.externalId),
             content: image.content,
@@ -179,7 +180,7 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           showSignature={showSignature}
           contact={contact}
           createdAt={message.createdAt}
-          gallery={mediaMessages.map((media) => ({
+          gallery={(message.deletedAt ? [] : mediaMessages).map((media) => ({
             id: media.id,
             type: media.type as "IMAGE" | "VIDEO",
             gifPlayback: Boolean(media.gifPlayback),
@@ -676,7 +677,13 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
           </span>
         </button>
       )}
-      {message.deletedAt ? null : inlineTime ? (
+      {message.deletedAt ? (<AnimatePresence initial={false}>
+        {showDeletedContent && message.type === "TEXT" && <motion.div key="deleted-content"
+          initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.22, ease: "easeOut" }} className="overflow-hidden">
+          <div className="mb-3 border-l-2 border-zinc-500/40 pl-3 pt-1">{content}</div>
+        </motion.div>}
+      </AnimatePresence>) : inlineTime ? (
         <div className="flex min-w-0 items-end gap-2">
           <div className="min-w-0">{content}</div>
           <span className="-mr-1 -mb-1 ml-auto flex shrink-0 items-center gap-0.5">
@@ -700,19 +707,33 @@ export function MessageBubble({ message, quotedMessage, contact, mediaMessages, 
       )}
       {canTranslate && <MessageTranslation translation={translation} lightBackground={isPrivate} onHide={() => hideTranslation(message.id, translationSource)} onRetry={() => void toggleTranslation(message.id, translationSource)} />}
       {message.deletedAt && (
-        <motion.p
-          role="note"
-          initial={reduceMotion ? false : { opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.24, ease: [0.22, 1, 0.36, 1] }}
-          className={`mt-1.5 flex items-center gap-1.5 text-[11px] italic ${isPrivate ? "text-zinc-600" : "text-white/55"}`}
-        >
-          <Trash size={12} weight="regular" aria-hidden="true" />
-          <span>{message.direction === "INCOMING" ? "Apagada pelo usuário" : "Mensagem apagada"}</span>
-        </motion.p>
+        <motion.div layout={!reduceMotion} className="flex min-w-0 flex-col gap-2 py-1">
+          {message.type !== "TEXT" && <div className={`flex min-w-[160px] items-center gap-2.5 py-1 ${isPrivate ? "text-zinc-500" : "text-zinc-400"}`}>
+            <span className={`flex size-8 shrink-0 items-center justify-center rounded-xl border ${isPrivate ? "border-zinc-300 bg-zinc-200/50" : "border-white/[0.06] bg-white/[0.035]"}`}>
+              {message.type === "IMAGE" || message.type === "STICKER" ? <ImageOff size={15} aria-hidden="true" /> : message.type === "VIDEO" ? <VideoOff size={15} aria-hidden="true" /> : message.type === "AUDIO" ? <MicOff size={15} aria-hidden="true" /> : <FileX2 size={15} aria-hidden="true" />}
+            </span>
+            <span className="text-xs font-medium">{message.type === "IMAGE" ? "Foto apagada" : message.type === "VIDEO" ? "V\u00eddeo apagado" : message.type === "AUDIO" ? "\u00c1udio apagado" : message.type === "STICKER" ? "Figurinha apagada" : "Mensagem apagada"}</span>
+          </div>}
+          {message.type === "TEXT" && Boolean(message.content.trim()) && <motion.button
+            type="button" aria-expanded={showDeletedContent}
+            onClick={() => setShowDeletedContent(current => !current)}
+            whileHover={reduceMotion ? undefined : { backgroundColor: "rgba(255,255,255,0.09)" }}
+            whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+            className={`flex w-fit items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-zinc-400 ${isPrivate ? "border-zinc-300 text-zinc-600" : "border-white/[0.08] bg-white/[0.035] text-zinc-300"}`}>
+            <AnimatePresence initial={false} mode="wait">
+              <motion.span key={showDeletedContent ? "hide" : "show"}
+                initial={{ opacity: 0, rotate: reduceMotion ? 0 : -20, scale: reduceMotion ? 1 : 0.7 }}
+                animate={{ opacity: 1, rotate: 0, scale: 1 }} exit={{ opacity: 0, scale: reduceMotion ? 1 : 0.7 }}
+                transition={{ duration: reduceMotion ? 0 : 0.12 }} className="flex">
+                {showDeletedContent ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
+              </motion.span>
+            </AnimatePresence>
+            {showDeletedContent ? "Ocultar mensagem" : "Ver mensagem apagada"}
+          </motion.button>}
+        </motion.div>
       )}
       {!inlineTime && timestamp && (
-        <div className={`flex items-center justify-end gap-0.5 ${isAudioFile ? "mt-2 pt-1" : isSticker ? "absolute right-1 bottom-1 rounded-md bg-black/55 px-1.5 py-0.5 shadow-sm backdrop-blur-sm" : (isImage && !imageHasCaption) || (isVideo && message.content === "[Vídeo]") ? "absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-0.5 shadow-sm backdrop-blur-[2px]" : isImage || isVideo ? "px-2 pt-0.5 pb-1" : "-mr-1 -mb-1 mt-1"}`}>
+        <div className={`flex items-center justify-end gap-0.5 ${message.deletedAt ? "mx-1 mt-1 px-2 pb-2 pt-1" : isAudioFile ? "mt-2 pt-1" : isSticker ? "absolute right-1 bottom-1 rounded-md bg-black/55 px-1.5 py-0.5 shadow-sm backdrop-blur-sm" : (isImage && !imageHasCaption) || (isVideo && message.content === "[Vídeo]") ? "absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-0.5 shadow-sm backdrop-blur-[2px]" : isImage || isVideo ? "px-2 pt-0.5 pb-1" : "-mr-1 -mb-1 mt-1"}`}>
           <AnimatePresence initial={false}>
             {message.pinned && (
               <motion.span key="pinned-footer" initial={reduceMotion ? false : { opacity: 0, rotate: -35, scale: 0.4 }} animate={{ opacity: 1, rotate: 0, scale: 1 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, rotate: 25, scale: 0.5 }} transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 650, damping: 20 }} className="flex text-amber-300" title="Mensagem fixada">
