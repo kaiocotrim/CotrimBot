@@ -85,6 +85,39 @@ export function useChat() {
   const [closing, setClosing] =
     useState(false);
 
+  // O servidor define quais mensagens persistidas pertencem ao histórico atual.
+  // Mantemos localmente apenas envios pendentes/falhos enquanto a API os confirma.
+  function mergeConversationPage(pageMessages: Message[], currentMessages: Message[], localMessages: Message[] = [], preserveOlder = false) {
+    const firstPageId = pageMessages[0]?.id;
+    const olderMessages = preserveOlder && firstPageId
+      ? currentMessages.filter((message) => message.id > 0 && message.id < firstPageId)
+      : [];
+    const pendingMessages = [...currentMessages, ...localMessages].filter((message) =>
+      message.id < 0 || message.deliveryStatus === "sending" || message.deliveryStatus === "failed",
+    );
+    const pageIds = new Set(pageMessages.map((message) => message.id));
+    const pageExternalIds = new Set(pageMessages.map((message) => message.externalId));
+    const pendingOnly = pendingMessages.filter((message) =>
+      !pageIds.has(message.id) && !pageExternalIds.has(message.externalId),
+    );
+    const mergedPage = pageMessages.map((message) => {
+      const pending = pendingMessages.find((item) =>
+        item.id === message.id || item.externalId === message.externalId,
+      );
+      return pending?.clientId ? { ...message, clientId: pending.clientId } : message;
+    });
+    return [...olderMessages, ...mergedPage, ...pendingOnly];
+  }
+
+  function retainPendingMessages(contactId: number, pageMessages: Message[], currentMessages: Message[]) {
+    const pageIds = new Set(pageMessages.map((message) => message.id));
+    const pageExternalIds = new Set(pageMessages.map((message) => message.externalId));
+    const pending = [...currentMessages, ...(forwardedMessagesRef.current.get(contactId) ?? [])]
+      .filter((message) => message.id < 0 || message.deliveryStatus === "sending" || message.deliveryStatus === "failed")
+      .filter((message) => !pageIds.has(message.id) && !pageExternalIds.has(message.externalId));
+    forwardedMessagesRef.current.set(contactId, [...new Map(pending.map((message) => [message.clientId ?? message.externalId, message])).values()]);
+  }
+
 
   // =========================================================
   // NOVAS MENSAGENS VIA WEBSOCKET
@@ -405,22 +438,9 @@ export function useChat() {
         const page = await getMessages(contactId);
         if (selectedContactIdRef.current !== contactId) return;
 
-        const localMessages = forwardedMessagesRef.current.get(contactId) ?? [];
-        const fetchedIds = new Set(page.messages.map((message) => message.id));
-        const fetchedExternalIds = new Set(page.messages.map((message) => message.externalId));
-        const localOnlyMessages = localMessages.filter((message) => !fetchedExternalIds.has(message.externalId));
-        forwardedMessagesRef.current.set(contactId, localOnlyMessages);
-
         setMessages((current) => {
-          const currentById = new Map(current.map((message) => [message.id, message]));
-          const currentByExternalId = new Map(current.map((message) => [message.externalId, message]));
-          const merged = page.messages.map((message) => {
-            const existing = currentById.get(message.id) ?? currentByExternalId.get(message.externalId);
-            return existing?.clientId ? { ...message, clientId: existing.clientId } : message;
-          });
-          const mergedIds = new Set(merged.map((message) => message.id));
-          const mergedExternalIds = new Set(merged.map((message) => message.externalId));
-          return [...merged, ...current.filter((message) => !fetchedIds.has(message.id) && !fetchedExternalIds.has(message.externalId) && !mergedIds.has(message.id) && !mergedExternalIds.has(message.externalId)), ...localOnlyMessages];
+          retainPendingMessages(contactId, page.messages, current);
+          return mergeConversationPage(page.messages, current, forwardedMessagesRef.current.get(contactId), true);
         });
         setHasOlderMessages(page.hasMore);
         await markMessagesAsRead(contactId);
@@ -572,13 +592,8 @@ export function useChat() {
     )
       .then((page) => {
         if (active) {
-          const localMessages = forwardedMessagesRef.current.get(selectedContactId) ?? [];
-          const persistedExternalIds = new Set(page.messages.map((message) => message.externalId));
-          const unpersistedLocalMessages = localMessages.filter(
-            (message) => !persistedExternalIds.has(message.externalId)
-          );
-          forwardedMessagesRef.current.set(selectedContactId, unpersistedLocalMessages);
-          setMessages([...page.messages, ...unpersistedLocalMessages]);
+          retainPendingMessages(selectedContactId, page.messages, []);
+          setMessages(mergeConversationPage(page.messages, [], forwardedMessagesRef.current.get(selectedContactId)));
           setHasOlderMessages(page.hasMore);
         }
 
@@ -620,21 +635,9 @@ export function useChat() {
       try {
         const page = await getMessages(contactId);
         if (!active || selectedContactIdRef.current !== contactId) return;
-        const localMessages = forwardedMessagesRef.current.get(contactId) ?? [];
-        const fetchedIds = new Set(page.messages.map((message) => message.id));
-        const fetchedExternalIds = new Set(page.messages.map((message) => message.externalId));
-        const localOnlyMessages = localMessages.filter((message) => !fetchedExternalIds.has(message.externalId));
-        forwardedMessagesRef.current.set(contactId, localOnlyMessages);
         setMessages((current) => {
-          const currentById = new Map(current.map((message) => [message.id, message]));
-          const currentByExternalId = new Map(current.map((message) => [message.externalId, message]));
-          const merged = page.messages.map((message) => {
-            const existing = currentById.get(message.id) ?? currentByExternalId.get(message.externalId);
-            return existing?.clientId ? { ...message, clientId: existing.clientId } : message;
-          });
-          const mergedIds = new Set(merged.map((message) => message.id));
-          const mergedExternalIds = new Set(merged.map((message) => message.externalId));
-          return [...merged, ...current.filter((message) => !fetchedIds.has(message.id) && !fetchedExternalIds.has(message.externalId) && !mergedIds.has(message.id) && !mergedExternalIds.has(message.externalId)), ...localOnlyMessages];
+          retainPendingMessages(contactId, page.messages, current);
+          return mergeConversationPage(page.messages, current, forwardedMessagesRef.current.get(contactId), true);
         });
         setHasOlderMessages(page.hasMore);
         await markMessagesAsRead(contactId);
