@@ -432,20 +432,41 @@ export function useChat() {
 
     async function refreshOpenConversation() {
       const contactId = selectedContactIdRef.current;
-      if (!contactId || document.visibilityState !== "visible" || !document.hasFocus()) return;
-
       try {
-        const page = await getMessages(contactId);
-        if (selectedContactIdRef.current !== contactId) return;
+        // Reconexões do Socket.IO não recuperam os eventos emitidos durante a
+        // queda. Busca a sidebar para restaurar prévias/contadores e o histórico
+        // da conversa ativa para recuperar todas as mensagens perdidas.
+        const [updatedContacts, page] = await Promise.all([
+          getContacts(),
+          contactId ? getMessages(contactId) : Promise.resolve(null),
+        ]);
+
+        setContacts((current) => {
+          // Preserva mensagens otimistas/falhas locais enquanto aceita os
+          // metadados e contadores atualizados do servidor.
+          return updatedContacts.map((updated) => {
+            const existing = current.find((contact) => contact.id === updated.id);
+            const localMessages = existing?.messages?.filter((message) =>
+              message.id < 0 || message.deliveryStatus === "sending" || message.deliveryStatus === "failed",
+            );
+            return localMessages?.length
+              ? { ...updated, messages: [...(updated.messages ?? []), ...localMessages] }
+              : updated;
+          });
+        });
+
+        if (!page || selectedContactIdRef.current !== contactId) return;
 
         setMessages((current) => {
-          retainPendingMessages(contactId, page.messages, current);
-          return mergeConversationPage(page.messages, current, forwardedMessagesRef.current.get(contactId), true);
+          retainPendingMessages(contactId!, page.messages, current);
+          return mergeConversationPage(page.messages, current, forwardedMessagesRef.current.get(contactId!), true);
         });
         setHasOlderMessages(page.hasMore);
-        await markMessagesAsRead(contactId);
-        const updatedContacts = await getContacts();
-        if (selectedContactIdRef.current === contactId) setContacts(updatedContacts);
+
+        // Só marca como lida quando o usuário está vendo o app e a conversa.
+        if (document.visibilityState === "visible" && document.hasFocus()) {
+          await markMessagesAsRead(contactId!);
+        }
       } catch (error) {
         console.error("Erro ao sincronizar conversa ao voltar para a aba:", error);
       }

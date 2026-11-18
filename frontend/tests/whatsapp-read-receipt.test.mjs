@@ -26,13 +26,16 @@ test("WhatsApp read events turn message checks white and update the conversation
       builder.onResolve({ filter: /^@\/lib\/socket$/ }, args => ({ path: args.path, namespace: "fixture" }));
       builder.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({ contents: `
         const handlers=new Map();export const socket={on(event,callback){if(!handlers.has(event))handlers.set(event,new Set());handlers.get(event).add(callback)},off(event,callback){handlers.get(event)?.delete(callback)},emit(){},connect(){},disconnect(){}};
-        window.receive=(event,payload)=>handlers.get(event)?.forEach(callback=>callback(payload));
+        window.receive=(event,payload)=>handlers.get(event)?.forEach(callback=>callback(payload));\n        window.reconnect=()=>handlers.get("connect")?.forEach(callback=>callback());
         window.readListenerCount=()=>handlers.get("message_read")?.size??0;
       ` }));
     } }],
   });
   const message = { id: 7, externalId: "sent-id", contactId: 1, direction: "OUTGOING", type: "TEXT", content: "Olá", createdAt: "2026-10-21T11:52:00Z", readAt: null, reaction: null };
+  const receivedWhileOffline = { id: 8, externalId: "received-offline-id", contactId: 1, direction: "INCOMING", type: "TEXT", content: "Chegou durante a queda", createdAt: "2026-10-21T11:54:00Z", readAt: null, reaction: null };
   const contact = { id: 1, name: "Cliente", phone: "5511999999999", isGroup: false, unreadCount: 0, messages: [message] };
+  let serverMessages = [message];
+  let serverContact = contact;
   const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL ?? "chrome", headless: true });
   try {
     const page = await browser.newPage();
@@ -40,9 +43,9 @@ test("WhatsApp read events turn message checks white and update the conversation
     page.on("pageerror", error => errors.push(error.message));
     await page.route("http://read-receipt.test/**", route => {
       const url = new URL(route.request().url());
-      if (url.pathname === "/api/contacts") return route.fulfill({ json: [contact] });
+      if (url.pathname === "/api/contacts") return route.fulfill({ json: [serverContact] });
       if (url.pathname === "/api/contacts/1/avatar") return route.fulfill({ json: { profilePictureUrl: null } });
-      if (url.pathname === "/api/contacts/1/messages") return route.fulfill({ json: { messages: [message], hasMore: false } });
+      if (url.pathname === "/api/contacts/1/messages") return route.fulfill({ json: { messages: serverMessages, hasMore: false } });
       if (url.pathname.endsWith("/read") || url.pathname.endsWith("/presence-subscription")) return route.fulfill({ status: 204 });
       return route.fulfill({ contentType: "text/html", body: '<div id="root"></div>' });
     });
@@ -50,6 +53,13 @@ test("WhatsApp read events turn message checks white and update the conversation
     await page.addScriptTag({ content: bundle.outputFiles[0].text });
     await page.waitForFunction(() => window.chat?.contacts.length === 1);
     await page.evaluate(() => window.chat.selectContact(window.chat.contacts[0]));
+    await expect(page.locator('[data-message="7"]')).toHaveCount(1);
+    // The server persists messages while this page is disconnected; no socket event arrives.
+    serverMessages = [message, receivedWhileOffline];
+    serverContact = { ...contact, unreadCount: 1, messages: [receivedWhileOffline] };
+    await page.evaluate(() => window.reconnect());
+    await expect(page.locator('[data-message="8"]')).toHaveCount(1);
+    await expect.poll(() => page.evaluate(() => window.chat.contacts[0].messages[0].id)).toBe(8);
     const receipt = page.locator('[data-message="7"] [aria-label="Mensagem enviada"]');
     await expect(receipt).toHaveClass(/text-white\/50/);
     await page.evaluate(() => window.receive("message_read", { messageId: 99, readAt: "2026-10-21T11:53:00Z" }));
@@ -57,7 +67,7 @@ test("WhatsApp read events turn message checks white and update the conversation
     await page.waitForTimeout(100);
     await page.evaluate(() => window.receive("message_read", { messageId: 7, readAt: "2026-10-21T11:53:00Z" }));
     await expect(page.locator('[data-message="7"] [aria-label="Mensagem visualizada"]')).toHaveClass(/\btext-white\b/);
-    await expect.poll(() => page.evaluate(() => window.chat.contacts[0].messages[0].readAt)).toBe("2026-10-21T11:53:00Z");
+    await expect.poll(() => page.evaluate(() => window.chat.messages.find(message => message.id === 7)?.readAt)).toBe("2026-10-21T11:53:00Z");
     // Uma confirmação posterior deve atualizar o GIF existente, sem duplicar
     // o balão nem apagar a confirmação de leitura já recebida.
     await page.evaluate(({ message, contact }) => window.receive("new_message", { message: { ...message, type: "VIDEO", content: "[GIF]", gifPlayback: true }, contact }), { message, contact });
