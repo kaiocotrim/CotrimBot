@@ -55,9 +55,11 @@ test("WhatsApp read events turn message checks white and update the conversation
     await page.evaluate(() => window.chat.selectContact(window.chat.contacts[0]));
     await expect(page.locator('[data-message="7"]')).toHaveCount(1);
     // The server persists messages while this page is disconnected; no socket event arrives.
+    await page.context().setOffline(true);
     serverMessages = [message, receivedWhileOffline];
     serverContact = { ...contact, unreadCount: 1, messages: [receivedWhileOffline] };
-    await page.evaluate(() => window.reconnect());
+    await page.context().setOffline(false);
+    await page.evaluate(() => window.dispatchEvent(new Event("online")));
     await expect(page.locator('[data-message="8"]')).toHaveCount(1);
     await expect.poll(() => page.evaluate(() => window.chat.contacts[0].messages[0].id)).toBe(8);
     const receipt = page.locator('[data-message="7"] [aria-label="Mensagem enviada"]');

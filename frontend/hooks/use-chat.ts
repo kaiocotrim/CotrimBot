@@ -430,7 +430,11 @@ export function useChat() {
     socket.on("contact_updated", handleContactUpdated);
     socket.on("contact_presence", handleContactPresence);
 
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let refreshing = false;
     async function refreshOpenConversation() {
+      if (refreshing) return;
+      refreshing = true;
       const contactId = selectedContactIdRef.current;
       try {
         // Reconexões do Socket.IO não recuperam os eventos emitidos durante a
@@ -469,9 +473,18 @@ export function useChat() {
         }
       } catch (error) {
         console.error("Erro ao sincronizar conversa ao voltar para a aba:", error);
+        if (!retryTimer && navigator.onLine) {
+          retryTimer = setTimeout(() => {
+            retryTimer = null;
+            void refreshOpenConversation();
+          }, 2000);
+        }
+      } finally {
+        refreshing = false;
       }
     }
     socket.on("connect", refreshOpenConversation);
+    window.addEventListener("online", refreshOpenConversation);
 
 
     // Remove o listener quando
@@ -492,6 +505,8 @@ export function useChat() {
       socket.off("contact_updated", handleContactUpdated);
       socket.off("contact_presence", handleContactPresence);
       socket.off("connect", refreshOpenConversation);
+      window.removeEventListener("online", refreshOpenConversation);
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [selectedContact]);
 
