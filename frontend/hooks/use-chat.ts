@@ -397,6 +397,41 @@ export function useChat() {
     socket.on("contact_updated", handleContactUpdated);
     socket.on("contact_presence", handleContactPresence);
 
+    async function refreshOpenConversation() {
+      const contactId = selectedContactIdRef.current;
+      if (!contactId || document.visibilityState !== "visible" || !document.hasFocus()) return;
+
+      try {
+        const page = await getMessages(contactId);
+        if (selectedContactIdRef.current !== contactId) return;
+
+        const localMessages = forwardedMessagesRef.current.get(contactId) ?? [];
+        const fetchedIds = new Set(page.messages.map((message) => message.id));
+        const fetchedExternalIds = new Set(page.messages.map((message) => message.externalId));
+        const localOnlyMessages = localMessages.filter((message) => !fetchedExternalIds.has(message.externalId));
+        forwardedMessagesRef.current.set(contactId, localOnlyMessages);
+
+        setMessages((current) => {
+          const currentById = new Map(current.map((message) => [message.id, message]));
+          const currentByExternalId = new Map(current.map((message) => [message.externalId, message]));
+          const merged = page.messages.map((message) => {
+            const existing = currentById.get(message.id) ?? currentByExternalId.get(message.externalId);
+            return existing?.clientId ? { ...message, clientId: existing.clientId } : message;
+          });
+          const mergedIds = new Set(merged.map((message) => message.id));
+          const mergedExternalIds = new Set(merged.map((message) => message.externalId));
+          return [...merged, ...current.filter((message) => !fetchedIds.has(message.id) && !fetchedExternalIds.has(message.externalId) && !mergedIds.has(message.id) && !mergedExternalIds.has(message.externalId)), ...localOnlyMessages];
+        });
+        setHasOlderMessages(page.hasMore);
+        await markMessagesAsRead(contactId);
+        const updatedContacts = await getContacts();
+        if (selectedContactIdRef.current === contactId) setContacts(updatedContacts);
+      } catch (error) {
+        console.error("Erro ao sincronizar conversa ao voltar para a aba:", error);
+      }
+    }
+    socket.on("connect", refreshOpenConversation);
+
 
     // Remove o listener quando
     // o effect for recriado/desmontado.
@@ -415,6 +450,7 @@ export function useChat() {
       socket.off("group_sender_updated", handleGroupSenderUpdated);
       socket.off("contact_updated", handleContactUpdated);
       socket.off("contact_presence", handleContactPresence);
+      socket.off("connect", refreshOpenConversation);
     };
   }, [selectedContact]);
 
@@ -582,6 +618,25 @@ export function useChat() {
     async function markVisibleConversationRead() {
       if (document.visibilityState !== "visible" || !document.hasFocus()) return;
       try {
+        const page = await getMessages(contactId);
+        if (!active || selectedContactIdRef.current !== contactId) return;
+        const localMessages = forwardedMessagesRef.current.get(contactId) ?? [];
+        const fetchedIds = new Set(page.messages.map((message) => message.id));
+        const fetchedExternalIds = new Set(page.messages.map((message) => message.externalId));
+        const localOnlyMessages = localMessages.filter((message) => !fetchedExternalIds.has(message.externalId));
+        forwardedMessagesRef.current.set(contactId, localOnlyMessages);
+        setMessages((current) => {
+          const currentById = new Map(current.map((message) => [message.id, message]));
+          const currentByExternalId = new Map(current.map((message) => [message.externalId, message]));
+          const merged = page.messages.map((message) => {
+            const existing = currentById.get(message.id) ?? currentByExternalId.get(message.externalId);
+            return existing?.clientId ? { ...message, clientId: existing.clientId } : message;
+          });
+          const mergedIds = new Set(merged.map((message) => message.id));
+          const mergedExternalIds = new Set(merged.map((message) => message.externalId));
+          return [...merged, ...current.filter((message) => !fetchedIds.has(message.id) && !fetchedExternalIds.has(message.externalId) && !mergedIds.has(message.id) && !mergedExternalIds.has(message.externalId)), ...localOnlyMessages];
+        });
+        setHasOlderMessages(page.hasMore);
         await markMessagesAsRead(contactId);
         const updatedContacts = await getContacts();
         if (active) setContacts(updatedContacts);
