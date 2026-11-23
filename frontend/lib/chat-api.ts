@@ -219,6 +219,11 @@ export async function postMessage(contactId: number, text: string, clientId?: st
   return parseResponse<{ message: Message }>(response, "Erro ao enviar mensagem");
 }
 
+export async function postContact(contactId: number, sharedContactIds: number[]): Promise<{ message: Message }> {
+  const response = await fetch(`${API_URL}/contacts/${contactId}/send-contact`, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ sharedContactIds }) });
+  return parseResponse<{ message: Message }>(response, "N?o foi poss?vel enviar o contato");
+}
+
 export async function postPoll(contactId: number, poll: Poll): Promise<{ message: Message }> {
   const response = await fetch(`${API_URL}/contacts/${contactId}/send-poll`, {
     method: "POST",

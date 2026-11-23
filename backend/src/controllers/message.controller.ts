@@ -15,6 +15,7 @@ import {
   getProfilePicture,
   sendWhatsAppReaction,
   sendWhatsAppMessage,
+  sendWhatsAppContact,
   sendWhatsAppMedia
 } from "../services/evolution.service.js";
 
@@ -559,6 +560,30 @@ export async function transcribeMessage(
  * Evolution API: route -> controller -> service -> Evolution API. Depois que a
  * Evolution confirma o envio, o controller usa o Prisma para persistir a mensagem.
  */
+export async function sendContactToContact(req: Request, res: Response) {
+  const contactId = Number(req.params.id);
+  const ids = req.body?.sharedContactIds;
+  if (!Number.isSafeInteger(contactId) || contactId <= 0 || !Array.isArray(ids) || !ids.length || ids.length > 100 || ids.some((id: unknown) => !Number.isSafeInteger(id) || Number(id) <= 0) || new Set(ids).size !== ids.length) return res.status(400).json({ message: "Selecao de contatos invalida" });
+  const [recipient, shared] = await Promise.all([prisma.contact.findUnique({ where: { id: contactId } }), prisma.contact.findMany({ where: { id: { in: ids }, isSaved: true, isGroup: false } })]);
+  if (!recipient || shared.length !== ids.length) return res.status(404).json({ message: "Contato nao encontrado" });
+  const byId = new Map(shared.map((item) => [item.id, item]));
+  const selected = ids.map((id: number) => byId.get(id)!);
+  const cards = selected.map((item) => ({ name: contactDisplayName(item).trim().slice(0, 191), phone: item.phone.replace(/\D/g, "") }));
+  if (cards.some((card) => !card.name || !/^\d{7,15}$/.test(card.phone))) return res.status(400).json({ message: "Telefone do contato invalido" });
+  try {
+    const result = await sendWhatsAppContact(recipient.phone, cards);
+    const externalId = result.key?.id;
+    if (!externalId) throw new Error("A Evolution nao retornou o ID da mensagem");
+    const data = { content: cards.map((card) => `${card.name}: +${card.phone}`).join("\n"), type: "CONTACT" as const, sharedContacts: cards, sentByUserId: req.user!.id };
+    const message = await prisma.message.upsert({ where: { externalId }, update: data, create: { ...data, externalId, direction: "OUTGOING", contactId }, include: sentByUserInclude });
+    getSocketServer().emit("new_message", { message, contact: { ...recipient, name: contactDisplayName(recipient) } });
+    return res.status(201).json({ message });
+  } catch (error) {
+    console.error("Erro ao enviar contato:", error);
+    return res.status(502).json({ message: "Nao foi possivel enviar os contatos. Tente novamente." });
+  }
+}
+
 export async function sendMessageToContact(req: Request, res: Response) {
   // O parâmetro :id identifica no banco qual contato receberá a mensagem.
   const contactId = Number(req.params.id);

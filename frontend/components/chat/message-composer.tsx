@@ -44,6 +44,7 @@ type MessageComposerProps = {
   onSend: (options: { private: boolean; includeSignature: boolean; mentionedUserIds?: string[] }) => void;
   onCloseWithBot: () => void;
   onSendPoll?: (poll: Poll) => Promise<void>;
+  onChooseContact?: () => void;
   allowCloseWithBot?: boolean;
   focusRequestKey: number | string;
   replyingTo: (Pick<Message, "id" | "type" | "content" | "direction" | "senderName" | "private"> & { externalId?: string }) | null;
@@ -148,6 +149,7 @@ export function MessageComposer({
   allowCloseWithBot = true,
   onSendMedia,
   onSendPoll,
+  onChooseContact,
   focusRequestKey,
   replyingTo,
   onCancelReply,
@@ -699,6 +701,7 @@ export function MessageComposer({
 
   function selectAttachment(kind: AttachmentKind) {
     if (sending) return;
+    if (kind === "contact") { closeAttachments(); onChooseContact?.(); return; }
     if (kind === "poll") {
       closeAttachments();
       setPollOpen(true);
@@ -706,7 +709,7 @@ export function MessageComposer({
     }
     const input = fileInputRef.current;
     if (!input || sending) return;
-    const accept: Record<Exclude<AttachmentKind, "poll">, string> = {
+    const accept: Record<Exclude<AttachmentKind, "poll" | "contact">, string> = {
       document: ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip",
       video: "video/*",
       image: "image/*",

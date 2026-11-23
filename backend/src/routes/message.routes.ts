@@ -24,6 +24,7 @@ import {
   reactToMessage,
   sendMediaToContact,
   sendMessageToContact,
+  sendContactToContact,
   transcribeMessage,
   updateMessageFlags,
 } from "../controllers/message.controller.js";
@@ -50,6 +51,7 @@ messageRouter.get("/contacts/:id/messages/favorites", getFavoriteMessages);
  */
 messageRouter.post("/contacts/:id/send", sendMessageToContact);
 messageRouter.post("/contacts/:id/send-poll", sendPoll);
+messageRouter.post("/contacts/:id/send-contact", sendContactToContact);
 messageRouter.get("/messages/:id/poll", getPollResults);
 messageRouter.get("/messages/:id/poll/voter-avatar", getPollVoterAvatar);
 messageRouter.put("/messages/:id/poll/vote", voteOnPoll);

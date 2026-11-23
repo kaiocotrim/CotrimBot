@@ -14,6 +14,7 @@ import {
   markMessagesAsRead,
   postMessage,
   postPoll,
+  postContact,
   reactToMessage as reactToMessageRequest,
   saveContact as saveContactRequest,
   startContactConversation as startContactConversationRequest,
@@ -1072,6 +1073,17 @@ export function useChat() {
   //
   // O useChat sabe qual contato está aberto,
   // então consegue descobrir para quem enviar.
+  async function sendSharedContact(sharedContactIds: number[]) {
+    if (!selectedContact || sending) throw new Error("Aguarde o envio atual.");
+    const contactId = selectedContact.id;
+    setSending(true);
+    try {
+      const { message } = await postContact(contactId, sharedContactIds);
+      if (selectedContactIdRef.current === contactId) setMessages((current) => current.some((item) => item.externalId === message.externalId) ? current : [...current, message]);
+      setContacts((current) => current.map((item) => item.id === contactId ? { ...item, messages: [message] } : item));
+    } finally { setSending(false); }
+  }
+
   async function sendPoll(poll: Poll) {
     if (!selectedContact || sending) throw new Error("Aguarde o envio atual antes de enviar a enquete.");
     const contactId = selectedContact.id;
@@ -1287,6 +1299,7 @@ export function useChat() {
     // Envio de arquivo
     sendMediaMessage,
     sendPoll,
+    sendSharedContact,
     updateMessageFlags,
     deleteMessage,
     editMessage,

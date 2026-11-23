@@ -668,3 +668,17 @@ export async function updateWhatsAppCallSettings(
 
   return confirmed;
 }
+
+export async function sendWhatsAppContact(number: string, contacts: { name: string; phone: string }[]) {
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE;
+  if (!apiUrl || !apiKey || !instance) throw new Error("Configura??o da Evolution API incompleta");
+  const response = await fetch(`${apiUrl}/message/sendContact/${instance}`, {
+    method: "POST", signal: AbortSignal.timeout(15000),
+    headers: { "Content-Type": "application/json", apikey: apiKey },
+    body: JSON.stringify({ number, contact: contacts.map((contact) => ({ fullName: contact.name, wuid: contact.phone, phoneNumber: `+${contact.phone}` })) }),
+  });
+  if (!response.ok) throw new Error(`Erro ao enviar contato pela Evolution: ${await response.text()}`);
+  return response.json() as Promise<{ key?: { id?: string } }>;
+}

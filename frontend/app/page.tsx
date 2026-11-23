@@ -223,6 +223,7 @@ function AuthenticatedHome({ session }: { session: NonNullable<ReturnType<typeof
           onForwardMessage={chat.forwardMessage}
           onSendMedia={chat.sendMediaMessage}
           onSendPoll={chat.sendPoll}
+          onSendSharedContact={chat.sendSharedContact}
           onCloseWithBot={chat.closeWithBot}
           onSelectContact={selectContact}
           onSaveContact={chat.saveContact}

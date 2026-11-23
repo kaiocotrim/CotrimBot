@@ -3,13 +3,14 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState, type RefObject } from "react";
 
-export type AttachmentKind = "document" | "video" | "image" | "audio" | "poll";
+export type AttachmentKind = "document" | "video" | "image" | "audio" | "poll" | "contact";
 
 const options: { kind: AttachmentKind; label: string; color: string; path: string }[] = [
   { kind: "document", label: "Documento", color: "#60a5fa", path: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6ZM14 2v6h6M8 13h8M8 17h6" },
   { kind: "video", label: "Vídeo", color: "#c4b5fd", path: "M4 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2ZM16 10l6-4v12l-6-4" },
   { kind: "image", label: "Imagem", color: "#fbbf24", path: "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2ZM3 16l5-5 4 4 3-3 6 6M8 7h.01" },
   { kind: "audio", label: "Áudio", color: "#34d399", path: "M9 18V5l12-2v13M9 8l12-2M9 18a3 3 0 1 1-3-3c1.66 0 3 1.34 3 3ZM21 16a3 3 0 1 1-3-3c1.66 0 3 1.34 3 3Z" },
+  { kind: "contact", label: "Contato", color: "#2dd4bf", path: "M15 18H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v8M9 10a2 2 0 1 0 4 0 2 2 0 0 0-4 0ZM7 16c.6-1.4 1.8-2 4-2m5 5 2 2 4-4" },
   { kind: "poll", label: "Enquete", color: "#f472b6", path: "M4 20V10M10 20V4M16 20v-7M22 20H2" },
 ];
 
@@ -73,7 +74,7 @@ export function AttachmentMenu({ open, triggerRef, onClose, onSelect, closing, o
   }, [open, onClose, triggerRef]);
 
   if (mobile) {
-    const mobileOptions = [...visibleOptions].sort((a, b) => ["image", "video", "audio", "document", "poll"].indexOf(a.kind) - ["image", "video", "audio", "document", "poll"].indexOf(b.kind));
+    const mobileOptions = [...visibleOptions].sort((a, b) => ["image", "video", "audio", "document", "contact", "poll"].indexOf(a.kind) - ["image", "video", "audio", "document", "contact", "poll"].indexOf(b.kind));
     return (
       <AnimatePresence>
         {open && (

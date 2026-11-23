@@ -51,6 +51,7 @@ type ChatPanelProps = {
 
   onCloseWithBot: () => void;
   onSendPoll: (poll: Poll) => Promise<void>;
+  onSendSharedContact: (sharedContactIds: number[]) => Promise<void>;
   onSelectContact: (contact: Contact) => void;
   onSaveContact: (name: string, phone: string, companyName: string, jobTitle?: string) => Promise<Contact[]>;
   onSaveSharedContact: (name: string, phone: string) => Promise<void>;
@@ -90,6 +91,7 @@ export function ChatPanel({
   onForwardMessage,
   onSendMedia,
   onSendPoll,
+  onSendSharedContact,
   onCloseWithBot,
   onSelectContact,
   onSaveContact,
@@ -133,6 +135,11 @@ export function ChatPanel({
   const [selectionBusy, setSelectionBusy] = useState(false);
   const [deleteSelectionOpen, setDeleteSelectionOpen] = useState(false);
   const [deleteSelectionError, setDeleteSelectionError] = useState<string | null>(null);
+  const [contactPickerOpen, setContactPickerOpen] = useState(false);
+  const [contactPickerQuery, setContactPickerQuery] = useState("");
+  const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(() => new Set());
+  const [contactPickerBusy, setContactPickerBusy] = useState(false);
+  const [contactPickerError, setContactPickerError] = useState<string | null>(null);
   const [forwardOpen, setForwardOpen] = useState(false);
   const [forwardQuery, setForwardQuery] = useState("");
   const [forwardTargetIds, setForwardTargetIds] = useState<Set<number>>(() => new Set());
@@ -159,6 +166,7 @@ export function ChatPanel({
     if (!query) return savedContacts;
     return savedContacts.filter((item) => `${item.name} ${item.phone} ${item.companyName ?? ""} ${item.jobTitle ?? ""}`.toLocaleLowerCase("pt-BR").includes(query));
   }, [contacts, forwardQuery]);
+  const shareableContacts = contacts.filter((item) => item.isSaved && !item.isGroup && `${item.name} ${item.phone}`.toLocaleLowerCase("pt-BR").includes(contactPickerQuery.toLocaleLowerCase("pt-BR"))).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   const activeReply = replyingTo?.contactId === contact?.id ? replyingTo : null;
 
   function replyToMessage(message: Message) {
@@ -514,6 +522,7 @@ export function ChatPanel({
             sending={sending}
             closing={closing}
             onSendPoll={onSendPoll}
+            onChooseContact={() => { setContactPickerQuery(""); setSelectedContactIds(new Set()); setContactPickerError(null); setContactPickerOpen(true); }}
             typingLabel={typingLabel}
             typingMembers={typingMembers}
             onStopTyping={() => sendTyping(false)}
@@ -535,6 +544,15 @@ export function ChatPanel({
             onCancelReply={() => setReplyingTo(null)}
           />
 
+          {contactPickerOpen && <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/65 p-3 backdrop-blur-[2px] sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !contactPickerBusy) setContactPickerOpen(false); }}>
+            <div role="dialog" aria-modal="true" aria-label="Enviar contatos" className="flex h-[min(740px,90dvh)] w-full max-w-[420px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#111] text-zinc-100 shadow-2xl">
+              <div className="flex h-16 shrink-0 items-center gap-3 border-b border-white/[0.07] px-4"><button type="button" aria-label="Fechar" onClick={() => setContactPickerOpen(false)} disabled={contactPickerBusy} className="flex size-9 items-center justify-center rounded-full text-zinc-400 hover:bg-white/[0.07] hover:text-white focus-visible:outline-2 focus-visible:outline-white/50"><X className="size-5" /></button><h2 className="text-base font-semibold">Enviar contatos</h2></div>
+              <div className="mx-4 mt-4 mb-3 flex h-11 items-center gap-3 rounded-xl border border-white/15 bg-white/[0.04] px-3 text-zinc-500 focus-within:border-white/40 focus-within:bg-white/[0.06]"><Search className="size-4 shrink-0" /><input autoFocus aria-label="Pesquisar nome ou número" placeholder="Pesquisar nome ou número" value={contactPickerQuery} onChange={(event) => setContactPickerQuery(event.target.value)} className="w-full bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-500" /></div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{shareableContacts.length > 0 && <p className="px-3 py-3 text-xs font-medium text-zinc-500">Contatos</p>}{shareableContacts.map((item) => <label key={item.id} className="flex min-h-[64px] cursor-pointer items-center gap-3 rounded-xl px-3 transition-colors hover:bg-white/[0.05] has-[:checked]:bg-white/[0.09]"><input type="checkbox" disabled={contactPickerBusy} checked={selectedContactIds.has(item.id)} onChange={() => setSelectedContactIds((current) => { const next = new Set(current); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; })} className="size-5 shrink-0 accent-zinc-100" /><Avatar contact={item} className="size-11" /><span className="min-w-0"><span className="block truncate text-sm font-medium">{item.name}</span>{item.jobTitle && <span className="block truncate text-xs text-zinc-500">{item.jobTitle}</span>}</span></label>)}{!shareableContacts.length && <p className="p-3 text-sm text-zinc-400">Nenhum contato salvo encontrado.</p>}</div>
+              {contactPickerError && <p role="alert" className="mt-2 text-sm text-red-300">{contactPickerError}</p>}
+              <div className="flex items-center justify-between border-t border-white/[0.07] px-4 py-3"><span className="text-xs text-zinc-400">{selectedContactIds.size} selecionado{selectedContactIds.size === 1 ? "" : "s"}</span><button type="button" disabled={!selectedContactIds.size || contactPickerBusy} onClick={async () => { setContactPickerBusy(true); setContactPickerError(null); try { await onSendSharedContact([...selectedContactIds]); setContactPickerOpen(false); } catch (error) { setContactPickerError(error instanceof Error ? error.message : "Falha ao enviar contatos."); } finally { setContactPickerBusy(false); } }} className="rounded-lg border border-white/15 bg-white/[0.09] px-5 py-2 text-sm font-medium text-zinc-100 hover:bg-white/[0.15] disabled:cursor-not-allowed disabled:opacity-40">{contactPickerBusy ? "Enviando..." : "Enviar"}</button></div>
+            </div>
+          </div>}
           <AnimatePresence>
             {forwardOpen && (
               <motion.div
